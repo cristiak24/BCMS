@@ -1,0 +1,13 @@
+{
+  "name": "bcms-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=apps/server\" \"npm run start --workspace=apps/client\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.0"
+  }
+}
