@@ -9,6 +9,7 @@ export const users = pgTable('users', {
     passwordHash: text('password_hash').notNull(),
     name: varchar('name', { length: 255 }).notNull(),
     role: roleEnum('role').default('coach').notNull(),
+    status: statusEnum('status').default('pending').notNull(),
 });
 
 export const players = pgTable('players', {

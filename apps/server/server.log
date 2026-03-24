@@ -1,0 +1,645 @@
+
+> server@1.0.0 dev
+> tsx watch src/index.ts
+
+[dotenv@17.3.1] injecting env (2) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+Registering routes...
+Routes registered.
+Server is running on port 3000
+[Request] POST /api/auth/login
+Login error: DrizzleQueryError: Failed query: select "id", "email", "password_hash", "name", "role", "status" from "users" where "users"."email" = $1 limit $2
+params: admin@test.com,1
+    at NeonHttpPreparedQuery.queryWithCache (/Users/baramariuscristianvalentin/BCMS/apps/server/node_modules/src/pg-core/session.ts:73:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async NeonHttpPreparedQuery.execute (/Users/baramariuscristianvalentin/BCMS/apps/server/node_modules/src/neon-http/session.ts:83:18)
+    at async <anonymous> (/Users/baramariuscristianvalentin/BCMS/apps/server/src/routes/auth.ts:32:24) {
+  query: 'select "id", "email", "password_hash", "name", "role", "status" from "users" where "users"."email" = $1 limit $2',
+  params: [ 'admin@test.com', 1 ],
+  cause: NeonDbError: column "status" does not exist
+      at mr.execute (/Users/baramariuscristianvalentin/BCMS/node_modules/@neondatabase/serverless/index.js:1300:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async <anonymous> (/Users/baramariuscristianvalentin/BCMS/apps/server/node_modules/src/neon-http/session.ts:84:11)
+      at async NeonHttpPreparedQuery.queryWithCache (/Users/baramariuscristianvalentin/BCMS/apps/server/node_modules/src/pg-core/session.ts:71:12)
+      at async NeonHttpPreparedQuery.execute (/Users/baramariuscristianvalentin/BCMS/apps/server/node_modules/src/neon-http/session.ts:83:18)
+      at async <anonymous> (/Users/baramariuscristianvalentin/BCMS/apps/server/src/routes/auth.ts:32:24) {
+    severity: 'ERROR',
+    code: '42703',
+    detail: undefined,
+    hint: undefined,
+    position: '56',
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'parse_relation.c',
+    line: '3716',
+    routine: 'errorMissingColumn',
+    sourceError: undefined
+  }
+}
+[Request] POST /api/auth/signup
+[Request] POST /api/auth/login
+[Request] GET /api/finance/documents
+[Request] GET /api/finance/documents
+[Request] GET /api/users/[id]
+DrizzleQueryError: Failed query: select "id", "email", "name", "role" from "users" where "users"."id" = $1 limit $2
+params: NaN,1
+    at NeonHttpPreparedQuery.queryWithCache (/Users/baramariuscristianvalentin/BCMS/apps/server/node_modules/src/pg-core/session.ts:73:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async NeonHttpPreparedQuery.execute (/Users/baramariuscristianvalentin/BCMS/apps/server/node_modules/src/neon-http/session.ts:83:18)
+    at async <anonymous> (/Users/baramariuscristianvalentin/BCMS/apps/server/src/routes/users.ts:28:22) {
+  query: 'select "id", "email", "name", "role" from "users" where "users"."id" = $1 limit $2',
+  params: [ NaN, 1 ],
+  cause: NeonDbError: invalid input syntax for type integer: "NaN"
+      at mr.execute (/Users/baramariuscristianvalentin/BCMS/node_modules/@neondatabase/serverless/index.js:1300:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async <anonymous> (/Users/baramariuscristianvalentin/BCMS/apps/server/node_modules/src/neon-http/session.ts:84:11)
+      at async NeonHttpPreparedQuery.queryWithCache (/Users/baramariuscristianvalentin/BCMS/apps/server/node_modules/src/pg-core/session.ts:71:12)
+      at async NeonHttpPreparedQuery.execute (/Users/baramariuscristianvalentin/BCMS/apps/server/node_modules/src/neon-http/session.ts:83:18)
+      at async <anonymous> (/Users/baramariuscristianvalentin/BCMS/apps/server/src/routes/users.ts:28:22) {
+    severity: 'ERROR',
+    code: '22P02',
+    detail: undefined,
+    hint: undefined,
+    position: undefined,
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: "unnamed portal parameter $1 = '...'",
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'numutils.c',
+    line: '616',
+    routine: 'pg_strtoint32_safe',
+    sourceError: undefined
+  }
+}
+[Request] GET /api/users
+[Request] GET /api/users/1
+[Request] GET /api/admin/requests
+[Request] GET /api/admin/requests
+[Request] GET /api/admin/requests
+[Request] GET /api/admin/requests
+[Request] GET /api/admin/requests
+[Request] GET /api/admin/requests
+12:28:42 AM [tsx] unlink in ./../../node_modules/dotenv/lib/main.js Restarting...
+cnode:internal/modules/cjs/loader:1421
+  const err = new Error(message);
+              ^
+
+Error: Cannot find module 'ms'
+Require stack:
+- /Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/common.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/node.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/index.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/express/node_modules/finalhandler/index.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/express/lib/application.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/express/lib/express.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/express/index.js
+- /Users/baramariuscristianvalentin/BCMS/apps/server/src/index.ts
+    at node:internal/modules/cjs/loader:1421:15
+    at nextResolveSimple (/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:4:1004)
+    at /Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:3:2630
+    at /Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:3:1542
+    at resolveTsPaths (/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:4:760)
+    at /Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:4:1102
+    at m._resolveFilename (file:///Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-B7jrtLTO.mjs:1:789)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/common.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/node.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/index.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/express/node_modules/finalhandler/index.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/express/lib/application.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/express/lib/express.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/express/index.js',
+    '/Users/baramariuscristianvalentin/BCMS/apps/server/src/index.ts'
+  ]
+}
+
+Node.js v24.11.1
+12:28:43 AM [tsx] unlink in ./../../node_modules/@neondatabase/serverless/index.js Rerunning...
+cnode:internal/modules/cjs/loader:1421
+  const err = new Error(message);
+              ^
+
+Error: Cannot find module 'ms'
+Require stack:
+- /Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/common.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/node.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/index.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/express/node_modules/finalhandler/index.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/express/lib/application.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/express/lib/express.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/express/index.js
+- /Users/baramariuscristianvalentin/BCMS/apps/server/src/index.ts
+    at node:internal/modules/cjs/loader:1421:15
+    at nextResolveSimple (/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:4:1004)
+    at /Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:3:2630
+    at /Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:3:1542
+    at resolveTsPaths (/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:4:760)
+    at /Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:4:1102
+    at m._resolveFilename (file:///Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-B7jrtLTO.mjs:1:789)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/common.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/node.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/index.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/express/node_modules/finalhandler/index.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/express/lib/application.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/express/lib/express.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/express/index.js',
+    '/Users/baramariuscristianvalentin/BCMS/apps/server/src/index.ts'
+  ]
+}
+
+Node.js v24.11.1
+12:28:43 AM [tsx] unlink in ./../../node_modules/call-bind-apply-helpers/actualApply.js Rerunning...
+cnode:internal/modules/cjs/loader:1421
+  const err = new Error(message);
+              ^
+
+Error: Cannot find module 'ms'
+Require stack:
+- /Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/common.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/node.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/index.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/express/node_modules/finalhandler/index.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/express/lib/application.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/express/lib/express.js
+- /Users/baramariuscristianvalentin/BCMS/node_modules/express/index.js
+- /Users/baramariuscristianvalentin/BCMS/apps/server/src/index.ts
+    at node:internal/modules/cjs/loader:1421:15
+    at nextResolveSimple (/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:4:1004)
+    at /Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:3:2630
+    at /Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:3:1542
+    at resolveTsPaths (/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:4:760)
+    at /Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-D46fvsV_.cjs:4:1102
+    at m._resolveFilename (file:///Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/register-B7jrtLTO.mjs:1:789)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/common.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/node.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/debug/src/index.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/express/node_modules/finalhandler/index.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/express/lib/application.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/express/lib/express.js',
+    '/Users/baramariuscristianvalentin/BCMS/node_modules/express/index.js',
+    '/Users/baramariuscristianvalentin/BCMS/apps/server/src/index.ts'
+  ]
+}
+
+Node.js v24.11.1
+12:28:43 AM [tsx] unlink in ./../../node_modules/express/lib/application.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:44 AM [tsx] unlink in ./../../node_modules/inherits/inherits.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:44 AM [tsx] unlink in ./../../node_modules/iconv-lite/encodings/internal.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:44 AM [tsx] unlink in ./../../node_modules/get-intrinsic/index.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:45 AM [tsx] unlink in ./../../node_modules/qs/lib/stringify.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:45 AM [tsx] unlink in ./../../node_modules/dunder-proto/get.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:45 AM [tsx] unlink in ./../../node_modules/mime-types/index.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:46 AM [tsx] unlink in ./../../node_modules/supports-color/index.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:46 AM [tsx] unlink in ./../../node_modules/raw-body/index.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:46 AM [tsx] unlink in ./../../node_modules/forwarded/index.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:46 AM [tsx] unlink in ./../../node_modules/negotiator/lib/mediaType.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:47 AM [tsx] unlink in ./../../node_modules/side-channel/index.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:47 AM [tsx] unlink in ./../../node_modules/cors/lib/index.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:47 AM [tsx] unlink in ./../../node_modules/object-assign/index.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:48 AM [tsx] unlink in ./../../node_modules/ipaddr.js/lib/ipaddr.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:48 AM [tsx] unlink in ./../../node_modules/wrappy/wrappy.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:48 AM [tsx] unlink in ./../../node_modules/send/index.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:48 AM [tsx] unlink in ./../../node_modules/side-channel-map/index.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
+12:28:49 AM [tsx] unlink in ./../../node_modules/router/lib/layer.js Rerunning...
+cnode:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/baramariuscristianvalentin/BCMS/node_modules/tsx/dist/preflight.cjs'
+Require stack:
+- internal/preload
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at node:internal/modules/cjs/loader:2046:12
+    at loadPreloadModules (node:internal/process/pre_execution:697:5)
+    at initializeModuleLoaders (node:internal/process/pre_execution:238:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+}
+
+Node.js v24.11.1
