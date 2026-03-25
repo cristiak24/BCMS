@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: bcms-server
+    runtime: node
+    rootDir: apps/server
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false        # ← setezi manual în Render Dashboard
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000

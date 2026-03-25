@@ -12,12 +12,25 @@ export const users = pgTable('users', {
     status: statusEnum('status').default('pending').notNull(),
 });
 
+export const teams = pgTable('teams', {
+    id: serial('id').primaryKey(),
+    frbTeamId: varchar('frb_team_id', { length: 50 }).notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    frbLeagueId: varchar('frb_league_id', { length: 50 }).notNull(),
+    leagueName: varchar('league_name', { length: 255 }).notNull(),
+    frbSeasonId: varchar('frb_season_id', { length: 50 }).notNull(),
+    seasonName: varchar('season_name', { length: 255 }).notNull(),
+    inviteCode: varchar('invite_code', { length: 10 }).notNull().unique(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const players = pgTable('players', {
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
     position: varchar('position', { length: 50 }),
     status: varchar('status', { length: 50 }),
     avatarUrl: text('avatar_url'),
+    teamId: integer('team_id').references(() => teams.id),
 });
 
 export const financialDocuments = pgTable('financial_documents', {
