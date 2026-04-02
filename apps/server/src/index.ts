@@ -7,6 +7,10 @@ import adminRouter from './routes/admin';
 import basketballRoutes from './routes/basketball';
 
 import teamsRoutes from './routes/teams';
+import playerRoutes from './routes/playerRoutes';
+import eventRoutes from './routes/eventRoutes';
+import documentRoutes from './routes/documents';
+import path from 'path';
 
 dotenv.config();
 
@@ -39,6 +43,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRouter);
 app.use('/api/basketball', basketballRoutes);
 app.use('/api/teams', teamsRoutes);
+app.use('/api/players', playerRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/documents', documentRoutes);
+
+// Serve uploads statically
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 console.log('Routes registered.');
 

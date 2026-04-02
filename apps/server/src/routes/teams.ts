@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { teams, players } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { teams, players, playersToTeams } from '../db/schema';
+import { eq, or } from 'drizzle-orm';
 import crypto from 'crypto';
 
 const router = Router();
@@ -77,8 +77,10 @@ router.delete('/:id', async (req, res) => {
             return;
         }
 
-        // Delete players associated with this team first (or set teamId to null depending on your policy).
-        // Let's set teamId to null for now rather than deleting players permanently.
+        // Delete relationships first
+        await db.delete(playersToTeams).where(eq(playersToTeams.teamId, id));
+        
+        // Also old legacy way: set teamId to null for players directly referencing this team
         await db.update(players).set({ teamId: null }).where(eq(players.teamId, id));
         
         // Delete the team
@@ -99,8 +101,33 @@ router.get('/:id/players', async (req, res) => {
             return;
         }
 
-        const teamPlayers = await db.select().from(players).where(eq(players.teamId, id));
-        res.json(teamPlayers);
+        // Get players from BOTH the legacy teamId column and the new join table
+        // We'll use a subquery or just a join. A join is better.
+        const teamPlayers = await db.select({
+            id: players.id,
+            firstName: players.firstName,
+            lastName: players.lastName,
+            name: players.name,
+            email: players.email,
+            number: players.number,
+            status: players.status,
+            avatarUrl: players.avatarUrl,
+            teamId: players.teamId,
+            createdAt: players.createdAt
+        })
+        .from(players)
+        .leftJoin(playersToTeams, eq(players.id, playersToTeams.playerId))
+        .where(
+            or(
+                eq(players.teamId, id),
+                eq(playersToTeams.teamId, id)
+            )
+        );
+
+        // Remove duplicates if any (though there shouldn't be if logic is correct)
+        const uniquePlayers = Array.from(new Map(teamPlayers.map(p => [p.id, p])).values());
+
+        res.json(uniquePlayers);
     } catch (e) {
         console.error(`[GET /api/teams/${req.params.id}/players] error:`, e);
         res.status(500).json({ error: 'Failed to fetch players' });
@@ -116,16 +143,28 @@ router.post('/:id/players', async (req, res) => {
             return;
         }
 
-        const { name, position, status, avatarUrl } = req.body;
-        if (!name) {
-            res.status(400).json({ error: 'Name is required' });
+        const { name, firstName: inputFirstName, lastName: inputLastName, status, avatarUrl } = req.body;
+        
+        let firstName = inputFirstName;
+        let lastName = inputLastName;
+
+        // Backward compatibility: if name is provided but not firstName/lastName
+        if (name && (!firstName || !lastName)) {
+            const parts = name.trim().split(' ');
+            firstName = firstName || parts[0];
+            lastName = lastName || (parts.length > 1 ? parts.slice(1).join(' ') : 'Player');
+        }
+
+        if (!firstName || !lastName) {
+            res.status(400).json({ error: 'First name and last name are required' });
             return;
         }
 
         const newPlayer = await db.insert(players).values({
-            name,
-            position,
-            status,
+            name: name || `${firstName} ${lastName}`,
+            firstName,
+            lastName,
+            status: status || 'active',
             avatarUrl,
             teamId,
         }).returning();

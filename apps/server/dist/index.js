@@ -11,6 +11,10 @@ const auth_1 = __importDefault(require("./routes/auth"));
 const admin_1 = __importDefault(require("./routes/admin"));
 const basketball_1 = __importDefault(require("./routes/basketball"));
 const teams_1 = __importDefault(require("./routes/teams"));
+const playerRoutes_1 = __importDefault(require("./routes/playerRoutes"));
+const eventRoutes_1 = __importDefault(require("./routes/eventRoutes"));
+const documents_1 = __importDefault(require("./routes/documents"));
+const path_1 = __importDefault(require("path"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const port = process.env.PORT || 3000;
@@ -38,6 +42,11 @@ app.use('/api/auth', auth_1.default);
 app.use('/api/admin', admin_1.default);
 app.use('/api/basketball', basketball_1.default);
 app.use('/api/teams', teams_1.default);
+app.use('/api/players', playerRoutes_1.default);
+app.use('/api/events', eventRoutes_1.default);
+app.use('/api/documents', documents_1.default);
+// Serve uploads statically
+app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../uploads')));
 console.log('Routes registered.');
 app.get('/', (_req, res) => {
     res.send('BCMS API is running');

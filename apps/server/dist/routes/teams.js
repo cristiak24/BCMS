@@ -83,8 +83,9 @@ router.delete('/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* 
             res.status(400).json({ error: 'Invalid ID' });
             return;
         }
-        // Delete players associated with this team first (or set teamId to null depending on your policy).
-        // Let's set teamId to null for now rather than deleting players permanently.
+        // Delete relationships first
+        yield db_1.db.delete(schema_1.playersToTeams).where((0, drizzle_orm_1.eq)(schema_1.playersToTeams.teamId, id));
+        // Also old legacy way: set teamId to null for players directly referencing this team
         yield db_1.db.update(schema_1.players).set({ teamId: null }).where((0, drizzle_orm_1.eq)(schema_1.players.teamId, id));
         // Delete the team
         yield db_1.db.delete(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.id, id));
@@ -103,8 +104,26 @@ router.get('/:id/players', (req, res) => __awaiter(void 0, void 0, void 0, funct
             res.status(400).json({ error: 'Invalid ID' });
             return;
         }
-        const teamPlayers = yield db_1.db.select().from(schema_1.players).where((0, drizzle_orm_1.eq)(schema_1.players.teamId, id));
-        res.json(teamPlayers);
+        // Get players from BOTH the legacy teamId column and the new join table
+        // We'll use a subquery or just a join. A join is better.
+        const teamPlayers = yield db_1.db.select({
+            id: schema_1.players.id,
+            firstName: schema_1.players.firstName,
+            lastName: schema_1.players.lastName,
+            name: schema_1.players.name,
+            email: schema_1.players.email,
+            number: schema_1.players.number,
+            status: schema_1.players.status,
+            avatarUrl: schema_1.players.avatarUrl,
+            teamId: schema_1.players.teamId,
+            createdAt: schema_1.players.createdAt
+        })
+            .from(schema_1.players)
+            .leftJoin(schema_1.playersToTeams, (0, drizzle_orm_1.eq)(schema_1.players.id, schema_1.playersToTeams.playerId))
+            .where((0, drizzle_orm_1.or)((0, drizzle_orm_1.eq)(schema_1.players.teamId, id), (0, drizzle_orm_1.eq)(schema_1.playersToTeams.teamId, id)));
+        // Remove duplicates if any (though there shouldn't be if logic is correct)
+        const uniquePlayers = Array.from(new Map(teamPlayers.map(p => [p.id, p])).values());
+        res.json(uniquePlayers);
     }
     catch (e) {
         console.error(`[GET /api/teams/${req.params.id}/players] error:`, e);
@@ -119,15 +138,24 @@ router.post('/:id/players', (req, res) => __awaiter(void 0, void 0, void 0, func
             res.status(400).json({ error: 'Invalid ID' });
             return;
         }
-        const { name, position, status, avatarUrl } = req.body;
-        if (!name) {
-            res.status(400).json({ error: 'Name is required' });
+        const { name, firstName: inputFirstName, lastName: inputLastName, status, avatarUrl } = req.body;
+        let firstName = inputFirstName;
+        let lastName = inputLastName;
+        // Backward compatibility: if name is provided but not firstName/lastName
+        if (name && (!firstName || !lastName)) {
+            const parts = name.trim().split(' ');
+            firstName = firstName || parts[0];
+            lastName = lastName || (parts.length > 1 ? parts.slice(1).join(' ') : 'Player');
+        }
+        if (!firstName || !lastName) {
+            res.status(400).json({ error: 'First name and last name are required' });
             return;
         }
         const newPlayer = yield db_1.db.insert(schema_1.players).values({
-            name,
-            position,
-            status,
+            name: name || `${firstName} ${lastName}`,
+            firstName,
+            lastName,
+            status: status || 'active',
             avatarUrl,
             teamId,
         }).returning();

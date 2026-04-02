@@ -1,0 +1,21 @@
+diff --git a/node_modules/expo-router/build/getDevServer/index.native.js b/node_modules/expo-router/build/getDevServer/index.native.js
+index f17cd60..b16275a 100644
+--- a/node_modules/expo-router/build/getDevServer/index.native.js
++++ b/node_modules/expo-router/build/getDevServer/index.native.js
+@@ -1,5 +1,14 @@
+ "use strict";
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.getDevServer = void 0;
+-exports.getDevServer = require('react-native/Libraries/Core/Devtools/getDevServer');
++try {
++  const getDevServerFn = require('react-native/Libraries/Core/Devtools/getDevServer');
++  exports.getDevServer = typeof getDevServerFn === 'function' ? getDevServerFn : (getDevServerFn.default || function() { 
++    return { bundleLoadedFromServer: true, fullBundleUrl: '', url: 'http://localhost:8081/' }; 
++  });
++} catch (e) {
++  exports.getDevServer = function() { 
++    return { bundleLoadedFromServer: true, fullBundleUrl: '', url: 'http://localhost:8081/' }; 
++  };
++}
+ //# sourceMappingURL=index.native.js.map
+\ No newline at end of file
