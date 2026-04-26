@@ -10,23 +10,18 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const db_1 = require("../db");
-const schema_1 = require("../db/schema");
-const drizzle_orm_1 = require("drizzle-orm");
+const firebaseAdmin_1 = require("../lib/firebaseAdmin");
 const router = (0, express_1.Router)();
-// GET /api/admin/requests
-// Get all users with status 'pending'
-router.get('/requests', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get('/requests', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const pendingUsers = yield db_1.db.select({
-            id: schema_1.users.id,
-            email: schema_1.users.email,
-            name: schema_1.users.name,
-            role: schema_1.users.role,
-            status: schema_1.users.status,
-        })
-            .from(schema_1.users)
-            .where((0, drizzle_orm_1.eq)(schema_1.users.status, 'pending'));
+        const pendingUsersSnap = yield firebaseAdmin_1.firestore.collection('users').where('status', '==', 'pending').get();
+        const pendingUsers = pendingUsersSnap.docs.map((docSnap) => docSnap.data()).map((user) => ({
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            status: user.status,
+        }));
         res.json(pendingUsers);
     }
     catch (error) {
@@ -34,52 +29,44 @@ router.get('/requests', (req, res) => __awaiter(void 0, void 0, void 0, function
         res.status(500).json({ error: 'Failed to fetch pending requests' });
     }
 }));
-// POST /api/admin/requests/:id/approve
-// Approve a user: Set status to 'processed' and assign a role
 router.post('/requests/:id/approve', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const { role } = req.body; // Admin selects the role
+    const id = Number(req.params.id);
+    const { role } = req.body;
     if (!role) {
         return res.status(400).json({ error: 'Role is required for approval' });
     }
+    if (Number.isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid user id' });
+    }
     try {
-        const updated = yield db_1.db
-            .update(schema_1.users)
-            .set({
-            status: 'processed',
-            role: role // 'admin', 'coach', 'accountant'
-        })
-            .where((0, drizzle_orm_1.eq)(schema_1.users.id, Number(id)))
-            .returning({
-            id: schema_1.users.id,
-            email: schema_1.users.email,
-            name: schema_1.users.name,
-            role: schema_1.users.role,
-            status: schema_1.users.status
-        });
-        if (updated.length === 0) {
+        const snap = yield firebaseAdmin_1.firestore.collection('users').where('id', '==', id).limit(1).get();
+        const docSnap = snap.docs[0];
+        if (!docSnap) {
             return res.status(404).json({ error: 'User not found' });
         }
-        res.json({ success: true, user: updated[0] });
+        const current = docSnap.data();
+        const nextUser = Object.assign(Object.assign({}, current), { status: 'processed', role });
+        yield docSnap.ref.set(nextUser, { merge: true });
+        res.json({ success: true, user: nextUser });
     }
     catch (error) {
         console.error('Error approving user:', error);
         res.status(500).json({ error: 'Failed to approve user' });
     }
 }));
-// POST /api/admin/requests/:id/reject
-// Reject a user: Set status to 'rejected' (or delete?)
 router.post('/requests/:id/reject', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid user id' });
+    }
     try {
-        const updated = yield db_1.db
-            .update(schema_1.users)
-            .set({ status: 'rejected' })
-            .where((0, drizzle_orm_1.eq)(schema_1.users.id, Number(id)))
-            .returning();
-        if (updated.length === 0) {
+        const snap = yield firebaseAdmin_1.firestore.collection('users').where('id', '==', id).limit(1).get();
+        const docSnap = snap.docs[0];
+        if (!docSnap) {
             return res.status(404).json({ error: 'User not found' });
         }
+        const current = docSnap.data();
+        yield docSnap.ref.set(Object.assign(Object.assign({}, current), { status: 'rejected' }), { merge: true });
         res.json({ success: true, message: 'User rejected' });
     }
     catch (error) {

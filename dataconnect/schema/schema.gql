@@ -1,0 +1,26 @@
+type User @table {
+  id: Int!
+  uid: String! @unique
+  email: String!
+  name: String!
+  firstName: String
+  lastName: String
+  role: String!
+  status: String!
+  clubId: Int
+  avatarUrl: String
+  phone: String
+  preferredLanguage: String
+  notificationPreferences: String
+  lastLoginAt: Timestamp
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+type Club @table {
+  id: Int!
+  name: String!
+  logoUrl: String
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}

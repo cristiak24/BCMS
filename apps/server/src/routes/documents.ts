@@ -1,28 +1,23 @@
 import { Router } from 'express';
-import { db } from '../db';
-import { teams } from '../db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { admin, firestore, nextNumericId, toIso } from '../lib/firebaseAdmin';
 import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 
 const router = Router();
 
-// POST /api/documents/generate-l12
 router.post('/generate-l12', async (req, res) => {
     try {
         const { teamId, matchDetails, players } = req.body;
-        
+
         if (!teamId || !players || !Array.isArray(players)) {
             res.status(400).json({ error: 'Missing required configuration for L12' });
             return;
         }
 
-        // Fetch team
-        const teamRecords = await db.select().from(teams).where(eq(teams.id, parseInt(teamId, 10)));
-        const team = teamRecords[0] || { name: 'Echipă Necunoscută' };
+        const teamSnap = await firestore.collection('teams').doc(String(teamId)).get();
+        const team = teamSnap.exists ? (teamSnap.data() as { id: number; name: string }) : { id: Number(teamId), name: 'Echipă Necunoscută' };
 
-        // Generate simple HTML to be rendered into PDF
         const htmlContent = `
             <!DOCTYPE html>
             <html lang="ro">
@@ -102,11 +97,10 @@ router.post('/generate-l12', async (req, res) => {
         const filename = `L12_${team.name.replace(/[^a-zA-Z0-9]/g, '_')}_${safeOpponentName}_${timestamp}.pdf`;
         const filePath = path.join(uploadsDir, filename);
 
-        // Generate PDF using puppeteer
         const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
         const page = await browser.newPage();
         await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-        
+
         await page.pdf({
             path: filePath,
             format: 'A4',
@@ -116,39 +110,46 @@ router.post('/generate-l12', async (req, res) => {
 
         await browser.close();
 
-        // Read for immediate response
         const pdfBuffer = fs.readFileSync(filePath);
-
-        // Record it in DB
         const matchTitle = `${team.name} vs ${matchDetails?.opponent || 'Adversar Necunoscut'}`;
         const documentUrl = `/uploads/l12/${filename}`;
+        const id = await nextNumericId('l12Documents');
 
-        await db.insert(require('../db/schema').l12Documents).values({
-            teamId: team.id,
+        await firestore.collection('l12Documents').doc(String(id)).set({
+            id,
+            teamId: Number(teamId),
             matchTitle,
-            documentUrl
+            documentUrl,
+            createdAt: new Date(),
         });
 
-        // Send PDF response
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.send(Buffer.from(pdfBuffer));
-        
     } catch (error) {
         console.error('Error generating L12:', error);
         res.status(500).json({ error: 'Failed to generate PDF' });
     }
 });
 
-// GET /api/documents/l12
-router.get('/l12', async (req, res) => {
+router.get('/l12', async (_req, res) => {
     try {
-        const { l12Documents } = require('../db/schema');
-        const docs = await db.select()
-            .from(l12Documents)
-            .orderBy(desc(l12Documents.createdAt))
-            .limit(50);
-            
+        const snap = await firestore.collection('l12Documents').orderBy('createdAt', 'desc').limit(50).get();
+        const docs = snap.docs.map((docSnap) => {
+            const data = docSnap.data() as {
+                id: number;
+                teamId: number;
+                matchTitle: string;
+                documentUrl: string;
+                createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
+            };
+
+            return {
+                ...data,
+                createdAt: toIso(data.createdAt) ?? new Date().toISOString(),
+            };
+        });
+
         res.json(docs);
     } catch (error) {
         console.error('Error fetching L12 documents:', error);

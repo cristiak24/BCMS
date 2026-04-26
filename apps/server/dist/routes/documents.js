@@ -13,14 +13,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const db_1 = require("../db");
-const schema_1 = require("../db/schema");
-const drizzle_orm_1 = require("drizzle-orm");
+const firebaseAdmin_1 = require("../lib/firebaseAdmin");
 const puppeteer_1 = __importDefault(require("puppeteer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const router = (0, express_1.Router)();
-// POST /api/documents/generate-l12
 router.post('/generate-l12', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { teamId, matchDetails, players } = req.body;
@@ -28,10 +25,8 @@ router.post('/generate-l12', (req, res) => __awaiter(void 0, void 0, void 0, fun
             res.status(400).json({ error: 'Missing required configuration for L12' });
             return;
         }
-        // Fetch team
-        const teamRecords = yield db_1.db.select().from(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.id, parseInt(teamId, 10)));
-        const team = teamRecords[0] || { name: 'Echipă Necunoscută' };
-        // Generate simple HTML to be rendered into PDF
+        const teamSnap = yield firebaseAdmin_1.firestore.collection('teams').doc(String(teamId)).get();
+        const team = teamSnap.exists ? teamSnap.data() : { id: Number(teamId), name: 'Echipă Necunoscută' };
         const htmlContent = `
             <!DOCTYPE html>
             <html lang="ro">
@@ -108,7 +103,6 @@ router.post('/generate-l12', (req, res) => __awaiter(void 0, void 0, void 0, fun
         const safeOpponentName = ((matchDetails === null || matchDetails === void 0 ? void 0 : matchDetails.opponent) || 'Necunoscut').replace(/[^a-zA-Z0-9]/g, '_');
         const filename = `L12_${team.name.replace(/[^a-zA-Z0-9]/g, '_')}_${safeOpponentName}_${timestamp}.pdf`;
         const filePath = path_1.default.join(uploadsDir, filename);
-        // Generate PDF using puppeteer
         const browser = yield puppeteer_1.default.launch({ headless: true, args: ['--no-sandbox'] });
         const page = yield browser.newPage();
         yield page.setContent(htmlContent, { waitUntil: 'networkidle0' });
@@ -119,17 +113,17 @@ router.post('/generate-l12', (req, res) => __awaiter(void 0, void 0, void 0, fun
             margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' }
         });
         yield browser.close();
-        // Read for immediate response
         const pdfBuffer = fs_1.default.readFileSync(filePath);
-        // Record it in DB
         const matchTitle = `${team.name} vs ${(matchDetails === null || matchDetails === void 0 ? void 0 : matchDetails.opponent) || 'Adversar Necunoscut'}`;
         const documentUrl = `/uploads/l12/${filename}`;
-        yield db_1.db.insert(require('../db/schema').l12Documents).values({
-            teamId: team.id,
+        const id = yield (0, firebaseAdmin_1.nextNumericId)('l12Documents');
+        yield firebaseAdmin_1.firestore.collection('l12Documents').doc(String(id)).set({
+            id,
+            teamId: Number(teamId),
             matchTitle,
-            documentUrl
+            documentUrl,
+            createdAt: new Date(),
         });
-        // Send PDF response
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.send(Buffer.from(pdfBuffer));
@@ -139,14 +133,14 @@ router.post('/generate-l12', (req, res) => __awaiter(void 0, void 0, void 0, fun
         res.status(500).json({ error: 'Failed to generate PDF' });
     }
 }));
-// GET /api/documents/l12
-router.get('/l12', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get('/l12', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { l12Documents } = require('../db/schema');
-        const docs = yield db_1.db.select()
-            .from(l12Documents)
-            .orderBy((0, drizzle_orm_1.desc)(l12Documents.createdAt))
-            .limit(50);
+        const snap = yield firebaseAdmin_1.firestore.collection('l12Documents').orderBy('createdAt', 'desc').limit(50).get();
+        const docs = snap.docs.map((docSnap) => {
+            var _a;
+            const data = docSnap.data();
+            return Object.assign(Object.assign({}, data), { createdAt: (_a = (0, firebaseAdmin_1.toIso)(data.createdAt)) !== null && _a !== void 0 ? _a : new Date().toISOString() });
+        });
         res.json(docs);
     }
     catch (error) {

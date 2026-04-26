@@ -1,0 +1,32 @@
+mutation CreateUser(
+  $id: Int!
+  $uid: String!
+  $email: String!
+  $name: String!
+  $firstName: String
+  $lastName: String
+  $role: String!
+  $status: String!
+  $createdAt: Timestamp!
+  $updatedAt: Timestamp!
+) @auth(level: NO_ACCESS) {
+  user_insert(data: {
+    id: $id
+    uid: $uid
+    email: $email
+    name: $name
+    firstName: $firstName
+    lastName: $lastName
+    role: $role
+    status: $status
+    createdAt: $createdAt
+    updatedAt: $updatedAt
+  })
+}
+
+mutation UpdateUserLastLogin($uid: String!, $lastLoginAt: Timestamp!) @auth(level: NO_ACCESS) {
+  user_updateMany(where: {uid: {eq: $uid}}, data: {
+    lastLoginAt: $lastLoginAt
+  })
+}
+

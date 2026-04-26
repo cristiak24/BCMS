@@ -1,108 +1,253 @@
-import { pgTable, serial, text, varchar, timestamp, pgEnum, integer } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, integer, text, timestamp, unique, foreignKey, pgEnum } from "drizzle-orm/pg-core"
+import { sql } from "drizzle-orm"
 
-export const roleEnum = pgEnum('role', ['admin', 'coach', 'accountant']);
-export const statusEnum = pgEnum('status', ['pending', 'processed', 'rejected']);
+export const role = pgEnum("role", ['admin', 'coach', 'accountant', 'player', 'parent', 'superadmin'])
+export const status = pgEnum("status", ['pending', 'processed', 'rejected'])
+export const userStatus = pgEnum("user_status", ['active', 'pending', 'disabled'])
+export const accessRequestStatus = pgEnum("access_request_status", ['pending', 'approved', 'denied'])
+export const inviteStatus = pgEnum("invite_status", ['active', 'used', 'expired', 'revoked'])
 
-export const users = pgTable('users', {
-    id: serial('id').primaryKey(),
-    email: varchar('email', { length: 255 }).notNull().unique(),
-    passwordHash: text('password_hash').notNull(),
-    name: varchar('name', { length: 255 }).notNull(),
-    role: roleEnum('role').default('coach').notNull(),
-    status: statusEnum('status').default('pending').notNull(),
+
+
+export const financialDocuments = pgTable("financial_documents", {
+	id: serial().primaryKey().notNull(),
+	type: varchar({ length: 50 }).notNull(),
+	amount: integer().notNull(),
+	description: text(),
+	date: timestamp({ mode: 'string' }).defaultNow().notNull(),
+	documentUrl: text("document_url"),
+	status: status().default('pending').notNull(),
 });
 
-export const teams = pgTable('teams', {
-    id: serial('id').primaryKey(),
-    frbTeamId: varchar('frb_team_id', { length: 50 }).notNull(),
-    name: varchar('name', { length: 255 }).notNull(),
-    frbLeagueId: varchar('frb_league_id', { length: 50 }).notNull(),
-    leagueName: varchar('league_name', { length: 255 }).notNull(),
-    frbSeasonId: varchar('frb_season_id', { length: 50 }).notNull(),
-    seasonName: varchar('season_name', { length: 255 }).notNull(),
-    inviteCode: varchar('invite_code', { length: 10 }).notNull().unique(),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
+export const users = pgTable("users", {
+	id: serial().primaryKey().notNull(),
+	uid: varchar({ length: 255 }), // Keep for backwards compatibility
+	firebaseUid: varchar("firebase_uid", { length: 255 }),
+	email: varchar({ length: 255 }).notNull(),
+	passwordHash: text("password_hash"),
+	name: varchar({ length: 255 }).notNull(),
+	firstName: varchar("first_name", { length: 255 }),
+	lastName: varchar("last_name", { length: 255 }),
+	role: role().default('coach').notNull(),
+	status: userStatus().default('pending').notNull(),
+	clubId: integer("club_id"),
+	avatarUrl: text("avatar_url"),
+	phone: varchar({ length: 50 }),
+	preferredLanguage: varchar("preferred_language", { length: 50 }),
+	lastLoginAt: timestamp("last_login_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("users_email_unique").on(table.email),
+	unique("users_firebase_uid_unique").on(table.firebaseUid),
+]);
+
+export const players = pgTable("players", {
+	id: serial().primaryKey().notNull(),
+	name: varchar({ length: 255 }),
+	status: varchar({ length: 50 }).default('active'),
+	avatarUrl: text("avatar_url"),
+	teamId: integer("team_id"),
+	firstName: varchar("first_name", { length: 255 }),
+	lastName: varchar("last_name", { length: 255 }),
+	number: integer(),
+	birthYear: integer("birth_year"),
+	medicalCheckExpiry: timestamp("medical_check_expiry", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	email: varchar({ length: 255 }),
+}, (table) => [
+	foreignKey({
+			columns: [table.teamId],
+			foreignColumns: [teams.id],
+			name: "players_team_id_teams_id_fk"
+		}),
+]);
+
+export const teams = pgTable("teams", {
+	id: serial().primaryKey().notNull(),
+	frbTeamId: varchar("frb_team_id", { length: 50 }).notNull(),
+	name: varchar({ length: 255 }).notNull(),
+	frbLeagueId: varchar("frb_league_id", { length: 50 }).notNull(),
+	leagueName: varchar("league_name", { length: 255 }).notNull(),
+	frbSeasonId: varchar("frb_season_id", { length: 50 }).notNull(),
+	seasonName: varchar("season_name", { length: 255 }).notNull(),
+	inviteCode: varchar("invite_code", { length: 10 }).notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("teams_invite_code_unique").on(table.inviteCode),
+]);
+
+export const playerPayments = pgTable("player_payments", {
+	id: serial().primaryKey().notNull(),
+	playerId: integer("player_id").notNull(),
+	amount: integer().notNull(),
+	month: integer().notNull(),
+	year: integer().notNull(),
+	status: varchar({ length: 50 }).notNull(),
+	date: timestamp({ mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.playerId],
+			foreignColumns: [players.id],
+			name: "player_payments_player_id_players_id_fk"
+		}),
+]);
+
+export const playersToTeams = pgTable("players_to_teams", {
+	id: serial().primaryKey().notNull(),
+	playerId: integer("player_id").notNull(),
+	teamId: integer("team_id").notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.playerId],
+			foreignColumns: [players.id],
+			name: "players_to_teams_player_id_players_id_fk"
+		}),
+	foreignKey({
+			columns: [table.teamId],
+			foreignColumns: [teams.id],
+			name: "players_to_teams_team_id_teams_id_fk"
+		}),
+]);
+
+export const financialSettings = pgTable("financial_settings", {
+	id: serial().primaryKey().notNull(),
+	monthlyPlayerFee: integer("monthly_player_fee").default(0).notNull(),
+	trainingLevy: integer("training_levy").default(0).notNull(),
+	facilityFee: integer("facility_fee").default(0).notNull(),
+	autoAdjust: integer("auto_adjust").default(1).notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
 });
 
-export const players = pgTable('players', {
-    id: serial('id').primaryKey(),
-    name: varchar('name', { length: 255 }), // Keep old name temporarily
-    firstName: varchar('first_name', { length: 255 }),
-    lastName: varchar('last_name', { length: 255 }),
-    email: varchar('email', { length: 255 }),
-    number: integer('number'), // Jersey number
-    birthYear: integer('birth_year'),
-    medicalCheckExpiry: timestamp('medical_check_expiry'),
-    status: varchar('status', { length: 50 }).default('active'), // active, inactive, injured
-    avatarUrl: text('avatar_url'),
-    teamId: integer('team_id').references(() => teams.id), // Keep old teamId temporarily
-    createdAt: timestamp('created_at').defaultNow().notNull(),
+export const events = pgTable("events", {
+	id: serial().primaryKey().notNull(),
+	type: varchar({ length: 50 }).notNull(),
+	title: varchar({ length: 255 }).notNull(),
+	description: text(),
+	location: varchar({ length: 255 }),
+	startTime: timestamp("start_time", { mode: 'string' }).notNull(),
+	endTime: timestamp("end_time", { mode: 'string' }).notNull(),
+	teamId: integer("team_id"),
+	coachId: integer("coach_id"),
+	amount: integer(),
+	status: varchar({ length: 50 }).default('scheduled'),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.teamId],
+			foreignColumns: [teams.id],
+			name: "events_team_id_teams_id_fk"
+		}),
+	foreignKey({
+			columns: [table.coachId],
+			foreignColumns: [users.id],
+			name: "events_coach_id_users_id_fk"
+		}),
+]);
+
+export const attendance = pgTable("attendance", {
+	id: serial().primaryKey().notNull(),
+	playerId: integer("player_id").notNull(),
+	teamId: integer("team_id").notNull(),
+	date: timestamp({ mode: 'string' }).defaultNow().notNull(),
+	status: varchar({ length: 50 }).notNull(),
+	eventId: integer("event_id"),
+}, (table) => [
+	foreignKey({
+			columns: [table.playerId],
+			foreignColumns: [players.id],
+			name: "attendance_player_id_players_id_fk"
+		}),
+	foreignKey({
+			columns: [table.teamId],
+			foreignColumns: [teams.id],
+			name: "attendance_team_id_teams_id_fk"
+		}),
+	foreignKey({
+			columns: [table.eventId],
+			foreignColumns: [events.id],
+			name: "attendance_event_id_events_id_fk"
+		}),
+]);
+
+export const l12Documents = pgTable("l12_documents", {
+	id: serial().primaryKey().notNull(),
+	teamId: integer("team_id").notNull(),
+	matchTitle: varchar("match_title", { length: 255 }).notNull(),
+	documentUrl: text("document_url").notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.teamId],
+			foreignColumns: [teams.id],
+			name: "l12_documents_team_id_teams_id_fk"
+		}),
+]);
+
+export const clubs = pgTable("clubs", {
+	id: serial().primaryKey().notNull(),
+	name: varchar({ length: 255 }).notNull(),
+	normalizedName: varchar("normalized_name", { length: 255 }),
+	createdBy: varchar("created_by", { length: 255 }),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("clubs_normalized_name_unique").on(table.normalizedName),
+]);
+export const accessRequests = pgTable("access_requests", {
+	id: serial().primaryKey().notNull(),
+	userId: integer("user_id").notNull(),
+	clubId: integer("club_id").notNull(),
+	userName: varchar("user_name", { length: 255 }),
+	userEmail: varchar("user_email", { length: 255 }),
+	requestedRole: role("requested_role").notNull(),
+	status: accessRequestStatus().default('pending').notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	reviewedAt: timestamp("reviewed_at", { mode: 'string' }),
+	reviewedBy: integer("reviewed_by"),
 });
 
-export const playersToTeams = pgTable('players_to_teams', {
-    id: serial('id').primaryKey(),
-    playerId: integer('player_id').references(() => players.id).notNull(),
-    teamId: integer('team_id').references(() => teams.id).notNull(),
+export const inviteLinks = pgTable("invite_links", {
+	id: serial().primaryKey().notNull(),
+	clubId: integer("club_id").notNull(),
+	role: role().notNull(),
+	token: varchar({ length: 255 }).notNull(),
+	tokenHash: varchar("token_hash", { length: 255 }).notNull(),
+	expiresAt: timestamp("expires_at", { mode: 'string' }).notNull(),
+	refreshIntervalMinutes: integer("refresh_interval_minutes").notNull(),
+	createdBy: integer("created_by"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	isActive: integer("is_active").default(1).notNull(),
 });
 
-export const attendance = pgTable('attendance', {
-    id: serial('id').primaryKey(),
-    playerId: integer('player_id').references(() => players.id).notNull(),
-    teamId: integer('team_id').references(() => teams.id).notNull(),
-    eventId: integer('event_id').references(() => events.id),
-    date: timestamp('date').defaultNow().notNull(),
-    status: varchar('status', { length: 50 }).notNull(), // present, absent, late, excused
-});
-
-export const playerPayments = pgTable('player_payments', {
-    id: serial('id').primaryKey(),
-    playerId: integer('player_id').references(() => players.id).notNull(),
-    amount: integer('amount').notNull(),
-    month: integer('month').notNull(),
-    year: integer('year').notNull(),
-    status: varchar('status', { length: 50 }).notNull(), // paid, pending, overdue
-    date: timestamp('date'),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-export const financialDocuments = pgTable('financial_documents', {
-    id: serial('id').primaryKey(),
-    type: varchar('type', { length: 50 }).notNull(), // 'expense' or 'income'
-    amount: integer('amount').notNull(), // using integer for cents avoids float issues, or I can use decimal. I'll use integer.
-    description: text('description'),
-    date: timestamp('date').defaultNow().notNull(),
-    documentUrl: text('document_url'),
-    status: statusEnum('status').default('pending').notNull(),
-});
-
-export const financialSettings = pgTable('financial_settings', {
-    id: serial('id').primaryKey(),
-    monthlyPlayerFee: integer('monthly_player_fee').notNull().default(0), // stored in cents or basic val, let's say dollars/RON
-    trainingLevy: integer('training_levy').notNull().default(0), // percentage * 10 or just exact number
-    facilityFee: integer('facility_fee').notNull().default(0),
-    autoAdjust: integer('auto_adjust').notNull().default(1), // 1 for true, 0 for false
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
-
-export const events = pgTable('events', {
-    id: serial('id').primaryKey(),
-    type: varchar('type', { length: 50 }).notNull(), // training, match, camp, admin
-    title: varchar('title', { length: 255 }).notNull(),
-    description: text('description'),
-    location: varchar('location', { length: 255 }),
-    startTime: timestamp('start_time').notNull(),
-    endTime: timestamp('end_time').notNull(),
-    teamId: integer('team_id').references(() => teams.id),
-    coachId: integer('coach_id').references(() => users.id),
-    amount: integer('amount'), // for camps/tournaments
-    status: varchar('status', { length: 50 }).default('scheduled'), // scheduled, completed, cancelled
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-export const l12Documents = pgTable('l12_documents', {
-    id: serial('id').primaryKey(),
-    teamId: integer('team_id').references(() => teams.id).notNull(),
-    matchTitle: varchar('match_title', { length: 255 }).notNull(),
-    documentUrl: text('document_url').notNull(),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export const invites = pgTable("invites", {
+	id: serial().primaryKey().notNull(),
+	email: varchar({ length: 255 }).notNull(),
+	role: role().notNull(),
+	clubId: integer("club_id"),
+	tokenHash: varchar("token_hash", { length: 255 }).notNull(),
+	status: inviteStatus().default('active').notNull(),
+	expiresAt: timestamp("expires_at", { mode: 'string' }).notNull(),
+	createdBy: integer("created_by"),
+	usedBy: integer("used_by"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	usedAt: timestamp("used_at", { mode: 'string' }),
+}, (table) => [
+	unique("invites_token_hash_unique").on(table.tokenHash),
+	foreignKey({
+		columns: [table.clubId],
+		foreignColumns: [clubs.id],
+		name: "invites_club_id_clubs_id_fk"
+	}),
+	foreignKey({
+		columns: [table.createdBy],
+		foreignColumns: [users.id],
+		name: "invites_created_by_users_id_fk"
+	}),
+	foreignKey({
+		columns: [table.usedBy],
+		foreignColumns: [users.id],
+		name: "invites_used_by_users_id_fk"
+	}),
+]);

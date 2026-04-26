@@ -1,18 +1,21 @@
 import express from 'express';
-import dotenv from 'dotenv';
 import financeRoutes from './routes/finance';
 import userRoutes from './routes/users';
 import authRoutes from './routes/auth';
+import profileRoutes from './routes/profile';
 import adminRouter from './routes/admin';
+import manageAccessRoutes from './routes/manageAccess';
 import basketballRoutes from './routes/basketball';
+import dashboardRoutes from './routes/dashboard';
 
 import teamsRoutes from './routes/teams';
 import playerRoutes from './routes/playerRoutes';
 import eventRoutes from './routes/eventRoutes';
 import documentRoutes from './routes/documents';
 import path from 'path';
+import { loadServerEnv } from './lib/loadEnv';
 
-dotenv.config();
+loadServerEnv();
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -21,7 +24,11 @@ const port = process.env.PORT || 3000;
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization, Accept, X-User-Id, X-User-Uid, X-User-Role, X-User-Club-Id'
+    );
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
     // Respond to preflight immediately
     if (req.method === 'OPTIONS') {
         res.status(204).end();
@@ -40,8 +47,11 @@ app.use((req, res, next) => {
 app.use('/api/finance', financeRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes);
 app.use('/api/admin', adminRouter);
+app.use('/api/manage-access', manageAccessRoutes);
 app.use('/api/basketball', basketballRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/teams', teamsRoutes);
 app.use('/api/players', playerRoutes);
 app.use('/api/events', eventRoutes);
@@ -59,4 +69,3 @@ app.get('/', (_req, res) => {
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
-

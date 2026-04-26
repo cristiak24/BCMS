@@ -19,24 +19,110 @@ const API_KEY = '9c3622c013ca2f69e8c373ecbf5af38e180f6d7d';
 const REFERER = 'https://www.frbaschet.ro/';
 const HEADERS = { Referer: REFERER };
 // ---------- Helpers ----------
+/**
+ * Parsează scorul din formatul "75 - 60" sau "75-60" sau "?" în { home, away }.
+ * Returnează { home: '', away: '' } dacă meciul nu are scor (neprogramat).
+ */
 function parseScore(rawScore) {
-    const clean = rawScore.replace(/\s+/g, '');
+    const clean = (rawScore || '').replace(/\s+/g, '').trim();
+    // Dacă e gol, "?", "- " sau nu conține cifre — meci neprogramat
+    if (!clean || clean === '?' || clean === '-' || !/\d/.test(clean)) {
+        return { home: '', away: '' };
+    }
     const parts = clean.split('-');
-    return { home: parts[0] || '?', away: parts[1] || '?' };
+    if (parts.length !== 2)
+        return { home: '', away: '' };
+    const h = parts[0].trim();
+    const a = parts[1].trim();
+    // Ambele trebuie să fie numere valide
+    if (!/^\d+$/.test(h) || !/^\d+$/.test(a)) {
+        return { home: '', away: '' };
+    }
+    return { home: h, away: a };
 }
-function determineResult(homeTeamName, homeScore, awayScore) {
+/**
+ * Determină statusul unui meci pe baza scorului și datei.
+ * - Dacă nu există scor → scheduled
+ * - Dacă există scor → finished
+ * (Live detection nu e suportată de API-ul FRB prin scraping static)
+ */
+function determineStatus(homeScore, awayScore) {
+    if (!homeScore || !awayScore)
+        return 'scheduled';
+    return 'finished';
+}
+/**
+ * Determină rezultatul W/L/D/N/A față de echipa cu teamId-ul dat.
+ * trackingTeamId = ID-ul echipei urmărite (din query param).
+ * Dacă nu putem determina → N/A.
+ */
+function determineResult(homeTeamRawHtml, awayTeamRawHtml, homeScore, awayScore, trackingTeamId) {
+    if (!homeScore || !awayScore)
+        return 'N/A';
     const h = parseInt(homeScore, 10);
     const a = parseInt(awayScore, 10);
     if (isNaN(h) || isNaN(a))
         return 'N/A';
-    return h > a ? 'W' : 'L';
+    // Încearcă să identifice echipa urmărită prin team_id în link-ul HTML brut
+    // Dacă linkul HTML al echipei conține teamId-ul, știm care echipă e a noastră
+    const isHome = homeTeamRawHtml.includes(`team_id=${trackingTeamId}`) ||
+        homeTeamRawHtml.includes(`team_id="${trackingTeamId}"`);
+    const isAway = awayTeamRawHtml.includes(`team_id=${trackingTeamId}`) ||
+        awayTeamRawHtml.includes(`team_id="${trackingTeamId}"`);
+    if (!isHome && !isAway) {
+        // Fallback: prima echipă listată e gazda → tratăm din perspectiva gazdei
+        if (h > a)
+            return 'W';
+        if (h < a)
+            return 'L';
+        return 'D';
+    }
+    if (isHome) {
+        if (h > a)
+            return 'W';
+        if (h < a)
+            return 'L';
+        return 'D';
+    }
+    // isAway
+    if (a > h)
+        return 'W';
+    if (a < h)
+        return 'L';
+    return 'D';
+}
+/**
+ * Convertește un șir "DD.MM.YYYY" într-un timestamp numeric pentru sortare.
+ * Returnează 0 dacă parsing eșuează.
+ */
+function parseDateToTimestamp(dateStr) {
+    if (!dateStr)
+        return 0;
+    const parts = dateStr.split('.');
+    if (parts.length !== 3)
+        return 0;
+    const [day, month, year] = parts.map(Number);
+    if (isNaN(day) || isNaN(month) || isNaN(year))
+        return 0;
+    return new Date(year, month - 1, day).getTime();
+}
+/**
+ * Strip-ează tag-urile HTML și normalizează whitespace-ul.
+ */
+function stripTags(s) {
+    return s.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 // ---------- GET /api/basketball/leagues ----------
 router.get('/leagues', (_req, res) => {
-    // Static for now — add more leagues here as needed
+    // Returnăm direct — lista este configurație fixă (ID-uri din FRB)
     res.json([
         { id: '25493', name: 'LNBM' },
-        { id: '25523', name: 'Liga 1' },
+        { id: '25523', name: 'Liga 1 Masculin' },
+        { id: '25503', name: 'LNBF' },
+        { id: '25533', name: 'Liga 1 Feminin' },
+        { id: '8339', name: 'U18' },
+        { id: '8348', name: 'U16' },
+        { id: '8346', name: 'U14' },
     ]);
 });
 // ---------- GET /api/basketball/seasons?leagueId= ----------
@@ -86,7 +172,7 @@ router.get('/teams', (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 teams.push({ id: match[1], name: match[2].trim() });
             }
         }
-        // Deduplicate teams by ID
+        // Deduplică după ID
         const uniqueTeams = Array.from(new Map(teams.map((t) => [t.id, t])).values());
         res.json(uniqueTeams);
     }
@@ -95,9 +181,8 @@ router.get('/teams', (req, res) => __awaiter(void 0, void 0, void 0, function* (
         res.status(500).json({ error: 'Failed to fetch teams' });
     }
 }));
-// ---------- GET /api/basketball/matches?teamId=&seasonId=&month=&leagueId= ----------
+// ---------- GET /api/basketball/matches?teamId=&seasonId=&leagueId=&month= ----------
 router.get('/matches', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
     const { teamId, seasonId, month, leagueId } = req.query;
     if (!teamId || !seasonId || !leagueId) {
         res.status(400).json({ error: 'teamId, seasonId and leagueId required' });
@@ -111,43 +196,85 @@ router.get('/matches', (req, res) => __awaiter(void 0, void 0, void 0, function*
             res.json([]);
             return;
         }
-        let html = htmlMatch[1]
+        const html = htmlMatch[1]
             .replace(/\\n/g, '')
+            .replace(/\\r/g, '')
+            .replace(/\\t/g, '')
             .replace(/\\"/g, '"')
             .replace(/\\\//g, '/');
-        // Parse table rows from HTML string
+        // Parsăm rândurile tabelului HTML
         const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-        const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-        const stripTags = (s) => s.replace(/<[^>]*>/g, '').trim();
         const matches = [];
         let rowMatch;
         while ((rowMatch = rowRegex.exec(html)) !== null) {
             const rowHtml = rowMatch[1];
-            const cells = [];
-            let cellMatch;
+            // Extragem celulele cu HTML raw (înainte de strip) pentru detectarea team_id
+            const rawCells = [];
             const cellReg = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+            let cellMatch;
             while ((cellMatch = cellReg.exec(rowHtml)) !== null) {
-                cells.push(stripTags(cellMatch[1]));
+                rawCells.push(cellMatch[1]);
             }
-            if (cells.length >= 4 && cells[0].trim() !== '') {
-                const score = parseScore(cells[2] || '');
-                const result = determineResult(cells[1], score.home, score.away);
-                matches.push({
-                    date: cells[0].trim(),
-                    homeTeam: ((_a = cells[1]) === null || _a === void 0 ? void 0 : _a.trim()) || '',
-                    awayTeam: ((_b = cells[3]) === null || _b === void 0 ? void 0 : _b.trim()) || '',
-                    homeScore: score.home,
-                    awayScore: score.away,
-                    result,
-                    league: ((_c = cells[4]) === null || _c === void 0 ? void 0 : _c.trim()) || '',
-                });
+            if (rawCells.length < 4 || !stripTags(rawCells[0]).trim())
+                continue;
+            // Coloana 0: dată (și opțional ora)
+            const rawDate = stripTags(rawCells[0]).trim();
+            // Data poate fi "15.03.2025" sau "15.03.2025 19:00"
+            const dateParts = rawDate.split(/\s+/);
+            const dateStr = dateParts[0] || '';
+            const timeStr = dateParts[1] || '';
+            // Validare și normalizare a datei la DD.MM.YYYY
+            let normalizedDateStr = dateStr;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                // Dacă formatul este YYYY-MM-DD
+                const parts = dateStr.split('-');
+                normalizedDateStr = `${parts[2]}.${parts[1]}.${parts[0]}`;
             }
+            else if (!/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) {
+                continue;
+            }
+            // Coloana 1: echipa gazdă (HTML raw pentru detectare team_id)
+            const homeTeamRaw = rawCells[1] || '';
+            const homeTeam = stripTags(homeTeamRaw);
+            // Coloana 2: scor
+            const rawScore = stripTags(rawCells[2] || '');
+            const { home: homeScore, away: awayScore } = parseScore(rawScore);
+            // Coloana 3: echipa oaspete (HTML raw pentru detectare team_id)
+            const awayTeamRaw = rawCells[3] || '';
+            const awayTeam = stripTags(awayTeamRaw);
+            // Coloana 4 (opțional): liga/categoria
+            const league = rawCells[4] ? stripTags(rawCells[4]).trim() : '';
+            if (!homeTeam || !awayTeam)
+                continue;
+            const status = determineStatus(homeScore, awayScore);
+            const result = status === 'finished'
+                ? determineResult(homeTeamRaw, awayTeamRaw, homeScore, awayScore, teamId)
+                : 'N/A';
+            matches.push({
+                date: normalizedDateStr,
+                time: timeStr,
+                homeTeam,
+                awayTeam,
+                homeScore,
+                awayScore,
+                result,
+                status,
+                league,
+            });
         }
+        // Sortare cronologică: scheduled → viitoare (asc), finished → trecute (desc)
+        // Returnăm în ordine crescătoare a datei — UI-ul va decide afișarea
+        matches.sort((a, b) => parseDateToTimestamp(a.date) - parseDateToTimestamp(b.date));
         res.json(matches);
     }
     catch (e) {
         console.error('[basketball/matches] error:', e);
         res.status(500).json({ error: 'Failed to fetch matches' });
     }
+}));
+// ---------- GET /api/basketball/dashboard-summary ----------
+// Agregă date din finance + players pentru KPI-uri dashboard
+router.get('/dashboard-summary', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    res.status(501).json({ message: 'Use /api/dashboard/summary instead' });
 }));
 exports.default = router;

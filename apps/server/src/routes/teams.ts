@@ -1,15 +1,81 @@
 import { Router } from 'express';
-import { db } from '../db';
-import { teams, players, playersToTeams } from '../db/schema';
-import { eq, or } from 'drizzle-orm';
+import { admin, firestore, nextNumericId, toIso } from '../lib/firebaseAdmin';
 import crypto from 'crypto';
+
+type TeamDoc = {
+    id: number;
+    frbTeamId: string;
+    name: string;
+    frbLeagueId: string;
+    leagueName: string;
+    frbSeasonId: string;
+    seasonName: string;
+    inviteCode: string;
+    createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
+    updatedAt?: FirebaseFirestore.Timestamp | Date | string | null;
+    clubId?: number | null;
+    createdBy?: string | null;
+};
+
+type PlayerDoc = {
+    id: number;
+    firstName: string;
+    lastName: string;
+    name?: string | null;
+    email?: string | null;
+    number?: number | null;
+    status?: string | null;
+    avatarUrl?: string | null;
+    medicalCheckExpiry?: FirebaseFirestore.Timestamp | Date | string | null;
+    birthYear?: number | null;
+    teamId?: number | null;
+    createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
+    updatedAt?: FirebaseFirestore.Timestamp | Date | string | null;
+};
 
 const router = Router();
 
+async function getTeamPlayersById(teamId: number) {
+    const playersSnap = await firestore.collection('players').where('teamId', '==', teamId).get();
+    const playerDocs = playersSnap.docs.map((docSnap) => docSnap.data() as PlayerDoc);
+
+    const joinSnap = await firestore.collection('playersToTeams').where('teamId', '==', teamId).get();
+    const joinPlayerIds = joinSnap.docs.map((docSnap) => Number((docSnap.data() as { playerId: number }).playerId));
+
+    if (joinPlayerIds.length > 0) {
+        const extraPlayersSnap = await firestore.collection('players').where('id', 'in', joinPlayerIds.slice(0, 10)).get();
+        extraPlayersSnap.docs.forEach((docSnap) => {
+            const player = docSnap.data() as PlayerDoc;
+            if (!playerDocs.some((existing) => existing.id === player.id)) {
+                playerDocs.push(player);
+            }
+        });
+    }
+
+    return Array.from(new Map(playerDocs.map((player) => [player.id, player])).values()).map((player) => ({
+        id: player.id,
+        firstName: player.firstName,
+        lastName: player.lastName,
+        name: player.name ?? `${player.firstName} ${player.lastName}`.trim(),
+        email: player.email ?? null,
+        number: player.number ?? null,
+        status: player.status ?? 'active',
+        avatarUrl: player.avatarUrl ?? null,
+        teamId: player.teamId ?? null,
+        createdAt: toIso(player.createdAt) ?? null,
+        medicalCheckExpiry: toIso(player.medicalCheckExpiry) ?? null,
+        birthYear: player.birthYear ?? null,
+    }));
+}
+
 // GET /api/teams
-router.get('/', async (req, res) => {
+router.get('/', async (_req, res) => {
     try {
-        const allTeams = await db.select().from(teams).orderBy(teams.createdAt);
+        const snap = await firestore.collection('teams').orderBy('createdAt', 'asc').get();
+        const allTeams = snap.docs.map((docSnap) => docSnap.data() as TeamDoc).map((team) => ({
+            ...team,
+            createdAt: toIso(team.createdAt) ?? new Date().toISOString(),
+        }));
         res.json(allTeams);
     } catch (e) {
         console.error('[GET /api/teams] error:', e);
@@ -26,10 +92,10 @@ router.post('/', async (req, res) => {
             return;
         }
 
-        // Generate a 6-character hex invite code
         const inviteCode = crypto.randomBytes(3).toString('hex').toUpperCase();
-
-        const newTeam = await db.insert(teams).values({
+        const id = await nextNumericId('teams');
+        const team: TeamDoc = {
+            id,
             frbTeamId,
             name,
             frbLeagueId,
@@ -37,9 +103,13 @@ router.post('/', async (req, res) => {
             frbSeasonId,
             seasonName,
             inviteCode,
-        }).returning();
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            createdBy: null,
+        };
 
-        res.json(newTeam[0]);
+        await firestore.collection('teams').doc(String(id)).set(team);
+        res.json({ ...team, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     } catch (e) {
         console.error('[POST /api/teams] error:', e);
         res.status(500).json({ error: 'Failed to create team' });
@@ -55,13 +125,14 @@ router.get('/:id', async (req, res) => {
             return;
         }
 
-        const team = await db.select().from(teams).where(eq(teams.id, id));
-        if (team.length === 0) {
+        const snap = await firestore.collection('teams').doc(String(id)).get();
+        if (!snap.exists) {
             res.status(404).json({ error: 'Team not found' });
             return;
         }
 
-        res.json(team[0]);
+        const team = snap.data() as TeamDoc;
+        res.json({ ...team, createdAt: toIso(team.createdAt) ?? null, updatedAt: toIso(team.updatedAt) ?? null });
     } catch (e) {
         console.error(`[GET /api/teams/${req.params.id}] error:`, e);
         res.status(500).json({ error: 'Failed to fetch team details' });
@@ -77,14 +148,16 @@ router.delete('/:id', async (req, res) => {
             return;
         }
 
-        // Delete relationships first
-        await db.delete(playersToTeams).where(eq(playersToTeams.teamId, id));
-        
-        // Also old legacy way: set teamId to null for players directly referencing this team
-        await db.update(players).set({ teamId: null }).where(eq(players.teamId, id));
-        
-        // Delete the team
-        await db.delete(teams).where(eq(teams.id, id));
+        const batch = firestore.batch();
+        const joinsSnap = await firestore.collection('playersToTeams').where('teamId', '==', id).get();
+        joinsSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+
+        const playersSnap = await firestore.collection('players').where('teamId', '==', id).get();
+        playersSnap.docs.forEach((docSnap) => batch.set(docSnap.ref, { teamId: null }, { merge: true }));
+
+        batch.delete(firestore.collection('teams').doc(String(id)));
+        await batch.commit();
+
         res.json({ success: true });
     } catch (e) {
         console.error(`[DELETE /api/teams/${req.params.id}] error:`, e);
@@ -101,33 +174,8 @@ router.get('/:id/players', async (req, res) => {
             return;
         }
 
-        // Get players from BOTH the legacy teamId column and the new join table
-        // We'll use a subquery or just a join. A join is better.
-        const teamPlayers = await db.select({
-            id: players.id,
-            firstName: players.firstName,
-            lastName: players.lastName,
-            name: players.name,
-            email: players.email,
-            number: players.number,
-            status: players.status,
-            avatarUrl: players.avatarUrl,
-            teamId: players.teamId,
-            createdAt: players.createdAt
-        })
-        .from(players)
-        .leftJoin(playersToTeams, eq(players.id, playersToTeams.playerId))
-        .where(
-            or(
-                eq(players.teamId, id),
-                eq(playersToTeams.teamId, id)
-            )
-        );
-
-        // Remove duplicates if any (though there shouldn't be if logic is correct)
-        const uniquePlayers = Array.from(new Map(teamPlayers.map(p => [p.id, p])).values());
-
-        res.json(uniquePlayers);
+        const teamPlayers = await getTeamPlayersById(id);
+        res.json(teamPlayers);
     } catch (e) {
         console.error(`[GET /api/teams/${req.params.id}/players] error:`, e);
         res.status(500).json({ error: 'Failed to fetch players' });
@@ -144,13 +192,11 @@ router.post('/:id/players', async (req, res) => {
         }
 
         const { name, firstName: inputFirstName, lastName: inputLastName, status, avatarUrl } = req.body;
-        
+
         let firstName = inputFirstName;
         let lastName = inputLastName;
-
-        // Backward compatibility: if name is provided but not firstName/lastName
         if (name && (!firstName || !lastName)) {
-            const parts = name.trim().split(' ');
+            const parts = String(name).trim().split(' ');
             firstName = firstName || parts[0];
             lastName = lastName || (parts.length > 1 ? parts.slice(1).join(' ') : 'Player');
         }
@@ -160,16 +206,28 @@ router.post('/:id/players', async (req, res) => {
             return;
         }
 
-        const newPlayer = await db.insert(players).values({
+        const id = await nextNumericId('players');
+        const player: PlayerDoc = {
+            id,
             name: name || `${firstName} ${lastName}`,
             firstName,
             lastName,
             status: status || 'active',
-            avatarUrl,
+            avatarUrl: avatarUrl || null,
             teamId,
-        }).returning();
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
 
-        res.json(newPlayer[0]);
+        await firestore.collection('players').doc(String(id)).set(player);
+        const relationId = await nextNumericId('playersToTeams');
+        await firestore.collection('playersToTeams').doc(String(relationId)).set({
+            id: relationId,
+            playerId: id,
+            teamId,
+        });
+
+        res.json({ ...player, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     } catch (e) {
         console.error(`[POST /api/teams/${req.params.id}/players] error:`, e);
         res.status(500).json({ error: 'Failed to create player' });

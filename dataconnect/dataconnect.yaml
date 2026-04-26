@@ -1,0 +1,13 @@
+specVersion: "v1"
+serviceId: "bcms-61b00-service"
+location: "europe-central2"
+schemas:
+  - source: "./schema"
+    datasource:
+      postgresql:
+        database: "bcms-61b00-database"
+        cloudSql:
+          instanceId: "bcms-61b00-instance"
+          # schemaValidation: "STRICT"     # STRICT mode makes Postgres schema match Data Connect exactly.
+          # schemaValidation: "COMPATIBLE" # COMPATIBLE mode makes Postgres schema compatible with Data Connect.
+connectorDirs: ["./example"]

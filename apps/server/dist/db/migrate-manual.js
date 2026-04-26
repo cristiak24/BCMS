@@ -8,14 +8,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const serverless_1 = require("@neondatabase/serverless");
-const dotenv_1 = __importDefault(require("dotenv"));
-const path_1 = __importDefault(require("path"));
-dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../../.env') });
+const loadEnv_1 = require("../lib/loadEnv");
+(0, loadEnv_1.loadServerEnv)();
 const sql = (0, serverless_1.neon)(process.env.DATABASE_URL);
 function migrate() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -119,6 +115,105 @@ function migrate() {
                 console.log('Error altering name column');
             }
             yield sql `
+            CREATE TABLE IF NOT EXISTS "clubs" (
+                "id" serial PRIMARY KEY NOT NULL,
+                "name" varchar(255) NOT NULL,
+                "created_at" timestamp DEFAULT now() NOT NULL
+            );
+        `;
+            console.log('Clubs table checked/created');
+            try {
+                yield sql `ALTER TABLE "users" ADD COLUMN "club_id" integer;`;
+                console.log('Added club_id to users');
+            }
+            catch (e) {
+                console.log('club_id already exists or error adding it');
+            }
+            try {
+                yield sql `ALTER TABLE "users" ADD COLUMN "first_name" varchar(255);`;
+                console.log('Added first_name to users');
+            }
+            catch (e) {
+                console.log('first_name already exists or error adding it');
+            }
+            try {
+                yield sql `ALTER TABLE "users" ADD COLUMN "last_name" varchar(255);`;
+                console.log('Added last_name to users');
+            }
+            catch (e) {
+                console.log('last_name already exists or error adding it');
+            }
+            try {
+                yield sql `ALTER TABLE "users" ADD COLUMN "avatar_url" text;`;
+                console.log('Added avatar_url to users');
+            }
+            catch (e) {
+                console.log('avatar_url already exists or error adding it');
+            }
+            try {
+                yield sql `ALTER TABLE "users" ADD COLUMN "phone" varchar(50);`;
+                console.log('Added phone to users');
+            }
+            catch (e) {
+                console.log('phone already exists or error adding it');
+            }
+            try {
+                yield sql `ALTER TABLE "users" ADD COLUMN "preferred_language" varchar(32);`;
+                console.log('Added preferred_language to users');
+            }
+            catch (e) {
+                console.log('preferred_language already exists or error adding it');
+            }
+            try {
+                yield sql `ALTER TABLE "users" ADD COLUMN "notification_preferences" jsonb;`;
+                console.log('Added notification_preferences to users');
+            }
+            catch (e) {
+                console.log('notification_preferences already exists or error adding it');
+            }
+            try {
+                yield sql `ALTER TABLE "users" ADD COLUMN "created_at" timestamp DEFAULT now() NOT NULL;`;
+                console.log('Added created_at to users');
+            }
+            catch (e) {
+                console.log('created_at already exists or error adding it');
+            }
+            try {
+                yield sql `ALTER TABLE "users" ADD COLUMN "last_login_at" timestamp;`;
+                console.log('Added last_login_at to users');
+            }
+            catch (e) {
+                console.log('last_login_at already exists or error adding it');
+            }
+            yield sql `
+            CREATE TABLE IF NOT EXISTS "access_requests" (
+                "id" serial PRIMARY KEY NOT NULL,
+                "user_id" integer NOT NULL,
+                "club_id" integer NOT NULL,
+                "requested_role" varchar(32) NOT NULL,
+                "status" varchar(32) DEFAULT 'pending' NOT NULL,
+                "created_at" timestamp DEFAULT now() NOT NULL,
+                "reviewed_at" timestamp,
+                "reviewed_by" integer
+            );
+        `;
+            console.log('Access requests table checked/created');
+            yield sql `
+            CREATE TABLE IF NOT EXISTS "invite_links" (
+                "id" serial PRIMARY KEY NOT NULL,
+                "club_id" integer NOT NULL,
+                "role" varchar(32) NOT NULL,
+                "token" text NOT NULL UNIQUE,
+                "token_hash" text NOT NULL UNIQUE,
+                "expires_at" timestamp NOT NULL,
+                "refresh_interval_minutes" integer NOT NULL,
+                "created_by" integer,
+                "created_at" timestamp DEFAULT now() NOT NULL,
+                "is_active" boolean DEFAULT true NOT NULL
+            );
+        `;
+            console.log('Invite links table checked/created');
+            yield sql `
             CREATE TABLE IF NOT EXISTS "events" (
                 "id" serial PRIMARY KEY NOT NULL,
                 "type" varchar(50) NOT NULL,
@@ -160,6 +255,24 @@ function migrate() {
                     else if (sqlQuery.includes('events_coach_id_users_id_fk')) {
                         yield sql `ALTER TABLE "events" ADD CONSTRAINT "events_coach_id_users_id_fk" FOREIGN KEY ("coach_id") REFERENCES "users"("id")`;
                     }
+                    else if (sqlQuery.includes('users_club_id_clubs_id_fk')) {
+                        yield sql `ALTER TABLE "users" ADD CONSTRAINT "users_club_id_clubs_id_fk" FOREIGN KEY ("club_id") REFERENCES "clubs"("id")`;
+                    }
+                    else if (sqlQuery.includes('access_requests_user_id_users_id_fk')) {
+                        yield sql `ALTER TABLE "access_requests" ADD CONSTRAINT "access_requests_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "users"("id")`;
+                    }
+                    else if (sqlQuery.includes('access_requests_club_id_clubs_id_fk')) {
+                        yield sql `ALTER TABLE "access_requests" ADD CONSTRAINT "access_requests_club_id_clubs_id_fk" FOREIGN KEY ("club_id") REFERENCES "clubs"("id")`;
+                    }
+                    else if (sqlQuery.includes('access_requests_reviewed_by_users_id_fk')) {
+                        yield sql `ALTER TABLE "access_requests" ADD CONSTRAINT "access_requests_reviewed_by_users_id_fk" FOREIGN KEY ("reviewed_by") REFERENCES "users"("id")`;
+                    }
+                    else if (sqlQuery.includes('invite_links_club_id_clubs_id_fk')) {
+                        yield sql `ALTER TABLE "invite_links" ADD CONSTRAINT "invite_links_club_id_clubs_id_fk" FOREIGN KEY ("club_id") REFERENCES "clubs"("id")`;
+                    }
+                    else if (sqlQuery.includes('invite_links_created_by_users_id_fk')) {
+                        yield sql `ALTER TABLE "invite_links" ADD CONSTRAINT "invite_links_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "users"("id")`;
+                    }
                     console.log(`Added FK ${constraint} to ${table}`);
                 }
                 catch (e) {
@@ -178,6 +291,12 @@ function migrate() {
             yield addFK('players_to_teams', 'players_to_teams_team_id_teams_id_fk', 'ALTER TABLE "players_to_teams" ADD CONSTRAINT "players_to_teams_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "teams"("id")');
             yield addFK('events', 'events_team_id_teams_id_fk', 'ALTER TABLE "events" ADD CONSTRAINT "events_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "teams"("id")');
             yield addFK('events', 'events_coach_id_users_id_fk', 'ALTER TABLE "events" ADD CONSTRAINT "events_coach_id_users_id_fk" FOREIGN KEY ("coach_id") REFERENCES "users"("id")');
+            yield addFK('users', 'users_club_id_clubs_id_fk', 'ALTER TABLE "users" ADD CONSTRAINT "users_club_id_clubs_id_fk" FOREIGN KEY ("club_id") REFERENCES "clubs"("id")');
+            yield addFK('access_requests', 'access_requests_user_id_users_id_fk', 'ALTER TABLE "access_requests" ADD CONSTRAINT "access_requests_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "users"("id")');
+            yield addFK('access_requests', 'access_requests_club_id_clubs_id_fk', 'ALTER TABLE "access_requests" ADD CONSTRAINT "access_requests_club_id_clubs_id_fk" FOREIGN KEY ("club_id") REFERENCES "clubs"("id")');
+            yield addFK('access_requests', 'access_requests_reviewed_by_users_id_fk', 'ALTER TABLE "access_requests" ADD CONSTRAINT "access_requests_reviewed_by_users_id_fk" FOREIGN KEY ("reviewed_by") REFERENCES "users"("id")');
+            yield addFK('invite_links', 'invite_links_club_id_clubs_id_fk', 'ALTER TABLE "invite_links" ADD CONSTRAINT "invite_links_club_id_clubs_id_fk" FOREIGN KEY ("club_id") REFERENCES "clubs"("id")');
+            yield addFK('invite_links', 'invite_links_created_by_users_id_fk', 'ALTER TABLE "invite_links" ADD CONSTRAINT "invite_links_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "users"("id")');
             console.log('Migration completed successfully!');
         }
         catch (error) {

@@ -1,0 +1,37 @@
+query GetUserByUidOrEmail($uid: String!, $email: String!) @auth(level: NO_ACCESS) {
+  users(where: {
+    _or: [
+      { uid: { eq: $uid } },
+      { email: { eq: $email } }
+    ]
+  }, limit: 1) {
+    id
+    uid
+    email
+    name
+    firstName
+    lastName
+    role
+    status
+    clubId
+    avatarUrl
+    phone
+    preferredLanguage
+    notificationPreferences
+    lastLoginAt
+    createdAt
+  }
+}
+
+query GetClubById($id: Int!) @auth(level: NO_ACCESS) {
+  club(id: $id) {
+    id
+    name
+  }
+}
+
+query GetMaxUserId @auth(level: NO_ACCESS) {
+  users(orderBy: [{ id: DESC }], limit: 1) {
+    id
+  }
+}

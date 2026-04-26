@@ -1,23 +1,26 @@
 import { Router } from 'express';
-import { db } from '../db';
-import { users } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { firestore } from '../lib/firebaseAdmin';
+
+type UserDoc = {
+    id: number;
+    email: string;
+    name: string;
+    role: string;
+    status: string;
+};
 
 const router = Router();
 
-// GET /api/admin/requests
-// Get all users with status 'pending'
-router.get('/requests', async (req, res) => {
+router.get('/requests', async (_req, res) => {
     try {
-        const pendingUsers = await db.select({
-            id: users.id,
-            email: users.email,
-            name: users.name,
-            role: users.role,
-            status: users.status,
-        })
-            .from(users)
-            .where(eq(users.status, 'pending'));
+        const pendingUsersSnap = await firestore.collection('users').where('status', '==', 'pending').get();
+        const pendingUsers = pendingUsersSnap.docs.map((docSnap) => docSnap.data() as UserDoc).map((user) => ({
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            status: user.status,
+        }));
 
         res.json(pendingUsers);
     } catch (error) {
@@ -26,58 +29,58 @@ router.get('/requests', async (req, res) => {
     }
 });
 
-// POST /api/admin/requests/:id/approve
-// Approve a user: Set status to 'processed' and assign a role
 router.post('/requests/:id/approve', async (req, res) => {
-    const { id } = req.params;
-    const { role } = req.body; // Admin selects the role
+    const id = Number(req.params.id);
+    const { role } = req.body as { role?: string };
 
     if (!role) {
         return res.status(400).json({ error: 'Role is required for approval' });
     }
 
-    try {
-        const updated = await db
-            .update(users)
-            .set({
-                status: 'processed',
-                role: role // 'admin', 'coach', 'accountant'
-            })
-            .where(eq(users.id, Number(id)))
-            .returning({
-                id: users.id,
-                email: users.email,
-                name: users.name,
-                role: users.role,
-                status: users.status
-            });
+    if (Number.isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid user id' });
+    }
 
-        if (updated.length === 0) {
+    try {
+        const snap = await firestore.collection('users').where('id', '==', id).limit(1).get();
+        const docSnap = snap.docs[0];
+
+        if (!docSnap) {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        res.json({ success: true, user: updated[0] });
+        const current = docSnap.data() as UserDoc;
+        const nextUser = {
+            ...current,
+            status: 'processed',
+            role,
+        };
+
+        await docSnap.ref.set(nextUser, { merge: true });
+        res.json({ success: true, user: nextUser });
     } catch (error) {
         console.error('Error approving user:', error);
         res.status(500).json({ error: 'Failed to approve user' });
     }
 });
 
-// POST /api/admin/requests/:id/reject
-// Reject a user: Set status to 'rejected' (or delete?)
 router.post('/requests/:id/reject', async (req, res) => {
-    const { id } = req.params;
+    const id = Number(req.params.id);
+
+    if (Number.isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid user id' });
+    }
 
     try {
-        const updated = await db
-            .update(users)
-            .set({ status: 'rejected' })
-            .where(eq(users.id, Number(id)))
-            .returning();
+        const snap = await firestore.collection('users').where('id', '==', id).limit(1).get();
+        const docSnap = snap.docs[0];
 
-        if (updated.length === 0) {
+        if (!docSnap) {
             return res.status(404).json({ error: 'User not found' });
         }
+
+        const current = docSnap.data() as UserDoc;
+        await docSnap.ref.set({ ...current, status: 'rejected' }, { merge: true });
 
         res.json({ success: true, message: 'User rejected' });
     } catch (error) {

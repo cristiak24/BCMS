@@ -13,15 +13,51 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const db_1 = require("../db");
-const schema_1 = require("../db/schema");
-const drizzle_orm_1 = require("drizzle-orm");
+const firebaseAdmin_1 = require("../lib/firebaseAdmin");
 const crypto_1 = __importDefault(require("crypto"));
 const router = (0, express_1.Router)();
+function getTeamPlayersById(teamId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const playersSnap = yield firebaseAdmin_1.firestore.collection('players').where('teamId', '==', teamId).get();
+        const playerDocs = playersSnap.docs.map((docSnap) => docSnap.data());
+        const joinSnap = yield firebaseAdmin_1.firestore.collection('playersToTeams').where('teamId', '==', teamId).get();
+        const joinPlayerIds = joinSnap.docs.map((docSnap) => Number(docSnap.data().playerId));
+        if (joinPlayerIds.length > 0) {
+            const extraPlayersSnap = yield firebaseAdmin_1.firestore.collection('players').where('id', 'in', joinPlayerIds.slice(0, 10)).get();
+            extraPlayersSnap.docs.forEach((docSnap) => {
+                const player = docSnap.data();
+                if (!playerDocs.some((existing) => existing.id === player.id)) {
+                    playerDocs.push(player);
+                }
+            });
+        }
+        return Array.from(new Map(playerDocs.map((player) => [player.id, player])).values()).map((player) => {
+            var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+            return ({
+                id: player.id,
+                firstName: player.firstName,
+                lastName: player.lastName,
+                name: (_a = player.name) !== null && _a !== void 0 ? _a : `${player.firstName} ${player.lastName}`.trim(),
+                email: (_b = player.email) !== null && _b !== void 0 ? _b : null,
+                number: (_c = player.number) !== null && _c !== void 0 ? _c : null,
+                status: (_d = player.status) !== null && _d !== void 0 ? _d : 'active',
+                avatarUrl: (_e = player.avatarUrl) !== null && _e !== void 0 ? _e : null,
+                teamId: (_f = player.teamId) !== null && _f !== void 0 ? _f : null,
+                createdAt: (_g = (0, firebaseAdmin_1.toIso)(player.createdAt)) !== null && _g !== void 0 ? _g : null,
+                medicalCheckExpiry: (_h = (0, firebaseAdmin_1.toIso)(player.medicalCheckExpiry)) !== null && _h !== void 0 ? _h : null,
+                birthYear: (_j = player.birthYear) !== null && _j !== void 0 ? _j : null,
+            });
+        });
+    });
+}
 // GET /api/teams
-router.get('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get('/', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const allTeams = yield db_1.db.select().from(schema_1.teams).orderBy(schema_1.teams.createdAt);
+        const snap = yield firebaseAdmin_1.firestore.collection('teams').orderBy('createdAt', 'asc').get();
+        const allTeams = snap.docs.map((docSnap) => docSnap.data()).map((team) => {
+            var _a;
+            return (Object.assign(Object.assign({}, team), { createdAt: (_a = (0, firebaseAdmin_1.toIso)(team.createdAt)) !== null && _a !== void 0 ? _a : new Date().toISOString() }));
+        });
         res.json(allTeams);
     }
     catch (e) {
@@ -37,9 +73,10 @@ router.post('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             res.status(400).json({ error: 'Missing required fields' });
             return;
         }
-        // Generate a 6-character hex invite code
         const inviteCode = crypto_1.default.randomBytes(3).toString('hex').toUpperCase();
-        const newTeam = yield db_1.db.insert(schema_1.teams).values({
+        const id = yield (0, firebaseAdmin_1.nextNumericId)('teams');
+        const team = {
+            id,
             frbTeamId,
             name,
             frbLeagueId,
@@ -47,8 +84,12 @@ router.post('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             frbSeasonId,
             seasonName,
             inviteCode,
-        }).returning();
-        res.json(newTeam[0]);
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            createdBy: null,
+        };
+        yield firebaseAdmin_1.firestore.collection('teams').doc(String(id)).set(team);
+        res.json(Object.assign(Object.assign({}, team), { createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
     }
     catch (e) {
         console.error('[POST /api/teams] error:', e);
@@ -57,18 +98,20 @@ router.post('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 }));
 // GET /api/teams/:id
 router.get('/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
     try {
         const id = parseInt(req.params.id, 10);
         if (isNaN(id)) {
             res.status(400).json({ error: 'Invalid ID' });
             return;
         }
-        const team = yield db_1.db.select().from(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.id, id));
-        if (team.length === 0) {
+        const snap = yield firebaseAdmin_1.firestore.collection('teams').doc(String(id)).get();
+        if (!snap.exists) {
             res.status(404).json({ error: 'Team not found' });
             return;
         }
-        res.json(team[0]);
+        const team = snap.data();
+        res.json(Object.assign(Object.assign({}, team), { createdAt: (_a = (0, firebaseAdmin_1.toIso)(team.createdAt)) !== null && _a !== void 0 ? _a : null, updatedAt: (_b = (0, firebaseAdmin_1.toIso)(team.updatedAt)) !== null && _b !== void 0 ? _b : null }));
     }
     catch (e) {
         console.error(`[GET /api/teams/${req.params.id}] error:`, e);
@@ -83,12 +126,13 @@ router.delete('/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* 
             res.status(400).json({ error: 'Invalid ID' });
             return;
         }
-        // Delete relationships first
-        yield db_1.db.delete(schema_1.playersToTeams).where((0, drizzle_orm_1.eq)(schema_1.playersToTeams.teamId, id));
-        // Also old legacy way: set teamId to null for players directly referencing this team
-        yield db_1.db.update(schema_1.players).set({ teamId: null }).where((0, drizzle_orm_1.eq)(schema_1.players.teamId, id));
-        // Delete the team
-        yield db_1.db.delete(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.id, id));
+        const batch = firebaseAdmin_1.firestore.batch();
+        const joinsSnap = yield firebaseAdmin_1.firestore.collection('playersToTeams').where('teamId', '==', id).get();
+        joinsSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+        const playersSnap = yield firebaseAdmin_1.firestore.collection('players').where('teamId', '==', id).get();
+        playersSnap.docs.forEach((docSnap) => batch.set(docSnap.ref, { teamId: null }, { merge: true }));
+        batch.delete(firebaseAdmin_1.firestore.collection('teams').doc(String(id)));
+        yield batch.commit();
         res.json({ success: true });
     }
     catch (e) {
@@ -104,26 +148,8 @@ router.get('/:id/players', (req, res) => __awaiter(void 0, void 0, void 0, funct
             res.status(400).json({ error: 'Invalid ID' });
             return;
         }
-        // Get players from BOTH the legacy teamId column and the new join table
-        // We'll use a subquery or just a join. A join is better.
-        const teamPlayers = yield db_1.db.select({
-            id: schema_1.players.id,
-            firstName: schema_1.players.firstName,
-            lastName: schema_1.players.lastName,
-            name: schema_1.players.name,
-            email: schema_1.players.email,
-            number: schema_1.players.number,
-            status: schema_1.players.status,
-            avatarUrl: schema_1.players.avatarUrl,
-            teamId: schema_1.players.teamId,
-            createdAt: schema_1.players.createdAt
-        })
-            .from(schema_1.players)
-            .leftJoin(schema_1.playersToTeams, (0, drizzle_orm_1.eq)(schema_1.players.id, schema_1.playersToTeams.playerId))
-            .where((0, drizzle_orm_1.or)((0, drizzle_orm_1.eq)(schema_1.players.teamId, id), (0, drizzle_orm_1.eq)(schema_1.playersToTeams.teamId, id)));
-        // Remove duplicates if any (though there shouldn't be if logic is correct)
-        const uniquePlayers = Array.from(new Map(teamPlayers.map(p => [p.id, p])).values());
-        res.json(uniquePlayers);
+        const teamPlayers = yield getTeamPlayersById(id);
+        res.json(teamPlayers);
     }
     catch (e) {
         console.error(`[GET /api/teams/${req.params.id}/players] error:`, e);
@@ -141,9 +167,8 @@ router.post('/:id/players', (req, res) => __awaiter(void 0, void 0, void 0, func
         const { name, firstName: inputFirstName, lastName: inputLastName, status, avatarUrl } = req.body;
         let firstName = inputFirstName;
         let lastName = inputLastName;
-        // Backward compatibility: if name is provided but not firstName/lastName
         if (name && (!firstName || !lastName)) {
-            const parts = name.trim().split(' ');
+            const parts = String(name).trim().split(' ');
             firstName = firstName || parts[0];
             lastName = lastName || (parts.length > 1 ? parts.slice(1).join(' ') : 'Player');
         }
@@ -151,15 +176,26 @@ router.post('/:id/players', (req, res) => __awaiter(void 0, void 0, void 0, func
             res.status(400).json({ error: 'First name and last name are required' });
             return;
         }
-        const newPlayer = yield db_1.db.insert(schema_1.players).values({
+        const id = yield (0, firebaseAdmin_1.nextNumericId)('players');
+        const player = {
+            id,
             name: name || `${firstName} ${lastName}`,
             firstName,
             lastName,
             status: status || 'active',
-            avatarUrl,
+            avatarUrl: avatarUrl || null,
             teamId,
-        }).returning();
-        res.json(newPlayer[0]);
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+        yield firebaseAdmin_1.firestore.collection('players').doc(String(id)).set(player);
+        const relationId = yield (0, firebaseAdmin_1.nextNumericId)('playersToTeams');
+        yield firebaseAdmin_1.firestore.collection('playersToTeams').doc(String(relationId)).set({
+            id: relationId,
+            playerId: id,
+            teamId,
+        });
+        res.json(Object.assign(Object.assign({}, player), { createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
     }
     catch (e) {
         console.error(`[POST /api/teams/${req.params.id}/players] error:`, e);
