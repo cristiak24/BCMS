@@ -1,12 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.invites = exports.inviteLinks = exports.accessRequests = exports.clubs = exports.l12Documents = exports.attendance = exports.events = exports.financialSettings = exports.playersToTeams = exports.playerPayments = exports.teams = exports.players = exports.users = exports.financialDocuments = exports.inviteStatus = exports.accessRequestStatus = exports.userStatus = exports.status = exports.role = void 0;
+exports.auditLogs = exports.invites = exports.inviteLinks = exports.accessRequests = exports.clubs = exports.l12Documents = exports.attendance = exports.events = exports.financialSettings = exports.playersToTeams = exports.playerPayments = exports.teams = exports.players = exports.users = exports.financialDocuments = exports.inviteStatus = exports.accessRequestStatus = exports.userStatus = exports.status = exports.role = void 0;
 const pg_core_1 = require("drizzle-orm/pg-core");
-exports.role = (0, pg_core_1.pgEnum)("role", ['admin', 'coach', 'accountant', 'player', 'parent', 'superadmin']);
+exports.role = (0, pg_core_1.pgEnum)("role", ['admin', 'coach', 'accountant', 'player', 'parent', 'staff', 'superadmin']);
 exports.status = (0, pg_core_1.pgEnum)("status", ['pending', 'processed', 'rejected']);
 exports.userStatus = (0, pg_core_1.pgEnum)("user_status", ['active', 'pending', 'disabled']);
 exports.accessRequestStatus = (0, pg_core_1.pgEnum)("access_request_status", ['pending', 'approved', 'denied']);
-exports.inviteStatus = (0, pg_core_1.pgEnum)("invite_status", ['active', 'used', 'expired', 'revoked']);
+exports.inviteStatus = (0, pg_core_1.pgEnum)("invite_status", ['pending', 'accepted', 'expired', 'revoked']);
 exports.financialDocuments = (0, pg_core_1.pgTable)("financial_documents", {
     id: (0, pg_core_1.serial)().primaryKey().notNull(),
     type: (0, pg_core_1.varchar)({ length: 50 }).notNull(),
@@ -209,17 +209,19 @@ exports.inviteLinks = (0, pg_core_1.pgTable)("invite_links", {
 });
 exports.invites = (0, pg_core_1.pgTable)("invites", {
     id: (0, pg_core_1.serial)().primaryKey().notNull(),
+    token: (0, pg_core_1.varchar)({ length: 255 }).notNull(),
     email: (0, pg_core_1.varchar)({ length: 255 }).notNull(),
     role: (0, exports.role)().notNull(),
     clubId: (0, pg_core_1.integer)("club_id"),
     tokenHash: (0, pg_core_1.varchar)("token_hash", { length: 255 }).notNull(),
-    status: (0, exports.inviteStatus)().default('active').notNull(),
+    status: (0, exports.inviteStatus)().default('pending').notNull(),
     expiresAt: (0, pg_core_1.timestamp)("expires_at", { mode: 'string' }).notNull(),
     createdBy: (0, pg_core_1.integer)("created_by"),
     usedBy: (0, pg_core_1.integer)("used_by"),
     createdAt: (0, pg_core_1.timestamp)("created_at", { mode: 'string' }).defaultNow().notNull(),
     usedAt: (0, pg_core_1.timestamp)("used_at", { mode: 'string' }),
 }, (table) => [
+    (0, pg_core_1.unique)("invites_token_unique").on(table.token),
     (0, pg_core_1.unique)("invites_token_hash_unique").on(table.tokenHash),
     (0, pg_core_1.foreignKey)({
         columns: [table.clubId],
@@ -235,5 +237,30 @@ exports.invites = (0, pg_core_1.pgTable)("invites", {
         columns: [table.usedBy],
         foreignColumns: [exports.users.id],
         name: "invites_used_by_users_id_fk"
+    }),
+]);
+exports.auditLogs = (0, pg_core_1.pgTable)("audit_logs", {
+    id: (0, pg_core_1.serial)().primaryKey().notNull(),
+    action: (0, pg_core_1.varchar)({ length: 120 }).notNull(),
+    entityType: (0, pg_core_1.varchar)("entity_type", { length: 80 }).notNull(),
+    entityId: (0, pg_core_1.varchar)("entity_id", { length: 120 }),
+    actorUserId: (0, pg_core_1.integer)("actor_user_id"),
+    actorUid: (0, pg_core_1.varchar)("actor_uid", { length: 255 }),
+    actorRole: (0, exports.role)("actor_role"),
+    clubId: (0, pg_core_1.integer)("club_id"),
+    metadata: (0, pg_core_1.text)(),
+    ipAddress: (0, pg_core_1.varchar)("ip_address", { length: 120 }),
+    userAgent: (0, pg_core_1.text)("user_agent"),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+    (0, pg_core_1.foreignKey)({
+        columns: [table.actorUserId],
+        foreignColumns: [exports.users.id],
+        name: "audit_logs_actor_user_id_users_id_fk",
+    }),
+    (0, pg_core_1.foreignKey)({
+        columns: [table.clubId],
+        foreignColumns: [exports.clubs.id],
+        name: "audit_logs_club_id_clubs_id_fk",
     }),
 ]);

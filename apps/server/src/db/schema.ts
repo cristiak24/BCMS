@@ -1,11 +1,11 @@
 import { pgTable, serial, varchar, integer, text, timestamp, unique, foreignKey, pgEnum } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
-export const role = pgEnum("role", ['admin', 'coach', 'accountant', 'player', 'parent', 'superadmin'])
+export const role = pgEnum("role", ['admin', 'coach', 'accountant', 'player', 'parent', 'staff', 'superadmin'])
 export const status = pgEnum("status", ['pending', 'processed', 'rejected'])
 export const userStatus = pgEnum("user_status", ['active', 'pending', 'disabled'])
 export const accessRequestStatus = pgEnum("access_request_status", ['pending', 'approved', 'denied'])
-export const inviteStatus = pgEnum("invite_status", ['active', 'used', 'expired', 'revoked'])
+export const inviteStatus = pgEnum("invite_status", ['pending', 'accepted', 'expired', 'revoked'])
 
 
 
@@ -223,17 +223,19 @@ export const inviteLinks = pgTable("invite_links", {
 
 export const invites = pgTable("invites", {
 	id: serial().primaryKey().notNull(),
+	token: varchar({ length: 255 }).notNull(),
 	email: varchar({ length: 255 }).notNull(),
 	role: role().notNull(),
 	clubId: integer("club_id"),
 	tokenHash: varchar("token_hash", { length: 255 }).notNull(),
-	status: inviteStatus().default('active').notNull(),
+	status: inviteStatus().default('pending').notNull(),
 	expiresAt: timestamp("expires_at", { mode: 'string' }).notNull(),
 	createdBy: integer("created_by"),
 	usedBy: integer("used_by"),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	usedAt: timestamp("used_at", { mode: 'string' }),
 }, (table) => [
+	unique("invites_token_unique").on(table.token),
 	unique("invites_token_hash_unique").on(table.tokenHash),
 	foreignKey({
 		columns: [table.clubId],
@@ -249,5 +251,31 @@ export const invites = pgTable("invites", {
 		columns: [table.usedBy],
 		foreignColumns: [users.id],
 		name: "invites_used_by_users_id_fk"
+	}),
+]);
+
+export const auditLogs = pgTable("audit_logs", {
+	id: serial().primaryKey().notNull(),
+	action: varchar({ length: 120 }).notNull(),
+	entityType: varchar("entity_type", { length: 80 }).notNull(),
+	entityId: varchar("entity_id", { length: 120 }),
+	actorUserId: integer("actor_user_id"),
+	actorUid: varchar("actor_uid", { length: 255 }),
+	actorRole: role("actor_role"),
+	clubId: integer("club_id"),
+	metadata: text(),
+	ipAddress: varchar("ip_address", { length: 120 }),
+	userAgent: text("user_agent"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+		columns: [table.actorUserId],
+		foreignColumns: [users.id],
+		name: "audit_logs_actor_user_id_users_id_fk",
+	}),
+	foreignKey({
+		columns: [table.clubId],
+		foreignColumns: [clubs.id],
+		name: "audit_logs_club_id_clubs_id_fk",
 	}),
 ]);

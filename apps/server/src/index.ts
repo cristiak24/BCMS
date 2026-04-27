@@ -5,6 +5,8 @@ import authRoutes from './routes/auth';
 import profileRoutes from './routes/profile';
 import adminRouter from './routes/admin';
 import manageAccessRoutes from './routes/manageAccess';
+import invitationsRoutes from './routes/invitations';
+import superAdminRoutes from './routes/superAdmin';
 import basketballRoutes from './routes/basketball';
 import dashboardRoutes from './routes/dashboard';
 
@@ -50,6 +52,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/admin', adminRouter);
 app.use('/api/manage-access', manageAccessRoutes);
+app.use('/api/invitations', invitationsRoutes);
+app.use('/api/super-admin', superAdminRoutes);
 app.use('/api/basketball', basketballRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/teams', teamsRoutes);

@@ -47,6 +47,7 @@ export async function getRequestUser(req: Request): Promise<AppUserContext | nul
 
     const user = userId != null
         ? await fetchDocByNumericId<{
+            id: number;
             email: string;
             name: string;
             role: AppUserContext['role'];
@@ -55,12 +56,12 @@ export async function getRequestUser(req: Request): Promise<AppUserContext | nul
         }>('users', userId)
         : rawUserId
             ? await fetchDocById<{
+                id: number | string;
                 email: string;
                 name: string;
                 role: AppUserContext['role'];
                 clubId?: number | null;
                 status?: AppUserContext['status'];
-                id?: number;
             }>('users', rawUserId)
             : null;
 
