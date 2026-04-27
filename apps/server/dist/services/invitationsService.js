@@ -11,7 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-var _a, _b, _c, _d, _e, _f;
+var _a, _b, _c, _d, _e;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.normalizeEmail = normalizeEmail;
 exports.normalizeClubName = normalizeClubName;
@@ -29,13 +29,12 @@ const drizzle_orm_1 = require("drizzle-orm");
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const auditService_1 = require("./auditService");
-const RESEND_API_KEY = ((_a = process.env.RESEND_API_KEY) === null || _a === void 0 ? void 0 : _a.trim()) || ((_b = process.env.SERVER_RESEND_API_KEY) === null || _b === void 0 ? void 0 : _b.trim()) || '';
-const RESEND_FROM_EMAIL = ((_c = process.env.RESEND_FROM_EMAIL) === null || _c === void 0 ? void 0 : _c.trim()) || 'BCMS <onboarding@resend.dev>';
-const APP_PUBLIC_URL = ((_d = process.env.APP_PUBLIC_URL) === null || _d === void 0 ? void 0 : _d.trim()) ||
-    ((_e = process.env.EXPO_PUBLIC_APP_URL) === null || _e === void 0 ? void 0 : _e.trim()) ||
-    ((_f = process.env.EXPO_PUBLIC_WEB_APP_URL) === null || _f === void 0 ? void 0 : _f.trim()) ||
-    'http://localhost:8081';
-const INVITE_TTL_MINUTES = 10;
+const loadEnv_1 = require("../lib/loadEnv");
+(0, loadEnv_1.loadServerEnv)();
+const RESEND_API_KEY = ((_a = process.env.RESEND_API_KEY) === null || _a === void 0 ? void 0 : _a.trim()) || '';
+const RESEND_FROM_EMAIL = ((_b = process.env.RESEND_FROM_EMAIL) === null || _b === void 0 ? void 0 : _b.trim()) || 'BCMS <onboarding@resend.dev>';
+const APP_PUBLIC_URL = ((_c = process.env.APP_BASE_URL) === null || _c === void 0 ? void 0 : _c.trim()) || ((_d = process.env.FRONTEND_URL) === null || _d === void 0 ? void 0 : _d.trim()) || 'http://localhost:8081';
+const INVITE_TTL_MINUTES = Number((_e = process.env.INVITE_EXPIRATION_MINUTES) !== null && _e !== void 0 ? _e : 10) || 10;
 const resend = RESEND_API_KEY ? new resend_1.Resend(RESEND_API_KEY) : null;
 function normalizeEmail(value) {
     return value.trim().toLowerCase();

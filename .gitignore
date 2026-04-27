@@ -1,4 +1,6 @@
 node_modules
+**/.env
 **/.env.local
 **/.env.*.local
 scripts/*.json
+scripts/bcms-61b00-firebase-adminsdk-fbsvc-98ff59a97d.json

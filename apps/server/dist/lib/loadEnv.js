@@ -8,7 +8,5 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
 function loadServerEnv() {
     const localEnvPath = path_1.default.resolve(__dirname, '../../.env.local');
-    const envPath = path_1.default.resolve(__dirname, '../../.env');
     dotenv_1.default.config({ path: localEnvPath, override: false });
-    dotenv_1.default.config({ path: envPath, override: false });
 }

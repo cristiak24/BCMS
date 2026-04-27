@@ -10,16 +10,31 @@ function initAdminApp() {
   }
 
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
-  const projectId =
-    process.env.FIREBASE_PROJECT_ID?.trim() ||
-    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID?.trim() ||
-    'bcms-61b00';
+  const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  if (!projectId) {
+    throw new Error('FIREBASE_PROJECT_ID is required.');
+  }
 
   if (serviceAccountJson) {
     const serviceAccount = JSON.parse(serviceAccountJson) as admin.ServiceAccount;
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       projectId: (serviceAccount as any).project_id || projectId,
+    });
+    return;
+  }
+
+  if (clientEmail && privateKey) {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+      projectId,
     });
     return;
   }

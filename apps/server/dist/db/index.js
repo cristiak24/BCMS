@@ -45,7 +45,6 @@ if (!connectionString) {
 }
 exports.pool = new pg_1.Pool({
     connectionString,
-    // Dacă folosești Supabase sau alt provider, ar putea fi nevoie de ssl: true
-    // ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
 });
 exports.db = (0, node_postgres_1.drizzle)(exports.pool, { schema });

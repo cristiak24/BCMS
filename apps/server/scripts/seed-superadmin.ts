@@ -23,7 +23,6 @@ import * as dotenv from 'dotenv';
 
 // Load env vars — __dirname is apps/server/scripts when run with tsx
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
 // Also load client env for EXPO_PUBLIC_FIREBASE_API_KEY fallback
 dotenv.config({ path: path.resolve(__dirname, '../../client/.env.local') });
 

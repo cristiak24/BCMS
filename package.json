@@ -7,15 +7,15 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=apps/server\" \"npm run start --workspace=apps/client\"",
+    "build:web": "npm run build:web --workspace=apps/client",
+    "deploy": "npm run build:web && firebase deploy --only hosting",
     "seed:superadmin": "tsx scripts/seedSuperadmin.ts",
     "functions:build": "npm run build --workspace=firebase/functions",
     "functions:deploy": "npm run build --workspace=firebase/functions && firebase deploy --only functions"
   },
   "devDependencies": {
+    "ajv": "^6.15.0",
     "concurrently": "^8.0.0"
-  },
-  "overrides": {
-    "ajv": "^8.17.1"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1"

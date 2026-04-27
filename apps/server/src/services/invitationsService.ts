@@ -5,15 +5,14 @@ import { db } from '../db';
 import { clubs, invites, users } from '../db/schema';
 import { writeAuditLog } from './auditService';
 import type { AuthenticatedRequest } from '../middleware/auth';
+import { loadServerEnv } from '../lib/loadEnv';
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim() || process.env.SERVER_RESEND_API_KEY?.trim() || '';
+loadServerEnv();
+
+const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim() || '';
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || 'BCMS <onboarding@resend.dev>';
-const APP_PUBLIC_URL =
-  process.env.APP_PUBLIC_URL?.trim() ||
-  process.env.EXPO_PUBLIC_APP_URL?.trim() ||
-  process.env.EXPO_PUBLIC_WEB_APP_URL?.trim() ||
-  'http://localhost:8081';
-const INVITE_TTL_MINUTES = 10;
+const APP_PUBLIC_URL = process.env.APP_BASE_URL?.trim() || process.env.FRONTEND_URL?.trim() || 'http://localhost:8081';
+const INVITE_TTL_MINUTES = Number(process.env.INVITE_EXPIRATION_MINUTES ?? 10) || 10;
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 export type SuperAdminInviteInput = {

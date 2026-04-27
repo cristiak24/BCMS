@@ -53,19 +53,33 @@ exports.admin = admin;
 const loadEnv_1 = require("./loadEnv");
 (0, loadEnv_1.loadServerEnv)();
 function initAdminApp() {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     if (admin.apps.length) {
         return;
     }
     const serviceAccountJson = (_a = process.env.FIREBASE_SERVICE_ACCOUNT_JSON) === null || _a === void 0 ? void 0 : _a.trim();
-    const projectId = ((_b = process.env.FIREBASE_PROJECT_ID) === null || _b === void 0 ? void 0 : _b.trim()) ||
-        ((_c = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID) === null || _c === void 0 ? void 0 : _c.trim()) ||
-        'bcms-61b00';
+    const projectId = (_b = process.env.FIREBASE_PROJECT_ID) === null || _b === void 0 ? void 0 : _b.trim();
+    const clientEmail = (_c = process.env.FIREBASE_CLIENT_EMAIL) === null || _c === void 0 ? void 0 : _c.trim();
+    const privateKey = (_d = process.env.FIREBASE_PRIVATE_KEY) === null || _d === void 0 ? void 0 : _d.replace(/\\n/g, '\n');
+    if (!projectId) {
+        throw new Error('FIREBASE_PROJECT_ID is required.');
+    }
     if (serviceAccountJson) {
         const serviceAccount = JSON.parse(serviceAccountJson);
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
             projectId: serviceAccount.project_id || projectId,
+        });
+        return;
+    }
+    if (clientEmail && privateKey) {
+        admin.initializeApp({
+            credential: admin.credential.cert({
+                projectId,
+                clientEmail,
+                privateKey,
+            }),
+            projectId,
         });
         return;
     }
