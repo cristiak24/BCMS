@@ -1,7 +1,9 @@
 import * as admin from 'firebase-admin';
 import { createHash, randomBytes } from 'crypto';
-import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https';
+import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
 import { Resend } from 'resend';
+import { app as serverApp } from '../../../apps/server/src/app';
 import {
   INVITE_DEFAULT_TTL_HOURS,
   type AuthSession,
@@ -39,6 +41,32 @@ if (!resendApiKey) {
 }
 
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
+const databaseUrlSecret = defineSecret('DATABASE_URL');
+const resendApiKeySecret = defineSecret('RESEND_API_KEY');
+const firebaseProjectIdSecret = defineSecret('FIREBASE_PROJECT_ID');
+const firebaseClientEmailSecret = defineSecret('FIREBASE_CLIENT_EMAIL');
+const firebasePrivateKeySecret = defineSecret('FIREBASE_PRIVATE_KEY');
+const appBaseUrlSecret = defineSecret('APP_BASE_URL');
+const frontendUrlSecret = defineSecret('FRONTEND_URL');
+const inviteExpirationMinutesSecret = defineSecret('INVITE_EXPIRATION_MINUTES');
+
+export const api = onRequest(
+  {
+    timeoutSeconds: 60,
+    memory: '1GiB',
+    secrets: [
+      databaseUrlSecret,
+      resendApiKeySecret,
+      firebaseProjectIdSecret,
+      firebaseClientEmailSecret,
+      firebasePrivateKeySecret,
+      appBaseUrlSecret,
+      frontendUrlSecret,
+      inviteExpirationMinutesSecret,
+    ],
+  },
+  serverApp,
+);
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();

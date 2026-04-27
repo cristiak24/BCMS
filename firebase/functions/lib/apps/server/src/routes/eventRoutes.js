@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const eventsController_1 = require("../controllers/eventsController");
+const router = (0, express_1.Router)();
+router.get('/', eventsController_1.eventsController.getEvents);
+router.get('/:id', eventsController_1.eventsController.getEventById);
+router.post('/', eventsController_1.eventsController.createEvent);
+router.put('/:id', eventsController_1.eventsController.updateEvent);
+router.delete('/:id', eventsController_1.eventsController.deleteEvent);
+router.get('/:id/attendance', eventsController_1.eventsController.getEventAttendance);
+router.post('/:id/attendance', eventsController_1.eventsController.updateEventAttendance);
+router.post('/sync-frb', eventsController_1.eventsController.syncFRBMatches);
+exports.default = router;

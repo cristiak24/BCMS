@@ -1,8 +1,16 @@
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
 
 export function loadServerEnv() {
-  const localEnvPath = path.resolve(__dirname, '../../.env.local');
+  const candidates = [
+    path.resolve(__dirname, '../../.env.local'),
+    path.resolve(process.cwd(), 'apps/server/.env.local'),
+    path.resolve(process.cwd(), '.env.local'),
+  ];
 
-  dotenv.config({ path: localEnvPath, override: false });
+  const localEnvPath = candidates.find((candidate) => fs.existsSync(candidate));
+  if (localEnvPath) {
+    dotenv.config({ path: localEnvPath, override: false });
+  }
 }

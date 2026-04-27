@@ -1,7 +1,10 @@
 {
   "functions": [
     {
-      "source": "firebase/functions"
+      "source": "firebase/functions",
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
     }
   ],
   "hosting": {
@@ -12,6 +15,10 @@
       "**/node_modules/**"
     ],
     "rewrites": [
+      {
+        "source": "/api/**",
+        "function": "api"
+      },
       {
         "source": "/super-admin/**",
         "destination": "/index.html"
