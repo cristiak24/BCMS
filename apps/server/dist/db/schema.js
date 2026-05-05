@@ -67,9 +67,15 @@ exports.teams = (0, pg_core_1.pgTable)("teams", {
     frbSeasonId: (0, pg_core_1.varchar)("frb_season_id", { length: 50 }).notNull(),
     seasonName: (0, pg_core_1.varchar)("season_name", { length: 255 }).notNull(),
     inviteCode: (0, pg_core_1.varchar)("invite_code", { length: 10 }).notNull(),
+    clubId: (0, pg_core_1.integer)("club_id"),
     createdAt: (0, pg_core_1.timestamp)("created_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
     (0, pg_core_1.unique)("teams_invite_code_unique").on(table.inviteCode),
+    (0, pg_core_1.foreignKey)({
+        columns: [table.clubId],
+        foreignColumns: [exports.clubs.id],
+        name: "teams_club_id_clubs_id_fk"
+    }),
 ]);
 exports.playerPayments = (0, pg_core_1.pgTable)("player_payments", {
     id: (0, pg_core_1.serial)().primaryKey().notNull(),

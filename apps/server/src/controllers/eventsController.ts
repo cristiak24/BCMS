@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
 import axios from 'axios';
-import { admin, firestore, nextNumericId, toDate, toIso } from '../lib/firebaseAdmin';
+import { toDate, toIso } from '../lib/firebaseAdmin';
+import { db } from '../db';
+import { attendance, events, players, teams, users } from '../db/schema';
+import { and, eq } from 'drizzle-orm';
+import { AuthenticatedRequest } from '../middleware/auth';
 
 const API_KEY = '9c3622c013ca2f69e8c373ecbf5af38e180f6d7d';
 const REFERER = 'https://www.frbaschet.ro/';
@@ -21,10 +25,17 @@ type EventDoc = {
     createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
 };
 
-type TeamDoc = { id: number; name: string; };
-type UserDoc = { id: number; name: string; };
 type PlayerDoc = { id: number; firstName?: string | null; lastName?: string | null; number?: number | null; };
 type AttendanceDoc = { id: number; eventId?: number | null; playerId: number; teamId: number; status: string; date?: FirebaseFirestore.Timestamp | Date | string | null; };
+
+function parseRequiredDate(value: unknown, fieldName: string) {
+    const date = value ? new Date(String(value)) : null;
+    if (!date || Number.isNaN(date.getTime())) {
+        throw new Error(`${fieldName} is invalid.`);
+    }
+
+    return date;
+}
 
 function parseFRBDate(dateStr: string) {
     const match = /(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2}))?/.exec(dateStr);
@@ -63,13 +74,13 @@ function determineStatus(homeScore: string, awayScore: string) {
 }
 
 async function enrichEvent(event: EventDoc) {
-    const [teamSnap, coachSnap] = await Promise.all([
-        event.teamId != null ? firestore.collection('teams').doc(String(event.teamId)).get() : Promise.resolve(null),
-        event.coachId != null ? firestore.collection('users').where('id', '==', event.coachId).limit(1).get() : Promise.resolve(null),
+    const [teamRows, coachRows] = await Promise.all([
+        event.teamId != null ? db.select({ name: teams.name }).from(teams).where(eq(teams.id, event.teamId)).limit(1) : Promise.resolve([]),
+        event.coachId != null ? db.select({ name: users.name }).from(users).where(eq(users.id, event.coachId)).limit(1) : Promise.resolve([]),
     ]);
 
-    const teamName = teamSnap?.exists ? (teamSnap.data() as TeamDoc).name : null;
-    const coachName = coachSnap && 'docs' in coachSnap ? ((coachSnap.docs[0]?.data() as UserDoc | undefined)?.name ?? null) : null;
+    const teamName = teamRows[0]?.name ?? null;
+    const coachName = coachRows[0]?.name ?? null;
 
     return {
         ...event,
@@ -81,14 +92,65 @@ async function enrichEvent(event: EventDoc) {
     };
 }
 
+function getRequestClubId(req: AuthenticatedRequest) {
+    return req.user?.clubId == null ? null : Number(req.user.clubId);
+}
+
+function isSuperadmin(req: AuthenticatedRequest) {
+    return req.user?.role === 'superadmin';
+}
+
+async function ensureTeamAccess(req: AuthenticatedRequest, teamId: number) {
+    const rows = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+    const team = rows[0];
+    if (!team) {
+        return { status: 404 as const, error: 'Team not found.' };
+    }
+
+    if (isSuperadmin(req)) {
+        return { status: 200 as const, team };
+    }
+
+    const requestClubId = getRequestClubId(req);
+    if (requestClubId == null) {
+        return { status: 403 as const, error: 'Your account is not assigned to a club.' };
+    }
+
+    if (team.clubId !== requestClubId) {
+        return { status: 403 as const, error: 'You do not have access to this team.' };
+    }
+
+    const role = req.user?.role;
+    if (role !== 'admin' && role !== 'coach' && role !== 'manager') {
+        return { status: 403 as const, error: 'You do not have permission to modify events for this team.' };
+    }
+
+    return { status: 200 as const, team };
+}
+
 export const eventsController = {
-    async getEvents(req: Request, res: Response) {
+    async getEvents(req: AuthenticatedRequest, res: Response) {
         try {
             const { start, end, type, coachId, teamId } = req.query as Record<string, string>;
-            const snap = await firestore.collection('events').get();
-            const events = snap.docs
-                .map((docSnap) => docSnap.data() as EventDoc)
+            const eventRows = await db.select().from(events);
+            
+            let allowedTeamIds: number[] | null = null;
+            if (!isSuperadmin(req)) {
+                const clubId = getRequestClubId(req);
+                if (clubId == null) {
+                    return res.json([]);
+                }
+                const clubTeams = await db.select({ id: teams.id }).from(teams).where(eq(teams.clubId, clubId));
+                allowedTeamIds = clubTeams.map(t => t.id);
+            }
+
+            const filteredEvents = eventRows
+                .map((event) => event as EventDoc)
                 .filter((event) => {
+                    if (allowedTeamIds !== null && event.teamId != null && !allowedTeamIds.includes(event.teamId)) {
+                        return false;
+                    }
+
                     if (type && event.type !== type) {
                         return false;
                     }
@@ -110,7 +172,7 @@ export const eventsController = {
                     return true;
                 });
 
-            const enriched = await Promise.all(events.map(enrichEvent));
+            const enriched = await Promise.all(filteredEvents.map(enrichEvent));
             res.json(enriched);
         } catch (error) {
             console.error('[GET /api/events] error:', error);
@@ -118,85 +180,129 @@ export const eventsController = {
         }
     },
 
-    async getEventById(req: Request, res: Response) {
+    async getEventById(req: AuthenticatedRequest, res: Response) {
         try {
             const eventId = Number(req.params.id);
-            const snap = await firestore.collection('events').doc(String(eventId)).get();
-            if (!snap.exists) {
+            const rows = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
+            const event = rows[0];
+            if (!event) {
                 return res.status(404).json({ error: 'Event not found' });
             }
 
-            res.json(await enrichEvent(snap.data() as EventDoc));
+            if (!isSuperadmin(req)) {
+                const clubId = getRequestClubId(req);
+                if (event.teamId != null) {
+                    const teamRows = await db.select().from(teams).where(eq(teams.id, event.teamId)).limit(1);
+                    if (teamRows[0] && teamRows[0].clubId !== clubId) {
+                        return res.status(403).json({ error: 'Access denied' });
+                    }
+                }
+            }
+
+            res.json(await enrichEvent(event as EventDoc));
         } catch (error) {
             console.error('Get event by id error:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     },
 
-    async createEvent(req: Request, res: Response) {
+    async createEvent(req: AuthenticatedRequest, res: Response) {
         try {
-            const id = await nextNumericId('events');
-            const event: EventDoc = {
-                id,
+            const startTime = parseRequiredDate(req.body.startTime, 'startTime');
+            const endTime = parseRequiredDate(req.body.endTime, 'endTime');
+            const teamId = req.body.teamId != null ? Number(req.body.teamId) : null;
+
+            if (!req.body.title || !String(req.body.title).trim()) {
+                return res.status(400).json({ error: 'Event title is required.' });
+            }
+
+            if (teamId == null || Number.isNaN(teamId)) {
+                return res.status(400).json({ error: 'A valid team is required.' });
+            }
+
+            const access = await ensureTeamAccess(req, teamId);
+            if (access.status !== 200) {
+                return res.status(access.status).json({ error: access.error });
+            }
+
+            const [event] = await db.insert(events).values({
                 type: req.body.type || 'training',
-                title: req.body.title || 'Untitled Event',
+                title: String(req.body.title).trim(),
                 description: req.body.description ?? null,
                 location: req.body.location ?? null,
-                startTime: req.body.startTime ? new Date(req.body.startTime) : new Date(),
-                endTime: req.body.endTime ? new Date(req.body.endTime) : new Date(Date.now() + 60 * 60 * 1000),
-                teamId: req.body.teamId != null ? Number(req.body.teamId) : null,
+                startTime: startTime.toISOString(),
+                endTime: endTime.toISOString(),
+                teamId,
                 coachId: req.body.coachId != null ? Number(req.body.coachId) : null,
                 amount: req.body.amount != null ? Number(req.body.amount) : null,
                 status: req.body.status || 'scheduled',
-                createdAt: new Date(),
-            };
+                createdAt: new Date().toISOString(),
+            }).returning();
 
-            await firestore.collection('events').doc(String(id)).set(event);
-            res.json(await enrichEvent(event));
+            res.json(await enrichEvent(event as EventDoc));
         } catch (error) {
             console.error('Create event error:', error);
-            res.status(500).json({ error: 'Internal server error' });
+            const message = error instanceof Error ? error.message : 'Internal server error';
+            const isValidationError = /^(startTime|endTime) is invalid\.$/.test(message);
+            res.status(isValidationError ? 400 : 500).json({ error: message });
         }
     },
 
-    async updateEvent(req: Request, res: Response) {
+    async updateEvent(req: AuthenticatedRequest, res: Response) {
         try {
             const eventId = Number(req.params.id);
-            const snap = await firestore.collection('events').doc(String(eventId)).get();
-            if (!snap.exists) {
+            const existingRows = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
+            const existingEvent = existingRows[0];
+            if (!existingEvent) {
                 return res.status(404).json({ error: 'Event not found' });
             }
 
-            const updates = {
+            if (existingEvent.teamId != null) {
+                const access = await ensureTeamAccess(req, existingEvent.teamId);
+                if (access.status !== 200) {
+                    return res.status(access.status).json({ error: access.error });
+                }
+            }
+
+            const updates: Partial<typeof events.$inferInsert> = {
                 ...(req.body.type !== undefined ? { type: req.body.type } : {}),
                 ...(req.body.title !== undefined ? { title: req.body.title } : {}),
                 ...(req.body.description !== undefined ? { description: req.body.description } : {}),
                 ...(req.body.location !== undefined ? { location: req.body.location } : {}),
-                ...(req.body.startTime !== undefined ? { startTime: new Date(req.body.startTime) } : {}),
-                ...(req.body.endTime !== undefined ? { endTime: new Date(req.body.endTime) } : {}),
+                ...(req.body.startTime !== undefined ? { startTime: new Date(req.body.startTime).toISOString() } : {}),
+                ...(req.body.endTime !== undefined ? { endTime: new Date(req.body.endTime).toISOString() } : {}),
                 ...(req.body.teamId !== undefined ? { teamId: req.body.teamId == null ? null : Number(req.body.teamId) } : {}),
                 ...(req.body.coachId !== undefined ? { coachId: req.body.coachId == null ? null : Number(req.body.coachId) } : {}),
                 ...(req.body.amount !== undefined ? { amount: req.body.amount == null ? null : Number(req.body.amount) } : {}),
                 ...(req.body.status !== undefined ? { status: req.body.status } : {}),
             };
 
-            await snap.ref.set(updates, { merge: true });
-            const updated = await snap.ref.get();
-            res.json(await enrichEvent(updated.data() as EventDoc));
+            const [updated] = await db.update(events).set(updates).where(eq(events.id, eventId)).returning();
+            res.json(await enrichEvent(updated as EventDoc));
         } catch (error) {
             console.error('Update event error:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     },
 
-    async deleteEvent(req: Request, res: Response) {
+    async deleteEvent(req: AuthenticatedRequest, res: Response) {
         try {
             const eventId = Number(req.params.id);
-            const batch = firestore.batch();
-            const attendanceSnap = await firestore.collection('attendance').where('eventId', '==', eventId).get();
-            attendanceSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
-            batch.delete(firestore.collection('events').doc(String(eventId)));
-            await batch.commit();
+            const existingRows = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
+            const existingEvent = existingRows[0];
+            if (!existingEvent) {
+                return res.status(404).json({ error: 'Event not found' });
+            }
+
+            if (existingEvent.teamId != null) {
+                const access = await ensureTeamAccess(req, existingEvent.teamId);
+                if (access.status !== 200) {
+                    return res.status(access.status).json({ error: access.error });
+                }
+            }
+
+            await db.delete(attendance).where(eq(attendance.eventId, eventId));
+            await db.delete(events).where(eq(events.id, eventId));
             res.json({ success: true });
         } catch (error) {
             console.error('Delete event error:', error);
@@ -204,17 +310,31 @@ export const eventsController = {
         }
     },
 
-    async getEventAttendance(req: Request, res: Response) {
+    async getEventAttendance(req: AuthenticatedRequest, res: Response) {
         try {
             const eventId = Number(req.params.id);
-            const attendanceSnap = await firestore.collection('attendance').where('eventId', '==', eventId).get();
-            const attendanceRows = attendanceSnap.docs.map((docSnap) => docSnap.data() as AttendanceDoc);
+            const existingRows = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
+            const existingEvent = existingRows[0];
+            if (!existingEvent) {
+                return res.status(404).json({ error: 'Event not found' });
+            }
+
+            if (!isSuperadmin(req)) {
+                const clubId = getRequestClubId(req);
+                if (existingEvent.teamId != null) {
+                    const teamRows = await db.select().from(teams).where(eq(teams.id, existingEvent.teamId)).limit(1);
+                    if (teamRows[0] && teamRows[0].clubId !== clubId) {
+                        return res.status(403).json({ error: 'Access denied' });
+                    }
+                }
+            }
+
+            const attendanceRows = await db.select().from(attendance).where(eq(attendance.eventId, eventId));
 
             const playerIds = attendanceRows.map((row) => row.playerId);
-            const playersSnap = await firestore.collection('players').get();
             const playersById = new Map<number, PlayerDoc>();
-            playersSnap.docs.forEach((docSnap) => {
-                const player = docSnap.data() as PlayerDoc;
+            const playerRows = playerIds.length ? await db.select().from(players) : [];
+            playerRows.forEach((player) => {
                 if (playerIds.includes(player.id)) {
                     playersById.set(player.id, player);
                 }
@@ -236,45 +356,43 @@ export const eventsController = {
         }
     },
 
-    async updateEventAttendance(req: Request, res: Response) {
+    async updateEventAttendance(req: AuthenticatedRequest, res: Response) {
         try {
             const eventId = Number(req.params.id);
             const playerAttendances = Array.isArray(req.body?.playerAttendances) ? req.body.playerAttendances : [];
-            const eventSnap = await firestore.collection('events').doc(String(eventId)).get();
+            const eventRows = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
+            const event = eventRows[0];
 
-            if (!eventSnap.exists) {
+            if (!event) {
                 return res.status(404).json({ error: 'Event not found' });
             }
 
-            const event = eventSnap.data() as EventDoc;
-            const batch = firestore.batch();
+            if (event.teamId != null) {
+                const access = await ensureTeamAccess(req, event.teamId);
+                if (access.status !== 200) {
+                    return res.status(access.status).json({ error: access.error });
+                }
+            }
 
             for (const item of playerAttendances) {
                 const playerId = Number(item.playerId);
                 const status = String(item.status);
-                const existingSnap = await firestore.collection('attendance')
-                    .where('eventId', '==', eventId)
-                    .where('playerId', '==', playerId)
-                    .limit(1)
-                    .get();
+                const existingRows = await db.select().from(attendance).where(and(eq(attendance.eventId, eventId), eq(attendance.playerId, playerId))).limit(1);
+                const existing = existingRows[0];
 
-                const existing = existingSnap.docs[0];
-                if (existing) {
-                    batch.set(existing.ref, { status, date: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+                if (existing?.id != null) {
+                    await db.update(attendance).set({ status, date: new Date().toISOString() }).where(eq(attendance.id, existing.id));
                 } else {
-                    const id = await nextNumericId('attendance');
-                    batch.set(firestore.collection('attendance').doc(String(id)), {
-                        id,
+                    await db.insert(attendance).values({
                         playerId,
                         eventId,
                         teamId: event.teamId ?? 0,
                         status,
-                        date: admin.firestore.FieldValue.serverTimestamp(),
+                        date: new Date().toISOString(),
                     });
                 }
             }
 
-            await batch.commit();
             res.json({ success: true });
         } catch (error) {
             console.error('Update event attendance error:', error);
@@ -282,10 +400,14 @@ export const eventsController = {
         }
     },
 
-    async syncFRBMatches(_req: Request, res: Response) {
+    async syncFRBMatches(req: AuthenticatedRequest, res: Response) {
         try {
-            const teamsSnap = await firestore.collection('teams').get();
-            const allTeams = teamsSnap.docs.map((docSnap) => docSnap.data() as { id: number; frbTeamId?: string; frbSeasonId?: string; frbLeagueId?: string; name: string; });
+            if (!isSuperadmin(req)) {
+                return res.status(403).json({ error: 'Only superadmin can sync FRB matches manually here.' });
+            }
+
+            const allTeams = await db.select().from(teams);
+            const existingEvents = (await db.select().from(events)).map((event) => event as EventDoc);
             let syncedCount = 0;
 
             for (const team of allTeams) {
@@ -317,6 +439,7 @@ export const eventsController = {
                         if (cells.length >= 4 && cells[0] !== '') {
                             const dateStr = cells[0];
                             const homeTeam = cells[1] || '';
+                            const score = parseScore(cells[2] || '');
                             const awayTeam = cells[3] || '';
                             if (!homeTeam && !awayTeam) continue;
 
@@ -326,9 +449,7 @@ export const eventsController = {
 
                             const endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000);
                             const startDateOnly = new Date(startTime.getFullYear(), startTime.getMonth(), startTime.getDate());
-                            const allEventsSnap = await firestore.collection('events').get();
-                            const exists = allEventsSnap.docs.some((docSnap) => {
-                                const event = docSnap.data() as EventDoc;
+                            const exists = existingEvents.some((event) => {
                                 if (event.teamId !== team.id || event.title !== title) {
                                     return false;
                                 }
@@ -340,19 +461,22 @@ export const eventsController = {
                             });
 
                             if (!exists) {
-                                const id = await nextNumericId('events');
-                                await firestore.collection('events').doc(String(id)).set({
-                                    id,
+                                const status = determineStatus(score.home, score.away);
+                                const description = status === 'finished'
+                                    ? `Synced from FRB. Score: ${score.home} - ${score.away}`
+                                    : 'Synced from FRB';
+                                const [created] = await db.insert(events).values({
                                     type: 'match',
                                     title,
-                                    description: 'Synced from FRB',
+                                    description,
                                     location: 'Auto-Synced Location',
-                                    startTime,
-                                    endTime,
+                                    startTime: startTime.toISOString(),
+                                    endTime: endTime.toISOString(),
                                     teamId: team.id,
-                                    status: 'scheduled',
-                                    createdAt: new Date(),
-                                });
+                                    status,
+                                    createdAt: new Date().toISOString(),
+                                }).returning();
+                                existingEvents.push(created as EventDoc);
                                 syncedCount++;
                             }
                         }

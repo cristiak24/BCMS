@@ -72,9 +72,15 @@ export const teams = pgTable("teams", {
 	frbSeasonId: varchar("frb_season_id", { length: 50 }).notNull(),
 	seasonName: varchar("season_name", { length: 255 }).notNull(),
 	inviteCode: varchar("invite_code", { length: 10 }).notNull(),
+	clubId: integer("club_id"),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	unique("teams_invite_code_unique").on(table.inviteCode),
+	foreignKey({
+			columns: [table.clubId],
+			foreignColumns: [clubs.id],
+			name: "teams_club_id_clubs_id_fk"
+		}),
 ]);
 
 export const playerPayments = pgTable("player_payments", {

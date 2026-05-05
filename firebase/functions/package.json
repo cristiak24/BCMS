@@ -1,7 +1,10 @@
 {
   "name": "bcms-firebase-functions",
   "private": true,
-  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "main": "lib/firebase/functions/src/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf lib",
@@ -21,7 +24,8 @@
     "multer": "^2.1.1",
     "pg": "^8.20.0",
     "puppeteer": "^24.40.0",
-    "resend": "^4.0.0"
+    "resend": "^4.0.0",
+    "stripe": "^22.1.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

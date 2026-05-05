@@ -7,9 +7,12 @@ const express_1 = require("express");
 const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
+const drizzle_orm_1 = require("drizzle-orm");
 const requestContext_1 = require("../lib/requestContext");
 const requestAuth_1 = require("../lib/requestAuth");
 const firebaseAdmin_1 = require("../lib/firebaseAdmin");
+const db_1 = require("../db");
+const schema_1 = require("../db/schema");
 const router = (0, express_1.Router)();
 const uploadDir = path_1.default.join(__dirname, '../../uploads/avatars');
 if (!fs_1.default.existsSync(uploadDir)) {
@@ -24,33 +27,39 @@ const storage = multer_1.default.diskStorage({
 });
 const upload = (0, multer_1.default)({ storage });
 async function findUserByNumericId(userId) {
-    const snap = await firebaseAdmin_1.firestore.collection('users').where('id', '==', userId).limit(1).get();
-    return snap.docs[0] ?? null;
+    const rows = await db_1.db.select().from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.id, userId)).limit(1);
+    return rows[0] ?? null;
 }
 async function resolveProfileRecord(userId, reqClubId) {
-    const userSnap = await findUserByNumericId(userId);
-    if (!userSnap) {
+    const user = await findUserByNumericId(userId);
+    if (!user) {
         return null;
     }
-    const user = userSnap.data();
     const clubId = user.clubId ?? (reqClubId ? Number(reqClubId) : null);
-    const clubSnap = clubId ? await firebaseAdmin_1.firestore.collection('clubs').doc(String(clubId)).get() : null;
-    const clubName = clubSnap?.exists ? clubSnap.data().name ?? null : null;
-    const playerSnap = user.email
-        ? await firebaseAdmin_1.firestore.collection('players').where('email', '==', user.email).limit(1).get()
-        : null;
-    const player = playerSnap?.docs[0]?.data();
+    const clubRows = clubId == null
+        ? []
+        : await db_1.db.select({ name: schema_1.clubs.name }).from(schema_1.clubs).where((0, drizzle_orm_1.eq)(schema_1.clubs.id, clubId)).limit(1);
+    const clubName = clubRows[0]?.name ?? null;
+    const playerRows = user.email
+        ? await db_1.db.select().from(schema_1.players).where((0, drizzle_orm_1.eq)(schema_1.players.email, user.email)).limit(1)
+        : [];
+    const player = playerRows[0];
     let teamName = null;
+    const teamIds = new Set();
     if (player?.teamId != null) {
-        const teamSnap = await firebaseAdmin_1.firestore.collection('teams').doc(String(player.teamId)).get();
-        teamName = teamSnap.exists ? teamSnap.data().name ?? null : null;
+        teamIds.add(player.teamId);
+        const teamRows = await db_1.db.select({ name: schema_1.teams.name }).from(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.id, player.teamId)).limit(1);
+        teamName = teamRows[0]?.name ?? null;
     }
-    else if (player?.id != null) {
-        const relationSnap = await firebaseAdmin_1.firestore.collection('playersToTeams').where('playerId', '==', player.id).limit(1).get();
-        const relation = relationSnap.docs[0]?.data();
-        if (relation?.teamId != null) {
-            const teamSnap = await firebaseAdmin_1.firestore.collection('teams').doc(String(relation.teamId)).get();
-            teamName = teamSnap.exists ? teamSnap.data().name ?? null : null;
+    if (player?.id != null) {
+        const relationRows = await db_1.db
+            .select()
+            .from(schema_1.playersToTeams)
+            .where((0, drizzle_orm_1.eq)(schema_1.playersToTeams.playerId, player.id));
+        relationRows.forEach((relation) => teamIds.add(relation.teamId));
+        if (!teamName && relationRows[0]?.teamId != null) {
+            const teamRows = await db_1.db.select({ name: schema_1.teams.name }).from(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.id, relationRows[0].teamId)).limit(1);
+            teamName = teamRows[0]?.name ?? null;
         }
     }
     const firstName = user.firstName ?? player?.firstName ?? user.name.split(' ')[0] ?? '';
@@ -68,10 +77,11 @@ async function resolveProfileRecord(userId, reqClubId) {
         clubId,
         clubName,
         teamName,
+        teamIds: Array.from(teamIds).map(String),
         avatarUrl: user.avatarUrl ?? null,
         phone: user.phone ?? null,
         preferredLanguage: user.preferredLanguage ?? null,
-        notificationPreferences: (user.notificationPreferences ?? null),
+        notificationPreferences: null,
         createdAt: (0, firebaseAdmin_1.toIso)(user.createdAt) ?? null,
         lastLoginAt: (0, firebaseAdmin_1.toIso)(user.lastLoginAt) ?? null,
     };
@@ -84,8 +94,10 @@ router.get('/me', async (req, res) => {
         }
         if (requestUser.isHardcodedAdmin || (requestUser.id === 0 && (0, requestAuth_1.isDemoAdmin)(req))) {
             const clubId = requestUser.clubId ?? (req.header('x-user-club-id') ? Number(req.header('x-user-club-id')) : null);
-            const clubSnap = clubId ? await firebaseAdmin_1.firestore.collection('clubs').doc(String(clubId)).get() : null;
-            const clubName = clubSnap?.exists ? clubSnap.data().name ?? null : null;
+            const clubRows = clubId == null
+                ? []
+                : await db_1.db.select({ name: schema_1.clubs.name }).from(schema_1.clubs).where((0, drizzle_orm_1.eq)(schema_1.clubs.id, clubId)).limit(1);
+            const clubName = clubRows[0]?.name ?? null;
             return res.json({
                 id: 0,
                 email: 'admin@test.com',
@@ -131,24 +143,22 @@ router.patch('/me', async (req, res) => {
         const trimmedLastName = typeof lastName === 'string' ? lastName.trim() : undefined;
         const trimmedPhone = typeof phone === 'string' ? phone.trim() : phone === null ? null : undefined;
         const trimmedLanguage = typeof preferredLanguage === 'string' ? preferredLanguage.trim() : preferredLanguage === null ? null : undefined;
-        const userSnap = await findUserByNumericId(requestUser.id);
-        if (!userSnap) {
+        const existingUser = await findUserByNumericId(requestUser.id);
+        if (!existingUser) {
             return res.status(404).json({ error: 'Profile not found' });
         }
-        const existingUser = userSnap.data();
         const nextName = [
             trimmedFirstName ?? existingUser.firstName ?? '',
             trimmedLastName ?? existingUser.lastName ?? '',
         ].filter(Boolean).join(' ').trim();
-        await userSnap.ref.set({
+        await db_1.db.update(schema_1.users).set({
             ...(trimmedFirstName !== undefined ? { firstName: trimmedFirstName } : {}),
             ...(trimmedLastName !== undefined ? { lastName: trimmedLastName } : {}),
             ...(trimmedPhone !== undefined ? { phone: trimmedPhone } : {}),
             ...(trimmedLanguage !== undefined ? { preferredLanguage: trimmedLanguage } : {}),
-            ...(notificationPreferences !== undefined ? { notificationPreferences } : {}),
             ...(nextName ? { name: nextName } : {}),
-            updatedAt: new Date(),
-        }, { merge: true });
+            updatedAt: new Date().toISOString(),
+        }).where((0, drizzle_orm_1.eq)(schema_1.users.id, requestUser.id));
         const profile = await resolveProfileRecord(requestUser.id, req.header('x-user-club-id'));
         return res.json(profile);
     }
@@ -175,14 +185,14 @@ router.post('/me/avatar', upload.single('image'), async (req, res) => {
             return res.status(400).json({ error: 'No image uploaded' });
         }
         const avatarUrl = `/uploads/avatars/${req.file.filename}`;
-        const userSnap = await findUserByNumericId(requestUser.id);
-        if (!userSnap) {
+        const existingUser = await findUserByNumericId(requestUser.id);
+        if (!existingUser) {
             return res.status(404).json({ error: 'Profile not found' });
         }
-        await userSnap.ref.set({
+        await db_1.db.update(schema_1.users).set({
             avatarUrl,
-            updatedAt: new Date(),
-        }, { merge: true });
+            updatedAt: new Date().toISOString(),
+        }).where((0, drizzle_orm_1.eq)(schema_1.users.id, requestUser.id));
         return res.json({ success: true, avatarUrl });
     }
     catch (error) {

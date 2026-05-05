@@ -55,7 +55,7 @@ function approveManageAccessRequest(user, requestId) {
         yield (0, manageAccessRepository_1.updateUserAccess)(request.userId, {
             clubId: club.id,
             role: request.requestedRole,
-            status: 'processed',
+            status: 'active',
         });
     });
 }
@@ -73,7 +73,7 @@ function denyManageAccessRequest(user, requestId) {
         yield (0, manageAccessRepository_1.updateUserAccess)(request.userId, {
             clubId: club.id,
             role: request.requestedRole,
-            status: 'rejected',
+            status: 'disabled',
         });
     });
 }
@@ -106,6 +106,9 @@ function generateClubInviteLink(user, role, refreshIntervalMinutes) {
             refreshIntervalMinutes: interval,
             createdBy: user.isHardcodedAdmin ? null : user.id,
         });
+        if (!created) {
+            throw new Error('Could not persist the invite link.');
+        }
         return toInviteLinkRecord({
             id: created.id,
             clubId: club.id,
@@ -121,7 +124,6 @@ function generateClubInviteLink(user, role, refreshIntervalMinutes) {
 }
 function getActiveClubInviteLink(user, role) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a;
         const club = yield ensureClubForUser(user);
         const active = yield (0, manageAccessRepository_1.getActiveInviteLinkForClubRole)(club.id, role);
         if (active && !(0, manageAccessTokens_1.isInviteExpired)(active.expiresAt)) {
@@ -137,9 +139,10 @@ function getActiveClubInviteLink(user, role) {
                 isActive: active.isActive === 1,
             });
         }
-        const latest = yield (0, manageAccessRepository_1.getLatestInviteLinkForClubRole)(club.id, role);
-        const interval = (_a = latest === null || latest === void 0 ? void 0 : latest.refreshIntervalMinutes) !== null && _a !== void 0 ? _a : 30;
-        return generateClubInviteLink(user, role, interval);
+        if (active) {
+            yield (0, manageAccessRepository_1.deactivateActiveInviteLinks)(club.id, role);
+        }
+        return null;
     });
 }
 function validateInviteToken(rawToken) {

@@ -2,7 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const eventsController_1 = require("../controllers/eventsController");
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
 router.get('/', eventsController_1.eventsController.getEvents);
 router.get('/:id', eventsController_1.eventsController.getEventById);
 router.post('/', eventsController_1.eventsController.createEvent);

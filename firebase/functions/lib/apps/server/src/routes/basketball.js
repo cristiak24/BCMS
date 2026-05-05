@@ -11,25 +11,19 @@ const REFERER = 'https://www.frbaschet.ro/';
 const HEADERS = { Referer: REFERER };
 // ---------- Helpers ----------
 /**
- * Parsează scorul din formatul "75 - 60" sau "75-60" sau "?" în { home, away }.
+ * Parsează scorul din formatul "75 - 60", "75-60", "75 : 60" sau "?" în { home, away }.
  * Returnează { home: '', away: '' } dacă meciul nu are scor (neprogramat).
  */
 function parseScore(rawScore) {
     const clean = (rawScore || '').replace(/\s+/g, '').trim();
     // Dacă e gol, "?", "- " sau nu conține cifre — meci neprogramat
-    if (!clean || clean === '?' || clean === '-' || !/\d/.test(clean)) {
+    if (!clean || clean === '?' || /^[-:–—]+$/.test(clean) || !/\d/.test(clean)) {
         return { home: '', away: '' };
     }
-    const parts = clean.split('-');
-    if (parts.length !== 2)
+    const scoreMatch = clean.match(/^(\d+)[-:–—](\d+)$/);
+    if (!scoreMatch)
         return { home: '', away: '' };
-    const h = parts[0].trim();
-    const a = parts[1].trim();
-    // Ambele trebuie să fie numere valide
-    if (!/^\d+$/.test(h) || !/^\d+$/.test(a)) {
-        return { home: '', away: '' };
-    }
-    return { home: h, away: a };
+    return { home: scoreMatch[1], away: scoreMatch[2] };
 }
 /**
  * Determină statusul unui meci pe baza scorului și datei.

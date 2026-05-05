@@ -2,9 +2,12 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { eq } from 'drizzle-orm';
 import { getRequestUser } from '../lib/requestContext';
 import { isDemoAdmin } from '../lib/requestAuth';
-import { admin, firestore, toIso } from '../lib/firebaseAdmin';
+import { toIso } from '../lib/firebaseAdmin';
+import { db } from '../db';
+import { clubs, players, playersToTeams, teams, users } from '../db/schema';
 
 type NotificationPreferences = {
     email?: boolean;
@@ -30,52 +33,46 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 async function findUserByNumericId(userId: number) {
-    const snap = await firestore.collection('users').where('id', '==', userId).limit(1).get();
-    return snap.docs[0] ?? null;
+    const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    return rows[0] ?? null;
 }
 
 async function resolveProfileRecord(userId: number, reqClubId: string | undefined) {
-    const userSnap = await findUserByNumericId(userId);
-    if (!userSnap) {
+    const user = await findUserByNumericId(userId);
+    if (!user) {
         return null;
     }
 
-    const user = userSnap.data() as {
-        id: number;
-        email: string;
-        name: string;
-        firstName?: string | null;
-        lastName?: string | null;
-        role: string;
-        status: string;
-        clubId?: number | null;
-        avatarUrl?: string | null;
-        phone?: string | null;
-        preferredLanguage?: string | null;
-        notificationPreferences?: NotificationPreferences | null;
-        createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
-        lastLoginAt?: FirebaseFirestore.Timestamp | Date | string | null;
-    };
-
     const clubId = user.clubId ?? (reqClubId ? Number(reqClubId) : null);
-    const clubSnap = clubId ? await firestore.collection('clubs').doc(String(clubId)).get() : null;
-    const clubName = clubSnap?.exists ? (clubSnap.data() as { name?: string }).name ?? null : null;
+    const clubRows = clubId == null
+        ? []
+        : await db.select({ name: clubs.name }).from(clubs).where(eq(clubs.id, clubId)).limit(1);
+    const clubName = clubRows[0]?.name ?? null;
 
-    const playerSnap = user.email
-        ? await firestore.collection('players').where('email', '==', user.email).limit(1).get()
-        : null;
-    const player = playerSnap?.docs[0]?.data() as { firstName?: string; lastName?: string; id?: number; teamId?: number | null } | undefined;
+    const playerRows = user.email
+        ? await db.select().from(players).where(eq(players.email, user.email)).limit(1)
+        : [];
+    const player = playerRows[0];
 
     let teamName: string | null = null;
+    const teamIds = new Set<number>();
     if (player?.teamId != null) {
-        const teamSnap = await firestore.collection('teams').doc(String(player.teamId)).get();
-        teamName = teamSnap.exists ? (teamSnap.data() as { name?: string }).name ?? null : null;
-    } else if (player?.id != null) {
-        const relationSnap = await firestore.collection('playersToTeams').where('playerId', '==', player.id).limit(1).get();
-        const relation = relationSnap.docs[0]?.data() as { teamId?: number } | undefined;
-        if (relation?.teamId != null) {
-            const teamSnap = await firestore.collection('teams').doc(String(relation.teamId)).get();
-            teamName = teamSnap.exists ? (teamSnap.data() as { name?: string }).name ?? null : null;
+        teamIds.add(player.teamId);
+        const teamRows = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, player.teamId)).limit(1);
+        teamName = teamRows[0]?.name ?? null;
+    }
+
+    if (player?.id != null) {
+        const relationRows = await db
+            .select()
+            .from(playersToTeams)
+            .where(eq(playersToTeams.playerId, player.id));
+
+        relationRows.forEach((relation) => teamIds.add(relation.teamId));
+
+        if (!teamName && relationRows[0]?.teamId != null) {
+            const teamRows = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, relationRows[0].teamId)).limit(1);
+            teamName = teamRows[0]?.name ?? null;
         }
     }
 
@@ -95,10 +92,11 @@ async function resolveProfileRecord(userId: number, reqClubId: string | undefine
         clubId,
         clubName,
         teamName,
+        teamIds: Array.from(teamIds).map(String),
         avatarUrl: user.avatarUrl ?? null,
         phone: user.phone ?? null,
         preferredLanguage: user.preferredLanguage ?? null,
-        notificationPreferences: (user.notificationPreferences ?? null) as NotificationPreferences | null,
+        notificationPreferences: null as NotificationPreferences | null,
         createdAt: toIso(user.createdAt) ?? null,
         lastLoginAt: toIso(user.lastLoginAt) ?? null,
     };
@@ -114,8 +112,10 @@ router.get('/me', async (req, res) => {
 
         if (requestUser.isHardcodedAdmin || (requestUser.id === 0 && isDemoAdmin(req))) {
             const clubId = requestUser.clubId ?? (req.header('x-user-club-id') ? Number(req.header('x-user-club-id')) : null);
-            const clubSnap = clubId ? await firestore.collection('clubs').doc(String(clubId)).get() : null;
-            const clubName = clubSnap?.exists ? (clubSnap.data() as { name?: string }).name ?? null : null;
+            const clubRows = clubId == null
+                ? []
+                : await db.select({ name: clubs.name }).from(clubs).where(eq(clubs.id, clubId)).limit(1);
+            const clubName = clubRows[0]?.name ?? null;
 
             return res.json({
                 id: 0,
@@ -176,26 +176,24 @@ router.patch('/me', async (req, res) => {
         const trimmedPhone = typeof phone === 'string' ? phone.trim() : phone === null ? null : undefined;
         const trimmedLanguage = typeof preferredLanguage === 'string' ? preferredLanguage.trim() : preferredLanguage === null ? null : undefined;
 
-        const userSnap = await findUserByNumericId(requestUser.id);
-        if (!userSnap) {
+        const existingUser = await findUserByNumericId(requestUser.id);
+        if (!existingUser) {
             return res.status(404).json({ error: 'Profile not found' });
         }
 
-        const existingUser = userSnap.data() as { firstName?: string; lastName?: string; name: string };
         const nextName = [
             trimmedFirstName ?? existingUser.firstName ?? '',
             trimmedLastName ?? existingUser.lastName ?? '',
         ].filter(Boolean).join(' ').trim();
 
-        await userSnap.ref.set({
+        await db.update(users).set({
             ...(trimmedFirstName !== undefined ? { firstName: trimmedFirstName } : {}),
             ...(trimmedLastName !== undefined ? { lastName: trimmedLastName } : {}),
             ...(trimmedPhone !== undefined ? { phone: trimmedPhone } : {}),
             ...(trimmedLanguage !== undefined ? { preferredLanguage: trimmedLanguage } : {}),
-            ...(notificationPreferences !== undefined ? { notificationPreferences } : {}),
             ...(nextName ? { name: nextName } : {}),
-            updatedAt: new Date(),
-        }, { merge: true });
+            updatedAt: new Date().toISOString(),
+        }).where(eq(users.id, requestUser.id));
 
         const profile = await resolveProfileRecord(requestUser.id, req.header('x-user-club-id'));
         return res.json(profile);
@@ -228,16 +226,16 @@ router.post('/me/avatar', upload.single('image'), async (req, res) => {
         }
 
         const avatarUrl = `/uploads/avatars/${req.file.filename}`;
-        const userSnap = await findUserByNumericId(requestUser.id);
+        const existingUser = await findUserByNumericId(requestUser.id);
 
-        if (!userSnap) {
+        if (!existingUser) {
             return res.status(404).json({ error: 'Profile not found' });
         }
 
-        await userSnap.ref.set({
+        await db.update(users).set({
             avatarUrl,
-            updatedAt: new Date(),
-        }, { merge: true });
+            updatedAt: new Date().toISOString(),
+        }).where(eq(users.id, requestUser.id));
 
         return res.json({ success: true, avatarUrl });
     } catch (error) {

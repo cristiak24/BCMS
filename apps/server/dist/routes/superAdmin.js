@@ -15,6 +15,7 @@ const auth_1 = require("../middleware/auth");
 const schema_1 = require("../db/schema");
 const db_1 = require("../db");
 const auditService_1 = require("../services/auditService");
+const invitationsService_1 = require("../services/invitationsService");
 const router = (0, express_1.Router)();
 function withClubName(row, clubMap) {
     var _a;
@@ -22,11 +23,13 @@ function withClubName(row, clubMap) {
 }
 function toClubSummary(club, userRows, inviteRows) {
     const clubUsers = userRows.filter((user) => user.clubId === club.id);
-    return Object.assign(Object.assign({}, club), { status: 'active', usersCount: clubUsers.length, userCount: clubUsers.length, adminsCount: clubUsers.filter((user) => user.role === 'admin').length, adminCount: clubUsers.filter((user) => user.role === 'admin').length, coachCount: clubUsers.filter((user) => user.role === 'coach').length, staffCount: clubUsers.filter((user) => user.role === 'staff' || user.role === 'accountant').length, playerCount: clubUsers.filter((user) => user.role === 'player').length, pendingInviteCount: inviteRows.filter((invite) => invite.clubId === club.id && invite.status === 'pending').length });
+    const now = new Date();
+    return Object.assign(Object.assign({}, club), { status: 'active', usersCount: clubUsers.length, userCount: clubUsers.length, adminsCount: clubUsers.filter((user) => user.role === 'admin').length, adminCount: clubUsers.filter((user) => user.role === 'admin').length, coachCount: clubUsers.filter((user) => user.role === 'coach').length, staffCount: clubUsers.filter((user) => user.role === 'staff' || user.role === 'accountant').length, playerCount: clubUsers.filter((user) => user.role === 'player').length, pendingInviteCount: inviteRows.filter((invite) => invite.clubId === club.id && (0, invitationsService_1.isVisiblePendingInvite)(invite, userRows, now)).length });
 }
 router.use(auth_1.authenticate, auth_1.requireSuperadmin);
 router.get('/dashboard', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        yield (0, invitationsService_1.syncInvitationStatuses)();
         const [clubRows, userRows, inviteRows, auditRows] = yield Promise.all([
             db_1.db.select().from(schema_1.clubs),
             db_1.db.select().from(schema_1.users),
@@ -41,7 +44,7 @@ router.get('/dashboard', (_req, res) => __awaiter(void 0, void 0, void 0, functi
             coaches: userRows.filter((user) => user.role === 'coach').length,
             staff: userRows.filter((user) => user.role === 'staff' || user.role === 'accountant').length,
             players: userRows.filter((user) => user.role === 'player').length,
-            pendingInvites: inviteRows.filter((invite) => invite.status === 'pending').length,
+            pendingInvites: inviteRows.filter((invite) => (0, invitationsService_1.isVisiblePendingInvite)(invite, userRows)).length,
             inactiveUsers: userRows.filter((user) => user.status === 'disabled').length,
         };
         const clubPreview = clubRows.slice(0, 6).map((club) => toClubSummary(club, userRows, inviteRows));
@@ -62,6 +65,7 @@ router.get('/dashboard', (_req, res) => __awaiter(void 0, void 0, void 0, functi
 }));
 router.get('/clubs', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        yield (0, invitationsService_1.syncInvitationStatuses)();
         const [clubRows, userRows, inviteRows] = yield Promise.all([
             db_1.db.select().from(schema_1.clubs).orderBy((0, drizzle_orm_1.desc)(schema_1.clubs.updatedAt)),
             db_1.db.select().from(schema_1.users),
@@ -112,6 +116,7 @@ router.post('/clubs', (req, res) => __awaiter(void 0, void 0, void 0, function* 
 }));
 router.get('/users', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        yield (0, invitationsService_1.syncInvitationStatuses)();
         const [userRows, clubRows, inviteRows] = yield Promise.all([
             db_1.db.select().from(schema_1.users).orderBy((0, drizzle_orm_1.desc)(schema_1.users.createdAt)),
             db_1.db.select().from(schema_1.clubs),
@@ -119,7 +124,7 @@ router.get('/users', (_req, res) => __awaiter(void 0, void 0, void 0, function* 
         ]);
         const clubMap = new Map(clubRows.map((club) => [club.id, club.name]));
         const pendingInvites = inviteRows
-            .filter((invite) => invite.status === 'pending')
+            .filter((invite) => (0, invitationsService_1.isVisiblePendingInvite)(invite, userRows))
             .map((invite) => {
             var _a;
             return ({
@@ -184,9 +189,33 @@ router.patch('/users/:id', (req, res) => __awaiter(void 0, void 0, void 0, funct
     }
 }));
 router.post('/users/:id/deactivate', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q;
     try {
-        const id = Number(req.params.id);
+        const rawId = String(req.params.id);
+        if (rawId.startsWith('invite-')) {
+            const inviteId = Number(rawId.slice('invite-'.length));
+            if (Number.isNaN(inviteId)) {
+                return res.status(400).json({ error: 'Invalid invite id.' });
+            }
+            const inviteRows = yield db_1.db.select().from(schema_1.invites).where((0, drizzle_orm_1.eq)(schema_1.invites.id, inviteId)).limit(1);
+            const invite = inviteRows[0];
+            if (!invite) {
+                return res.status(404).json({ error: 'Invite not found.' });
+            }
+            const updatedInvite = yield db_1.db.update(schema_1.invites).set({ status: 'revoked' }).where((0, drizzle_orm_1.eq)(schema_1.invites.id, inviteId)).returning();
+            yield (0, auditService_1.writeAuditLog)({
+                action: 'invitation.revoked',
+                entityType: 'invitation',
+                entityId: inviteId,
+                actorUserId: (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id) !== null && _b !== void 0 ? _b : null,
+                actorUid: (_d = (_c = req.firebaseUser) === null || _c === void 0 ? void 0 : _c.uid) !== null && _d !== void 0 ? _d : null,
+                actorRole: (_f = (_e = req.user) === null || _e === void 0 ? void 0 : _e.role) !== null && _f !== void 0 ? _f : null,
+                clubId: (_g = invite.clubId) !== null && _g !== void 0 ? _g : null,
+                metadata: { email: invite.email, role: invite.role, status: 'revoked' },
+            });
+            return res.json({ success: true, invitation: (_h = updatedInvite[0]) !== null && _h !== void 0 ? _h : invite });
+        }
+        const id = Number(rawId);
         if (Number.isNaN(id)) {
             return res.status(400).json({ error: 'Invalid user id.' });
         }
@@ -201,10 +230,10 @@ router.post('/users/:id/deactivate', (req, res) => __awaiter(void 0, void 0, voi
             action: 'user.deactivated',
             entityType: 'user',
             entityId: id,
-            actorUserId: (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id) !== null && _b !== void 0 ? _b : null,
-            actorUid: (_d = (_c = req.firebaseUser) === null || _c === void 0 ? void 0 : _c.uid) !== null && _d !== void 0 ? _d : null,
-            actorRole: (_f = (_e = req.user) === null || _e === void 0 ? void 0 : _e.role) !== null && _f !== void 0 ? _f : null,
-            clubId: (_g = updated[0].clubId) !== null && _g !== void 0 ? _g : null,
+            actorUserId: (_k = (_j = req.user) === null || _j === void 0 ? void 0 : _j.id) !== null && _k !== void 0 ? _k : null,
+            actorUid: (_m = (_l = req.firebaseUser) === null || _l === void 0 ? void 0 : _l.uid) !== null && _m !== void 0 ? _m : null,
+            actorRole: (_p = (_o = req.user) === null || _o === void 0 ? void 0 : _o.role) !== null && _p !== void 0 ? _p : null,
+            clubId: (_q = updated[0].clubId) !== null && _q !== void 0 ? _q : null,
         });
         res.json({ success: true, user: updated[0] });
     }
@@ -261,12 +290,13 @@ router.get('/roles', (_req, res) => __awaiter(void 0, void 0, void 0, function* 
     });
 }));
 router.get('/settings', (_req, res) => {
-    var _a, _b;
+    var _a, _b, _c, _d;
     res.json({
         success: true,
         settings: {
             inviteTtlHours: (_a = process.env.INVITE_TTL_HOURS) !== null && _a !== void 0 ? _a : '168',
-            resendFromEmail: (_b = process.env.RESEND_FROM_EMAIL) !== null && _b !== void 0 ? _b : 'BCMS <onboarding@resend.dev>',
+            resendFromEmail: (_b = process.env.RESEND_FROM_EMAIL) !== null && _b !== void 0 ? _b : 'BCMS <no-reply@bcms.ro>',
+            appBaseUrl: (_d = (_c = process.env.APP_BASE_URL) !== null && _c !== void 0 ? _c : process.env.FRONTEND_URL) !== null && _d !== void 0 ? _d : 'https://bcms.ro',
         },
     });
 });

@@ -15,14 +15,17 @@ const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const auth_1 = require("../middleware/auth");
 const auditService_1 = require("../services/auditService");
+const invitationsService_1 = require("../services/invitationsService");
 const router = (0, express_1.Router)();
 function toClubSummary(club, userRows, inviteRows) {
     const clubUsers = userRows.filter((user) => user.clubId === club.id);
-    return Object.assign(Object.assign({}, club), { status: 'active', usersCount: clubUsers.length, userCount: clubUsers.length, adminsCount: clubUsers.filter((user) => user.role === 'admin').length, adminCount: clubUsers.filter((user) => user.role === 'admin').length, coachCount: clubUsers.filter((user) => user.role === 'coach').length, staffCount: clubUsers.filter((user) => user.role === 'staff' || user.role === 'accountant').length, playerCount: clubUsers.filter((user) => user.role === 'player').length, pendingInviteCount: inviteRows.filter((invite) => invite.clubId === club.id && invite.status === 'pending').length });
+    const now = new Date();
+    return Object.assign(Object.assign({}, club), { status: 'active', usersCount: clubUsers.length, userCount: clubUsers.length, adminsCount: clubUsers.filter((user) => user.role === 'admin').length, adminCount: clubUsers.filter((user) => user.role === 'admin').length, coachCount: clubUsers.filter((user) => user.role === 'coach').length, staffCount: clubUsers.filter((user) => user.role === 'staff' || user.role === 'accountant').length, playerCount: clubUsers.filter((user) => user.role === 'player').length, pendingInviteCount: inviteRows.filter((invite) => invite.clubId === club.id && (0, invitationsService_1.isVisiblePendingInvite)(invite, userRows, now)).length });
 }
 router.use(auth_1.authenticate, auth_1.requireSuperadmin);
 router.get('/', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        yield (0, invitationsService_1.syncInvitationStatuses)();
         const [clubRows, userRows, inviteRows] = yield Promise.all([
             db_1.db.select().from(schema_1.clubs).orderBy((0, drizzle_orm_1.desc)(schema_1.clubs.updatedAt)),
             db_1.db.select().from(schema_1.users),

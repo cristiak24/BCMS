@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { eventsController } from '../controllers/eventsController';
+import { authenticate } from '../middleware/auth';
 
 const router = Router();
+
+router.use(authenticate);
 
 router.get('/', eventsController.getEvents);
 router.get('/:id', eventsController.getEventById);

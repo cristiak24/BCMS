@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import { createHash, randomBytes } from 'crypto';
 import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
+import { setGlobalOptions } from 'firebase-functions/v2';
 import { Resend } from 'resend';
 import { app as serverApp } from '../../../apps/server/src/app';
 import {
@@ -24,31 +25,85 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
+setGlobalOptions({ region: 'europe-west1' });
+
 const db = admin.firestore();
 db.settings({ ignoreUndefinedProperties: true });
 const auth = admin.auth();
 
-const resendApiKey = process.env.RESEND_API_KEY?.trim();
-const resendFromEmail = process.env.RESEND_FROM_EMAIL?.trim() || 'BCMS <onboarding@resend.dev>';
-const appPublicUrl = process.env.APP_PUBLIC_URL?.trim() || 'http://localhost:8081';
-const parsedInviteTtlHours = Number(process.env.INVITE_TTL_HOURS ?? INVITE_DEFAULT_TTL_HOURS);
-const inviteTtlHours = Number.isFinite(parsedInviteTtlHours) && parsedInviteTtlHours > 0
-  ? parsedInviteTtlHours
-  : INVITE_DEFAULT_TTL_HOURS;
-
-if (!resendApiKey) {
-  console.warn('RESEND_API_KEY is not set. Club admin invites will not be emailed until it is configured.');
-}
-
-const resend = resendApiKey ? new Resend(resendApiKey) : null;
 const databaseUrlSecret = defineSecret('DATABASE_URL');
 const resendApiKeySecret = defineSecret('RESEND_API_KEY');
-const firebaseProjectIdSecret = defineSecret('FIREBASE_PROJECT_ID');
-const firebaseClientEmailSecret = defineSecret('FIREBASE_CLIENT_EMAIL');
-const firebasePrivateKeySecret = defineSecret('FIREBASE_PRIVATE_KEY');
 const appBaseUrlSecret = defineSecret('APP_BASE_URL');
 const frontendUrlSecret = defineSecret('FRONTEND_URL');
 const inviteExpirationMinutesSecret = defineSecret('INVITE_EXPIRATION_MINUTES');
+const stripeSecretKeySecret = defineSecret('STRIPE_SECRET_KEY');
+const stripePublishableKeySecret = defineSecret('STRIPE_PUBLISHABLE_KEY');
+const stripeWebhookSecretSecret = defineSecret('STRIPE_WEBHOOK_SECRET');
+const stripeCurrencySecret = defineSecret('STRIPE_CURRENCY');
+const inviteEmailSecrets = [resendApiKeySecret, appBaseUrlSecret, frontendUrlSecret];
+
+function getResend() {
+  const resendApiKey = process.env.RESEND_API_KEY?.trim();
+  return resendApiKey ? new Resend(resendApiKey) : null;
+}
+
+function getResendFromEmail() {
+  return process.env.RESEND_FROM_EMAIL?.trim() || 'BCMS <no-reply@bcms.ro>';
+}
+
+function isLocalUrl(value: string) {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0' || hostname === '::1';
+  } catch {
+    return false;
+  }
+}
+
+function isDeployedRuntime() {
+  return Boolean(
+    process.env.NODE_ENV === 'production' ||
+    process.env.GCLOUD_PROJECT ||
+    process.env.GOOGLE_CLOUD_PROJECT ||
+    process.env.K_SERVICE ||
+    process.env.FUNCTION_TARGET,
+  );
+}
+
+function normalizePublicUrl(value?: string | null) {
+  const trimmed = value?.trim().replace(/\/+$/, '');
+  if (!trimmed) {
+    return null;
+  }
+
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return isDeployedRuntime() && isLocalUrl(withProtocol) ? null : withProtocol;
+}
+
+function getAppPublicUrl() {
+  const candidates = [
+    process.env.APP_PUBLIC_URL,
+    process.env.APP_BASE_URL,
+    process.env.FRONTEND_URL,
+    process.env.FIREBASE_HOSTING_URL,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizePublicUrl(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return 'https://bcms.ro';
+}
+
+function getInviteTtlHours() {
+  const parsedInviteTtlHours = Number(process.env.INVITE_TTL_HOURS ?? INVITE_DEFAULT_TTL_HOURS);
+  return Number.isFinite(parsedInviteTtlHours) && parsedInviteTtlHours > 0
+    ? parsedInviteTtlHours
+    : INVITE_DEFAULT_TTL_HOURS;
+}
 
 export const api = onRequest(
   {
@@ -57,12 +112,13 @@ export const api = onRequest(
     secrets: [
       databaseUrlSecret,
       resendApiKeySecret,
-      firebaseProjectIdSecret,
-      firebaseClientEmailSecret,
-      firebasePrivateKeySecret,
       appBaseUrlSecret,
       frontendUrlSecret,
       inviteExpirationMinutesSecret,
+      stripeSecretKeySecret,
+      stripePublishableKeySecret,
+      stripeWebhookSecretSecret,
+      stripeCurrencySecret,
     ],
   },
   serverApp,
@@ -143,7 +199,7 @@ async function loadInviteByTokenHash(tokenHash: string) {
 }
 
 function buildSignupUrl(rawToken: string) {
-  return `${appPublicUrl.replace(/\/+$/, '')}/signup?inviteToken=${encodeURIComponent(rawToken)}`;
+  return `${getAppPublicUrl().replace(/\/+$/, '')}/signup?inviteToken=${encodeURIComponent(rawToken)}`;
 }
 
 async function sendClubAdminInviteEmail(params: {
@@ -152,12 +208,14 @@ async function sendClubAdminInviteEmail(params: {
   signupUrl: string;
   expiresAt: Date;
 }) {
+  const resend = getResend();
+
   if (!resend) {
     throw new HttpsError('failed-precondition', 'Resend is not configured.');
   }
 
   await resend.emails.send({
-    from: resendFromEmail,
+    from: getResendFromEmail(),
     to: params.email,
     subject: `Join as Admin for Club ${params.clubName}`,
     html: `
@@ -258,7 +316,7 @@ async function loadTeamName(teamId?: string | null) {
   return team.name ?? null;
 }
 
-export const createClubAdminInvite = onCall(async (request) => {
+export const createClubAdminInvite = onCall({ secrets: inviteEmailSecrets }, async (request) => {
   const { authContext, profile } = await loadCallerProfile(request);
   const payload = request.data as Partial<CreateClubAdminInviteInput>;
   const email = typeof payload.email === 'string' ? normalizeEmail(payload.email) : '';
@@ -279,7 +337,7 @@ export const createClubAdminInvite = onCall(async (request) => {
 
   const rawToken = randomBytes(32).toString('base64url');
   const tokenHash = hashInviteToken(rawToken);
-  const expiresAt = admin.firestore.Timestamp.fromDate(new Date(Date.now() + inviteTtlHours * 60 * 60 * 1000));
+  const expiresAt = admin.firestore.Timestamp.fromDate(new Date(Date.now() + getInviteTtlHours() * 60 * 60 * 1000));
   const inviteRef = db.collection('invites').doc();
   const deterministicClubRef = db.collection('clubs').doc(buildClubDocId(normalizedClubName));
 

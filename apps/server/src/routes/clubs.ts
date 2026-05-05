@@ -4,6 +4,7 @@ import { db } from '../db';
 import { clubs, invites, users } from '../db/schema';
 import { authenticate, requireSuperadmin, type AuthenticatedRequest } from '../middleware/auth';
 import { writeAuditLog } from '../services/auditService';
+import { isVisiblePendingInvite, syncInvitationStatuses } from '../services/invitationsService';
 
 const router = Router();
 
@@ -13,6 +14,7 @@ function toClubSummary(
   inviteRows: Array<typeof invites.$inferSelect>,
 ) {
   const clubUsers = userRows.filter((user) => user.clubId === club.id);
+  const now = new Date();
 
   return {
     ...club,
@@ -24,7 +26,7 @@ function toClubSummary(
     coachCount: clubUsers.filter((user) => user.role === 'coach').length,
     staffCount: clubUsers.filter((user) => user.role === 'staff' || user.role === 'accountant').length,
     playerCount: clubUsers.filter((user) => user.role === 'player').length,
-    pendingInviteCount: inviteRows.filter((invite) => invite.clubId === club.id && invite.status === 'pending').length,
+    pendingInviteCount: inviteRows.filter((invite) => invite.clubId === club.id && isVisiblePendingInvite(invite, userRows, now)).length,
   };
 }
 
@@ -32,6 +34,8 @@ router.use(authenticate, requireSuperadmin);
 
 router.get('/', async (_req, res) => {
   try {
+    await syncInvitationStatuses();
+
     const [clubRows, userRows, inviteRows] = await Promise.all([
       db.select().from(clubs).orderBy(desc(clubs.updatedAt)),
       db.select().from(users),

@@ -20,25 +20,19 @@ const REFERER = 'https://www.frbaschet.ro/';
 const HEADERS = { Referer: REFERER };
 // ---------- Helpers ----------
 /**
- * Parsează scorul din formatul "75 - 60" sau "75-60" sau "?" în { home, away }.
+ * Parsează scorul din formatul "75 - 60", "75-60", "75 : 60" sau "?" în { home, away }.
  * Returnează { home: '', away: '' } dacă meciul nu are scor (neprogramat).
  */
 function parseScore(rawScore) {
     const clean = (rawScore || '').replace(/\s+/g, '').trim();
     // Dacă e gol, "?", "- " sau nu conține cifre — meci neprogramat
-    if (!clean || clean === '?' || clean === '-' || !/\d/.test(clean)) {
+    if (!clean || clean === '?' || /^[-:–—]+$/.test(clean) || !/\d/.test(clean)) {
         return { home: '', away: '' };
     }
-    const parts = clean.split('-');
-    if (parts.length !== 2)
+    const scoreMatch = clean.match(/^(\d+)[-:–—](\d+)$/);
+    if (!scoreMatch)
         return { home: '', away: '' };
-    const h = parts[0].trim();
-    const a = parts[1].trim();
-    // Ambele trebuie să fie numere valide
-    if (!/^\d+$/.test(h) || !/^\d+$/.test(a)) {
-        return { home: '', away: '' };
-    }
-    return { home: h, away: a };
+    return { home: scoreMatch[1], away: scoreMatch[2] };
 }
 /**
  * Determină statusul unui meci pe baza scorului și datei.
@@ -111,6 +105,56 @@ function parseDateToTimestamp(dateStr) {
  */
 function stripTags(s) {
     return s.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+}
+function decodeWidgetHtml(raw) {
+    return raw
+        .replace(/\\n/g, '')
+        .replace(/\\r/g, '')
+        .replace(/\\t/g, '')
+        .replace(/\\"/g, '"')
+        .replace(/\\\//g, '/')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&#039;/g, "'")
+        .replace(/&quot;/g, '"');
+}
+function parseStandingsTable(raw) {
+    var _a, _b, _c, _d;
+    const htmlMatch = raw.match(/MBT\.API\.update\('[^']*',\s*'([\s\S]*?)'\);/);
+    const html = decodeWidgetHtml((_a = htmlMatch === null || htmlMatch === void 0 ? void 0 : htmlMatch[1]) !== null && _a !== void 0 ? _a : raw);
+    const bodyMatch = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
+    const tbody = (_b = bodyMatch === null || bodyMatch === void 0 ? void 0 : bodyMatch[1]) !== null && _b !== void 0 ? _b : html;
+    const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+    const rows = [];
+    let rowMatch;
+    while ((rowMatch = rowRegex.exec(tbody)) !== null) {
+        const cells = [];
+        const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+        let cellMatch;
+        while ((cellMatch = cellRegex.exec(rowMatch[1])) !== null) {
+            cells.push(stripTags(cellMatch[1]));
+        }
+        if (cells.length < 4)
+            continue;
+        const position = Number(cells[0].replace(/[^\d]/g, ''));
+        const team = cells[1].trim();
+        const recordMatch = cells[2].replace(/\s+/g, '').match(/^(\d+)\/(\d+)$/);
+        const wins = Number((_c = recordMatch === null || recordMatch === void 0 ? void 0 : recordMatch[1]) !== null && _c !== void 0 ? _c : NaN);
+        const losses = Number((_d = recordMatch === null || recordMatch === void 0 ? void 0 : recordMatch[2]) !== null && _d !== void 0 ? _d : NaN);
+        const points = Number(cells[3].replace(/[^\d-]/g, ''));
+        if (!Number.isFinite(position) || !team || !Number.isFinite(wins) || !Number.isFinite(losses) || !Number.isFinite(points)) {
+            continue;
+        }
+        rows.push({
+            position,
+            team,
+            wins,
+            losses,
+            played: wins + losses,
+            points,
+        });
+    }
+    return rows;
 }
 // ---------- GET /api/basketball/leagues ----------
 router.get('/leagues', (_req, res) => {
@@ -270,6 +314,34 @@ router.get('/matches', (req, res) => __awaiter(void 0, void 0, void 0, function*
     catch (e) {
         console.error('[basketball/matches] error:', e);
         res.status(500).json({ error: 'Failed to fetch matches' });
+    }
+}));
+// ---------- GET /api/basketball/standings?seasonId=&leagueId= ----------
+router.get('/standings', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { seasonId, leagueId } = req.query;
+    if (!seasonId || !leagueId) {
+        res.status(400).json({ error: 'seasonId and leagueId required' });
+        return;
+    }
+    try {
+        const baseUrl = `https://widgets.baskethotel.com/widget-service/show?api=${API_KEY}&lang=ro`;
+        const initialUrl = `${baseUrl}&request[0][widget]=300&request[0][param][league_id]=${leagueId}&request[0][param][season_id]=${seasonId}&request[0][param][template]=v2&request[0][param][show_stage_selector]=1&request[0][param][stage_selector]=dropdown&request[0][param][use_group_sort_index]=1`;
+        const initialResponse = yield axios_1.default.get(initialUrl, { headers: HEADERS });
+        const initialRaw = String(initialResponse.data);
+        const state = (_a = initialRaw.match(/state:\s*\\?'([^'\\]+)\\?'/)) === null || _a === void 0 ? void 0 : _a[1];
+        const stageId = (_b = initialRaw.match(/activeStage\s*=\s*\\?'([^'\\]+)\\?'/)) === null || _b === void 0 ? void 0 : _b[1];
+        if (!state) {
+            res.json([]);
+            return;
+        }
+        const tableUrl = `${baseUrl}&request[0][container]=standings&request[0][widget]=300&request[0][part]=table&request[0][state]=${encodeURIComponent(state)}&request[0][param][season_id]=${seasonId}${stageId ? `&request[0][param][group_filter]=${stageId}` : ''}&request[0][param][showTeamLogo]=&request[0][param][teamLogoSize]=20x20`;
+        const tableResponse = yield axios_1.default.get(tableUrl, { headers: HEADERS });
+        res.json(parseStandingsTable(String(tableResponse.data)));
+    }
+    catch (e) {
+        console.error('[basketball/standings] error:', e);
+        res.status(500).json({ error: 'Failed to fetch standings' });
     }
 }));
 // ---------- GET /api/basketball/dashboard-summary ----------

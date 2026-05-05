@@ -1,17 +1,17 @@
 import crypto from 'crypto';
 import { Resend } from 'resend';
-import { desc, eq, or } from 'drizzle-orm';
+import { and, desc, eq, lte, or } from 'drizzle-orm';
 import { db } from '../db';
 import { clubs, invites, users } from '../db/schema';
 import { writeAuditLog } from './auditService';
 import type { AuthenticatedRequest } from '../middleware/auth';
 import { loadServerEnv } from '../lib/loadEnv';
+import { resolvePublicAppUrl } from '../lib/publicUrl';
 
 loadServerEnv();
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim() || '';
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || 'BCMS <onboarding@resend.dev>';
-const APP_PUBLIC_URL = process.env.APP_BASE_URL?.trim() || process.env.FRONTEND_URL?.trim() || 'http://localhost:8081';
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || 'BCMS <no-reply@bcms.ro>';
 const INVITE_TTL_MINUTES = Number(process.env.INVITE_EXPIRATION_MINUTES ?? 10) || 10;
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
@@ -53,7 +53,66 @@ export function generateInviteToken() {
 }
 
 export function buildInviteUrl(token: string) {
-  return `${APP_PUBLIC_URL.replace(/\/+$/, '')}/invite/${encodeURIComponent(token)}`;
+  return `${resolvePublicAppUrl()}/invite/${encodeURIComponent(token)}`;
+}
+
+function invitationUserKey(email: string, clubId: number | null) {
+  return `${normalizeEmail(email)}:${clubId ?? 'none'}`;
+}
+
+export function isInviteExpired(invite: Pick<typeof invites.$inferSelect, 'expiresAt'>, now = new Date()) {
+  return new Date(invite.expiresAt).getTime() <= now.getTime();
+}
+
+export function isVisiblePendingInvite(
+  invite: Pick<typeof invites.$inferSelect, 'email' | 'clubId' | 'status' | 'expiresAt'>,
+  userRows: Array<Pick<typeof users.$inferSelect, 'email' | 'clubId'>>,
+  now = new Date(),
+) {
+  if (invite.status !== 'pending' || isInviteExpired(invite, now)) {
+    return false;
+  }
+
+  const matchingUser = userRows.some((user) => invitationUserKey(user.email, user.clubId) === invitationUserKey(invite.email, invite.clubId));
+  return !matchingUser;
+}
+
+export async function syncInvitationStatuses() {
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  await db
+    .update(invites)
+    .set({ status: 'expired' })
+    .where(and(eq(invites.status, 'pending'), lte(invites.expiresAt, nowIso)));
+
+  const [pendingInvites, userRows] = await Promise.all([
+    db.select().from(invites).where(eq(invites.status, 'pending')),
+    db.select({
+      id: users.id,
+      email: users.email,
+      clubId: users.clubId,
+    }).from(users),
+  ]);
+
+  const usersByInviteKey = new Map(userRows.map((user) => [invitationUserKey(user.email, user.clubId), user] as const));
+  const acceptedAt = new Date().toISOString();
+
+  await Promise.all(
+    pendingInvites.map((invite) => {
+      const matchingUser = usersByInviteKey.get(invitationUserKey(invite.email, invite.clubId));
+
+      if (!matchingUser) {
+        return Promise.resolve();
+      }
+
+      return db.update(invites).set({
+        status: 'accepted',
+        usedBy: matchingUser.id,
+        usedAt: invite.usedAt ?? acceptedAt,
+      }).where(eq(invites.id, invite.id));
+    }),
+  );
 }
 
 async function findClubById(clubId: number) {
@@ -185,6 +244,8 @@ export async function createSuperAdminInvitation(
 }
 
 export async function validateInvitationToken(token: string) {
+  await syncInvitationStatuses();
+
   const tokenHash = hashInviteToken(token);
   const rows = await db.select({
     id: invites.id,
@@ -216,6 +277,8 @@ export async function validateInvitationToken(token: string) {
     await db.update(invites).set({ status: 'expired' }).where(eq(invites.id, invite.id));
   }
 
+  const canAccept = !isExpired && (status === 'pending' || status === 'accepted');
+
   return {
     id: invite.id,
     token: invite.token,
@@ -229,13 +292,13 @@ export async function validateInvitationToken(token: string) {
     usedAt: invite.usedAt,
     usedBy: invite.usedBy,
     isExpired,
-    canAccept: !isExpired && status === 'pending',
+    canAccept,
     message: isExpired
       ? 'This invitation has expired. Ask a Super Admin to send a new one.'
       : status === 'revoked'
         ? 'This invitation has been revoked.'
         : status === 'accepted'
-          ? 'This invitation has already been used.'
+          ? 'This invitation was already accepted. You can finish activating the account again.'
           : null,
   };
 }
@@ -264,11 +327,7 @@ export async function acceptInvitation(params: {
     throw new Error('Invite has been revoked.');
   }
 
-  if (invite.status === 'accepted') {
-    throw new Error('Invite has already been accepted.');
-  }
-
-  if (new Date(invite.expiresAt).getTime() <= Date.now()) {
+  if (invite.status !== 'accepted' && new Date(invite.expiresAt).getTime() <= Date.now()) {
     await db.update(invites).set({ status: 'expired' }).where(eq(invites.id, invite.id));
     throw new Error('Invite expired.');
   }
@@ -318,7 +377,7 @@ export async function acceptInvitation(params: {
   await db.update(invites).set({
     status: 'accepted',
     usedBy: userId,
-    usedAt: new Date().toISOString(),
+    usedAt: invite.usedAt ?? new Date().toISOString(),
   }).where(eq(invites.id, invite.id));
 
   await writeAuditLog({
@@ -386,6 +445,8 @@ export async function completeUserRegistration(params: {
 }
 
 export async function listInvitations() {
+  await syncInvitationStatuses();
+
   const rows = await db.select({
     id: invites.id,
     token: invites.token,

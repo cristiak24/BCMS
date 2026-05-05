@@ -26,6 +26,20 @@ exports.findInviteLinkByTokenHash = findInviteLinkByTokenHash;
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
+function inviteLinkSelection() {
+    return {
+        id: schema_1.inviteLinks.id,
+        clubId: schema_1.inviteLinks.clubId,
+        role: schema_1.inviteLinks.role,
+        token: schema_1.inviteLinks.token,
+        tokenHash: schema_1.inviteLinks.tokenHash,
+        expiresAt: (0, drizzle_orm_1.sql) `${schema_1.inviteLinks.expiresAt} AT TIME ZONE 'UTC'`.as('expires_at'),
+        refreshIntervalMinutes: schema_1.inviteLinks.refreshIntervalMinutes,
+        createdBy: schema_1.inviteLinks.createdBy,
+        createdAt: (0, drizzle_orm_1.sql) `${schema_1.inviteLinks.createdAt} AT TIME ZONE 'UTC'`.as('created_at'),
+        isActive: schema_1.inviteLinks.isActive,
+    };
+}
 function findUserDocByNumericId(userId) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a;
@@ -166,6 +180,7 @@ function deactivateActiveInviteLinks(clubId, role) {
 }
 function createInviteLink(payload) {
     return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b;
         const record = {
             clubId: payload.clubId,
             role: payload.role,
@@ -177,14 +192,21 @@ function createInviteLink(payload) {
             createdAt: new Date().toISOString(),
             isActive: 1,
         };
-        const inserted = yield db_1.db.insert(schema_1.inviteLinks).values(record).returning();
-        return inserted[0];
+        const inserted = yield db_1.db.insert(schema_1.inviteLinks).values(record).returning({ id: schema_1.inviteLinks.id });
+        const createdId = (_a = inserted[0]) === null || _a === void 0 ? void 0 : _a.id;
+        if (!createdId) {
+            return null;
+        }
+        const rows = yield db_1.db.select(inviteLinkSelection()).from(schema_1.inviteLinks)
+            .where((0, drizzle_orm_1.eq)(schema_1.inviteLinks.id, createdId))
+            .limit(1);
+        return (_b = rows[0]) !== null && _b !== void 0 ? _b : null;
     });
 }
 function getLatestInviteLinkForClubRole(clubId, role) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a;
-        const rows = yield db_1.db.select().from(schema_1.inviteLinks)
+        const rows = yield db_1.db.select(inviteLinkSelection()).from(schema_1.inviteLinks)
             .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.inviteLinks.clubId, clubId), (0, drizzle_orm_1.eq)(schema_1.inviteLinks.role, role)))
             .orderBy((0, drizzle_orm_1.desc)(schema_1.inviteLinks.createdAt))
             .limit(1);
@@ -194,7 +216,7 @@ function getLatestInviteLinkForClubRole(clubId, role) {
 function getActiveInviteLinkForClubRole(clubId, role) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a;
-        const rows = yield db_1.db.select().from(schema_1.inviteLinks)
+        const rows = yield db_1.db.select(inviteLinkSelection()).from(schema_1.inviteLinks)
             .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.inviteLinks.clubId, clubId), (0, drizzle_orm_1.eq)(schema_1.inviteLinks.role, role), (0, drizzle_orm_1.eq)(schema_1.inviteLinks.isActive, 1)))
             .orderBy((0, drizzle_orm_1.desc)(schema_1.inviteLinks.createdAt))
             .limit(1);
@@ -204,7 +226,7 @@ function getActiveInviteLinkForClubRole(clubId, role) {
 function findInviteLinkByTokenHash(tokenHash) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a;
-        const rows = yield db_1.db.select().from(schema_1.inviteLinks)
+        const rows = yield db_1.db.select(inviteLinkSelection()).from(schema_1.inviteLinks)
             .where((0, drizzle_orm_1.eq)(schema_1.inviteLinks.tokenHash, tokenHash))
             .limit(1);
         const invite = rows[0];

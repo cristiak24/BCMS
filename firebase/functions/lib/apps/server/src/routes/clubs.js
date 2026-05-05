@@ -6,9 +6,11 @@ const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const auth_1 = require("../middleware/auth");
 const auditService_1 = require("../services/auditService");
+const invitationsService_1 = require("../services/invitationsService");
 const router = (0, express_1.Router)();
 function toClubSummary(club, userRows, inviteRows) {
     const clubUsers = userRows.filter((user) => user.clubId === club.id);
+    const now = new Date();
     return {
         ...club,
         status: 'active',
@@ -19,12 +21,13 @@ function toClubSummary(club, userRows, inviteRows) {
         coachCount: clubUsers.filter((user) => user.role === 'coach').length,
         staffCount: clubUsers.filter((user) => user.role === 'staff' || user.role === 'accountant').length,
         playerCount: clubUsers.filter((user) => user.role === 'player').length,
-        pendingInviteCount: inviteRows.filter((invite) => invite.clubId === club.id && invite.status === 'pending').length,
+        pendingInviteCount: inviteRows.filter((invite) => invite.clubId === club.id && (0, invitationsService_1.isVisiblePendingInvite)(invite, userRows, now)).length,
     };
 }
 router.use(auth_1.authenticate, auth_1.requireSuperadmin);
 router.get('/', async (_req, res) => {
     try {
+        await (0, invitationsService_1.syncInvitationStatuses)();
         const [clubRows, userRows, inviteRows] = await Promise.all([
             db_1.db.select().from(schema_1.clubs).orderBy((0, drizzle_orm_1.desc)(schema_1.clubs.updatedAt)),
             db_1.db.select().from(schema_1.users),

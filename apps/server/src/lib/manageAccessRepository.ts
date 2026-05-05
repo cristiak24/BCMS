@@ -1,7 +1,7 @@
 import { admin, toIso } from './firebaseAdmin';
 import { db } from '../db';
 import { users, clubs, teams, accessRequests, inviteLinks } from '../db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import type { AccessRequestRecord, InviteRole } from '../types/manageAccess';
 
 type UserDoc = {
@@ -12,6 +12,21 @@ type UserDoc = {
     clubId?: number | null;
     status?: string;
 };
+
+function inviteLinkSelection() {
+    return {
+        id: inviteLinks.id,
+        clubId: inviteLinks.clubId,
+        role: inviteLinks.role,
+        token: inviteLinks.token,
+        tokenHash: inviteLinks.tokenHash,
+        expiresAt: sql<string>`${inviteLinks.expiresAt} AT TIME ZONE 'UTC'`.as('expires_at'),
+        refreshIntervalMinutes: inviteLinks.refreshIntervalMinutes,
+        createdBy: inviteLinks.createdBy,
+        createdAt: sql<string>`${inviteLinks.createdAt} AT TIME ZONE 'UTC'`.as('created_at'),
+        isActive: inviteLinks.isActive,
+    };
+}
 
 async function findUserDocByNumericId(userId: number) {
     const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
@@ -123,7 +138,7 @@ export async function denyAccessRequest(id: number, clubId: number, reviewedBy: 
     return updated[0] ?? null;
 }
 
-export async function updateUserAccess(userId: number, payload: { clubId: number; role: InviteRole; status: 'processed' | 'rejected'; }) {
+export async function updateUserAccess(userId: number, payload: { clubId: number; role: InviteRole; status: 'active' | 'disabled'; }) {
     const updated = await db.update(users)
         .set({
             clubId: payload.clubId,
@@ -167,12 +182,22 @@ export async function createInviteLink(payload: {
         isActive: 1,
     };
 
-    const inserted = await db.insert(inviteLinks).values(record).returning();
-    return inserted[0];
+    const inserted = await db.insert(inviteLinks).values(record).returning({ id: inviteLinks.id });
+    const createdId = inserted[0]?.id;
+
+    if (!createdId) {
+        return null;
+    }
+
+    const rows = await db.select(inviteLinkSelection()).from(inviteLinks)
+        .where(eq(inviteLinks.id, createdId))
+        .limit(1);
+
+    return rows[0] ?? null;
 }
 
 export async function getLatestInviteLinkForClubRole(clubId: number, role: InviteRole) {
-    const rows = await db.select().from(inviteLinks)
+    const rows = await db.select(inviteLinkSelection()).from(inviteLinks)
         .where(and(eq(inviteLinks.clubId, clubId), eq(inviteLinks.role, role as any)))
         .orderBy(desc(inviteLinks.createdAt))
         .limit(1);
@@ -181,7 +206,7 @@ export async function getLatestInviteLinkForClubRole(clubId: number, role: Invit
 }
 
 export async function getActiveInviteLinkForClubRole(clubId: number, role: InviteRole) {
-    const rows = await db.select().from(inviteLinks)
+    const rows = await db.select(inviteLinkSelection()).from(inviteLinks)
         .where(and(
             eq(inviteLinks.clubId, clubId),
             eq(inviteLinks.role, role as any),
@@ -194,7 +219,7 @@ export async function getActiveInviteLinkForClubRole(clubId: number, role: Invit
 }
 
 export async function findInviteLinkByTokenHash(tokenHash: string) {
-    const rows = await db.select().from(inviteLinks)
+    const rows = await db.select(inviteLinkSelection()).from(inviteLinks)
         .where(eq(inviteLinks.tokenHash, tokenHash))
         .limit(1);
         

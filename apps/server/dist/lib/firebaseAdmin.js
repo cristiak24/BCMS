@@ -53,14 +53,16 @@ exports.admin = admin;
 const loadEnv_1 = require("./loadEnv");
 (0, loadEnv_1.loadServerEnv)();
 function initAdminApp() {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f;
     if (admin.apps.length) {
         return;
     }
     const serviceAccountJson = (_a = process.env.FIREBASE_SERVICE_ACCOUNT_JSON) === null || _a === void 0 ? void 0 : _a.trim();
-    const projectId = ((_b = process.env.FIREBASE_PROJECT_ID) === null || _b === void 0 ? void 0 : _b.trim()) || ((_c = process.env.GCLOUD_PROJECT) === null || _c === void 0 ? void 0 : _c.trim());
-    const clientEmail = (_d = process.env.FIREBASE_CLIENT_EMAIL) === null || _d === void 0 ? void 0 : _d.trim();
-    const privateKey = (_e = process.env.FIREBASE_PRIVATE_KEY) === null || _e === void 0 ? void 0 : _e.replace(/\\n/g, '\n');
+    const projectId = ((_b = process.env.FIREBASE_PROJECT_ID) === null || _b === void 0 ? void 0 : _b.trim()) ||
+        ((_c = process.env.GCLOUD_PROJECT) === null || _c === void 0 ? void 0 : _c.trim()) ||
+        ((_d = process.env.GOOGLE_CLOUD_PROJECT) === null || _d === void 0 ? void 0 : _d.trim());
+    const clientEmail = (_e = process.env.FIREBASE_CLIENT_EMAIL) === null || _e === void 0 ? void 0 : _e.trim();
+    const privateKey = (_f = process.env.FIREBASE_PRIVATE_KEY) === null || _f === void 0 ? void 0 : _f.replace(/\\n/g, '\n');
     if (!projectId) {
         throw new Error('FIREBASE_PROJECT_ID is required.');
     }

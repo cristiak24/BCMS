@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { playersController } from '../controllers/playersController';
+import { authenticate } from '../middleware/auth';
 
 const router = Router();
+
+router.use(authenticate);
 
 router.get('/search', playersController.searchPlayers);
 router.get('/roster/summary', playersController.getRosterSummary);

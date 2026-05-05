@@ -2,7 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const playersController_1 = require("../controllers/playersController");
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
 router.get('/search', playersController_1.playersController.searchPlayers);
 router.get('/roster/summary', playersController_1.playersController.getRosterSummary);
 router.get('/roster', playersController_1.playersController.getRoster);

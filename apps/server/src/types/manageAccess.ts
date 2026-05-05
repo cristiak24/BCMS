@@ -6,7 +6,7 @@ export type AppUserContext = {
     id: number;
     email: string;
     name: string;
-    role: 'admin' | 'player' | 'parent' | 'coach' | 'accountant';
+    role: 'admin' | 'superadmin' | 'player' | 'parent' | 'coach' | 'accountant' | 'staff';
     clubId: number | null;
     status?: UserAccessStatus;
     isHardcodedAdmin?: boolean;

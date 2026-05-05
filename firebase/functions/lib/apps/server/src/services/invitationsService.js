@@ -8,6 +8,9 @@ exports.normalizeClubName = normalizeClubName;
 exports.hashInviteToken = hashInviteToken;
 exports.generateInviteToken = generateInviteToken;
 exports.buildInviteUrl = buildInviteUrl;
+exports.isInviteExpired = isInviteExpired;
+exports.isVisiblePendingInvite = isVisiblePendingInvite;
+exports.syncInvitationStatuses = syncInvitationStatuses;
 exports.createSuperAdminInvitation = createSuperAdminInvitation;
 exports.validateInvitationToken = validateInvitationToken;
 exports.acceptInvitation = acceptInvitation;
@@ -20,10 +23,10 @@ const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const auditService_1 = require("./auditService");
 const loadEnv_1 = require("../lib/loadEnv");
+const publicUrl_1 = require("../lib/publicUrl");
 (0, loadEnv_1.loadServerEnv)();
 const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim() || '';
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || 'BCMS <onboarding@resend.dev>';
-const APP_PUBLIC_URL = process.env.APP_BASE_URL?.trim() || process.env.FRONTEND_URL?.trim() || 'http://localhost:8081';
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || 'BCMS <no-reply@bcms.ro>';
 const INVITE_TTL_MINUTES = Number(process.env.INVITE_EXPIRATION_MINUTES ?? 10) || 10;
 const resend = RESEND_API_KEY ? new resend_1.Resend(RESEND_API_KEY) : null;
 function normalizeEmail(value) {
@@ -39,7 +42,49 @@ function generateInviteToken() {
     return crypto_1.default.randomBytes(32).toString('base64url');
 }
 function buildInviteUrl(token) {
-    return `${APP_PUBLIC_URL.replace(/\/+$/, '')}/invite/${encodeURIComponent(token)}`;
+    return `${(0, publicUrl_1.resolvePublicAppUrl)()}/invite/${encodeURIComponent(token)}`;
+}
+function invitationUserKey(email, clubId) {
+    return `${normalizeEmail(email)}:${clubId ?? 'none'}`;
+}
+function isInviteExpired(invite, now = new Date()) {
+    return new Date(invite.expiresAt).getTime() <= now.getTime();
+}
+function isVisiblePendingInvite(invite, userRows, now = new Date()) {
+    if (invite.status !== 'pending' || isInviteExpired(invite, now)) {
+        return false;
+    }
+    const matchingUser = userRows.some((user) => invitationUserKey(user.email, user.clubId) === invitationUserKey(invite.email, invite.clubId));
+    return !matchingUser;
+}
+async function syncInvitationStatuses() {
+    const now = new Date();
+    const nowIso = now.toISOString();
+    await db_1.db
+        .update(schema_1.invites)
+        .set({ status: 'expired' })
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.invites.status, 'pending'), (0, drizzle_orm_1.lte)(schema_1.invites.expiresAt, nowIso)));
+    const [pendingInvites, userRows] = await Promise.all([
+        db_1.db.select().from(schema_1.invites).where((0, drizzle_orm_1.eq)(schema_1.invites.status, 'pending')),
+        db_1.db.select({
+            id: schema_1.users.id,
+            email: schema_1.users.email,
+            clubId: schema_1.users.clubId,
+        }).from(schema_1.users),
+    ]);
+    const usersByInviteKey = new Map(userRows.map((user) => [invitationUserKey(user.email, user.clubId), user]));
+    const acceptedAt = new Date().toISOString();
+    await Promise.all(pendingInvites.map((invite) => {
+        const matchingUser = usersByInviteKey.get(invitationUserKey(invite.email, invite.clubId));
+        if (!matchingUser) {
+            return Promise.resolve();
+        }
+        return db_1.db.update(schema_1.invites).set({
+            status: 'accepted',
+            usedBy: matchingUser.id,
+            usedAt: invite.usedAt ?? acceptedAt,
+        }).where((0, drizzle_orm_1.eq)(schema_1.invites.id, invite.id));
+    }));
 }
 async function findClubById(clubId) {
     const clubRows = await db_1.db.select().from(schema_1.clubs).where((0, drizzle_orm_1.eq)(schema_1.clubs.id, clubId)).limit(1);
@@ -153,6 +198,7 @@ async function createSuperAdminInvitation(input, actor = {}) {
     };
 }
 async function validateInvitationToken(token) {
+    await syncInvitationStatuses();
     const tokenHash = hashInviteToken(token);
     const rows = await db_1.db.select({
         id: schema_1.invites.id,
@@ -179,6 +225,7 @@ async function validateInvitationToken(token) {
     if (isExpired && invite.status !== 'expired') {
         await db_1.db.update(schema_1.invites).set({ status: 'expired' }).where((0, drizzle_orm_1.eq)(schema_1.invites.id, invite.id));
     }
+    const canAccept = !isExpired && (status === 'pending' || status === 'accepted');
     return {
         id: invite.id,
         token: invite.token,
@@ -192,13 +239,13 @@ async function validateInvitationToken(token) {
         usedAt: invite.usedAt,
         usedBy: invite.usedBy,
         isExpired,
-        canAccept: !isExpired && status === 'pending',
+        canAccept,
         message: isExpired
             ? 'This invitation has expired. Ask a Super Admin to send a new one.'
             : status === 'revoked'
                 ? 'This invitation has been revoked.'
                 : status === 'accepted'
-                    ? 'This invitation has already been used.'
+                    ? 'This invitation was already accepted. You can finish activating the account again.'
                     : null,
     };
 }
@@ -215,10 +262,7 @@ async function acceptInvitation(params) {
     if (invite.status === 'revoked') {
         throw new Error('Invite has been revoked.');
     }
-    if (invite.status === 'accepted') {
-        throw new Error('Invite has already been accepted.');
-    }
-    if (new Date(invite.expiresAt).getTime() <= Date.now()) {
+    if (invite.status !== 'accepted' && new Date(invite.expiresAt).getTime() <= Date.now()) {
         await db_1.db.update(schema_1.invites).set({ status: 'expired' }).where((0, drizzle_orm_1.eq)(schema_1.invites.id, invite.id));
         throw new Error('Invite expired.');
     }
@@ -259,7 +303,7 @@ async function acceptInvitation(params) {
     await db_1.db.update(schema_1.invites).set({
         status: 'accepted',
         usedBy: userId,
-        usedAt: new Date().toISOString(),
+        usedAt: invite.usedAt ?? new Date().toISOString(),
     }).where((0, drizzle_orm_1.eq)(schema_1.invites.id, invite.id));
     await (0, auditService_1.writeAuditLog)({
         action: 'invitation.accepted',
@@ -312,6 +356,7 @@ async function completeUserRegistration(params) {
     return updated[0];
 }
 async function listInvitations() {
+    await syncInvitationStatuses();
     const rows = await db_1.db.select({
         id: schema_1.invites.id,
         token: schema_1.invites.token,

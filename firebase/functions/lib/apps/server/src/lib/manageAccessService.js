@@ -41,7 +41,7 @@ async function approveManageAccessRequest(user, requestId) {
     await (0, manageAccessRepository_1.updateUserAccess)(request.userId, {
         clubId: club.id,
         role: request.requestedRole,
-        status: 'processed',
+        status: 'active',
     });
 }
 async function denyManageAccessRequest(user, requestId) {
@@ -57,7 +57,7 @@ async function denyManageAccessRequest(user, requestId) {
     await (0, manageAccessRepository_1.updateUserAccess)(request.userId, {
         clubId: club.id,
         role: request.requestedRole,
-        status: 'rejected',
+        status: 'disabled',
     });
 }
 function toInviteLinkRecord(params) {
@@ -87,6 +87,9 @@ async function generateClubInviteLink(user, role, refreshIntervalMinutes) {
         refreshIntervalMinutes: interval,
         createdBy: user.isHardcodedAdmin ? null : user.id,
     });
+    if (!created) {
+        throw new Error('Could not persist the invite link.');
+    }
     return toInviteLinkRecord({
         id: created.id,
         clubId: club.id,
@@ -115,9 +118,10 @@ async function getActiveClubInviteLink(user, role) {
             isActive: active.isActive === 1,
         });
     }
-    const latest = await (0, manageAccessRepository_1.getLatestInviteLinkForClubRole)(club.id, role);
-    const interval = latest?.refreshIntervalMinutes ?? 30;
-    return generateClubInviteLink(user, role, interval);
+    if (active) {
+        await (0, manageAccessRepository_1.deactivateActiveInviteLinks)(club.id, role);
+    }
+    return null;
 }
 async function validateInviteToken(rawToken) {
     const invite = await (0, manageAccessRepository_1.findInviteLinkByTokenHash)((0, manageAccessTokens_1.hashInviteToken)(rawToken));

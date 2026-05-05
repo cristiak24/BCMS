@@ -4,120 +4,235 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const firebaseAdmin_1 = require("../lib/firebaseAdmin");
+const drizzle_orm_1 = require("drizzle-orm");
 const crypto_1 = __importDefault(require("crypto"));
+const db_1 = require("../db");
+const schema_1 = require("../db/schema");
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
-async function getTeamPlayersById(teamId) {
-    const playersSnap = await firebaseAdmin_1.firestore.collection('players').where('teamId', '==', teamId).get();
-    const playerDocs = playersSnap.docs.map((docSnap) => docSnap.data());
-    const joinSnap = await firebaseAdmin_1.firestore.collection('playersToTeams').where('teamId', '==', teamId).get();
-    const joinPlayerIds = joinSnap.docs.map((docSnap) => Number(docSnap.data().playerId));
-    if (joinPlayerIds.length > 0) {
-        const extraPlayersSnap = await firebaseAdmin_1.firestore.collection('players').where('id', 'in', joinPlayerIds.slice(0, 10)).get();
-        extraPlayersSnap.docs.forEach((docSnap) => {
-            const player = docSnap.data();
-            if (!playerDocs.some((existing) => existing.id === player.id)) {
-                playerDocs.push(player);
-            }
-        });
+router.use(auth_1.authenticate);
+function mapTeam(team) {
+    return {
+        ...team,
+        createdAt: team.createdAt ?? new Date().toISOString(),
+    };
+}
+function getRequestClubId(req) {
+    return req.user?.clubId == null ? null : Number(req.user.clubId);
+}
+function isSuperadmin(req) {
+    return req.user?.role === 'superadmin';
+}
+async function resolveScopedClubId(req, explicitClubId) {
+    if (!req.user) {
+        throw new Error('Authentication is required.');
     }
-    return Array.from(new Map(playerDocs.map((player) => [player.id, player])).values()).map((player) => ({
+    const requestClubId = getRequestClubId(req);
+    if (requestClubId != null) {
+        return requestClubId;
+    }
+    if (!isSuperadmin(req)) {
+        throw new Error('Your account is not assigned to a club.');
+    }
+    const parsedClubId = explicitClubId == null ? null : Number(explicitClubId);
+    if (parsedClubId != null && !Number.isNaN(parsedClubId) && parsedClubId > 0) {
+        return parsedClubId;
+    }
+    throw new Error('A club is required for this action.');
+}
+async function ensureTeamAccess(req, teamId) {
+    const rows = await db_1.db.select().from(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.id, teamId)).limit(1);
+    const team = rows[0];
+    if (!team) {
+        return { status: 404, error: 'Team not found.' };
+    }
+    if (isSuperadmin(req)) {
+        return { status: 200, team };
+    }
+    const requestClubId = getRequestClubId(req);
+    if (requestClubId == null) {
+        return { status: 403, error: 'Your account is not assigned to a club.' };
+    }
+    if (team.clubId !== requestClubId) {
+        return { status: 403, error: 'You do not have access to this team.' };
+    }
+    return { status: 200, team };
+}
+function mapPlayer(player) {
+    return {
         id: player.id,
-        firstName: player.firstName,
-        lastName: player.lastName,
-        name: player.name ?? `${player.firstName} ${player.lastName}`.trim(),
+        firstName: player.firstName ?? 'Unknown',
+        lastName: player.lastName ?? 'Player',
+        name: player.name ?? `${player.firstName ?? 'Unknown'} ${player.lastName ?? 'Player'}`.trim(),
         email: player.email ?? null,
         number: player.number ?? null,
         status: player.status ?? 'active',
         avatarUrl: player.avatarUrl ?? null,
         teamId: player.teamId ?? null,
-        createdAt: (0, firebaseAdmin_1.toIso)(player.createdAt) ?? null,
-        medicalCheckExpiry: (0, firebaseAdmin_1.toIso)(player.medicalCheckExpiry) ?? null,
+        createdAt: player.createdAt ?? null,
+        medicalCheckExpiry: player.medicalCheckExpiry ?? null,
         birthYear: player.birthYear ?? null,
-    }));
+    };
 }
-// GET /api/teams
-router.get('/', async (_req, res) => {
+async function generateInviteCode() {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+        const inviteCode = crypto_1.default.randomBytes(3).toString('hex').toUpperCase();
+        const existing = await db_1.db.select({ id: schema_1.teams.id }).from(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.inviteCode, inviteCode)).limit(1);
+        if (!existing[0]) {
+            return inviteCode;
+        }
+    }
+    throw new Error('Failed to generate a unique invite code.');
+}
+async function getTeamPlayersById(teamId) {
+    const [directPlayers, relationRows] = await Promise.all([
+        db_1.db.select().from(schema_1.players).where((0, drizzle_orm_1.eq)(schema_1.players.teamId, teamId)),
+        db_1.db
+            .select({ player: schema_1.players })
+            .from(schema_1.playersToTeams)
+            .innerJoin(schema_1.players, (0, drizzle_orm_1.eq)(schema_1.playersToTeams.playerId, schema_1.players.id))
+            .where((0, drizzle_orm_1.eq)(schema_1.playersToTeams.teamId, teamId)),
+    ]);
+    const uniquePlayers = new Map();
+    directPlayers.forEach((player) => uniquePlayers.set(player.id, player));
+    relationRows.forEach((row) => uniquePlayers.set(row.player.id, row.player));
+    return Array.from(uniquePlayers.values()).map(mapPlayer);
+}
+function parseRouteId(value) {
+    const normalized = Array.isArray(value) ? value[0] : value;
+    return Number.parseInt(normalized, 10);
+}
+router.get('/', async (req, res) => {
     try {
-        const snap = await firebaseAdmin_1.firestore.collection('teams').orderBy('createdAt', 'asc').get();
-        const allTeams = snap.docs.map((docSnap) => docSnap.data()).map((team) => ({
-            ...team,
-            createdAt: (0, firebaseAdmin_1.toIso)(team.createdAt) ?? new Date().toISOString(),
-        }));
-        res.json(allTeams);
+        if (!req.user) {
+            res.status(401).json({ error: 'Authentication is required.' });
+            return;
+        }
+        const rows = isSuperadmin(req)
+            ? await db_1.db.select().from(schema_1.teams).orderBy((0, drizzle_orm_1.asc)(schema_1.teams.createdAt))
+            : await db_1.db
+                .select()
+                .from(schema_1.teams)
+                .where((0, drizzle_orm_1.eq)(schema_1.teams.clubId, getRequestClubId(req) ?? -1))
+                .orderBy((0, drizzle_orm_1.asc)(schema_1.teams.createdAt));
+        res.json(rows.map(mapTeam));
     }
     catch (e) {
         console.error('[GET /api/teams] error:', e);
         res.status(500).json({ error: 'Failed to fetch teams' });
     }
 });
-// POST /api/teams
 router.post('/', async (req, res) => {
     try {
-        const { frbTeamId, name, frbLeagueId, leagueName, frbSeasonId, seasonName } = req.body;
-        if (!frbTeamId || !name || !frbLeagueId || !leagueName || !frbSeasonId || !seasonName) {
+        if (!req.user) {
+            res.status(401).json({ error: 'Authentication is required.' });
+            return;
+        }
+        const { frbTeamId, name, frbLeagueId, leagueName, frbSeasonId, seasonName, isCustom } = req.body;
+        const normalizedName = typeof name === 'string' ? name.trim() : '';
+        const normalizedLeagueName = typeof leagueName === 'string' ? leagueName.trim() : '';
+        const normalizedSeasonName = typeof seasonName === 'string' ? seasonName.trim() : '';
+        const normalizedFrbTeamId = typeof frbTeamId === 'string' ? frbTeamId.trim() : '';
+        const normalizedFrbLeagueId = typeof frbLeagueId === 'string' ? frbLeagueId.trim() : '';
+        const normalizedFrbSeasonId = typeof frbSeasonId === 'string' ? frbSeasonId.trim() : '';
+        const customTeam = isCustom === true;
+        if (!normalizedName || !normalizedLeagueName || !normalizedSeasonName) {
             res.status(400).json({ error: 'Missing required fields' });
             return;
         }
-        const inviteCode = crypto_1.default.randomBytes(3).toString('hex').toUpperCase();
-        const id = await (0, firebaseAdmin_1.nextNumericId)('teams');
-        const team = {
-            id,
-            frbTeamId,
-            name,
-            frbLeagueId,
-            leagueName,
-            frbSeasonId,
-            seasonName,
+        if (!customTeam && (!normalizedFrbTeamId || !normalizedFrbLeagueId || !normalizedFrbSeasonId)) {
+            res.status(400).json({ error: 'Missing FRB identifiers for imported team.' });
+            return;
+        }
+        const clubId = await resolveScopedClubId(req, req.body?.clubId);
+        const clubRows = await db_1.db.select({ id: schema_1.clubs.id }).from(schema_1.clubs).where((0, drizzle_orm_1.eq)(schema_1.clubs.id, clubId)).limit(1);
+        if (!clubRows[0]) {
+            res.status(400).json({ error: 'Club not found.' });
+            return;
+        }
+        const existingTeam = customTeam
+            ? await db_1.db
+                .select()
+                .from(schema_1.teams)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.teams.name, normalizedName), (0, drizzle_orm_1.eq)(schema_1.teams.leagueName, normalizedLeagueName), (0, drizzle_orm_1.eq)(schema_1.teams.seasonName, normalizedSeasonName), (0, drizzle_orm_1.eq)(schema_1.teams.clubId, clubId)))
+                .limit(1)
+            : await db_1.db
+                .select()
+                .from(schema_1.teams)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.teams.frbTeamId, normalizedFrbTeamId), (0, drizzle_orm_1.eq)(schema_1.teams.frbSeasonId, normalizedFrbSeasonId), (0, drizzle_orm_1.eq)(schema_1.teams.clubId, clubId)))
+                .limit(1);
+        if (existingTeam[0]) {
+            res.status(409).json({ error: customTeam ? 'This custom team already exists.' : 'This team is already imported for the selected season.' });
+            return;
+        }
+        const inviteCode = await generateInviteCode();
+        const inserted = await db_1.db
+            .insert(schema_1.teams)
+            .values({
+            frbTeamId: customTeam ? '' : normalizedFrbTeamId,
+            name: normalizedName,
+            frbLeagueId: customTeam ? '' : normalizedFrbLeagueId,
+            leagueName: normalizedLeagueName,
+            frbSeasonId: customTeam ? '' : normalizedFrbSeasonId,
+            seasonName: normalizedSeasonName,
             inviteCode,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            createdBy: null,
-        };
-        await firebaseAdmin_1.firestore.collection('teams').doc(String(id)).set(team);
-        res.json({ ...team, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+            clubId,
+        })
+            .returning();
+        res.json(mapTeam(inserted[0]));
     }
     catch (e) {
         console.error('[POST /api/teams] error:', e);
         res.status(500).json({ error: 'Failed to create team' });
     }
 });
-// GET /api/teams/:id
 router.get('/:id', async (req, res) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (isNaN(id)) {
+        const id = parseRouteId(req.params.id);
+        if (Number.isNaN(id)) {
             res.status(400).json({ error: 'Invalid ID' });
             return;
         }
-        const snap = await firebaseAdmin_1.firestore.collection('teams').doc(String(id)).get();
-        if (!snap.exists) {
-            res.status(404).json({ error: 'Team not found' });
+        const access = await ensureTeamAccess(req, id);
+        if (access.status !== 200) {
+            res.status(access.status).json({ error: access.error });
             return;
         }
-        const team = snap.data();
-        res.json({ ...team, createdAt: (0, firebaseAdmin_1.toIso)(team.createdAt) ?? null, updatedAt: (0, firebaseAdmin_1.toIso)(team.updatedAt) ?? null });
+        res.json(mapTeam(access.team));
     }
     catch (e) {
         console.error(`[GET /api/teams/${req.params.id}] error:`, e);
         res.status(500).json({ error: 'Failed to fetch team details' });
     }
 });
-// DELETE /api/teams/:id
 router.delete('/:id', async (req, res) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (isNaN(id)) {
+        const id = parseRouteId(req.params.id);
+        if (Number.isNaN(id)) {
             res.status(400).json({ error: 'Invalid ID' });
             return;
         }
-        const batch = firebaseAdmin_1.firestore.batch();
-        const joinsSnap = await firebaseAdmin_1.firestore.collection('playersToTeams').where('teamId', '==', id).get();
-        joinsSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
-        const playersSnap = await firebaseAdmin_1.firestore.collection('players').where('teamId', '==', id).get();
-        playersSnap.docs.forEach((docSnap) => batch.set(docSnap.ref, { teamId: null }, { merge: true }));
-        batch.delete(firebaseAdmin_1.firestore.collection('teams').doc(String(id)));
-        await batch.commit();
+        const access = await ensureTeamAccess(req, id);
+        if (access.status !== 200) {
+            res.status(access.status).json({ error: access.error });
+            return;
+        }
+        await db_1.db.transaction(async (tx) => {
+            const eventRows = await tx
+                .select({ id: schema_1.events.id })
+                .from(schema_1.events)
+                .where((0, drizzle_orm_1.eq)(schema_1.events.teamId, id));
+            const eventIds = eventRows.map((event) => event.id);
+            await tx.delete(schema_1.attendance).where((0, drizzle_orm_1.eq)(schema_1.attendance.teamId, id));
+            if (eventIds.length > 0) {
+                await tx.delete(schema_1.attendance).where((0, drizzle_orm_1.inArray)(schema_1.attendance.eventId, eventIds));
+            }
+            await tx.delete(schema_1.events).where((0, drizzle_orm_1.eq)(schema_1.events.teamId, id));
+            await tx.delete(schema_1.l12Documents).where((0, drizzle_orm_1.eq)(schema_1.l12Documents.teamId, id));
+            await tx.delete(schema_1.playersToTeams).where((0, drizzle_orm_1.eq)(schema_1.playersToTeams.teamId, id));
+            await tx.update(schema_1.players).set({ teamId: null }).where((0, drizzle_orm_1.eq)(schema_1.players.teamId, id));
+            await tx.delete(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.id, id));
+        });
         res.json({ success: true });
     }
     catch (e) {
@@ -125,12 +240,16 @@ router.delete('/:id', async (req, res) => {
         res.status(500).json({ error: 'Failed to delete team' });
     }
 });
-// GET /api/teams/:id/players
 router.get('/:id/players', async (req, res) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (isNaN(id)) {
+        const id = parseRouteId(req.params.id);
+        if (Number.isNaN(id)) {
             res.status(400).json({ error: 'Invalid ID' });
+            return;
+        }
+        const access = await ensureTeamAccess(req, id);
+        if (access.status !== 200) {
+            res.status(access.status).json({ error: access.error });
             return;
         }
         const teamPlayers = await getTeamPlayersById(id);
@@ -141,12 +260,16 @@ router.get('/:id/players', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch players' });
     }
 });
-// POST /api/teams/:id/players
 router.post('/:id/players', async (req, res) => {
     try {
-        const teamId = parseInt(req.params.id, 10);
-        if (isNaN(teamId)) {
+        const teamId = parseRouteId(req.params.id);
+        if (Number.isNaN(teamId)) {
             res.status(400).json({ error: 'Invalid ID' });
+            return;
+        }
+        const access = await ensureTeamAccess(req, teamId);
+        if (access.status !== 200) {
+            res.status(access.status).json({ error: access.error });
             return;
         }
         const { name, firstName: inputFirstName, lastName: inputLastName, status, avatarUrl } = req.body;
@@ -161,26 +284,23 @@ router.post('/:id/players', async (req, res) => {
             res.status(400).json({ error: 'First name and last name are required' });
             return;
         }
-        const id = await (0, firebaseAdmin_1.nextNumericId)('players');
-        const player = {
-            id,
+        const insertedPlayers = await db_1.db
+            .insert(schema_1.players)
+            .values({
             name: name || `${firstName} ${lastName}`,
             firstName,
             lastName,
             status: status || 'active',
             avatarUrl: avatarUrl || null,
             teamId,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        };
-        await firebaseAdmin_1.firestore.collection('players').doc(String(id)).set(player);
-        const relationId = await (0, firebaseAdmin_1.nextNumericId)('playersToTeams');
-        await firebaseAdmin_1.firestore.collection('playersToTeams').doc(String(relationId)).set({
-            id: relationId,
-            playerId: id,
+        })
+            .returning();
+        const insertedPlayer = insertedPlayers[0];
+        await db_1.db.insert(schema_1.playersToTeams).values({
+            playerId: insertedPlayer.id,
             teamId,
         });
-        res.json({ ...player, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+        res.json(mapPlayer(insertedPlayer));
     }
     catch (e) {
         console.error(`[POST /api/teams/${req.params.id}/players] error:`, e);
