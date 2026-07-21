@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="BCMS">
+  <rect width="512" height="512" rx="112" fill="#2563EB"/>
+  <path d="M141 132h142c59 0 96 30 96 78 0 29-15 52-43 65 36 12 55 38 55 76 0 53-41 85-105 85H141V132Zm70 122h61c23 0 37-12 37-31 0-18-14-30-37-30h-61v61Zm0 121h69c25 0 40-13 40-34s-15-34-40-34h-69v68Z" fill="#FFFFFF"/>
+  <path d="M118 256c0-75 61-136 136-136 35 0 67 13 91 35" fill="none" stroke="#93C5FD" stroke-width="24" stroke-linecap="round"/>
+  <path d="M394 256c0 75-61 136-136 136-35 0-67-13-91-35" fill="none" stroke="#BFDBFE" stroke-width="24" stroke-linecap="round"/>
+</svg>

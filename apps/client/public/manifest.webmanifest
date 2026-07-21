@@ -1,0 +1,20 @@
+{
+  "name": "BCMS",
+  "short_name": "BCMS",
+  "description": "BCMS web app for basketball club operations.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#2563EB",
+  "categories": ["sports", "productivity"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

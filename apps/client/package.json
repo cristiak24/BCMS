@@ -1,0 +1,30 @@
+{
+  "name": "bcms-web",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "vite",
+    "web": "vite",
+    "build:web": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build:web && cd ../.. && firebase deploy --only hosting",
+    "lint": "vite build"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
+    "firebase": "^12.7.0",
+    "lucide-react": "^1.17.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-router-dom": "^7.16.0",
+    "vite": "^8.0.16"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "@types/react-dom": "~19.1.7",
+    "eslint": "^9.25.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.19",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}
