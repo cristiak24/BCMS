@@ -30,7 +30,7 @@ function InlineSearch({ value, onChange, placeholder }: { value: string; onChang
         onChangeText={onChange}
         placeholder={placeholder}
         placeholderTextColor="var(--c-faint)"
-        className="w-full h-[36px] rounded-[10px] border border-[#E3EAF5] bg-[#F8FAFD] pl-9 pr-3 text-[13px] font-semibold text-[#0E2041]"
+        className="w-full h-[34px] rounded-[10px] border border-[#E3EAF5] bg-[#F8FAFC] pl-9 pr-3 text-[12.5px] font-semibold text-[#0E2041]"
       />
     </View>
   );
@@ -52,24 +52,24 @@ function Chip({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.8}
-      className={`flex-row items-center gap-2 rounded-full px-4 py-2.5 border ${
+      className={`flex-row items-center gap-1.5 rounded-full px-3 py-1.5 border ${
         active ? 'bg-[#1D3E90] border-[#1D3E90]' : 'bg-[#F4F7FC] border-[#E3EAF5] hover:bg-[#EAF1FB]'
       }`}
     >
       {dotColor ? (
         <View
           style={{
-            width: 8,
-            height: 8,
-            borderRadius: 4,
+            width: 6,
+            height: 6,
+            borderRadius: 3,
             backgroundColor: active ? 'var(--c-surface)' : dotColor,
           }}
         />
       ) : null}
-      <Text className={`text-[12.5px] font-bold ${active ? 'text-white' : 'text-[#334155]'}`} numberOfLines={1}>
+      <Text className={`text-[11.5px] font-bold ${active ? 'text-white' : 'text-[#334155]'}`} numberOfLines={1}>
         {label}
       </Text>
-      {active ? <Check size={13} color="#FFFFFF" /> : null}
+      {active ? <Check size={11} color="#FFFFFF" /> : null}
     </TouchableOpacity>
   );
 }
@@ -147,9 +147,9 @@ export function FilterModal({
 
           {/* Body */}
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 28, paddingTop: 22, paddingBottom: 24 }}>
-            <View className="mb-7">
+            <View className="mb-6">
               <SectionLabel>Categorie eveniment</SectionLabel>
-              <View className="flex-row flex-wrap gap-2">
+              <View className="flex-row flex-wrap gap-1.5">
                 {EVENT_TYPES.map((type) => (
                   <Chip
                     key={type}
@@ -162,7 +162,7 @@ export function FilterModal({
               </View>
             </View>
 
-            <View className="mb-7">
+            <View className="mb-6">
               <SectionLabel icon={<UserCog size={13} color="var(--c-faint)" />}>Antrenor</SectionLabel>
               {coaches.length === 0 ? (
                 <Text className="text-slate-400 text-[13px] font-semibold">Niciun antrenor disponibil.</Text>
@@ -174,7 +174,7 @@ export function FilterModal({
                   {filteredCoaches.length === 0 ? (
                     <Text className="text-slate-400 text-[13px] font-semibold">Niciun antrenor găsit.</Text>
                   ) : (
-                    <View className="flex-row flex-wrap gap-2">
+                    <View className="flex-row flex-wrap gap-1.5">
                       {filteredCoaches.map((coach) => (
                         <Chip
                           key={coach.id}
@@ -189,7 +189,7 @@ export function FilterModal({
               )}
             </View>
 
-            <View className="mb-7">
+            <View className="mb-6">
               <SectionLabel icon={<Users size={13} color="var(--c-faint)" />}>Club / echipă</SectionLabel>
               {teams.length === 0 ? (
                 <Text className="text-slate-400 text-[13px] font-semibold">Nicio echipă disponibilă.</Text>
@@ -201,7 +201,7 @@ export function FilterModal({
                   {filteredTeams.length === 0 ? (
                     <Text className="text-slate-400 text-[13px] font-semibold">Nicio echipă găsită.</Text>
                   ) : (
-                    <View className="flex-row flex-wrap gap-2">
+                    <View className="flex-row flex-wrap gap-1.5">
                       {filteredTeams.map((team) => (
                         <Chip
                           key={team.id}
@@ -221,7 +221,7 @@ export function FilterModal({
               <TouchableOpacity
                 onPress={() => setShowCancelled(!showCancelled)}
                 activeOpacity={0.85}
-                className="flex-row items-center justify-between rounded-2xl border border-[#E3EAF5] bg-[#F8FAFD] px-5 py-4"
+                className="flex-row items-center justify-between rounded-2xl border border-[#E3EAF5] bg-[#F8FAFC] px-5 py-4"
               >
                 <View className="flex-1 pr-4">
                   <Text className="text-[14px] font-black text-[#0E2041]">Arată evenimentele anulate</Text>
