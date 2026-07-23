@@ -10,6 +10,40 @@ import ProfileImagePicker from './ProfileImagePicker';
 import ProfileForm from './ProfileForm';
 import PasswordChangeForm from './PasswordChangeForm';
 import { useFirebaseAuth } from '../../context/AuthContext';
+import { useTheme, type ThemeMode } from '../../context/ThemeContext';
+
+const THEME_OPTIONS: { mode: ThemeMode; label: string; icon: string }[] = [
+  { mode: 'light', label: 'Light', icon: 'wb-sunny' },
+  { mode: 'dark', label: 'Dark', icon: 'nightlight' },
+  { mode: 'system', label: 'System', icon: 'settings' },
+];
+
+function AppearanceCard() {
+  const { mode, setMode } = useTheme();
+  return (
+    <View className="bg-white rounded-[28px] p-6 border border-slate-100 shadow-sm">
+      <Text className="text-[#0E2041] text-[12px] font-black uppercase tracking-widest mb-1">Appearance</Text>
+      <Text className="text-[#64748B] text-sm font-semibold mb-4">Choose how BCMS looks on this device.</Text>
+      <View className="flex-row gap-2">
+        {THEME_OPTIONS.map((opt) => {
+          const active = mode === opt.mode;
+          return (
+            <Pressable
+              key={opt.mode}
+              onPress={() => setMode(opt.mode)}
+              accessibilityRole="button"
+              accessibilityLabel={`Use ${opt.label} theme`}
+              className={`flex-1 items-center justify-center rounded-2xl px-3 py-4 border ${active ? 'bg-[#1D3E90] border-[#1D3E90]' : 'bg-[#F8FAFC] border-slate-100'}`}
+            >
+              <MaterialIcons name={opt.icon} size={22} color={active ? '#FFFFFF' : 'var(--c-muted)'} />
+              <Text className={`text-[12px] font-black mt-2 ${active ? 'text-white' : 'text-[#64748B]'}`}>{opt.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
 function sessionToProfile(session: AuthUser): ProfileRecord {
   const fullName = [session.firstName, session.lastName].filter(Boolean).join(' ').trim() || session.name;
@@ -53,7 +87,7 @@ type ProfileScreenProps = {
 
 export default function ProfileScreen({ showBackButton = true }: ProfileScreenProps) {
   const router = useRouter();
-  const { isMobile } = useResponsive();
+  const { isMobile, isDesktop } = useResponsive();
   const insets = useSafeAreaInsets();
   const { initializing, session: authSession, signOut } = useFirebaseAuth();
   const [loading, setLoading] = useState(true);
@@ -180,7 +214,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
   if (loading && !profile) {
     return (
       <View className="flex-1 items-center justify-center bg-[#F1F5F9]">
-        <ActivityIndicator size="large" color="#1D3E90" />
+        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
       </View>
     );
   }
@@ -226,7 +260,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
               accessibilityRole="button"
               accessibilityLabel="Go back"
             >
-              <MaterialIcons name="arrow-back" size={isMobile ? 22 : 18} color="#0E2041" />
+              <MaterialIcons name="arrow-back" size={isMobile ? 22 : 18} color="var(--c-ink)" />
               {!isMobile ? <Text className="ml-2 text-[#0E2041] font-bold">Back</Text> : null}
             </Pressable>
           ) : (
@@ -271,7 +305,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
                       <Text className="text-emerald-700 text-[10px] font-black uppercase tracking-widest">{profile.status}</Text>
                     </View>
                   </View>
-                  <Text className="text-[#0E2041] text-3xl font-black leading-tight" numberOfLines={1}>
+                  <Text className={`text-[#0E2041] ${isMobile ? 'text-2xl' : 'text-3xl'} font-black leading-tight`} numberOfLines={2}>
                     {profile.fullName || profile.name}
                   </Text>
                   <Text className="text-slate-500 font-semibold mt-1" numberOfLines={1}>
@@ -293,28 +327,34 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
           </View>
         </View>
 
-        <View className="gap-6">
-          <ProfileForm profile={profile} onSave={handleSaveProfile} />
-          <PasswordChangeForm onChangePassword={handlePasswordChange} />
-        </View>
+        <View className={`${isDesktop ? 'flex-row items-start' : ''} gap-6 mb-10`}>
+          <View className={isDesktop ? 'flex-1' : undefined}>
+            <ProfileForm profile={profile} onSave={handleSaveProfile} />
+          </View>
 
-        <View className="mt-6 mb-10 bg-white rounded-[28px] p-6 border border-slate-100 shadow-sm">
-          <Text className="text-[#0E2041] text-[12px] font-black uppercase tracking-widest mb-4">Account Details</Text>
-          <View className="flex-row flex-wrap gap-3">
-            {[
-              { label: 'Email', value: profile.email },
-              { label: 'Role', value: profile.role },
-              { label: 'Club', value: profile.clubName ?? 'Not assigned' },
-              { label: 'Team', value: profile.teamName ?? 'Not assigned' },
-              { label: 'Status', value: profile.status },
-              { label: 'Member since', value: formatDate(profile.createdAt) },
-              { label: 'Last login', value: formatDate(profile.lastLoginAt) },
-            ].map((item) => (
-              <View key={item.label} className="min-w-[160px] flex-1 bg-[#F8FAFC] rounded-2xl px-4 py-3 border border-slate-100">
-                <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">{item.label}</Text>
-                <Text className="text-[#0E2041] font-semibold mt-1" numberOfLines={2}>{item.value}</Text>
+          <View className={`gap-6 ${isDesktop ? 'flex-1' : ''}`}>
+            <AppearanceCard />
+            <PasswordChangeForm onChangePassword={handlePasswordChange} />
+
+            <View className="bg-white rounded-[28px] p-6 border border-slate-100 shadow-sm">
+              <Text className="text-[#0E2041] text-[12px] font-black uppercase tracking-widest mb-4">Account Details</Text>
+              <View className="flex-row flex-wrap gap-3">
+                {[
+                  { label: 'Email', value: profile.email },
+                  { label: 'Role', value: profile.role },
+                  { label: 'Club', value: profile.clubName ?? 'Not assigned' },
+                  { label: 'Team', value: profile.teamName ?? 'Not assigned' },
+                  { label: 'Status', value: profile.status },
+                  { label: 'Member since', value: formatDate(profile.createdAt) },
+                  { label: 'Last login', value: formatDate(profile.lastLoginAt) },
+                ].map((item) => (
+                  <View key={item.label} className="min-w-[150px] flex-1 bg-[#F8FAFC] rounded-2xl px-4 py-3 border border-slate-100">
+                    <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">{item.label}</Text>
+                    <Text className="text-[#0E2041] font-semibold mt-1" numberOfLines={2}>{item.value}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
+            </View>
           </View>
         </View>
       </View>

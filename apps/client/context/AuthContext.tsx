@@ -13,6 +13,7 @@ import { firebaseAuth } from '../config/firebase';
 import {
   clearAuthSession,
   getCachedAuthSession,
+  readAuthSession,
   saveAuthSession,
   setCachedAuthSession,
   type AuthUser,
@@ -165,11 +166,20 @@ export function FirebaseAuthProvider({ children }: PropsWithChildren) {
         }
       } catch (error) {
         console.error('[AuthContext] Failed to load session from backend:', error);
-        // Don't sign out of Firebase — user is authenticated, just no Postgres profile yet
-        setCachedAuthSession(null);
-        await clearAuthSession();
+        // The Firebase user is still authenticated — the backend was just unreachable or
+        // slow (fetchMeFromBackend already retried). Fall back to the persisted session for
+        // this same account so a transient hiccup (e.g. a page refresh while /auth/me is
+        // briefly slow) doesn't log the user out. Only clear when there's no usable session.
+        const persisted = await readAuthSession();
+        const fallback = persisted && persisted.uid === nextUser.uid ? persisted : null;
+        if (fallback) {
+          setCachedAuthSession(fallback);
+        } else {
+          setCachedAuthSession(null);
+          await clearAuthSession();
+        }
         if (mounted && requestId === authRequestId.current) {
-          setSession(null);
+          setSession(fallback);
         }
       } finally {
         if (mounted && requestId === authRequestId.current) {

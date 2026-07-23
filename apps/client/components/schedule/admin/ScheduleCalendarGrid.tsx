@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, useWindowDimensions } from '@/src/web/rea
 import { CalendarEvent } from '../../../services/eventsApi';
 import { EVENT_TYPE_META, CalendarDayCell, getMonthGridDays, groupEventsByDay, isCancelledEvent } from '../scheduleShared';
 
-const WEEKDAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+const WEEKDAY_LABELS = ['LUN', 'MAR', 'MIE', 'JOI', 'VIN', 'SÂM', 'DUM'];
 
 export const CalendarLegend = React.memo(() => (
   <View className="flex-row flex-wrap items-center gap-5 px-1">
@@ -129,8 +129,8 @@ const CalendarCell = React.memo(({
         {overflow > 0 && (
           <TouchableOpacity onPress={onSelectDay} activeOpacity={0.7} className="self-start mt-[1px]">
             <View className="bg-slate-100 rounded-full px-2 py-[2px]">
-              <Text style={{ fontSize: 9, fontWeight: '800', color: '#64748B' }}>
-                +{overflow} more
+              <Text style={{ fontSize: 9, fontWeight: '800', color: 'var(--c-muted)' }}>
+                +{overflow} încă
               </Text>
             </View>
           </TouchableOpacity>
@@ -174,12 +174,12 @@ export const MonthlyCalendarGrid = React.memo(({
     <View style={{ paddingVertical: 16, flex: 1 }}>
       <View
         style={{
-          backgroundColor: '#fff',
+          backgroundColor: 'var(--c-surface)',
           borderRadius: 32,
           borderWidth: 1,
-          borderColor: '#DDE7F5',
+          borderColor: 'var(--c-border)',
           overflow: 'hidden',
-          shadowColor: '#0F172A',
+          shadowColor: 'var(--c-ink-strong)',
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.08,
           shadowRadius: 24,

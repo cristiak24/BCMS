@@ -26,17 +26,17 @@ export function EventAttendanceModal({
           <View className="flex-row justify-between items-center">
             <View>
               <Text className="text-3xl font-black text-[#1E293B]">{event?.title}</Text>
-              <Text className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">Event Attendance Registry</Text>
+              <Text className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">Registru prezență eveniment</Text>
             </View>
             <TouchableOpacity onPress={onClose} className="w-12 h-12 bg-slate-50 rounded-2xl items-center justify-center">
-              <X color="#1E293B" size={24} />
+              <X color="var(--c-ink-soft)" size={24} />
             </TouchableOpacity>
           </View>
 
           <View className="flex-row gap-3 mb-8">
             <View className="flex-1 bg-emerald-50 rounded-3xl p-5 border border-emerald-100 items-center justify-center">
               <Text className="text-emerald-600 font-black text-3xl">{attendanceList.filter((a) => a.status === 'present').length}</Text>
-              <Text className="text-emerald-700 font-bold text-[10px] uppercase tracking-wider mt-1">Present</Text>
+              <Text className="text-emerald-700 font-bold text-[10px] uppercase tracking-wider mt-1">Prezent</Text>
             </View>
             <View className="flex-1 bg-rose-50 rounded-3xl p-5 border border-rose-100 items-center justify-center">
               <Text className="text-rose-600 font-black text-3xl">{attendanceList.filter((a) => a.status === 'absent').length}</Text>
@@ -44,7 +44,7 @@ export function EventAttendanceModal({
             </View>
             <View className="flex-1 bg-slate-50 rounded-3xl p-5 border border-slate-100 items-center justify-center">
               <Text className="text-slate-600 font-black text-3xl">{attendanceList.filter((a) => !a.status).length}</Text>
-              <Text className="text-slate-700 font-bold text-[10px] uppercase tracking-wider mt-1">Pending</Text>
+              <Text className="text-slate-700 font-bold text-[10px] uppercase tracking-wider mt-1">În așteptare</Text>
             </View>
           </View>
 
@@ -58,7 +58,7 @@ export function EventAttendanceModal({
                     </View>
                     <View>
                       <Text className="font-black text-slate-800 text-[15px]">{player.firstName} {player.lastName}</Text>
-                      <Text className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Player Profile</Text>
+                      <Text className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Profil jucător</Text>
                     </View>
                   </View>
                   <View className="flex-row gap-2">
@@ -66,7 +66,7 @@ export function EventAttendanceModal({
                       onPress={() => onUpdate(player.playerId, 'present')}
                       className={`w-20 py-3 rounded-2xl border ${player.status === 'present' ? 'bg-emerald-500 border-emerald-600 shadow-lg shadow-emerald-200' : 'bg-white border-slate-100'}`}
                     >
-                      <Text className={`text-center font-black text-[10px] uppercase tracking-widest ${player.status === 'present' ? 'text-white' : 'text-slate-400'}`}>Present</Text>
+                      <Text className={`text-center font-black text-[10px] uppercase tracking-widest ${player.status === 'present' ? 'text-white' : 'text-slate-400'}`}>Prezent</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => onUpdate(player.playerId, 'absent')}
@@ -81,7 +81,7 @@ export function EventAttendanceModal({
           </ScrollView>
 
           <TouchableOpacity onPress={onClose} className="bg-slate-900 h-14 rounded-2xl items-center justify-center">
-            <Text className="text-white font-black uppercase tracking-widest text-xs">Close Registry</Text>
+            <Text className="text-white font-black uppercase tracking-widest text-xs">Închide registrul</Text>
           </TouchableOpacity>
         </View>
       </Pressable>

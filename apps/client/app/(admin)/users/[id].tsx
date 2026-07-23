@@ -57,7 +57,7 @@ export default function UserDetail() {
         <View className="max-w-3xl mx-auto w-full pt-6 px-4">
             <View className={`mb-6 ${isMobile ? 'gap-3' : 'flex-row items-center'}`}>
                 <Pressable onPress={() => router.back()} className="mr-4 min-h-[44px] px-4 py-2 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-50 flex-row items-center">
-                    <MaterialIcons name="arrow-back" size={17} color="#1D3E90" />
+                    <MaterialIcons name="arrow-back" size={17} color="var(--c-brand-fg)" />
                     <Text className="ml-2 text-slate-700 font-black">Back</Text>
                 </Pressable>
                 <Text className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-black text-[#0E2041]`}>Edit User</Text>
@@ -82,7 +82,7 @@ export default function UserDetail() {
                             value={name}
                             onChangeText={setName}
                             placeholder="Enter name"
-                            placeholderTextColor="#94A3B8"
+                            placeholderTextColor="var(--c-faint)"
                         />
                     </View>
 

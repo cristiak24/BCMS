@@ -126,7 +126,7 @@ export default function AddAppointmentModal({ visible, onClose, preSelectedPlaye
                 <Text className="text-xs font-bold text-gray-500">Programare vizite medicale (Multi-Echipe)</Text>
              </View>
              <Pressable onPress={onClose} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center hover:bg-gray-50 transition-colors">
-               <X size={20} color="#64748B" />
+               <X size={20} color="var(--c-muted)" />
              </Pressable>
           </View>
 
@@ -139,14 +139,14 @@ export default function AddAppointmentModal({ visible, onClose, preSelectedPlaye
                 <Text className="text-[10px] font-black tracking-widest text-[#1D3E90] uppercase mb-2 ml-1">Alege Echipe</Text>
                 <View className="border border-gray-200 bg-white rounded-2xl overflow-hidden min-h-[60px]">
                    {loadingTeams ? (
-                       <ActivityIndicator size="small" color="#1D3E90" className="m-4" />
+                       <ActivityIndicator size="small" color="var(--c-brand-fg)" className="m-4" />
                    ) : (
                        <View className="flex-row flex-wrap p-2 gap-2">
                            {teams.map(t => {
                                const isSelected = selectedTeamIds.includes(t.id);
                                return (
                                  <Pressable key={t.id} onPress={() => toggleTeam(t.id)} className={`px-3 py-2 rounded-[14px] flex-row items-center border ${isSelected ? 'bg-[#1D3E90] border-[#1D3E90]' : 'bg-gray-50 border-gray-200'}`}>
-                                     <Users size={12} color={isSelected ? '#ffffff' : '#94A3B8'} />
+                                     <Users size={12} color={isSelected ? '#ffffff' : 'var(--c-faint)'} />
                                      <Text className={`text-[12px] ml-2 font-bold ${isSelected ? 'text-white' : 'text-[#0D2040]'}`}>{t.name}</Text>
                                  </Pressable>
                                );
@@ -164,11 +164,11 @@ export default function AddAppointmentModal({ visible, onClose, preSelectedPlaye
                     onPress={() => { if (Platform.OS !== 'web') setShowPicker(true); }}
                     className="flex-row items-center border border-gray-200 bg-gray-50 rounded-2xl px-4 h-14 focus-within:border-[#1D3E90]"
                   >
-                     <CalendarIcon size={18} color="#94A3B8" />
+                     <CalendarIcon size={18} color="var(--c-faint)" />
                      <TextInput 
                        placeholder="DD-MM-YYYY" 
                        className="flex-1 ml-3 text-[14px] font-bold text-[#0E2041] outline-none"
-                       placeholderTextColor="#9ca3af"
+                       placeholderTextColor="var(--c-faint)"
                        value={date} 
                        onChangeText={handleDateChange}
                        editable={Platform.OS === 'web'}
@@ -191,11 +191,11 @@ export default function AddAppointmentModal({ visible, onClose, preSelectedPlaye
                 <View className="flex-1">
                   <Text className="text-[10px] font-black tracking-widest text-[#1D3E90] uppercase mb-2 ml-1">Locație</Text>
                   <View className="flex-row items-center border border-gray-200 bg-gray-50 rounded-2xl px-4 h-14 focus-within:border-[#1D3E90]">
-                     <MapPin size={18} color="#94A3B8" />
+                     <MapPin size={18} color="var(--c-faint)" />
                      <TextInput 
                        placeholder="Clinică" 
                        className="flex-1 ml-3 text-[14px] font-bold text-[#0E2041] outline-none"
-                       placeholderTextColor="#9ca3af"
+                       placeholderTextColor="var(--c-faint)"
                        value={location} onChangeText={setLocation}
                      />
                   </View>
@@ -211,7 +211,7 @@ export default function AddAppointmentModal({ visible, onClose, preSelectedPlaye
                 <Switch 
                   value={isSpecificPlayers} 
                   onValueChange={setIsSpecificPlayers} 
-                  trackColor={{ false: '#cbd5e1', true: '#1D3E90' }}
+                  trackColor={{ false: 'var(--c-border-strong)', true: 'var(--c-brand-fg)' }}
                   thumbColor="#ffffff"
                 />
               </View>
@@ -225,13 +225,13 @@ export default function AddAppointmentModal({ visible, onClose, preSelectedPlaye
                       </Text>
                       {players.length > 0 && !loadingPlayers && (
                           <Pressable onPress={handleSelectAllPlayers} className="flex-row items-center gap-1.5 bg-blue-100/50 px-2.5 py-1.5 rounded-md">
-                             <CheckSquare size={12} color="#1D3E90" />
+                             <CheckSquare size={12} color="var(--c-brand-fg)" />
                              <Text className="text-[10px] font-bold text-[#1D3E90] uppercase">{allSelected ? 'Deselectează' : 'Selectează Toți'}</Text>
                           </Pressable>
                       )}
                    </View>
                    <View className="p-2 gap-1 bg-white max-h-48">
-                     {loadingPlayers && <ActivityIndicator size="small" color="#1D3E90" className="m-4" />}
+                     {loadingPlayers && <ActivityIndicator size="small" color="var(--c-brand-fg)" className="m-4" />}
                      {!loadingPlayers && players.length === 0 && selectedTeamIds.length > 0 && <Text className="p-4 text-gray-400 text-xs text-center w-full">Nu aveți jucători în echipele alese.</Text>}
                      {!loadingPlayers && players.map(player => {
                         const isSelected = selectedPlayers.includes(player.id);

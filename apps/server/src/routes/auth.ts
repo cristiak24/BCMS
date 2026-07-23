@@ -3,7 +3,7 @@ import { db } from '../db';
 import { users, clubs, players, playersToTeams } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { ensureDefaultClub } from '../lib/manageAccessRepository';
-import { splitDisplayName } from '../lib/password';
+import { splitDisplayName, verifyPassword } from '../lib/password';
 import { authenticate, requireSuperadmin, AuthenticatedRequest } from '../middleware/auth';
 import { acceptInvitation, createSuperAdminInvitation, validateInvitationToken } from '../services/invitationsService';
 import { createPendingAccessRequestForSignup, validateInviteToken } from '../lib/manageAccessService';
@@ -57,6 +57,69 @@ function normalizeEmail(value: string) {
     return value.trim().toLowerCase();
 }
 
+function buildAuthUser(user: typeof users.$inferSelect, clubName: string | null, teamIds: string[]) {
+    return {
+        id: user.id,
+        uid: user.firebaseUid ?? user.uid ?? '',
+        email: user.email,
+        name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        clubId: user.clubId,
+        status: user.status,
+        clubName,
+        teamIds,
+        avatarUrl: user.avatarUrl,
+        photoURL: user.avatarUrl,
+        phone: user.phone,
+        preferredLanguage: user.preferredLanguage,
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt,
+    };
+}
+
+async function ensureFirebaseUserForLogin(user: typeof users.$inferSelect) {
+    const email = normalizeEmail(user.email);
+    let firebaseUserRecord;
+
+    try {
+        firebaseUserRecord = user.firebaseUid
+            ? await firebaseAuth.getUser(user.firebaseUid)
+            : await firebaseAuth.getUserByEmail(email);
+    } catch (error: any) {
+        if (error?.code !== 'auth/user-not-found') {
+            throw error;
+        }
+
+        try {
+            firebaseUserRecord = await firebaseAuth.getUserByEmail(email);
+        } catch (emailLookupError: any) {
+            if (emailLookupError?.code !== 'auth/user-not-found') {
+                throw emailLookupError;
+            }
+
+            firebaseUserRecord = await firebaseAuth.createUser({
+                email,
+                displayName: user.name ?? email,
+                password: crypto.randomBytes(24).toString('base64url'),
+                disabled: false,
+            });
+        }
+    }
+
+    if (firebaseUserRecord.uid && user.firebaseUid !== firebaseUserRecord.uid) {
+        const [updatedUser] = await db.update(users).set({
+            firebaseUid: firebaseUserRecord.uid,
+            updatedAt: new Date().toISOString(),
+        }).where(eq(users.id, user.id)).returning();
+
+        return { firebaseUserRecord, user: updatedUser ?? { ...user, firebaseUid: firebaseUserRecord.uid } };
+    }
+
+    return { firebaseUserRecord, user };
+}
+
 async function sendForgotPasswordEmail(email: string, resetLink: string, name?: string | null) {
     if (!resend) {
         throw new Error('RESEND_API_KEY is missing.');
@@ -89,6 +152,57 @@ async function sendForgotPasswordEmail(email: string, resetLink: string, name?: 
     });
 }
 
+// POST /api/auth/legacy-login
+// Bridges existing DB-password accounts into Firebase Auth without forcing
+// users through a manual password reset first.
+router.post('/legacy-login', async (req: AuthenticatedRequest, res: any) => {
+    try {
+        const email = normalizeEmail(String(req.body?.email ?? ''));
+        const password = String(req.body?.password ?? '');
+
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email si parola sunt obligatorii.' });
+        }
+
+        const [existingUser] = await db
+            .select()
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1);
+
+        if (!existingUser || !existingUser.passwordHash || !verifyPassword(password, existingUser.passwordHash)) {
+            return res.status(401).json({ error: 'Email sau parola incorecte.' });
+        }
+
+        if (existingUser.status === 'disabled') {
+            return res.status(403).json({ error: 'Contul este dezactivat. Contacteaza administratorul clubului.' });
+        }
+
+        const { firebaseUserRecord, user } = await ensureFirebaseUserForLogin(existingUser);
+        const now = new Date().toISOString();
+        const [updatedUser] = await db.update(users).set({
+            lastLoginAt: now,
+            updatedAt: now,
+        }).where(eq(users.id, user.id)).returning();
+
+        const activeUser = updatedUser ?? user;
+        const [clubName, teamIds] = await Promise.all([
+            findClubName(activeUser.clubId),
+            findPlayerTeamIdsByEmail(activeUser.email),
+        ]);
+        const customToken = await firebaseAuth.createCustomToken(firebaseUserRecord.uid);
+
+        return res.json({
+            success: true,
+            customToken,
+            user: buildAuthUser(activeUser, clubName, teamIds),
+        });
+    } catch (error) {
+        console.error('Legacy login error:', error);
+        return res.status(500).json({ error: 'Nu am putut autentifica utilizatorul.' });
+    }
+});
+
 // GET /api/auth/me
 router.get('/me', authenticate, async (req: AuthenticatedRequest, res: any) => {
     try {
@@ -102,23 +216,7 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res: any) => {
 
         res.json({
             success: true,
-            user: {
-                id: user.id,
-                email: user.email,
-                name: user.name,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                role: user.role,
-                clubId: user.clubId,
-                status: user.status,
-                clubName,
-                teamIds,
-                avatarUrl: user.avatarUrl,
-                phone: user.phone,
-                preferredLanguage: user.preferredLanguage,
-                createdAt: user.createdAt,
-                lastLoginAt: user.lastLoginAt,
-            }
+            user: buildAuthUser(user, clubName, teamIds),
         });
     } catch (error) {
         console.error('Error fetching /me:', error);

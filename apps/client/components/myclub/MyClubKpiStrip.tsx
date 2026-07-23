@@ -17,10 +17,10 @@ export default function MyClubKpiStrip({ teams }: { teams: Team[] }) {
     }, [teams]);
 
     const cards: { label: string; value: number; dot: string }[] = [
-        { label: 'Total echipe', value: stats.total, dot: '#1D3E90' },
-        { label: 'Echipe FRB', value: stats.frb, dot: '#C62828' },
-        { label: 'Echipe manuale', value: stats.manual, dot: '#0E9F6E' },
-        { label: 'Total jucători', value: stats.players, dot: '#64748B' },
+        { label: 'Total echipe', value: stats.total, dot: 'var(--c-brand-fg)' },
+        { label: 'Echipe FRB', value: stats.frb, dot: 'var(--c-danger)' },
+        { label: 'Echipe manuale', value: stats.manual, dot: 'var(--c-success)' },
+        { label: 'Total jucători', value: stats.players, dot: 'var(--c-muted)' },
         { label: 'Echipe masculine', value: stats.masculine, dot: '#28345E' },
         { label: 'Echipe feminine', value: stats.feminine, dot: '#7C3560' },
     ];

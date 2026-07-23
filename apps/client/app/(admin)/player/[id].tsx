@@ -92,7 +92,7 @@ export default function PlayerProfile() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#1D3E90" />
+        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
       </View>
     );
   }
@@ -169,10 +169,10 @@ export default function PlayerProfile() {
 
   const AdminStatusPill = ({ label, tone }: { label: string; tone: 'red' | 'blue' | 'orange' | 'emerald' }) => {
     const stylesByTone = {
-      red: { backgroundColor: '#FEF2F2', color: '#EF4444' },
-      blue: { backgroundColor: '#EFF6FF', color: '#2563EB' },
-      orange: { backgroundColor: '#FFF7ED', color: '#EA580C' },
-      emerald: { backgroundColor: '#ECFDF5', color: '#059669' },
+      red: { backgroundColor: 'var(--c-danger-bg)', color: 'var(--c-danger)' },
+      blue: { backgroundColor: 'var(--c-surface-tint)', color: 'var(--c-blue)' },
+      orange: { backgroundColor: 'var(--c-warning-bg)', color: '#EA580C' },
+      emerald: { backgroundColor: 'var(--c-success-bg)', color: 'var(--c-success-fg)' },
     };
 
     return (
@@ -188,7 +188,7 @@ export default function PlayerProfile() {
       <View className="pt-6 md:pt-8" style={{ paddingHorizontal: isCompact ? 16 : 32 }}>
         <View className="mb-5 flex-row items-center justify-between gap-3">
           <TouchableOpacity onPress={handleGoBack} className="h-11 w-11 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white shadow-sm">
-            <ArrowLeft color="#0E2041" size={19} />
+            <ArrowLeft color="var(--c-ink)" size={19} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleSave}
@@ -202,7 +202,7 @@ export default function PlayerProfile() {
 
         <View className="overflow-hidden rounded-[34px] border border-[#DCE7F5] bg-white shadow-sm">
           <LinearGradient
-            colors={['#0E2F7F', '#1D3E90', '#2F6FE4']}
+            colors={['#0E2F7F', 'var(--c-brand-fg)', '#2F6FE4']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{ padding: isCompact ? 20 : 28 }}
@@ -271,16 +271,16 @@ export default function PlayerProfile() {
             label="Training"
             value={`${attendanceRate}%`}
             caption={attendanceTrend}
-            icon={<Activity color="#2563EB" size={19} />}
-            color="#2563EB"
+            icon={<Activity color="var(--c-blue)" size={19} />}
+            color="var(--c-blue)"
             progress={attendanceRate}
           />
           <MetricCard
             label="Specialty camps"
             value={`${campsRate}%`}
             caption={campsText}
-            icon={<Award color="#F59E0B" size={19} />}
-            color="#F59E0B"
+            icon={<Award color="var(--c-warning)" size={19} />}
+            color="var(--c-warning)"
             progress={campsRate}
           />
           <TouchableOpacity onPress={() => setShowCalendar(true)} className="min-w-[240px] flex-1 rounded-[24px] bg-[#0E2041] p-5 shadow-md shadow-slate-900/20">
@@ -312,7 +312,7 @@ export default function PlayerProfile() {
             <View className="mb-6 flex-row items-center justify-between gap-4">
               <View className="flex-row items-center gap-3">
                 <View className="h-10 w-10 items-center justify-center rounded-2xl bg-[#EEF4FF]">
-                  <User color="#123B95" size={18} />
+                  <User color="var(--c-brand-fg)" size={18} />
                 </View>
                 <View>
                   <Text className="text-xl font-black text-[#0E2041]">Player details</Text>
@@ -362,7 +362,7 @@ export default function PlayerProfile() {
 
             <View className="mt-7 rounded-[24px] border border-red-100 bg-red-50/50 p-4" style={{ flexDirection: isCompact ? 'column' : 'row', gap: 14, alignItems: isCompact ? 'flex-start' : 'center' }}>
               <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white">
-                <Info color="#EF4444" size={18} />
+                <Info color="var(--c-danger)" size={18} />
               </View>
               <View className="flex-1">
                 <Text className="font-black text-slate-900">Danger Zone</Text>
@@ -379,7 +379,7 @@ export default function PlayerProfile() {
               <View className="mb-5 flex-row items-center justify-between">
                 <View className="flex-row items-center gap-3">
                   <View className={`h-11 w-11 items-center justify-center rounded-2xl ${isMedicalValid ? 'bg-emerald-50' : 'bg-red-50'}`}>
-                    <Activity color={isMedicalValid ? '#10B981' : '#EF4444'} size={20} />
+                    <Activity color={isMedicalValid ? 'var(--c-success)' : 'var(--c-danger)'} size={20} />
                   </View>
                   <View>
                     <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">Medical visa</Text>
@@ -402,7 +402,7 @@ export default function PlayerProfile() {
               <View className="mb-5 flex-row items-center justify-between">
                 <View className="flex-row items-center gap-3">
                   <View className={`h-11 w-11 items-center justify-center rounded-2xl ${paymentTone === 'blue' ? 'bg-blue-50' : 'bg-orange-50'}`}>
-                    <CreditCard color={paymentTone === 'blue' ? '#2563EB' : '#F97316'} size={20} />
+                    <CreditCard color={paymentTone === 'blue' ? 'var(--c-blue)' : 'var(--c-warning)'} size={20} />
                   </View>
                   <View>
                     <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">{feesName}</Text>
@@ -417,7 +417,7 @@ export default function PlayerProfile() {
               </View>
               <TouchableOpacity onPress={() => setShowTransactions(true)} className="mt-4 h-11 flex-row items-center justify-center rounded-2xl bg-[#EEF4FF] px-5">
                 <Text className="text-[10px] font-black uppercase tracking-widest text-[#123B95]">View transactions</Text>
-                <ChevronRight color="#123B95" size={15} />
+                <ChevronRight color="var(--c-brand-fg)" size={15} />
               </TouchableOpacity>
             </View>
 
@@ -459,7 +459,7 @@ export default function PlayerProfile() {
                    <Text className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">Player Statistics</Text>
                 </View>
                 <TouchableOpacity onPress={() => setShowCalendar(false)} className="w-10 h-10 bg-slate-50 rounded-xl items-center justify-center">
-                   <X color="#94A3B8" size={20} />
+                   <X color="var(--c-faint)" size={20} />
                 </TouchableOpacity>
              </View>
 
@@ -477,7 +477,7 @@ export default function PlayerProfile() {
              </View>
 
              <View className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex-row items-center">
-                <Info color="#1D3E90" size={16} />
+                <Info color="var(--c-brand-fg)" size={16} />
                 <Text className="text-xs text-slate-600 font-bold ml-3 italic">Mock calendar view for illustration.</Text>
              </View>
           </View>
@@ -524,7 +524,7 @@ export default function PlayerProfile() {
                 <Text className="text-slate-400 text-xs font-bold mt-1">{firstName} {lastName}</Text>
               </View>
               <TouchableOpacity onPress={() => setShowTransactions(false)} className="w-10 h-10 rounded-2xl bg-slate-100 items-center justify-center">
-                <X color="#1E293B" size={18} />
+                <X color="var(--c-ink-soft)" size={18} />
               </TouchableOpacity>
             </View>
 

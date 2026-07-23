@@ -27,6 +27,14 @@ const drizzle_orm_1 = require("drizzle-orm");
 const router = (0, express_1.Router)();
 const DEFAULT_STRIPE_PUBLISHABLE_KEY = 'pk_test_51TP7NnCFpLYWSHx5i7EAuPRWUXgoP0lxHFIqDIGvyQOpNIbu4VOg2IMg7H8LW5HgTslJVudDxe3xnGXgRIubcVbA00swDdrRS0';
 const DEFAULT_PAYMENT_CURRENCY = (process.env.STRIPE_CURRENCY || 'ron').trim().toLowerCase();
+const FINANCE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const ALLOWED_FINANCE_UPLOAD_MIME_TYPES = new Set([
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+]);
+const ALLOWED_FINANCE_UPLOAD_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.webp']);
 const ZERO_DECIMAL_CURRENCIES = new Set([
     'bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga',
     'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf',
@@ -1179,19 +1187,50 @@ const storage = multer_1.default.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadDir),
     filename: (_req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path_1.default.extname(file.originalname));
+        cb(null, file.fieldname + '-' + uniqueSuffix + path_1.default.extname(file.originalname).toLowerCase());
     }
 });
-const upload = (0, multer_1.default)({ storage });
-router.get('/documents', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const upload = (0, multer_1.default)({
+    storage,
+    limits: { fileSize: FINANCE_UPLOAD_MAX_BYTES, files: 1 },
+    fileFilter: (_req, file, cb) => {
+        const extension = path_1.default.extname(file.originalname).toLowerCase();
+        if (!ALLOWED_FINANCE_UPLOAD_MIME_TYPES.has(file.mimetype) || !ALLOWED_FINANCE_UPLOAD_EXTENSIONS.has(extension)) {
+            cb(new Error('Only PDF, JPG, PNG or WebP files up to 10MB are allowed.'));
+            return;
+        }
+        cb(null, true);
+    },
+});
+router.get('/documents', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const snap = yield firebaseAdmin_1.firestore.collection('financialDocuments').orderBy('date', 'desc').get();
-        const docs = snap.docs.map((docSnap) => {
-            var _a;
-            const data = docSnap.data();
-            return Object.assign(Object.assign({}, data), { date: (_a = (0, firebaseAdmin_1.toIso)(data.date)) !== null && _a !== void 0 ? _a : new Date().toISOString() });
-        });
-        res.json(docs);
+        const clubId = yield resolveAdminFinanceClubId(req, res);
+        if (clubId === null && res.headersSent) {
+            return;
+        }
+        try {
+            let query = firebaseAdmin_1.firestore.collection('financialDocuments');
+            if (clubId !== null) {
+                query = query.where('clubId', '==', clubId);
+            }
+            const snap = yield query.orderBy('date', 'desc').get();
+            const docs = snap.docs.map((docSnap) => {
+                var _a;
+                const data = docSnap.data();
+                return Object.assign(Object.assign({}, data), { date: (_a = (0, firebaseAdmin_1.toIso)(data.date)) !== null && _a !== void 0 ? _a : new Date().toISOString() });
+            });
+            res.json(docs);
+        }
+        catch (firestoreError) {
+            console.error('[GET /api/finance/documents] Firestore fallback:', firestoreError);
+            const docs = clubId !== null
+                ? yield db_1.db.select().from(schema_1.financialDocuments).where((0, drizzle_orm_1.eq)(schema_1.financialDocuments.clubId, clubId)).orderBy((0, drizzle_orm_1.desc)(schema_1.financialDocuments.date))
+                : yield db_1.db.select().from(schema_1.financialDocuments).orderBy((0, drizzle_orm_1.desc)(schema_1.financialDocuments.date));
+            res.json(docs.map((doc) => {
+                var _a;
+                return (Object.assign(Object.assign({}, doc), { date: (_a = (0, firebaseAdmin_1.toIso)(doc.date)) !== null && _a !== void 0 ? _a : new Date().toISOString() }));
+            }));
+        }
     }
     catch (error) {
         console.error(error);
@@ -1199,7 +1238,11 @@ router.get('/documents', (_req, res) => __awaiter(void 0, void 0, void 0, functi
     }
 }));
 router.patch('/documents/:id/status', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b;
+    const clubId = yield resolveAdminFinanceClubId(req, res);
+    if (clubId === null && res.headersSent) {
+        return;
+    }
     const id = Number(req.params.id);
     const { status } = req.body;
     if (!status || !['pending', 'processed', 'rejected'].includes(status)) {
@@ -1207,44 +1250,108 @@ router.patch('/documents/:id/status', (req, res) => __awaiter(void 0, void 0, vo
         return;
     }
     try {
-        const snap = yield firebaseAdmin_1.firestore.collection('financialDocuments').where('id', '==', id).limit(1).get();
-        const docSnap = snap.docs[0];
-        if (!docSnap) {
-            res.status(404).json({ error: 'Document not found' });
-            return;
+        try {
+            const snap = yield firebaseAdmin_1.firestore.collection('financialDocuments').where('id', '==', id).limit(1).get();
+            const docSnap = snap.docs[0];
+            if (!docSnap) {
+                res.status(404).json({ error: 'Document not found' });
+                return;
+            }
+            const existing = docSnap.data();
+            if (clubId !== null && existing.clubId != null && Number(existing.clubId) !== clubId) {
+                res.status(403).json({ error: 'This document belongs to a different club.' });
+                return;
+            }
+            yield docSnap.ref.set({ status }, { merge: true });
+            const updated = yield docSnap.ref.get();
+            res.json(Object.assign(Object.assign({}, updated.data()), { date: (_a = (0, firebaseAdmin_1.toIso)(updated.data().date)) !== null && _a !== void 0 ? _a : null }));
         }
-        yield docSnap.ref.set({ status }, { merge: true });
-        const updated = yield docSnap.ref.get();
-        res.json(Object.assign(Object.assign({}, updated.data()), { date: (_a = (0, firebaseAdmin_1.toIso)(updated.data().date)) !== null && _a !== void 0 ? _a : null }));
+        catch (firestoreError) {
+            console.error('[PATCH /api/finance/documents/:id/status] Firestore fallback:', firestoreError);
+            const existingRows = yield db_1.db.select().from(schema_1.financialDocuments).where((0, drizzle_orm_1.eq)(schema_1.financialDocuments.id, id)).limit(1);
+            const existing = existingRows[0];
+            if (!existing) {
+                res.status(404).json({ error: 'Document not found' });
+                return;
+            }
+            if (clubId !== null && existing.clubId != null && Number(existing.clubId) !== clubId) {
+                res.status(403).json({ error: 'This document belongs to a different club.' });
+                return;
+            }
+            const updatedRows = yield db_1.db
+                .update(schema_1.financialDocuments)
+                .set({ status: status })
+                .where((0, drizzle_orm_1.eq)(schema_1.financialDocuments.id, id))
+                .returning();
+            const updated = updatedRows[0];
+            if (!updated) {
+                res.status(404).json({ error: 'Document not found' });
+                return;
+            }
+            res.json(Object.assign(Object.assign({}, updated), { date: (_b = (0, firebaseAdmin_1.toIso)(updated.date)) !== null && _b !== void 0 ? _b : null }));
+        }
     }
     catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to update document status' });
     }
 }));
-router.post('/upload', upload.single('file'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post('/upload', (req, res, next) => {
+    upload.single('file')(req, res, (error) => {
+        if (error) {
+            return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid document upload.' });
+        }
+        next();
+    });
+}, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
+        const clubId = yield resolveAdminFinanceClubId(req, res);
+        if (clubId === null && res.headersSent) {
+            if (req.file) {
+                fs_1.default.unlink(req.file.path, () => { });
+            }
+            return;
+        }
         if (!req.file) {
             res.status(400).json({ error: 'No file uploaded' });
             return;
         }
         const { type, amount, description } = req.body;
+        const parsedAmount = normalizeMoneyValue(amount);
         const documentUrl = `/uploads/${req.file.filename}`;
-        const id = yield (0, firebaseAdmin_1.nextNumericId)('financialDocuments');
         const record = {
-            id,
             type: type || 'expense',
-            amount: amount ? parseInt(amount, 10) : 0,
+            amount: parsedAmount != null ? Math.round(parsedAmount) : 0,
             description: description || 'New Document',
             documentUrl,
             status: 'pending',
             date: new Date(),
+            clubId: clubId !== null && clubId !== void 0 ? clubId : null,
         };
-        yield firebaseAdmin_1.firestore.collection('financialDocuments').doc(String(id)).set(record);
-        res.json(Object.assign(Object.assign({}, record), { date: new Date().toISOString() }));
+        try {
+            const id = yield (0, firebaseAdmin_1.nextNumericId)('financialDocuments');
+            yield firebaseAdmin_1.firestore.collection('financialDocuments').doc(String(id)).set(Object.assign({ id }, record));
+            res.json(Object.assign(Object.assign({ id }, record), { date: new Date().toISOString() }));
+        }
+        catch (firestoreError) {
+            console.error('[POST /api/finance/upload] Firestore fallback:', firestoreError);
+            const inserted = yield db_1.db.insert(schema_1.financialDocuments).values({
+                type: String(record.type),
+                amount: record.amount,
+                description: String(record.description),
+                documentUrl,
+                status: 'pending',
+                clubId: record.clubId,
+            }).returning();
+            res.json(Object.assign(Object.assign({}, inserted[0]), { date: (_a = (0, firebaseAdmin_1.toIso)(inserted[0].date)) !== null && _a !== void 0 ? _a : new Date().toISOString() }));
+        }
     }
     catch (error) {
         console.error('[POST /api/finance/upload] error:', error);
+        if (req.file) {
+            fs_1.default.unlink(req.file.path, () => { });
+        }
         res.status(500).json({ error: 'Failed to upload document' });
     }
 }));

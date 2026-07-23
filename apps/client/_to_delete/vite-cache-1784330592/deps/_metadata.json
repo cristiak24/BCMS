@@ -1,0 +1,82 @@
+{
+  "hash": "610effd4",
+  "configHash": "80ebc84e",
+  "lockfileHash": "23a13251",
+  "browserHash": "fba4f0a8",
+  "optimized": {
+    "firebase/app": {
+      "src": "../../../../../node_modules/firebase/app/dist/esm/index.esm.js",
+      "file": "firebase_app.js",
+      "fileHash": "b0597994",
+      "needsInterop": false
+    },
+    "firebase/auth": {
+      "src": "../../../../../node_modules/firebase/auth/dist/esm/index.esm.js",
+      "file": "firebase_auth.js",
+      "fileHash": "08a6089b",
+      "needsInterop": false
+    },
+    "lucide-react-native": {
+      "src": "../../../../../node_modules/lucide-react/dist/esm/lucide-react.mjs",
+      "file": "lucide-react-native.js",
+      "fileHash": "6af2980b",
+      "needsInterop": false
+    },
+    "lucide-react": {
+      "src": "../../../../../node_modules/lucide-react/dist/esm/lucide-react.mjs",
+      "file": "lucide-react.js",
+      "fileHash": "562121af",
+      "needsInterop": false
+    },
+    "react-dom": {
+      "src": "../../../../../node_modules/react-dom/index.js",
+      "file": "react-dom.js",
+      "fileHash": "575a7611",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../../../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "dee4fbc6",
+      "needsInterop": true
+    },
+    "react-router-dom": {
+      "src": "../../../../../node_modules/react-router-dom/dist/index.mjs",
+      "file": "react-router-dom.js",
+      "fileHash": "1a64da0d",
+      "needsInterop": false
+    },
+    "react": {
+      "src": "../../../../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "c6c50ae9",
+      "needsInterop": true
+    },
+    "react/jsx-dev-runtime": {
+      "src": "../../../../../node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "2ccae54e",
+      "needsInterop": true
+    },
+    "react/jsx-runtime": {
+      "src": "../../../../../node_modules/react/jsx-runtime.js",
+      "file": "react_jsx-runtime.js",
+      "fileHash": "42454079",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "index.esm-BhtekDr2": {
+      "file": "index.esm-BhtekDr2.js",
+      "isDynamicEntry": false
+    },
+    "lucide-react-DJchE_tV": {
+      "file": "lucide-react-DJchE_tV.js",
+      "isDynamicEntry": false
+    },
+    "react-EYxsQL-m": {
+      "file": "react-EYxsQL-m.js",
+      "isDynamicEntry": false
+    }
+  }
+}

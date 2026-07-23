@@ -243,6 +243,80 @@ export async function createSuperAdminInvitation(
   };
 }
 
+export async function resendClubInvitation(
+  params: { inviteId: number; clubId: number },
+  actor: Pick<AuthenticatedRequest, 'user' | 'firebaseUser'> & { ip?: string; userAgent?: string } = {}
+) {
+  const rows = await db.select().from(invites)
+    .where(and(eq(invites.id, params.inviteId), eq(invites.clubId, params.clubId)))
+    .limit(1);
+
+  const invite = rows[0];
+
+  if (!invite) {
+    throw new Error('Invitation not found.');
+  }
+
+  if (invite.status !== 'pending') {
+    throw new Error('Only pending invitations can be resent.');
+  }
+
+  const club = await findClubById(invite.clubId ?? params.clubId);
+
+  // Resending mints a fresh token + expiry on the same invite row, so any old
+  // link stops working and the recipient gets a link that is valid again.
+  const token = generateInviteToken();
+  const tokenHash = hashInviteToken(token);
+  const expiresAt = new Date(Date.now() + INVITE_TTL_MINUTES * 60 * 1000);
+
+  await db.update(invites).set({
+    token,
+    tokenHash,
+    status: 'pending',
+    expiresAt: expiresAt.toISOString(),
+  }).where(eq(invites.id, invite.id));
+
+  const inviteUrl = buildInviteUrl(token);
+
+  try {
+    await sendInviteEmail({
+      to: invite.email,
+      clubName: club.name,
+      role: invite.role,
+      url: inviteUrl,
+      expiresAt,
+      fullName: invite.email.split('@')[0],
+    });
+  } catch (error) {
+    await db.update(invites).set({ status: 'revoked' }).where(eq(invites.id, invite.id));
+    throw error;
+  }
+
+  await writeAuditLog({
+    action: 'invitation.resent',
+    entityType: 'invitation',
+    entityId: invite.id,
+    actorUserId: actor.user?.id ?? null,
+    actorUid: actor.firebaseUser?.uid ?? null,
+    actorRole: actor.user?.role ?? actor.firebaseUser?.role ?? null,
+    clubId: club.id,
+    metadata: { email: invite.email, role: invite.role, clubId: club.id, clubName: club.name },
+    ipAddress: actor.ip ?? null,
+    userAgent: actor.userAgent ?? null,
+  });
+
+  return {
+    id: invite.id,
+    email: invite.email,
+    role: invite.role,
+    clubId: club.id,
+    clubName: club.name,
+    status: 'pending',
+    expiresAt: expiresAt.toISOString(),
+    inviteUrl,
+  };
+}
+
 export async function validateInvitationToken(token: string) {
   await syncInvitationStatuses();
 

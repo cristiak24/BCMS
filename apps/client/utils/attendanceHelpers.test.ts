@@ -50,6 +50,16 @@ test('computeDailyAttendance marks mixed states as partial', () => {
   assert.equal(result.status, 'partial');
 });
 
+test('computeDailyAttendance marks present + still-ungraded session as partial', () => {
+  const result = computeDailyAttendance(7, sampleEvents, {
+    1: [{ playerId: 7, status: 'present' }],
+    2: [], // second session not graded yet
+  });
+
+  assert.equal(result.status, 'partial');
+  assert.equal(result.presentCount, 1);
+});
+
 test('computeDailyAttendance keeps fully unmarked day as pending', () => {
   const result = computeDailyAttendance(7, sampleEvents, {
     1: [],

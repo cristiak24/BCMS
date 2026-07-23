@@ -35,7 +35,7 @@ export default function AdminActionButton({
                     : 'border border-[#DDE7F5] bg-white hover:border-blue-200'
             } ${disabled ? 'opacity-60' : ''} ${className ?? ''}`}
         >
-            <MaterialIcons name={icon} size={18} color={isPrimary ? '#FFFFFF' : '#334155'} />
+            <MaterialIcons name={icon} size={18} color={isPrimary ? '#FFFFFF' : 'var(--c-ink-soft)'} />
             <Text className={`${isPrimary ? 'text-white' : 'text-slate-700'} font-bold ml-2`}>
                 {label}
             </Text>

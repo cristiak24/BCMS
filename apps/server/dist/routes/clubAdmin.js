@@ -16,7 +16,29 @@ const schema_1 = require("../db/schema");
 const db_1 = require("../db");
 const invitationsService_1 = require("../services/invitationsService");
 const auditService_1 = require("../services/auditService");
+const rateLimit_1 = require("../middleware/rateLimit");
+const microCache_1 = require("../lib/microCache");
 const router = (0, express_1.Router)();
+// Short-lived cache for the read-heavy accounts listing (invitation sync + a few
+// queries). Invalidated immediately on any mutation in this process.
+const ACCOUNTS_CACHE_TTL_MS = 15000;
+const accountsCacheKey = (clubId) => `club-admin:accounts:${clubId}`;
+// Explicit, safe column projection — never expose passwordHash / firebaseUid / uid.
+const safeUserColumns = {
+    id: schema_1.users.id,
+    email: schema_1.users.email,
+    name: schema_1.users.name,
+    firstName: schema_1.users.firstName,
+    lastName: schema_1.users.lastName,
+    role: schema_1.users.role,
+    status: schema_1.users.status,
+    clubId: schema_1.users.clubId,
+    avatarUrl: schema_1.users.avatarUrl,
+    phone: schema_1.users.phone,
+    lastLoginAt: schema_1.users.lastLoginAt,
+    createdAt: schema_1.users.createdAt,
+    updatedAt: schema_1.users.updatedAt,
+};
 function normalizeClubAdminInviteRole(value) {
     return value === 'coach' || value === 'player' ? value : null;
 }
@@ -33,45 +55,49 @@ function ensureClubAdmin(req, res) {
 }
 router.use(auth_1.authenticate);
 router.get('/accounts', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
     const actor = ensureClubAdmin(req, res);
     if (!actor) {
         return;
     }
     try {
-        yield (0, invitationsService_1.syncInvitationStatuses)();
-        const [clubRows, userRows, inviteRows] = yield Promise.all([
-            db_1.db.select({ id: schema_1.clubs.id, name: schema_1.clubs.name }).from(schema_1.clubs).where((0, drizzle_orm_1.eq)(schema_1.clubs.id, actor.clubId)).limit(1),
-            db_1.db.select().from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.clubId, actor.clubId)).orderBy((0, drizzle_orm_1.desc)(schema_1.users.createdAt)),
-            db_1.db.select().from(schema_1.invites).where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.invites.clubId, actor.clubId), (0, drizzle_orm_1.eq)(schema_1.invites.status, 'pending'))).orderBy((0, drizzle_orm_1.desc)(schema_1.invites.createdAt)),
-        ]);
-        const clubName = (_b = (_a = clubRows[0]) === null || _a === void 0 ? void 0 : _a.name) !== null && _b !== void 0 ? _b : null;
-        const pendingInvites = inviteRows
-            .filter((invite) => (0, invitationsService_1.isVisiblePendingInvite)(invite, userRows))
-            .map((invite) => ({
-            id: `invite-${invite.id}`,
-            email: invite.email,
-            name: invite.email.split('@')[0],
-            role: invite.role,
-            status: invite.status,
-            clubId: invite.clubId,
-            clubName,
-            createdAt: invite.createdAt,
-            lastLoginAt: null,
-            source: 'invite',
+        const clubId = actor.clubId;
+        const payload = yield (0, microCache_1.getOrCompute)(accountsCacheKey(clubId), ACCOUNTS_CACHE_TTL_MS, () => __awaiter(void 0, void 0, void 0, function* () {
+            var _a, _b;
+            yield (0, invitationsService_1.syncInvitationStatuses)();
+            const [clubRows, userRows, inviteRows] = yield Promise.all([
+                db_1.db.select({ id: schema_1.clubs.id, name: schema_1.clubs.name }).from(schema_1.clubs).where((0, drizzle_orm_1.eq)(schema_1.clubs.id, clubId)).limit(1),
+                db_1.db.select(safeUserColumns).from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.clubId, clubId)).orderBy((0, drizzle_orm_1.desc)(schema_1.users.createdAt)),
+                db_1.db.select().from(schema_1.invites).where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.invites.clubId, clubId), (0, drizzle_orm_1.eq)(schema_1.invites.status, 'pending'))).orderBy((0, drizzle_orm_1.desc)(schema_1.invites.createdAt)),
+            ]);
+            const clubName = (_b = (_a = clubRows[0]) === null || _a === void 0 ? void 0 : _a.name) !== null && _b !== void 0 ? _b : null;
+            const pendingInvites = inviteRows
+                .filter((invite) => (0, invitationsService_1.isVisiblePendingInvite)(invite, userRows))
+                .map((invite) => ({
+                id: `invite-${invite.id}`,
+                email: invite.email,
+                name: invite.email.split('@')[0],
+                role: invite.role,
+                status: invite.status,
+                clubId: invite.clubId,
+                clubName,
+                createdAt: invite.createdAt,
+                lastLoginAt: null,
+                source: 'invite',
+            }));
+            const activeUsers = userRows.map((user) => (Object.assign(Object.assign({}, user), { status: user.status === 'pending' ? 'pending_registration' : user.status === 'disabled' ? 'inactive' : 'active', clubName, source: 'user' })));
+            return {
+                success: true,
+                users: [...pendingInvites, ...activeUsers].sort((a, b) => { var _a, _b; return String((_a = b.createdAt) !== null && _a !== void 0 ? _a : '').localeCompare(String((_b = a.createdAt) !== null && _b !== void 0 ? _b : '')); }),
+            };
         }));
-        const activeUsers = userRows.map((user) => (Object.assign(Object.assign({}, user), { status: user.status === 'pending' ? 'pending_registration' : user.status === 'disabled' ? 'inactive' : 'active', clubName, source: 'user' })));
-        res.json({
-            success: true,
-            users: [...pendingInvites, ...activeUsers].sort((a, b) => { var _a, _b; return String((_a = b.createdAt) !== null && _a !== void 0 ? _a : '').localeCompare(String((_b = a.createdAt) !== null && _b !== void 0 ? _b : '')); }),
-        });
+        res.json(payload);
     }
     catch (error) {
         console.error('Club admin accounts error:', error);
         res.status(500).json({ error: 'Could not load club accounts.' });
     }
 }));
-router.post('/accounts/invitations', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post('/accounts/invitations', (0, rateLimit_1.rateLimit)({ bucket: 'club-admin:invite', limit: 10, windowMs: 60000 }), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e, _f;
     const actor = ensureClubAdmin(req, res);
     if (!actor) {
@@ -93,6 +119,7 @@ router.post('/accounts/invitations', (req, res) => __awaiter(void 0, void 0, voi
             ip: req.ip,
             userAgent: (_f = req.get('user-agent')) !== null && _f !== void 0 ? _f : undefined,
         });
+        (0, microCache_1.invalidate)(accountsCacheKey(actor.clubId));
         res.status(201).json({ success: true, invitation: result });
     }
     catch (error) {
@@ -101,7 +128,7 @@ router.post('/accounts/invitations', (req, res) => __awaiter(void 0, void 0, voi
         res.status(400).json({ error: message });
     }
 }));
-router.patch('/accounts/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.patch('/accounts/:id', (0, rateLimit_1.rateLimit)({ bucket: 'club-admin:mutate', limit: 30, windowMs: 60000 }), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e, _f, _g;
     const actor = ensureClubAdmin(req, res);
     if (!actor) {
@@ -139,6 +166,7 @@ router.patch('/accounts/:id', (req, res) => __awaiter(void 0, void 0, void 0, fu
             clubId: actor.clubId,
             metadata: { previousRole: currentUser.role, nextRole },
         });
+        (0, microCache_1.invalidate)(accountsCacheKey(actor.clubId));
         res.json({ success: true, user: updated[0] });
     }
     catch (error) {
@@ -146,7 +174,7 @@ router.patch('/accounts/:id', (req, res) => __awaiter(void 0, void 0, void 0, fu
         res.status(500).json({ error: 'Could not update user role.' });
     }
 }));
-router.post('/accounts/:id/deactivate', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post('/accounts/:id/deactivate', (0, rateLimit_1.rateLimit)({ bucket: 'club-admin:mutate', limit: 30, windowMs: 60000 }), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
     const actor = ensureClubAdmin(req, res);
     if (!actor) {
@@ -179,6 +207,7 @@ router.post('/accounts/:id/deactivate', (req, res) => __awaiter(void 0, void 0, 
                 clubId: actor.clubId,
                 metadata: { email: invite.email, role: invite.role },
             });
+            (0, microCache_1.invalidate)(accountsCacheKey(actor.clubId));
             return res.json({ success: true, invitation: (_g = updatedInvite[0]) !== null && _g !== void 0 ? _g : invite });
         }
         const id = Number(rawId);
@@ -211,6 +240,7 @@ router.post('/accounts/:id/deactivate', (req, res) => __awaiter(void 0, void 0, 
             clubId: actor.clubId,
             metadata: { email: targetUser.email, role: targetUser.role },
         });
+        (0, microCache_1.invalidate)(accountsCacheKey(actor.clubId));
         res.json({ success: true, user: updated[0] });
     }
     catch (error) {

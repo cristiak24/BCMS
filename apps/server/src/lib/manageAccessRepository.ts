@@ -3,6 +3,28 @@ import { db } from '../db';
 import { users, clubs, teams, accessRequests, inviteLinks } from '../db/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import type { AccessRequestRecord, InviteRole } from '../types/manageAccess';
+import { decryptInviteToken, encryptInviteToken } from './manageAccessTokens';
+
+type InviteLinkRow = {
+    id: number;
+    clubId: number;
+    role: string;
+    token: string;
+    tokenHash: string;
+    expiresAt: string;
+    refreshIntervalMinutes: number;
+    createdBy: number | null;
+    createdAt: string;
+    isActive: number;
+};
+
+/** Return the row with its `token` decrypted back to the raw invite token. */
+function withDecryptedToken<T extends { token: string }>(row: T | undefined | null): T | null {
+    if (!row) {
+        return null;
+    }
+    return { ...row, token: decryptInviteToken(row.token) };
+}
 
 type UserDoc = {
     id: number;
@@ -173,7 +195,7 @@ export async function createInviteLink(payload: {
     const record = {
         clubId: payload.clubId,
         role: payload.role as any,
-        token: payload.token,
+        token: encryptInviteToken(payload.token),
         tokenHash: payload.tokenHash,
         expiresAt: payload.expiresAt.toISOString(),
         refreshIntervalMinutes: payload.refreshIntervalMinutes,
@@ -193,7 +215,7 @@ export async function createInviteLink(payload: {
         .where(eq(inviteLinks.id, createdId))
         .limit(1);
 
-    return rows[0] ?? null;
+    return withDecryptedToken(rows[0] as InviteLinkRow | undefined);
 }
 
 export async function getLatestInviteLinkForClubRole(clubId: number, role: InviteRole) {
@@ -202,7 +224,7 @@ export async function getLatestInviteLinkForClubRole(clubId: number, role: Invit
         .orderBy(desc(inviteLinks.createdAt))
         .limit(1);
 
-    return rows[0] ?? null;
+    return withDecryptedToken(rows[0] as InviteLinkRow | undefined);
 }
 
 export async function getActiveInviteLinkForClubRole(clubId: number, role: InviteRole) {
@@ -215,7 +237,7 @@ export async function getActiveInviteLinkForClubRole(clubId: number, role: Invit
         .orderBy(desc(inviteLinks.createdAt))
         .limit(1);
 
-    return rows[0] ?? null;
+    return withDecryptedToken(rows[0] as InviteLinkRow | undefined);
 }
 
 export async function findInviteLinkByTokenHash(tokenHash: string) {
@@ -223,7 +245,7 @@ export async function findInviteLinkByTokenHash(tokenHash: string) {
         .where(eq(inviteLinks.tokenHash, tokenHash))
         .limit(1);
         
-    const invite = rows[0];
+    const invite = withDecryptedToken(rows[0] as InviteLinkRow | undefined);
     if (!invite) {
         return null;
     }

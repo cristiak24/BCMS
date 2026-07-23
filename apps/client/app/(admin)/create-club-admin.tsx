@@ -29,7 +29,7 @@ export default function CreateClubAdminScreen() {
   if (initializing) {
     return (
       <View className="flex-1 items-center justify-center bg-slate-50">
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color="var(--c-blue)" />
       </View>
     );
   }
@@ -38,7 +38,7 @@ export default function CreateClubAdminScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-slate-50 px-4">
         <GlassCard className="items-center px-6 py-10 max-w-xl">
-          <MaterialIcons name="lock-outline" size={34} color="#475569" />
+          <MaterialIcons name="lock-outline" size={34} color="var(--c-muted)" />
           <Text className="text-2xl font-black text-slate-900 mt-4 text-center">Superadmin access required</Text>
           <Text className="text-slate-500 text-center mt-2">
             This page is restricted to superadmin accounts only.
@@ -69,7 +69,7 @@ export default function CreateClubAdminScreen() {
             onPress={reloadSession}
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 flex-row items-center gap-2"
           >
-            <MaterialIcons name="refresh" size={18} color="#0F172A" />
+            <MaterialIcons name="refresh" size={18} color="var(--c-ink-strong)" />
             <Text className="font-bold text-slate-900">Refresh</Text>
           </Pressable>
 

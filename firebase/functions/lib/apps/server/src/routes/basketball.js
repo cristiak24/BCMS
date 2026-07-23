@@ -97,6 +97,55 @@ function parseDateToTimestamp(dateStr) {
 function stripTags(s) {
     return s.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
+function decodeWidgetHtml(raw) {
+    return raw
+        .replace(/\\n/g, '')
+        .replace(/\\r/g, '')
+        .replace(/\\t/g, '')
+        .replace(/\\"/g, '"')
+        .replace(/\\\//g, '/')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&#039;/g, "'")
+        .replace(/&quot;/g, '"');
+}
+function parseStandingsTable(raw) {
+    const htmlMatch = raw.match(/MBT\.API\.update\('[^']*',\s*'([\s\S]*?)'\);/);
+    const html = decodeWidgetHtml(htmlMatch?.[1] ?? raw);
+    const bodyMatch = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
+    const tbody = bodyMatch?.[1] ?? html;
+    const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+    const rows = [];
+    let rowMatch;
+    while ((rowMatch = rowRegex.exec(tbody)) !== null) {
+        const cells = [];
+        const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+        let cellMatch;
+        while ((cellMatch = cellRegex.exec(rowMatch[1])) !== null) {
+            cells.push(stripTags(cellMatch[1]));
+        }
+        if (cells.length < 4)
+            continue;
+        const position = Number(cells[0].replace(/[^\d]/g, ''));
+        const team = cells[1].trim();
+        const recordMatch = cells[2].replace(/\s+/g, '').match(/^(\d+)\/(\d+)$/);
+        const wins = Number(recordMatch?.[1] ?? NaN);
+        const losses = Number(recordMatch?.[2] ?? NaN);
+        const points = Number(cells[3].replace(/[^\d-]/g, ''));
+        if (!Number.isFinite(position) || !team || !Number.isFinite(wins) || !Number.isFinite(losses) || !Number.isFinite(points)) {
+            continue;
+        }
+        rows.push({
+            position,
+            team,
+            wins,
+            losses,
+            played: wins + losses,
+            points,
+        });
+    }
+    return rows;
+}
 // ---------- GET /api/basketball/leagues ----------
 router.get('/leagues', (_req, res) => {
     // Returnăm direct — lista este configurație fixă (ID-uri din FRB)
@@ -255,6 +304,33 @@ router.get('/matches', async (req, res) => {
     catch (e) {
         console.error('[basketball/matches] error:', e);
         res.status(500).json({ error: 'Failed to fetch matches' });
+    }
+});
+// ---------- GET /api/basketball/standings?seasonId=&leagueId= ----------
+router.get('/standings', async (req, res) => {
+    const { seasonId, leagueId } = req.query;
+    if (!seasonId || !leagueId) {
+        res.status(400).json({ error: 'seasonId and leagueId required' });
+        return;
+    }
+    try {
+        const baseUrl = `https://widgets.baskethotel.com/widget-service/show?api=${API_KEY}&lang=ro`;
+        const initialUrl = `${baseUrl}&request[0][widget]=300&request[0][param][league_id]=${leagueId}&request[0][param][season_id]=${seasonId}&request[0][param][template]=v2&request[0][param][show_stage_selector]=1&request[0][param][stage_selector]=dropdown&request[0][param][use_group_sort_index]=1`;
+        const initialResponse = await axios_1.default.get(initialUrl, { headers: HEADERS });
+        const initialRaw = String(initialResponse.data);
+        const state = initialRaw.match(/state:\s*\\?'([^'\\]+)\\?'/)?.[1];
+        const stageId = initialRaw.match(/activeStage\s*=\s*\\?'([^'\\]+)\\?'/)?.[1];
+        if (!state) {
+            res.json([]);
+            return;
+        }
+        const tableUrl = `${baseUrl}&request[0][container]=standings&request[0][widget]=300&request[0][part]=table&request[0][state]=${encodeURIComponent(state)}&request[0][param][season_id]=${seasonId}${stageId ? `&request[0][param][group_filter]=${stageId}` : ''}&request[0][param][showTeamLogo]=&request[0][param][teamLogoSize]=20x20`;
+        const tableResponse = await axios_1.default.get(tableUrl, { headers: HEADERS });
+        res.json(parseStandingsTable(String(tableResponse.data)));
+    }
+    catch (e) {
+        console.error('[basketball/standings] error:', e);
+        res.status(500).json({ error: 'Failed to fetch standings' });
     }
 });
 // ---------- GET /api/basketball/dashboard-summary ----------

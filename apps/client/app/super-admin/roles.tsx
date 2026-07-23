@@ -13,7 +13,7 @@ export default function RolesScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-[#EEF3FF]">
-        <ActivityIndicator size="large" color="#173AA8" />
+        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
       </View>
     );
   }

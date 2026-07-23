@@ -292,6 +292,7 @@ exports.eventsController = {
                     lastName: player?.lastName ?? '',
                     number: player?.number ?? null,
                     status: row.status,
+                    note: row.note ?? null,
                 };
             }));
         }
@@ -318,10 +319,17 @@ exports.eventsController = {
             for (const item of playerAttendances) {
                 const playerId = Number(item.playerId);
                 const status = String(item.status);
+                // Note is optional: only touch it when the caller explicitly sends
+                // a `note` key, so status-only updates (e.g. the quick toggle modal)
+                // never wipe an existing coach note.
+                const hasNote = Object.prototype.hasOwnProperty.call(item, 'note');
+                const note = hasNote ? (item.note == null ? null : String(item.note)) : undefined;
                 const existingRows = await db_1.db.select().from(schema_1.attendance).where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.attendance.eventId, eventId), (0, drizzle_orm_1.eq)(schema_1.attendance.playerId, playerId))).limit(1);
                 const existing = existingRows[0];
                 if (existing?.id != null) {
-                    await db_1.db.update(schema_1.attendance).set({ status, date: new Date().toISOString() }).where((0, drizzle_orm_1.eq)(schema_1.attendance.id, existing.id));
+                    await db_1.db.update(schema_1.attendance)
+                        .set({ status, date: new Date().toISOString(), ...(hasNote ? { note } : {}) })
+                        .where((0, drizzle_orm_1.eq)(schema_1.attendance.id, existing.id));
                 }
                 else {
                     await db_1.db.insert(schema_1.attendance).values({
@@ -330,6 +338,7 @@ exports.eventsController = {
                         teamId: event.teamId ?? 0,
                         status,
                         date: new Date().toISOString(),
+                        note: note ?? null,
                     });
                 }
             }

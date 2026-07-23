@@ -17,7 +17,29 @@ const firebaseAdmin_1 = require("../lib/firebaseAdmin");
 const puppeteer_1 = __importDefault(require("puppeteer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
+const auth_1 = require("../middleware/auth");
+const db_1 = require("../db");
+const schema_1 = require("../db/schema");
+const drizzle_orm_1 = require("drizzle-orm");
 const router = (0, express_1.Router)();
+const MAX_L12_PLAYERS = 24;
+router.use(auth_1.authenticate, (0, auth_1.requireRoles)(['admin', 'coach']));
+function escapeHtml(value) {
+    return String(value !== null && value !== void 0 ? value : '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+function safeFileSegment(value) {
+    return String(value !== null && value !== void 0 ? value : 'Necunoscut')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 80) || 'Necunoscut';
+}
 router.post('/generate-l12', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { teamId, matchDetails, players } = req.body;
@@ -25,8 +47,20 @@ router.post('/generate-l12', (req, res) => __awaiter(void 0, void 0, void 0, fun
             res.status(400).json({ error: 'Missing required configuration for L12' });
             return;
         }
-        const teamSnap = yield firebaseAdmin_1.firestore.collection('teams').doc(String(teamId)).get();
-        const team = teamSnap.exists ? teamSnap.data() : { id: Number(teamId), name: 'Echipă Necunoscută' };
+        if (players.length === 0 || players.length > MAX_L12_PLAYERS) {
+            res.status(400).json({ error: `L12 requires between 1 and ${MAX_L12_PLAYERS} players.` });
+            return;
+        }
+        let team = { id: Number(teamId), name: 'Echipă Necunoscută' };
+        try {
+            const teamSnap = yield firebaseAdmin_1.firestore.collection('teams').doc(String(teamId)).get();
+            if (teamSnap.exists) {
+                team = teamSnap.data();
+            }
+        }
+        catch (teamError) {
+            console.error('Error loading team for L12:', teamError);
+        }
         const htmlContent = `
             <!DOCTYPE html>
             <html lang="ro">
@@ -50,13 +84,13 @@ router.post('/generate-l12', (req, res) => __awaiter(void 0, void 0, void 0, fun
             <body>
                 <div class="header">
                     <h1>Foaie de Joc L12</h1>
-                    <p>Echipa: ${team.name}</p>
+                    <p>Echipa: ${escapeHtml(team.name)}</p>
                 </div>
                 
                 <div class="match-info">
-                    <div>Adversar: ${(matchDetails === null || matchDetails === void 0 ? void 0 : matchDetails.opponent) || '-'}</div>
-                    <div>Data: ${(matchDetails === null || matchDetails === void 0 ? void 0 : matchDetails.date) || '-'}</div>
-                    <div>Competiție: ${(matchDetails === null || matchDetails === void 0 ? void 0 : matchDetails.competition) || '-'}</div>
+                    <div>Adversar: ${escapeHtml((matchDetails === null || matchDetails === void 0 ? void 0 : matchDetails.opponent) || '-')}</div>
+                    <div>Data: ${escapeHtml((matchDetails === null || matchDetails === void 0 ? void 0 : matchDetails.date) || '-')}</div>
+                    <div>Competiție: ${escapeHtml((matchDetails === null || matchDetails === void 0 ? void 0 : matchDetails.competition) || '-')}</div>
                 </div>
 
                 <table>
@@ -73,9 +107,9 @@ router.post('/generate-l12', (req, res) => __awaiter(void 0, void 0, void 0, fun
                         ${players.map((p, index) => `
                             <tr>
                                 <td>${index + 1}</td>
-                                <td>${p.firstName || ''} ${p.lastName || p.name || ''}</td>
-                                <td>${p.category || 'M/F'}</td>
-                                <td>${p.number || '-'}</td>
+                                <td>${escapeHtml(`${p.firstName || ''} ${p.lastName || p.name || ''}`.trim())}</td>
+                                <td>${escapeHtml(p.category || 'M/F')}</td>
+                                <td>${escapeHtml(p.number || '-')}</td>
                                 <td>Valid</td>
                             </tr>
                         `).join('')}
@@ -100,8 +134,7 @@ router.post('/generate-l12', (req, res) => __awaiter(void 0, void 0, void 0, fun
             fs_1.default.mkdirSync(uploadsDir, { recursive: true });
         }
         const timestamp = Date.now();
-        const safeOpponentName = ((matchDetails === null || matchDetails === void 0 ? void 0 : matchDetails.opponent) || 'Necunoscut').replace(/[^a-zA-Z0-9]/g, '_');
-        const filename = `L12_${team.name.replace(/[^a-zA-Z0-9]/g, '_')}_${safeOpponentName}_${timestamp}.pdf`;
+        const filename = `L12_${safeFileSegment(team.name)}_${safeFileSegment(matchDetails === null || matchDetails === void 0 ? void 0 : matchDetails.opponent)}_${timestamp}.pdf`;
         const filePath = path_1.default.join(uploadsDir, filename);
         const browser = yield puppeteer_1.default.launch({ headless: true, args: ['--no-sandbox'] });
         const page = yield browser.newPage();
@@ -116,14 +149,31 @@ router.post('/generate-l12', (req, res) => __awaiter(void 0, void 0, void 0, fun
         const pdfBuffer = fs_1.default.readFileSync(filePath);
         const matchTitle = `${team.name} vs ${(matchDetails === null || matchDetails === void 0 ? void 0 : matchDetails.opponent) || 'Adversar Necunoscut'}`;
         const documentUrl = `/uploads/l12/${filename}`;
-        const id = yield (0, firebaseAdmin_1.nextNumericId)('l12Documents');
-        yield firebaseAdmin_1.firestore.collection('l12Documents').doc(String(id)).set({
-            id,
-            teamId: Number(teamId),
-            matchTitle,
-            documentUrl,
-            createdAt: new Date(),
-        });
+        void (() => __awaiter(void 0, void 0, void 0, function* () {
+            try {
+                const id = yield (0, firebaseAdmin_1.nextNumericId)('l12Documents');
+                yield firebaseAdmin_1.firestore.collection('l12Documents').doc(String(id)).set({
+                    id,
+                    teamId: Number(teamId),
+                    matchTitle,
+                    documentUrl,
+                    createdAt: new Date(),
+                });
+            }
+            catch (archiveError) {
+                console.error('Error saving L12 archive entry:', archiveError);
+                try {
+                    yield db_1.db.insert(schema_1.l12Documents).values({
+                        teamId: Number(teamId),
+                        matchTitle,
+                        documentUrl,
+                    });
+                }
+                catch (dbArchiveError) {
+                    console.error('Error saving L12 archive entry to Postgres:', dbArchiveError);
+                }
+            }
+        }))();
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.send(Buffer.from(pdfBuffer));
@@ -135,13 +185,23 @@ router.post('/generate-l12', (req, res) => __awaiter(void 0, void 0, void 0, fun
 }));
 router.get('/l12', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const snap = yield firebaseAdmin_1.firestore.collection('l12Documents').orderBy('createdAt', 'desc').limit(50).get();
-        const docs = snap.docs.map((docSnap) => {
-            var _a;
-            const data = docSnap.data();
-            return Object.assign(Object.assign({}, data), { createdAt: (_a = (0, firebaseAdmin_1.toIso)(data.createdAt)) !== null && _a !== void 0 ? _a : new Date().toISOString() });
-        });
-        res.json(docs);
+        try {
+            const snap = yield firebaseAdmin_1.firestore.collection('l12Documents').orderBy('createdAt', 'desc').limit(50).get();
+            const docs = snap.docs.map((docSnap) => {
+                var _a;
+                const data = docSnap.data();
+                return Object.assign(Object.assign({}, data), { createdAt: (_a = (0, firebaseAdmin_1.toIso)(data.createdAt)) !== null && _a !== void 0 ? _a : new Date().toISOString() });
+            });
+            res.json(docs);
+        }
+        catch (firestoreError) {
+            console.error('[GET /api/documents/l12] Firestore fallback:', firestoreError);
+            const docs = yield db_1.db.select().from(schema_1.l12Documents).orderBy((0, drizzle_orm_1.desc)(schema_1.l12Documents.createdAt)).limit(50);
+            res.json(docs.map((doc) => {
+                var _a;
+                return (Object.assign(Object.assign({}, doc), { createdAt: (_a = (0, firebaseAdmin_1.toIso)(doc.createdAt)) !== null && _a !== void 0 ? _a : new Date().toISOString() }));
+            }));
+        }
     }
     catch (error) {
         console.error('Error fetching L12 documents:', error);

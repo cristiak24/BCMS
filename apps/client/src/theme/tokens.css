@@ -1,0 +1,123 @@
+/*
+ * BCMS semantic color tokens.
+ *
+ * Light mode (:root) holds the EXACT colors the app shipped with, so switching
+ * a hardcoded `#RRGGBB` to `var(--c-…)` is a no-op in light mode (zero visual
+ * regression). Dark mode (`html[data-theme="dark"]`) remaps the same tokens to
+ * a designed slate/navy palette tuned to the blue brand.
+ *
+ * Buckets:
+ *   surfaces  – page & card backgrounds (light → dark)
+ *   ink       – text (dark → light)
+ *   borders   – hairlines
+ *   brand     – primary blue/navy, split by role (surface vs foreground vs border)
+ *   status    – green / red / amber / sky / purple (kept legible on both)
+ */
+
+:root {
+  color-scheme: light;
+
+  /* ── Surfaces ─────────────────────────────── */
+  --c-bg: #F5F7FB;            /* app page background */
+  --c-bg-alt: #EAF1F8;        /* alt page background (admin shell) */
+  --c-surface: #FFFFFF;       /* cards / sheets */
+  --c-surface-2: #F8FAFC;     /* subtle raised / inputs */
+  --c-surface-3: #F1F5F9;     /* muted fill */
+  --c-surface-tint: #EEF3FF;  /* bluish highlight fill */
+
+  /* ── Ink / text ───────────────────────────── */
+  --c-ink: #0E2041;           /* primary text */
+  --c-ink-strong: #07152F;    /* headings / darkest */
+  --c-ink-soft: #1E293B;      /* secondary text */
+  --c-muted: #64748B;         /* muted text */
+  --c-faint: #94A3B8;         /* faint / placeholder */
+
+  /* ── Borders ──────────────────────────────── */
+  --c-border: #E2E8F0;
+  --c-border-soft: #EEF2F9;
+  --c-border-strong: #CBD5E1;
+
+  /* ── Brand (blue / navy) ──────────────────── */
+  --c-brand-surface: #1D3E90; /* navy hero / filled brand backgrounds */
+  --c-brand-surface-deep: #0B1E3D;
+  --c-brand-fg: #1D3E90;      /* brand text / icons on light surfaces */
+  --c-brand-border: #1D3E90;
+  --c-brand-strong: #102A72;  /* deep navy accents */
+  --c-blue: #2563EB;          /* blue-600 accent */
+  --c-blue-deep: #1D4ED8;
+  --c-sky: #0EA5E9;
+  --c-purple: #635BFF;
+
+  /* ── Status ───────────────────────────────── */
+  --c-success: #10B981;
+  --c-success-fg: #047857;
+  --c-success-bg: #E6F8F1;
+  --c-danger: #DC2626;
+  --c-danger-fg: #B42318;
+  --c-danger-bg: #FBEAEA;
+  --c-warning: #F59E0B;
+  --c-warning-fg: #B45309;
+  --c-warning-bg: #FEF3C7;
+
+  /* ── On-brand text (stays light in both modes) ── */
+  --c-on-brand: #FFFFFF;
+
+  /* Dark surfaces that stay dark in BOTH modes (hero cards, dark panels). */
+  --c-surface-inverse: #0E2041;
+
+  /* Light tint used as TEXT on colored/dark surfaces (hero subtitles, labels)
+     — stays light in both modes. */
+  --c-tint-fg: #D6E6FF;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* ── Surfaces ─────────────────────────────── */
+  --c-bg: #0B1220;
+  --c-bg-alt: #0A1120;
+  --c-surface: #141E33;
+  --c-surface-2: #1B2740;
+  --c-surface-3: #202D48;
+  --c-surface-tint: #21304F;
+
+  /* ── Ink / text ───────────────────────────── */
+  --c-ink: #E9EEF7;
+  --c-ink-strong: #F3F6FC;
+  --c-ink-soft: #C6D2E6;
+  --c-muted: #95A4C0;
+  --c-faint: #6E7D9B;
+
+  /* ── Borders ──────────────────────────────── */
+  --c-border: #273450;
+  --c-border-soft: #1F2B45;
+  --c-border-strong: #384A6C;
+
+  /* ── Brand (blue / navy) ──────────────────── */
+  --c-brand-surface: #24448F;
+  --c-brand-surface-deep: #16294F;
+  --c-brand-fg: #7DA0E8;
+  --c-brand-border: #33508F;
+  --c-brand-strong: #2E4A8C;
+  --c-blue: #4F86F7;
+  --c-blue-deep: #6699FF;
+  --c-sky: #38BDF8;
+  --c-purple: #8B84FF;
+
+  /* ── Status ───────────────────────────────── */
+  --c-success: #34D399;
+  --c-success-fg: #4ADE9A;
+  --c-success-bg: #113026;
+  --c-danger: #F87171;
+  --c-danger-fg: #FCA5A5;
+  --c-danger-bg: #341A1A;
+  --c-warning: #FBBF24;
+  --c-warning-fg: #FCD34D;
+  --c-warning-bg: #33280F;
+
+  /* on-brand text stays light */
+  --c-on-brand: #FFFFFF;
+
+  --c-surface-inverse: #10192B;
+  --c-tint-fg: #CAD8F4;
+}

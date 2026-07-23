@@ -14,7 +14,7 @@ export default function ProtectedRoute({ children, roles }: ProtectedRouteProps)
   const { initializing, session } = useFirebaseAuth();
 
   if (initializing) {
-    return <LoadingScreen message="Preparing your workspace..." color="#1D3E90" />;
+    return <LoadingScreen message="Preparing your workspace..." color="var(--c-brand-fg)" />;
   }
 
   if (!session) {

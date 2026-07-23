@@ -36,7 +36,7 @@ function TeamCard({ team }: { team: TeamWithPlayers }) {
           <Text className="mt-2 text-[#64748B] font-semibold" numberOfLines={1}>{team.seasonName || 'Current season'}</Text>
         </View>
         <View className="h-14 w-14 rounded-2xl bg-[#EBF4FF] items-center justify-center">
-          <MaterialIcons name="groups" size={26} color="#0A2C93" />
+          <MaterialIcons name="groups" size={26} color="var(--c-brand-fg)" />
         </View>
       </View>
 
@@ -135,20 +135,20 @@ export default function CoachTeams() {
           </View>
 
           <Pressable onPress={() => loadData(true)} className="h-12 w-12 rounded-full bg-white border border-[#E3ECF6] items-center justify-center">
-            {refreshing ? <ActivityIndicator size="small" color="#0A2C93" /> : <MaterialIcons name="refresh" size={22} color="#0A2C93" />}
+            {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={22} color="var(--c-brand-fg)" />}
           </Pressable>
         </View>
 
         {error ? (
           <View className="mb-6 rounded-[24px] border border-red-100 bg-white px-5 py-4 flex-row items-center gap-3">
-            <MaterialIcons name="error-outline" size={22} color="#DC2626" />
+            <MaterialIcons name="error-outline" size={22} color="var(--c-danger)" />
             <Text className="flex-1 text-red-600 font-bold">{error}</Text>
           </View>
         ) : null}
 
         {loading ? (
           <View className="py-16 items-center justify-center">
-            <ActivityIndicator size="large" color="#0A2C93" />
+            <ActivityIndicator size="large" color="var(--c-brand-fg)" />
           </View>
         ) : visibleTeams.length ? (
           <View className="flex-row flex-wrap gap-6">
@@ -156,7 +156,7 @@ export default function CoachTeams() {
           </View>
         ) : (
           <View className="rounded-[30px] border border-[#E3ECF6] bg-white px-6 py-12 items-center">
-            <MaterialIcons name="groups" size={34} color="#8EA1B8" />
+            <MaterialIcons name="groups" size={34} color="var(--c-faint)" />
             <Text className="text-[#64748B] font-bold text-center mt-3">No teams available for this coach account.</Text>
           </View>
         )}

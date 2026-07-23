@@ -43,7 +43,7 @@ export default function RegistrationModal({ visible, email, clubName, onSubmit }
             </Text>
           </View>
           <View className="w-12 h-12 rounded-2xl bg-[#E7EEFF] items-center justify-center">
-            <MaterialIcons name="assignment-ind" size={24} color="#173AA8" />
+            <MaterialIcons name="assignment-ind" size={24} color="var(--c-brand-fg)" />
           </View>
         </View>
 
@@ -51,9 +51,9 @@ export default function RegistrationModal({ visible, email, clubName, onSubmit }
         <Text className="text-[#102A72] font-semibold mt-1">{email}</Text>
 
         <View className="gap-3 mt-5">
-          <TextInput value={firstName} onChangeText={setFirstName} placeholder="First name" className="rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72]" placeholderTextColor="#9AA7C2" />
-          <TextInput value={lastName} onChangeText={setLastName} placeholder="Last name" className="rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72]" placeholderTextColor="#9AA7C2" />
-          <TextInput value={phone} onChangeText={setPhone} placeholder="Phone number (optional)" className="rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72]" placeholderTextColor="#9AA7C2" />
+          <TextInput value={firstName} onChangeText={setFirstName} placeholder="First name" className="rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72]" placeholderTextColor="var(--c-faint)" />
+          <TextInput value={lastName} onChangeText={setLastName} placeholder="Last name" className="rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72]" placeholderTextColor="var(--c-faint)" />
+          <TextInput value={phone} onChangeText={setPhone} placeholder="Phone number (optional)" className="rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72]" placeholderTextColor="var(--c-faint)" />
         </View>
 
         <Pressable onPress={handleSubmit} disabled={loading} className="mt-5 rounded-2xl bg-[#173AA8] py-4 items-center justify-center shadow-lg shadow-blue-900/20">

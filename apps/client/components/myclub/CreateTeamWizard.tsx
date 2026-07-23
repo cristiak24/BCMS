@@ -180,7 +180,7 @@ export default function CreateTeamWizard({
                 <View className="flex-row items-center justify-between px-6 pt-6 pb-1">
                     <Text className="text-[18px] font-black text-[#0E2041]">Creează echipă</Text>
                     <Pressable onPress={onClose} disabled={creating} className="w-9 h-9 rounded-full bg-[#F8FAFC] items-center justify-center border border-gray-100">
-                        <X size={16} color="#64748B" />
+                        <X size={16} color="var(--c-muted)" />
                     </Pressable>
                 </View>
 
@@ -201,7 +201,7 @@ export default function CreateTeamWizard({
                                 className={`flex-1 rounded-[18px] p-4 border-2 items-start ${source === 'frb' ? 'border-[#1D3E90] bg-[#F4F8FD]' : 'border-[#E2E8F0] bg-white'}`}
                             >
                                 <View className="w-9 h-9 rounded-[10px] bg-[#EBF1FF] items-center justify-center mb-3">
-                                    <RefreshCw size={16} color="#1D3E90" />
+                                    <RefreshCw size={16} color="var(--c-brand-fg)" />
                                 </View>
                                 <Text className="text-[13.5px] font-black text-[#0E2041] mb-1">Import din FRB</Text>
                                 <Text className="text-[11.5px] font-semibold text-[#64748B] leading-relaxed text-left">Preia echipa oficială direct din sistemul federației.</Text>
@@ -211,7 +211,7 @@ export default function CreateTeamWizard({
                                 className={`flex-1 rounded-[18px] p-4 border-2 items-start ${source === 'manual' ? 'border-[#1D3E90] bg-[#F4F8FD]' : 'border-[#E2E8F0] bg-white'}`}
                             >
                                 <View className="w-9 h-9 rounded-[10px] bg-[#E6F8F1] items-center justify-center mb-3">
-                                    <Plus size={16} color="#0B7A55" />
+                                    <Plus size={16} color="var(--c-success-fg)" />
                                 </View>
                                 <Text className="text-[13.5px] font-black text-[#0E2041] mb-1">Creare manuală</Text>
                                 <Text className="text-[11.5px] font-semibold text-[#64748B] leading-relaxed text-left">Definești echipa și alegi jucătorii din baza de date a clubului.</Text>
@@ -307,16 +307,16 @@ export default function CreateTeamWizard({
                         <View className="gap-3.5">
                             <View>
                                 <Text className="text-[10px] font-black text-[#1D3E90] uppercase tracking-widest mb-1.5 ml-1">Nume echipă</Text>
-                                <TextInput value={customName} onChangeText={setCustomName} placeholder="Ex: Municipal U16 Masculin" placeholderTextColor="#94A3B8" className="w-full h-[48px] rounded-[14px] border border-gray-200 px-4 text-[14px] font-bold text-[#0E2041] bg-[#F8FAFC]" />
+                                <TextInput value={customName} onChangeText={setCustomName} placeholder="Ex: Municipal U16 Masculin" placeholderTextColor="var(--c-faint)" className="w-full h-[48px] rounded-[14px] border border-gray-200 px-4 text-[14px] font-bold text-[#0E2041] bg-[#F8FAFC]" />
                             </View>
                             <View className="flex-row gap-3">
                                 <View className="flex-1">
                                     <Text className="text-[10px] font-black text-[#1D3E90] uppercase tracking-widest mb-1.5 ml-1">Categorie</Text>
-                                    <TextInput value={customCategory} onChangeText={setCustomCategory} placeholder="Ex: Junior League" placeholderTextColor="#94A3B8" className="w-full h-[48px] rounded-[14px] border border-gray-200 px-4 text-[14px] font-bold text-[#0E2041] bg-[#F8FAFC]" />
+                                    <TextInput value={customCategory} onChangeText={setCustomCategory} placeholder="Ex: Junior League" placeholderTextColor="var(--c-faint)" className="w-full h-[48px] rounded-[14px] border border-gray-200 px-4 text-[14px] font-bold text-[#0E2041] bg-[#F8FAFC]" />
                                 </View>
                                 <View className="flex-1">
                                     <Text className="text-[10px] font-black text-[#1D3E90] uppercase tracking-widest mb-1.5 ml-1">Sezon</Text>
-                                    <TextInput value={customSeason} onChangeText={setCustomSeason} placeholder="2025-2026" placeholderTextColor="#94A3B8" className="w-full h-[48px] rounded-[14px] border border-gray-200 px-4 text-[14px] font-bold text-[#0E2041] bg-[#F8FAFC]" />
+                                    <TextInput value={customSeason} onChangeText={setCustomSeason} placeholder="2025-2026" placeholderTextColor="var(--c-faint)" className="w-full h-[48px] rounded-[14px] border border-gray-200 px-4 text-[14px] font-bold text-[#0E2041] bg-[#F8FAFC]" />
                                 </View>
                             </View>
                             <View className="flex-row gap-3">
@@ -355,13 +355,13 @@ export default function CreateTeamWizard({
                             <Text className="text-[12px] font-semibold text-[#64748B]">Selectează jucători existenți din baza de date a clubului. Poți adăuga alții mai târziu, din pagina echipei.</Text>
                             <View className="relative">
                                 <View className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                    <Search size={14} color="#94A3B8" />
+                                    <Search size={14} color="var(--c-faint)" />
                                 </View>
                                 <TextInput
                                     value={playerQuery}
                                     onChangeText={setPlayerQuery}
                                     placeholder="Caută după nume"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholderTextColor="var(--c-faint)"
                                     className="w-full h-[44px] rounded-[14px] border border-gray-200 pl-9 pr-3 text-[13px] font-bold text-[#0E2041] bg-[#F8FAFC]"
                                 />
                             </View>
@@ -372,7 +372,7 @@ export default function CreateTeamWizard({
                                         <View key={p.id} className="flex-row items-center gap-1.5 pl-3 pr-1.5 py-1 rounded-full bg-[#EBF1FF]">
                                             <Text className="text-[11.5px] font-bold text-[#1D3E90]">{p.firstName} {p.lastName}</Text>
                                             <Pressable onPress={() => setSelectedPlayers((prev) => prev.filter((sp) => sp.id !== p.id))} className="w-5 h-5 rounded-full items-center justify-center hover:bg-white/60">
-                                                <X size={11} color="#1D3E90" />
+                                                <X size={11} color="var(--c-brand-fg)" />
                                             </Pressable>
                                         </View>
                                     ))}
@@ -380,7 +380,7 @@ export default function CreateTeamWizard({
                             )}
 
                             <View className="max-h-[160px] overflow-y-auto gap-1.5">
-                                {searchingPlayers && <ActivityIndicator size="small" color="#1D3E90" />}
+                                {searchingPlayers && <ActivityIndicator size="small" color="var(--c-brand-fg)" />}
                                 {!searchingPlayers && playerQuery.trim().length >= 2 && playerResults.length === 0 && (
                                     <Text className="text-[12px] font-semibold text-[#94A3B8]">Niciun jucător găsit.</Text>
                                 )}
@@ -391,7 +391,7 @@ export default function CreateTeamWizard({
                                         className="flex-row items-center justify-between px-3.5 py-2.5 rounded-[12px] bg-[#F8FAFC] border border-[#F1F5F9] hover:bg-[#F1F5F9]"
                                     >
                                         <Text className="text-[13px] font-bold text-[#0E2041]">{p.firstName} {p.lastName}</Text>
-                                        <Plus size={14} color="#1D3E90" />
+                                        <Plus size={14} color="var(--c-brand-fg)" />
                                     </Pressable>
                                 ))}
                             </View>

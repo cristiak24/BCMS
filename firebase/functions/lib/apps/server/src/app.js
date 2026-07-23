@@ -94,8 +94,12 @@ function createAllowedOrigins() {
         .map(normalizeAllowedOrigin)
         .filter((value) => Boolean(value));
     const developmentOrigins = [
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
         'http://localhost:8081',
         'http://127.0.0.1:8081',
+        'http://localhost:8091',
+        'http://127.0.0.1:8091',
         'http://localhost:19006',
         'http://127.0.0.1:19006',
         'http://localhost:3000',
@@ -125,7 +129,10 @@ function createServerApp() {
             try {
                 const parsedOrigin = new URL(origin);
                 const hostname = parsedOrigin.hostname.toLowerCase();
-                const trustedHostname = hostname === 'bcms.ro' ||
+                const isLocalDevelopment = process.env.NODE_ENV !== 'production' &&
+                    ['localhost', '127.0.0.1', '::1'].includes(hostname);
+                const trustedHostname = isLocalDevelopment ||
+                    hostname === 'bcms.ro' ||
                     hostname === 'www.bcms.ro' ||
                     hostname.endsWith('.web.app') ||
                     hostname.endsWith('.firebaseapp.com');
@@ -145,9 +152,10 @@ function createServerApp() {
     }));
     app.post('/api/finance/stripe/webhook', express_1.default.raw({ type: 'application/json' }), finance_1.stripeWebhookHandler);
     app.use(express_1.default.json());
-    console.log('Registering routes...');
     app.use((req, res, next) => {
-        console.log(`[Request] ${req.method} ${req.path}`);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`[Request] ${req.method} ${req.path}`);
+        }
         next();
     });
     app.use('/api/finance', finance_1.default);
@@ -167,9 +175,15 @@ function createServerApp() {
     app.use('/api/events', eventRoutes_1.default);
     app.use('/api/documents', documents_1.default);
     app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../uploads')));
-    console.log('Routes registered.');
     app.get('/', (_req, res) => {
         res.send('BCMS API is running');
+    });
+    app.use('/api', (_req, res) => {
+        res.status(404).json({ success: false, error: 'API route not found.' });
+    });
+    app.use((error, _req, res, _next) => {
+        console.error('[Unhandled API error]', error);
+        res.status(500).json({ success: false, error: 'Internal server error.' });
     });
     return app;
 }

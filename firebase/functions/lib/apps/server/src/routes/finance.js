@@ -18,10 +18,19 @@ const drizzle_orm_1 = require("drizzle-orm");
 const router = (0, express_1.Router)();
 const DEFAULT_STRIPE_PUBLISHABLE_KEY = 'pk_test_51TP7NnCFpLYWSHx5i7EAuPRWUXgoP0lxHFIqDIGvyQOpNIbu4VOg2IMg7H8LW5HgTslJVudDxe3xnGXgRIubcVbA00swDdrRS0';
 const DEFAULT_PAYMENT_CURRENCY = (process.env.STRIPE_CURRENCY || 'ron').trim().toLowerCase();
+const FINANCE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const ALLOWED_FINANCE_UPLOAD_MIME_TYPES = new Set([
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+]);
+const ALLOWED_FINANCE_UPLOAD_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.webp']);
 const ZERO_DECIMAL_CURRENCIES = new Set([
     'bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga',
     'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf',
 ]);
+const DEFAULT_PAYMENT_DUE_DAY = 25;
 let stripeClient = null;
 function chunkArray(items, size) {
     const chunks = [];
@@ -206,6 +215,16 @@ function normalizeMoneyValue(value) {
     const amount = Number(value);
     return Number.isFinite(amount) && amount >= 0 ? amount : null;
 }
+// Day-of-month (1..31) by which the monthly fee can be paid. Returns null for
+// invalid input so callers can reject it; use resolveDueDay() to read a stored
+// value with the default fallback.
+function normalizeDueDay(value) {
+    const day = Math.trunc(Number(value));
+    return Number.isFinite(day) && day >= 1 && day <= 31 ? day : null;
+}
+function resolveDueDay(value) {
+    return normalizeDueDay(value) ?? DEFAULT_PAYMENT_DUE_DAY;
+}
 async function getPlayerClubId(player) {
     const directClubId = Number(player.clubId);
     if (Number.isFinite(directClubId) && directClubId > 0) {
@@ -278,6 +297,7 @@ async function seedSettingsData(clubId) {
         trainingLevy: normalizeMoneyValue(legacy?.trainingLevy) ?? 0,
         facilityFee: normalizeMoneyValue(legacy?.facilityFee) ?? 0,
         autoAdjust: Number(legacy?.autoAdjust ?? 1) ? 1 : 0,
+        paymentDueDay: resolveDueDay(legacy?.paymentDueDay),
         updatedAt: new Date(),
     };
 }
@@ -317,6 +337,7 @@ async function getSettingsData(clubId) {
             trainingLevy: existing.trainingLevy,
             facilityFee: existing.facilityFee,
             autoAdjust: existing.autoAdjust,
+            paymentDueDay: resolveDueDay(existing.paymentDueDay),
             updatedAt: existing.updatedAt,
         };
     }
@@ -337,6 +358,7 @@ async function getSettingsData(clubId) {
         trainingLevy: inserted[0].trainingLevy,
         facilityFee: inserted[0].facilityFee,
         autoAdjust: inserted[0].autoAdjust,
+        paymentDueDay: resolveDueDay(inserted[0].paymentDueDay),
         updatedAt: inserted[0].updatedAt,
     };
 }
@@ -549,7 +571,9 @@ async function buildPlayerFees(player, paymentRows, currency) {
                 amount: monthlyPlayerFee,
                 currency,
                 status: 'upcoming',
-                dueDate: new Date(currentYear, currentMonth - 1, 28).toISOString(),
+                // The monthly fee can be paid until the configured due day of the
+                // following month (e.g. due day 25 → July's fee is due Aug 25).
+                dueDate: new Date(currentYear, currentMonth, resolveDueDay(settings.paymentDueDay)).toISOString(),
                 icon: 'training',
             });
         }
@@ -600,13 +624,16 @@ function buildTransactions(paymentRows, currency) {
         receiptUrl: data.receiptUrl ?? null,
     }));
 }
-async function buildAdminRecentPayments(clubId, limit = 12) {
-    const teamRows = clubId == null
+async function buildAdminRecentPayments(clubId, limit = 12, teamId = null) {
+    const allTeamRows = clubId == null
         ? await db_1.db.select({ id: schema_1.teams.id, name: schema_1.teams.name }).from(schema_1.teams)
         : await db_1.db.select({ id: schema_1.teams.id, name: schema_1.teams.name }).from(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.clubId, clubId));
+    // When scoped to a single team, restrict every downstream lookup to it so the
+    // report only contains that team's players' payments.
+    const teamRows = teamId != null ? allTeamRows.filter((team) => team.id === teamId) : allTeamRows;
     const teamNameById = new Map(teamRows.map((team) => [team.id, team.name]));
     const teamIds = teamRows.map((team) => team.id);
-    const directPlayers = clubId == null
+    const directPlayers = clubId == null && teamId == null
         ? await db_1.db.select().from(schema_1.players)
         : teamIds.length
             ? await db_1.db.select().from(schema_1.players).where((0, drizzle_orm_1.inArray)(schema_1.players.teamId, teamIds))
@@ -618,7 +645,9 @@ async function buildAdminRecentPayments(clubId, limit = 12) {
             .innerJoin(schema_1.players, (0, drizzle_orm_1.eq)(schema_1.playersToTeams.playerId, schema_1.players.id))
             .where((0, drizzle_orm_1.inArray)(schema_1.playersToTeams.teamId, teamIds))
         : [];
-    const clubUserRows = clubId == null
+    // Club-wide fallback players (users without an explicit team) don't belong to
+    // a single team, so skip them entirely when the report is team-scoped.
+    const clubUserRows = clubId == null || teamId != null
         ? []
         : await db_1.db
             .select({ email: schema_1.users.email })
@@ -1102,21 +1131,52 @@ const storage = multer_1.default.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadDir),
     filename: (_req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path_1.default.extname(file.originalname));
+        cb(null, file.fieldname + '-' + uniqueSuffix + path_1.default.extname(file.originalname).toLowerCase());
     }
 });
-const upload = (0, multer_1.default)({ storage });
-router.get('/documents', async (_req, res) => {
+const upload = (0, multer_1.default)({
+    storage,
+    limits: { fileSize: FINANCE_UPLOAD_MAX_BYTES, files: 1 },
+    fileFilter: (_req, file, cb) => {
+        const extension = path_1.default.extname(file.originalname).toLowerCase();
+        if (!ALLOWED_FINANCE_UPLOAD_MIME_TYPES.has(file.mimetype) || !ALLOWED_FINANCE_UPLOAD_EXTENSIONS.has(extension)) {
+            cb(new Error('Only PDF, JPG, PNG or WebP files up to 10MB are allowed.'));
+            return;
+        }
+        cb(null, true);
+    },
+});
+router.get('/documents', async (req, res) => {
     try {
-        const snap = await firebaseAdmin_1.firestore.collection('financialDocuments').orderBy('date', 'desc').get();
-        const docs = snap.docs.map((docSnap) => {
-            const data = docSnap.data();
-            return {
-                ...data,
-                date: (0, firebaseAdmin_1.toIso)(data.date) ?? new Date().toISOString(),
-            };
-        });
-        res.json(docs);
+        const clubId = await resolveAdminFinanceClubId(req, res);
+        if (clubId === null && res.headersSent) {
+            return;
+        }
+        try {
+            let query = firebaseAdmin_1.firestore.collection('financialDocuments');
+            if (clubId !== null) {
+                query = query.where('clubId', '==', clubId);
+            }
+            const snap = await query.orderBy('date', 'desc').get();
+            const docs = snap.docs.map((docSnap) => {
+                const data = docSnap.data();
+                return {
+                    ...data,
+                    date: (0, firebaseAdmin_1.toIso)(data.date) ?? new Date().toISOString(),
+                };
+            });
+            res.json(docs);
+        }
+        catch (firestoreError) {
+            console.error('[GET /api/finance/documents] Firestore fallback:', firestoreError);
+            const docs = clubId !== null
+                ? await db_1.db.select().from(schema_1.financialDocuments).where((0, drizzle_orm_1.eq)(schema_1.financialDocuments.clubId, clubId)).orderBy((0, drizzle_orm_1.desc)(schema_1.financialDocuments.date))
+                : await db_1.db.select().from(schema_1.financialDocuments).orderBy((0, drizzle_orm_1.desc)(schema_1.financialDocuments.date));
+            res.json(docs.map((doc) => ({
+                ...doc,
+                date: (0, firebaseAdmin_1.toIso)(doc.date) ?? new Date().toISOString(),
+            })));
+        }
     }
     catch (error) {
         console.error(error);
@@ -1124,6 +1184,10 @@ router.get('/documents', async (_req, res) => {
     }
 });
 router.patch('/documents/:id/status', async (req, res) => {
+    const clubId = await resolveAdminFinanceClubId(req, res);
+    if (clubId === null && res.headersSent) {
+        return;
+    }
     const id = Number(req.params.id);
     const { status } = req.body;
     if (!status || !['pending', 'processed', 'rejected'].includes(status)) {
@@ -1131,50 +1195,120 @@ router.patch('/documents/:id/status', async (req, res) => {
         return;
     }
     try {
-        const snap = await firebaseAdmin_1.firestore.collection('financialDocuments').where('id', '==', id).limit(1).get();
-        const docSnap = snap.docs[0];
-        if (!docSnap) {
-            res.status(404).json({ error: 'Document not found' });
-            return;
+        try {
+            const snap = await firebaseAdmin_1.firestore.collection('financialDocuments').where('id', '==', id).limit(1).get();
+            const docSnap = snap.docs[0];
+            if (!docSnap) {
+                res.status(404).json({ error: 'Document not found' });
+                return;
+            }
+            const existing = docSnap.data();
+            if (clubId !== null && existing.clubId != null && Number(existing.clubId) !== clubId) {
+                res.status(403).json({ error: 'This document belongs to a different club.' });
+                return;
+            }
+            await docSnap.ref.set({ status }, { merge: true });
+            const updated = await docSnap.ref.get();
+            res.json({
+                ...updated.data(),
+                date: (0, firebaseAdmin_1.toIso)(updated.data().date) ?? null,
+            });
         }
-        await docSnap.ref.set({ status }, { merge: true });
-        const updated = await docSnap.ref.get();
-        res.json({
-            ...updated.data(),
-            date: (0, firebaseAdmin_1.toIso)(updated.data().date) ?? null,
-        });
+        catch (firestoreError) {
+            console.error('[PATCH /api/finance/documents/:id/status] Firestore fallback:', firestoreError);
+            const existingRows = await db_1.db.select().from(schema_1.financialDocuments).where((0, drizzle_orm_1.eq)(schema_1.financialDocuments.id, id)).limit(1);
+            const existing = existingRows[0];
+            if (!existing) {
+                res.status(404).json({ error: 'Document not found' });
+                return;
+            }
+            if (clubId !== null && existing.clubId != null && Number(existing.clubId) !== clubId) {
+                res.status(403).json({ error: 'This document belongs to a different club.' });
+                return;
+            }
+            const updatedRows = await db_1.db
+                .update(schema_1.financialDocuments)
+                .set({ status: status })
+                .where((0, drizzle_orm_1.eq)(schema_1.financialDocuments.id, id))
+                .returning();
+            const updated = updatedRows[0];
+            if (!updated) {
+                res.status(404).json({ error: 'Document not found' });
+                return;
+            }
+            res.json({
+                ...updated,
+                date: (0, firebaseAdmin_1.toIso)(updated.date) ?? null,
+            });
+        }
     }
     catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to update document status' });
     }
 });
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', (req, res, next) => {
+    upload.single('file')(req, res, (error) => {
+        if (error) {
+            return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid document upload.' });
+        }
+        next();
+    });
+}, async (req, res) => {
     try {
+        const clubId = await resolveAdminFinanceClubId(req, res);
+        if (clubId === null && res.headersSent) {
+            if (req.file) {
+                fs_1.default.unlink(req.file.path, () => { });
+            }
+            return;
+        }
         if (!req.file) {
             res.status(400).json({ error: 'No file uploaded' });
             return;
         }
         const { type, amount, description } = req.body;
+        const parsedAmount = normalizeMoneyValue(amount);
         const documentUrl = `/uploads/${req.file.filename}`;
-        const id = await (0, firebaseAdmin_1.nextNumericId)('financialDocuments');
         const record = {
-            id,
             type: type || 'expense',
-            amount: amount ? parseInt(amount, 10) : 0,
+            amount: parsedAmount != null ? Math.round(parsedAmount) : 0,
             description: description || 'New Document',
             documentUrl,
             status: 'pending',
             date: new Date(),
+            clubId: clubId ?? null,
         };
-        await firebaseAdmin_1.firestore.collection('financialDocuments').doc(String(id)).set(record);
-        res.json({
-            ...record,
-            date: new Date().toISOString(),
-        });
+        try {
+            const id = await (0, firebaseAdmin_1.nextNumericId)('financialDocuments');
+            await firebaseAdmin_1.firestore.collection('financialDocuments').doc(String(id)).set({ id, ...record });
+            res.json({
+                id,
+                ...record,
+                date: new Date().toISOString(),
+            });
+        }
+        catch (firestoreError) {
+            console.error('[POST /api/finance/upload] Firestore fallback:', firestoreError);
+            const inserted = await db_1.db.insert(schema_1.financialDocuments).values({
+                type: String(record.type),
+                amount: record.amount,
+                description: String(record.description),
+                documentUrl,
+                status: 'pending',
+                clubId: record.clubId,
+            }).returning();
+            res.json({
+                ...inserted[0],
+                date: (0, firebaseAdmin_1.toIso)(inserted[0].date) ?? new Date().toISOString(),
+            });
+        }
     }
     catch (error) {
         console.error('[POST /api/finance/upload] error:', error);
+        if (req.file) {
+            fs_1.default.unlink(req.file.path, () => { });
+        }
         res.status(500).json({ error: 'Failed to upload document' });
     }
 });
@@ -1242,10 +1376,84 @@ router.get('/admin/recent-payments', async (req, res) => {
         const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
             ? Math.min(Math.floor(parsedLimit), 50)
             : 12;
-        res.json(await buildAdminRecentPayments(clubId, limit));
+        const parsedTeamId = Number(req.query?.teamId);
+        const teamId = Number.isFinite(parsedTeamId) && parsedTeamId > 0 ? parsedTeamId : null;
+        res.json(await buildAdminRecentPayments(clubId, limit, teamId));
     }
     catch (error) {
         handleRouteError(res, error, '[GET /api/finance/admin/recent-payments]');
+    }
+});
+// Record a payment made outside Stripe (e.g. a player paying cash) so it shows
+// up in the team payment report alongside online payments.
+router.post('/admin/manual-payment', async (req, res) => {
+    try {
+        const clubId = await resolveAdminFinanceClubId(req, res);
+        if (clubId === null && res.headersSent) {
+            return;
+        }
+        const body = req.body;
+        const playerId = Number(body.playerId);
+        const amount = Number(body.amount);
+        if (!Number.isFinite(playerId) || playerId <= 0) {
+            res.status(400).json({ error: 'Jucătorul selectat este invalid.' });
+            return;
+        }
+        if (!Number.isFinite(amount) || amount <= 0) {
+            res.status(400).json({ error: 'Suma trebuie să fie un număr mai mare ca 0.' });
+            return;
+        }
+        const player = await getPlayerByNumericId(playerId);
+        if (!player) {
+            res.status(404).json({ error: 'Jucătorul nu a fost găsit.' });
+            return;
+        }
+        const method = (String(body.method ?? 'cash').trim().toLowerCase()) || 'cash';
+        const description = typeof body.description === 'string' && body.description.trim()
+            ? body.description.trim()
+            : 'Plată numerar';
+        const when = body.date ? ((0, firebaseAdmin_1.toDate)(body.date) ?? new Date()) : new Date();
+        const currency = DEFAULT_PAYMENT_CURRENCY;
+        try {
+            const id = await (0, firebaseAdmin_1.nextNumericId)('playerPayments');
+            const record = {
+                id,
+                playerId,
+                amount: Math.round(amount),
+                month: when.getMonth() + 1,
+                year: when.getFullYear(),
+                status: 'paid',
+                date: when,
+                createdAt: when,
+                description,
+                provider: method,
+                currency,
+                receiptUrl: null,
+            };
+            await firebaseAdmin_1.firestore.collection('playerPayments').doc(String(id)).set(record);
+            res.json({ success: true, payment: record });
+        }
+        catch (firestoreError) {
+            if (!isFirestoreNotFound(firestoreError)) {
+                console.error('[POST /api/finance/admin/manual-payment] Firestore fallback:', firestoreError);
+            }
+            const inserted = await db_1.db
+                .insert(schema_1.playerPayments)
+                .values({
+                playerId,
+                amount: Math.round(amount),
+                month: when.getMonth() + 1,
+                year: when.getFullYear(),
+                status: 'paid',
+                date: when.toISOString(),
+                createdAt: when.toISOString(),
+            })
+                .returning();
+            res.json({ success: true, payment: inserted[0] });
+        }
+    }
+    catch (error) {
+        handleRouteError(res, error, '[POST /api/finance/admin/manual-payment]');
     }
 });
 router.post('/player/checkout-session', async (req, res) => {
@@ -1407,6 +1615,7 @@ router.get('/settings', async (req, res) => {
             trainingLevy: normalizeMoneyValue(data.trainingLevy) ?? 0,
             facilityFee: normalizeMoneyValue(data.facilityFee) ?? 0,
             autoAdjust: Number(data.autoAdjust ?? 1) ? 1 : 0,
+            paymentDueDay: resolveDueDay(data.paymentDueDay),
             updatedAt: (0, firebaseAdmin_1.toIso)(data.updatedAt) ?? new Date().toISOString(),
         });
     }
@@ -1421,12 +1630,20 @@ router.patch('/settings', async (req, res) => {
         if (clubId === null && res.headersSent) {
             return;
         }
-        const { monthlyPlayerFee, trainingLevy, facilityFee, autoAdjust } = req.body;
+        const { monthlyPlayerFee, trainingLevy, facilityFee, autoAdjust, paymentDueDay } = req.body;
         const updates = {
             id: clubId ?? 1,
             clubId: clubId ?? null,
             updatedAt: new Date(),
         };
+        if (paymentDueDay !== undefined) {
+            const day = normalizeDueDay(paymentDueDay);
+            if (day == null) {
+                res.status(400).json({ error: 'paymentDueDay must be a day between 1 and 31.' });
+                return;
+            }
+            updates.paymentDueDay = day;
+        }
         if (monthlyPlayerFee !== undefined) {
             const amount = normalizeMoneyValue(monthlyPlayerFee);
             if (amount == null) {
@@ -1466,6 +1683,7 @@ router.patch('/settings', async (req, res) => {
                 trainingLevy: normalizeMoneyValue(data.trainingLevy) ?? 0,
                 facilityFee: normalizeMoneyValue(data.facilityFee) ?? 0,
                 autoAdjust: Number(data.autoAdjust ?? 1) ? 1 : 0,
+                paymentDueDay: resolveDueDay(data.paymentDueDay),
                 updatedAt: (0, firebaseAdmin_1.toIso)(data.updatedAt) ?? new Date().toISOString(),
             });
             return;
@@ -1480,6 +1698,7 @@ router.patch('/settings', async (req, res) => {
             ...(updates.trainingLevy !== undefined ? { trainingLevy: Number(updates.trainingLevy) } : {}),
             ...(updates.facilityFee !== undefined ? { facilityFee: Number(updates.facilityFee) } : {}),
             ...(updates.autoAdjust !== undefined ? { autoAdjust: Number(updates.autoAdjust) } : {}),
+            ...(updates.paymentDueDay !== undefined ? { paymentDueDay: Number(updates.paymentDueDay) } : {}),
             updatedAt: new Date().toISOString(),
         };
         const existingRows = await db_1.db.select().from(schema_1.financialSettings).where((0, drizzle_orm_1.eq)(schema_1.financialSettings.id, 1)).limit(1);
@@ -1490,6 +1709,7 @@ router.patch('/settings', async (req, res) => {
                 trainingLevy: Number(updates.trainingLevy ?? 0),
                 facilityFee: Number(updates.facilityFee ?? 0),
                 autoAdjust: Number(updates.autoAdjust ?? 1),
+                paymentDueDay: Number(updates.paymentDueDay ?? DEFAULT_PAYMENT_DUE_DAY),
                 updatedAt: new Date().toISOString(),
             }).returning())[0];
         res.json({
@@ -1498,6 +1718,7 @@ router.patch('/settings', async (req, res) => {
             trainingLevy: normalizeMoneyValue(data.trainingLevy) ?? 0,
             facilityFee: normalizeMoneyValue(data.facilityFee) ?? 0,
             autoAdjust: Number(data.autoAdjust ?? 1) ? 1 : 0,
+            paymentDueDay: resolveDueDay(data.paymentDueDay),
             updatedAt: (0, firebaseAdmin_1.toIso)(data.updatedAt) ?? new Date().toISOString(),
         });
     }

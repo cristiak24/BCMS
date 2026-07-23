@@ -16,6 +16,9 @@ type NotificationPreferences = {
 };
 
 const router = Router();
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+const ALLOWED_AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_AVATAR_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
 const uploadDir = path.join(__dirname, '../../uploads/avatars');
 if (!fs.existsSync(uploadDir)) {
@@ -26,11 +29,24 @@ const storage = multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadDir),
     filename: (_req, file, cb) => {
         const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        cb(null, `${file.fieldname}-${uniqueSuffix}${path.extname(file.originalname)}`);
+        const extension = path.extname(file.originalname).toLowerCase();
+        cb(null, `${file.fieldname}-${uniqueSuffix}${extension}`);
     },
 });
 
-const upload = multer({ storage });
+const upload = multer({
+    storage,
+    limits: { fileSize: AVATAR_MAX_BYTES, files: 1 },
+    fileFilter: (_req, file, cb) => {
+        const extension = path.extname(file.originalname).toLowerCase();
+        if (!ALLOWED_AVATAR_MIME_TYPES.has(file.mimetype) || !ALLOWED_AVATAR_EXTENSIONS.has(extension)) {
+            cb(new Error('Only JPG, PNG or WebP images up to 2MB are allowed.'));
+            return;
+        }
+
+        cb(null, true);
+    },
+});
 
 async function findUserByNumericId(userId: number) {
     const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
@@ -209,7 +225,15 @@ router.post('/me/password', async (_req, res) => {
     });
 });
 
-router.post('/me/avatar', upload.single('image'), async (req, res) => {
+router.post('/me/avatar', (req, res, next) => {
+    upload.single('image')(req, res, (error) => {
+        if (error) {
+            return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid avatar upload.' });
+        }
+
+        next();
+    });
+}, async (req, res) => {
     try {
         const requestUser = await getRequestUser(req);
 

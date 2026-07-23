@@ -11,10 +11,21 @@ const schema_1 = require("../db/schema");
 const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 router.use(auth_1.authenticate);
+const TEAM_GENDERS = ['M', 'F'];
+const TEAM_LEVELS = ['national', 'municipal', 'initiere'];
+function isAttendancePresent(status) {
+    const normalized = (status || '').trim().toLowerCase();
+    return normalized === 'present' || normalized === 'late' || normalized === 'medical' || normalized === 'excused';
+}
+function isPaidStatus(status) {
+    const normalized = (status || '').trim().toLowerCase();
+    return normalized === 'paid' || normalized === 'processed' || normalized === 'succeeded' || normalized === 'success';
+}
 function mapTeam(team) {
     return {
         ...team,
         createdAt: team.createdAt ?? new Date().toISOString(),
+        updatedAt: team.updatedAt ?? team.createdAt ?? new Date().toISOString(),
     };
 }
 function getRequestClubId(req) {
@@ -115,11 +126,82 @@ router.get('/', async (req, res) => {
                 .from(schema_1.teams)
                 .where((0, drizzle_orm_1.eq)(schema_1.teams.clubId, getRequestClubId(req) ?? -1))
                 .orderBy((0, drizzle_orm_1.asc)(schema_1.teams.createdAt));
-        res.json(rows.map(mapTeam));
+        const teamIds = rows.map((team) => team.id);
+        const coachIds = Array.from(new Set(rows.map((team) => team.coachId).filter((id) => id != null)));
+        const [directPlayers, relationRows, coachRows] = await Promise.all([
+            teamIds.length
+                ? db_1.db.select({ id: schema_1.players.id, teamId: schema_1.players.teamId, medicalCheckExpiry: schema_1.players.medicalCheckExpiry }).from(schema_1.players).where((0, drizzle_orm_1.inArray)(schema_1.players.teamId, teamIds))
+                : Promise.resolve([]),
+            teamIds.length
+                ? db_1.db
+                    .select({ teamId: schema_1.playersToTeams.teamId, playerId: schema_1.playersToTeams.playerId, medicalCheckExpiry: schema_1.players.medicalCheckExpiry })
+                    .from(schema_1.playersToTeams)
+                    .innerJoin(schema_1.players, (0, drizzle_orm_1.eq)(schema_1.playersToTeams.playerId, schema_1.players.id))
+                    .where((0, drizzle_orm_1.inArray)(schema_1.playersToTeams.teamId, teamIds))
+                : Promise.resolve([]),
+            coachIds.length
+                ? db_1.db.select({ id: schema_1.users.id, name: schema_1.users.name }).from(schema_1.users).where((0, drizzle_orm_1.inArray)(schema_1.users.id, coachIds))
+                : Promise.resolve([]),
+        ]);
+        const coachMap = new Map(coachRows.map((coach) => [coach.id, coach.name]));
+        const now = Date.now();
+        const isMedicalCheckStale = (expiry) => !expiry || new Date(expiry).getTime() < now;
+        const statsByTeam = new Map();
+        const bucketFor = (teamId) => {
+            let bucket = statsByTeam.get(teamId);
+            if (!bucket) {
+                bucket = { playerIds: new Set(), staleMedicalChecks: new Set() };
+                statsByTeam.set(teamId, bucket);
+            }
+            return bucket;
+        };
+        directPlayers.forEach((player) => {
+            if (player.teamId == null)
+                return;
+            const bucket = bucketFor(player.teamId);
+            bucket.playerIds.add(player.id);
+            if (isMedicalCheckStale(player.medicalCheckExpiry))
+                bucket.staleMedicalChecks.add(player.id);
+        });
+        relationRows.forEach((row) => {
+            const bucket = bucketFor(row.teamId);
+            bucket.playerIds.add(row.playerId);
+            if (isMedicalCheckStale(row.medicalCheckExpiry))
+                bucket.staleMedicalChecks.add(row.playerId);
+        });
+        res.json(rows.map((team) => {
+            const stats = statsByTeam.get(team.id);
+            return {
+                ...mapTeam(team),
+                coachName: team.coachId != null ? coachMap.get(team.coachId) ?? null : null,
+                playerCount: stats ? stats.playerIds.size : 0,
+                staleMedicalChecks: stats ? stats.staleMedicalChecks.size : 0,
+            };
+        }));
     }
     catch (e) {
         console.error('[GET /api/teams] error:', e);
         res.status(500).json({ error: 'Failed to fetch teams' });
+    }
+});
+router.get('/coaches', async (req, res) => {
+    try {
+        if (!req.user) {
+            res.status(401).json({ error: 'Authentication is required.' });
+            return;
+        }
+        const rows = isSuperadmin(req)
+            ? await db_1.db.select({ id: schema_1.users.id, name: schema_1.users.name }).from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.role, 'coach')).orderBy((0, drizzle_orm_1.asc)(schema_1.users.name))
+            : await db_1.db
+                .select({ id: schema_1.users.id, name: schema_1.users.name })
+                .from(schema_1.users)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.role, 'coach'), (0, drizzle_orm_1.eq)(schema_1.users.clubId, getRequestClubId(req) ?? -1)))
+                .orderBy((0, drizzle_orm_1.asc)(schema_1.users.name));
+        res.json(rows);
+    }
+    catch (e) {
+        console.error('[GET /api/teams/coaches] error:', e);
+        res.status(500).json({ error: 'Failed to fetch coaches' });
     }
 });
 router.post('/', async (req, res) => {
@@ -128,7 +210,7 @@ router.post('/', async (req, res) => {
             res.status(401).json({ error: 'Authentication is required.' });
             return;
         }
-        const { frbTeamId, name, frbLeagueId, leagueName, frbSeasonId, seasonName, isCustom } = req.body;
+        const { frbTeamId, name, frbLeagueId, leagueName, frbSeasonId, seasonName, isCustom, gender, level, coachId } = req.body;
         const normalizedName = typeof name === 'string' ? name.trim() : '';
         const normalizedLeagueName = typeof leagueName === 'string' ? leagueName.trim() : '';
         const normalizedSeasonName = typeof seasonName === 'string' ? seasonName.trim() : '';
@@ -136,8 +218,15 @@ router.post('/', async (req, res) => {
         const normalizedFrbLeagueId = typeof frbLeagueId === 'string' ? frbLeagueId.trim() : '';
         const normalizedFrbSeasonId = typeof frbSeasonId === 'string' ? frbSeasonId.trim() : '';
         const customTeam = isCustom === true;
+        const normalizedGender = TEAM_GENDERS.includes(gender) ? gender : null;
+        const normalizedLevel = TEAM_LEVELS.includes(level) ? level : null;
+        const normalizedCoachId = coachId == null || coachId === '' ? null : Number(coachId);
         if (!normalizedName || !normalizedLeagueName || !normalizedSeasonName) {
             res.status(400).json({ error: 'Missing required fields' });
+            return;
+        }
+        if (!normalizedGender) {
+            res.status(400).json({ error: 'Gender is required.' });
             return;
         }
         if (!customTeam && (!normalizedFrbTeamId || !normalizedFrbLeagueId || !normalizedFrbSeasonId)) {
@@ -165,6 +254,15 @@ router.post('/', async (req, res) => {
             res.status(409).json({ error: customTeam ? 'This custom team already exists.' : 'This team is already imported for the selected season.' });
             return;
         }
+        let coachName = null;
+        if (normalizedCoachId != null) {
+            const coachRows = await db_1.db.select({ id: schema_1.users.id, name: schema_1.users.name }).from(schema_1.users).where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, normalizedCoachId), (0, drizzle_orm_1.eq)(schema_1.users.role, 'coach'))).limit(1);
+            if (!coachRows[0]) {
+                res.status(400).json({ error: 'Selected coach was not found.' });
+                return;
+            }
+            coachName = coachRows[0].name;
+        }
         const inviteCode = await generateInviteCode();
         const inserted = await db_1.db
             .insert(schema_1.teams)
@@ -177,9 +275,12 @@ router.post('/', async (req, res) => {
             seasonName: normalizedSeasonName,
             inviteCode,
             clubId,
+            gender: normalizedGender,
+            level: normalizedLevel,
+            coachId: normalizedCoachId,
         })
             .returning();
-        res.json(mapTeam(inserted[0]));
+        res.json({ ...mapTeam(inserted[0]), coachName, playerCount: 0, staleMedicalChecks: 0 });
     }
     catch (e) {
         console.error('[POST /api/teams] error:', e);
@@ -198,11 +299,108 @@ router.get('/:id', async (req, res) => {
             res.status(access.status).json({ error: access.error });
             return;
         }
-        res.json(mapTeam(access.team));
+        const [teamPlayers, coachRow] = await Promise.all([
+            getTeamPlayersById(id),
+            access.team.coachId != null
+                ? db_1.db.select({ name: schema_1.users.name }).from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.id, access.team.coachId)).limit(1)
+                : Promise.resolve([]),
+        ]);
+        const now = Date.now();
+        const staleMedicalChecks = teamPlayers.filter((player) => !player.medicalCheckExpiry || new Date(player.medicalCheckExpiry).getTime() < now).length;
+        res.json({
+            ...mapTeam(access.team),
+            coachName: coachRow[0]?.name ?? null,
+            playerCount: teamPlayers.length,
+            staleMedicalChecks,
+        });
     }
     catch (e) {
         console.error(`[GET /api/teams/${req.params.id}] error:`, e);
         res.status(500).json({ error: 'Failed to fetch team details' });
+    }
+});
+router.get('/:id/stats', async (req, res) => {
+    try {
+        const id = parseRouteId(req.params.id);
+        if (Number.isNaN(id)) {
+            res.status(400).json({ error: 'Invalid ID' });
+            return;
+        }
+        const access = await ensureTeamAccess(req, id);
+        if (access.status !== 200) {
+            res.status(access.status).json({ error: access.error });
+            return;
+        }
+        const teamPlayers = await getTeamPlayersById(id);
+        const playerIds = teamPlayers.map((p) => p.id);
+        const [attendanceRows, paymentRows] = await Promise.all([
+            db_1.db.select().from(schema_1.attendance).where((0, drizzle_orm_1.eq)(schema_1.attendance.teamId, id)),
+            playerIds.length
+                ? db_1.db.select().from(schema_1.playerPayments).where((0, drizzle_orm_1.inArray)(schema_1.playerPayments.playerId, playerIds))
+                : Promise.resolve([]),
+        ]);
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const rateOf = (rows) => rows.length === 0 ? null : Math.round((rows.filter((r) => isAttendancePresent(r.status)).length / rows.length) * 1000) / 10;
+        const monthRows = attendanceRows.filter((r) => r.date && new Date(r.date) >= monthStart);
+        const prevMonthRows = attendanceRows.filter((r) => r.date && new Date(r.date) >= prevMonthStart && new Date(r.date) < monthStart);
+        const attByPlayer = new Map();
+        for (const row of attendanceRows) {
+            const bucket = attByPlayer.get(row.playerId) ?? { present: 0, total: 0, monthPresent: 0, monthTotal: 0 };
+            bucket.total += 1;
+            if (isAttendancePresent(row.status))
+                bucket.present += 1;
+            if (row.date && new Date(row.date) >= monthStart) {
+                bucket.monthTotal += 1;
+                if (isAttendancePresent(row.status))
+                    bucket.monthPresent += 1;
+            }
+            attByPlayer.set(row.playerId, bucket);
+        }
+        const paymentsByPlayer = new Map();
+        for (const row of paymentRows) {
+            const list = paymentsByPlayer.get(row.playerId) ?? [];
+            list.push(row);
+            paymentsByPlayer.set(row.playerId, list);
+        }
+        let playersWithArrears = 0;
+        let totalOutstanding = 0;
+        const playerStats = teamPlayers.map((player) => {
+            const att = attByPlayer.get(player.id);
+            const attendanceRate = att && att.total > 0 ? Math.round((att.present / att.total) * 100) : null;
+            const monthlyRate = att && att.monthTotal > 0 ? Math.round((att.monthPresent / att.monthTotal) * 100) : null;
+            const payments = paymentsByPlayer.get(player.id) ?? [];
+            const unpaid = payments.filter((row) => !isPaidStatus(row.status));
+            const outstandingAmount = unpaid.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+            const latest = [...payments].sort((a, b) => new Date(b.date ?? b.createdAt ?? 0).getTime() - new Date(a.date ?? a.createdAt ?? 0).getTime())[0];
+            const paymentStatus = latest ? (isPaidStatus(latest.status) ? 'paid' : 'due') : 'none';
+            if (outstandingAmount > 0) {
+                playersWithArrears += 1;
+                totalOutstanding += outstandingAmount;
+            }
+            return {
+                playerId: player.id,
+                attendanceRate,
+                present: att?.present ?? 0,
+                total: att?.total ?? 0,
+                monthlyRate,
+                paymentStatus,
+                outstandingAmount,
+            };
+        });
+        res.json({
+            monthlyAttendanceRate: rateOf(monthRows),
+            previousMonthAttendanceRate: rateOf(prevMonthRows),
+            overallAttendanceRate: rateOf(attendanceRows),
+            playersWithArrears,
+            totalOutstanding,
+            players: playerStats,
+        });
+    }
+    catch (e) {
+        console.error(`[GET /api/teams/${req.params.id}/stats] error:`, e);
+        res.status(500).json({ error: 'Failed to fetch team stats' });
     }
 });
 router.delete('/:id', async (req, res) => {
@@ -238,6 +436,64 @@ router.delete('/:id', async (req, res) => {
     catch (e) {
         console.error(`[DELETE /api/teams/${req.params.id}] error:`, e);
         res.status(500).json({ error: 'Failed to delete team' });
+    }
+});
+router.patch('/:id', async (req, res) => {
+    try {
+        const id = parseRouteId(req.params.id);
+        if (Number.isNaN(id)) {
+            res.status(400).json({ error: 'Invalid ID' });
+            return;
+        }
+        const access = await ensureTeamAccess(req, id);
+        if (access.status !== 200) {
+            res.status(access.status).json({ error: access.error });
+            return;
+        }
+        const body = req.body ?? {};
+        const updates = { updatedAt: new Date().toISOString() };
+        if (typeof body.name === 'string' && body.name.trim()) {
+            updates.name = body.name.trim();
+        }
+        if (TEAM_GENDERS.includes(body.gender)) {
+            updates.gender = body.gender;
+        }
+        if (TEAM_LEVELS.includes(body.level)) {
+            updates.level = body.level;
+        }
+        if (typeof body.isActive === 'boolean') {
+            updates.isActive = body.isActive;
+        }
+        if ('coachId' in body) {
+            const nextCoachId = body.coachId == null || body.coachId === '' ? null : Number(body.coachId);
+            if (nextCoachId != null) {
+                const coachRows = await db_1.db.select({ id: schema_1.users.id }).from(schema_1.users).where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, nextCoachId), (0, drizzle_orm_1.eq)(schema_1.users.role, 'coach'))).limit(1);
+                if (!coachRows[0]) {
+                    res.status(400).json({ error: 'Selected coach was not found.' });
+                    return;
+                }
+            }
+            updates.coachId = nextCoachId;
+        }
+        const updated = await db_1.db.update(schema_1.teams).set(updates).where((0, drizzle_orm_1.eq)(schema_1.teams.id, id)).returning();
+        const [teamPlayers, coachRow] = await Promise.all([
+            getTeamPlayersById(id),
+            updated[0].coachId != null
+                ? db_1.db.select({ name: schema_1.users.name }).from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.id, updated[0].coachId)).limit(1)
+                : Promise.resolve([]),
+        ]);
+        const now = Date.now();
+        const staleMedicalChecks = teamPlayers.filter((player) => !player.medicalCheckExpiry || new Date(player.medicalCheckExpiry).getTime() < now).length;
+        res.json({
+            ...mapTeam(updated[0]),
+            coachName: coachRow[0]?.name ?? null,
+            playerCount: teamPlayers.length,
+            staleMedicalChecks,
+        });
+    }
+    catch (e) {
+        console.error(`[PATCH /api/teams/${req.params.id}] error:`, e);
+        res.status(500).json({ error: 'Failed to update team' });
     }
 });
 router.get('/:id/players', async (req, res) => {
@@ -305,6 +561,30 @@ router.post('/:id/players', async (req, res) => {
     catch (e) {
         console.error(`[POST /api/teams/${req.params.id}/players] error:`, e);
         res.status(500).json({ error: 'Failed to create player' });
+    }
+});
+router.delete('/:id/players/:playerId', async (req, res) => {
+    try {
+        const teamId = parseRouteId(req.params.id);
+        const playerId = parseRouteId(req.params.playerId);
+        if (Number.isNaN(teamId) || Number.isNaN(playerId)) {
+            res.status(400).json({ error: 'Invalid ID' });
+            return;
+        }
+        const access = await ensureTeamAccess(req, teamId);
+        if (access.status !== 200) {
+            res.status(access.status).json({ error: access.error });
+            return;
+        }
+        await db_1.db.transaction(async (tx) => {
+            await tx.delete(schema_1.playersToTeams).where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.playersToTeams.teamId, teamId), (0, drizzle_orm_1.eq)(schema_1.playersToTeams.playerId, playerId)));
+            await tx.update(schema_1.players).set({ teamId: null }).where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.players.id, playerId), (0, drizzle_orm_1.eq)(schema_1.players.teamId, teamId)));
+        });
+        res.json({ success: true });
+    }
+    catch (e) {
+        console.error(`[DELETE /api/teams/${req.params.id}/players/${req.params.playerId}] error:`, e);
+        res.status(500).json({ error: 'Failed to remove player from team' });
     }
 });
 exports.default = router;

@@ -13,6 +13,7 @@ const express_1 = require("express");
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 function listUsers() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -34,22 +35,13 @@ function findUserByUid(uid) {
         return (_a = rows[0]) !== null && _a !== void 0 ? _a : undefined;
     });
 }
+router.use(auth_1.authenticate);
 // GET /api/users/me
 router.get('/me', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    // Usually set by auth middleware, but we can also check headers
-    const uid = req.headers['x-user-uid'] || req.headers['x-user-id'];
-    if (!uid) {
-        return res.status(401).json({ error: 'Unauthorized: missing uid' });
-    }
+    var _a, _b;
     try {
-        let user;
-        // Check if uid is a numeric string (id) or a firebase uid
-        if (!isNaN(Number(uid)) && String(Number(uid)) === uid) {
-            user = yield findUserByNumericId(Number(uid));
-        }
-        else {
-            user = yield findUserByUid(uid);
-        }
+        const uid = (_a = req.firebaseUser) === null || _a === void 0 ? void 0 : _a.uid;
+        const user = (_b = req.user) !== null && _b !== void 0 ? _b : (uid ? yield findUserByUid(uid) : null);
         if (!user) {
             return res.status(404).json({ error: 'User profile not found' });
         }
@@ -73,7 +65,7 @@ router.get('/me', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 }));
 // GET /api/users
-router.get('/', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get('/', (0, auth_1.requireRoles)(['admin']), (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const allUsers = yield listUsers();
         res.json(allUsers.map((user) => ({
@@ -89,7 +81,7 @@ router.get('/', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 }));
 // GET /api/users/:id
-router.get('/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get('/:id', (0, auth_1.requireRoles)(['admin']), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) {
         res.status(400).json({ error: 'Invalid user id' });
@@ -114,7 +106,7 @@ router.get('/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 }));
 // PATCH /api/users/:id
-router.patch('/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.patch('/:id', (0, auth_1.requireRoles)(['admin']), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const id = Number(req.params.id);
     const { name, role } = req.body;
     if (Number.isNaN(id)) {

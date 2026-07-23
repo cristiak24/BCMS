@@ -559,7 +559,7 @@ const RiskManagementBlock = ({ expiringItems, expiredCount, loading, compact = f
                         <MaterialIcons name={expiredCount > 0 ? 'warning' : 'verified'} size={17} color={expiredCount > 0 ? dash.danger : dash.success} />
                     </View>
                     <View className="ml-3 flex-1">
-                        <Text className="text-[13px] font-semibold" style={{ color: expiredCount > 0 ? '#991B1B' : '#047857' }}>
+                        <Text className="text-[13px] font-semibold" style={{ color: expiredCount > 0 ? '#991B1B' : 'var(--c-success-fg)' }}>
                             Necesită atenție
                         </Text>
                         {compact ? (
@@ -619,7 +619,7 @@ const RiskManagementBlock = ({ expiringItems, expiredCount, loading, compact = f
                                             className="px-2 py-[3px] rounded-md"
                                             style={{ backgroundColor: d.urgent ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.12)' }}
                                         >
-                                            <Text className="text-[9px] font-semibold tracking-wide" style={{ color: d.urgent ? dash.danger : '#B45309' }}>
+                                            <Text className="text-[9px] font-semibold tracking-wide" style={{ color: d.urgent ? dash.danger : 'var(--c-warning-fg)' }}>
                                                 {d.daysLeft !== null ? `${d.daysLeft} ZILE RĂMASE` : 'EXPIRAT'}
                                             </Text>
                                         </View>
@@ -1006,7 +1006,7 @@ function MobileWidgetStack({ children }: { children: React.ReactNode }) {
                         disabled={activeIndex === 0}
                         className={`w-9 h-9 rounded-full items-center justify-center border border-[#DCE6F5] ${activeIndex === 0 ? 'bg-white/60 opacity-50' : 'bg-white'}`}
                     >
-                        <MaterialIcons name="chevron-left" size={20} color="#0D2040" />
+                        <MaterialIcons name="chevron-left" size={20} color="var(--c-ink)" />
                     </Pressable>
                     <Pressable
                         onPress={() => goToWidget('right')}
@@ -1299,7 +1299,7 @@ export default function Dashboard() {
                                 onPress={() => scrollResults('left')}
                                 className="w-10 h-10 rounded-full bg-white border border-[#DCE6F5] items-center justify-center shadow-sm dash-nav-btn"
                             >
-                                <MaterialIcons name="chevron-left" size={22} color="#0D2040" />
+                                <MaterialIcons name="chevron-left" size={22} color="var(--c-ink)" />
                             </Pressable>
                             <Pressable
                                 onPress={() => scrollResults('right')}
@@ -1313,7 +1313,7 @@ export default function Dashboard() {
                                 onPress={() => scrollMobileResults('left')}
                                 className="w-9 h-9 rounded-full bg-white border border-[#DCE6F5] items-center justify-center shadow-sm dash-nav-btn"
                             >
-                                <MaterialIcons name="chevron-left" size={20} color="#0D2040" />
+                                <MaterialIcons name="chevron-left" size={20} color="var(--c-ink)" />
                             </Pressable>
                             <Pressable
                                 onPress={() => scrollMobileResults('right')}

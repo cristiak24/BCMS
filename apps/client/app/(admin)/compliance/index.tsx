@@ -40,7 +40,7 @@ export default function ComplianceDashboard() {
             onPress={() => setIsUpdateOpen(true)}
             className="bg-white border border-gray-200 px-5 py-2.5 rounded-[14px] flex-row items-center gap-2 shadow-sm hover:bg-gray-50 transition-colors"
           >
-            <PenLine size={16} color="#0D2040" />
+            <PenLine size={16} color="var(--c-ink)" />
             <Text className="text-[#0D2040] font-black text-[12px] uppercase tracking-wider">Update File</Text>
           </Pressable>
         </View>
@@ -88,7 +88,7 @@ export default function ComplianceDashboard() {
             <View className="mb-6">
                 {loading ? (
                     <View className="bg-white rounded-3xl p-12 items-center justify-center border border-gray-100">
-                        <ActivityIndicator size="large" color="#1D3E90" />
+                        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
                     </View>
                 ) : (
                     <ComplianceTable 

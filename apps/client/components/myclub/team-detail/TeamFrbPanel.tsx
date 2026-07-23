@@ -43,17 +43,17 @@ export default function TeamFrbPanel({ team }: { team: Team }) {
         <View className="bg-white rounded-[20px] border border-[#E3E9F2] p-5">
             <View className="flex-row bg-[#F4F8FD] p-1 rounded-[14px] border border-[#DDE7F5] self-start mb-5">
                 <Pressable onPress={() => setView('matches')} className={`flex-row items-center gap-1.5 px-3.5 py-2 rounded-[11px] ${view === 'matches' ? 'bg-white shadow-sm' : ''}`}>
-                    <CalendarClock size={14} color={view === 'matches' ? '#1D3E90' : '#94A3B8'} />
+                    <CalendarClock size={14} color={view === 'matches' ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
                     <Text className={`text-[12px] font-black ${view === 'matches' ? 'text-[#1D3E90]' : 'text-[#94A3B8]'}`}>Meciuri</Text>
                 </Pressable>
                 <Pressable onPress={() => setView('standings')} className={`flex-row items-center gap-1.5 px-3.5 py-2 rounded-[11px] ${view === 'standings' ? 'bg-white shadow-sm' : ''}`}>
-                    <ListOrdered size={14} color={view === 'standings' ? '#1D3E90' : '#94A3B8'} />
+                    <ListOrdered size={14} color={view === 'standings' ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
                     <Text className={`text-[12px] font-black ${view === 'standings' ? 'text-[#1D3E90]' : 'text-[#94A3B8]'}`}>Clasament</Text>
                 </Pressable>
             </View>
 
             {loading ? (
-                <View className="items-center justify-center py-12"><ActivityIndicator size="large" color="#1D3E90" /></View>
+                <View className="items-center justify-center py-12"><ActivityIndicator size="large" color="var(--c-brand-fg)" /></View>
             ) : error ? (
                 <Text className="text-[13px] font-bold text-[#94A3B8] py-8 text-center">{error}</Text>
             ) : view === 'matches' ? (

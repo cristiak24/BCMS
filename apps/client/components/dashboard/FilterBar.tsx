@@ -25,20 +25,20 @@ export default function FilterBar({ items }: { items: FilterBarItem[] }) {
               key={item.key}
               onPress={item.onPress}
               accessibilityRole="button"
-              className="dash-filter-hover h-10 rounded-[11px] px-3.5 flex-row items-center active:scale-[0.98] transition-all duration-200"
+              className="dash-filter-hover h-10 shrink-0 rounded-[11px] px-3.5 flex-row items-center active:scale-[0.98] transition-all duration-200"
               style={{
                 backgroundColor: isActive ? dash.surface : 'transparent',
                 ...(isActive ? dash.shadow.sm : {}),
               }}
             >
               <Text
-                className="text-[9px] font-bold uppercase tracking-[0.08em] mr-2"
+                className="text-[9px] font-bold uppercase tracking-[0.08em] mr-2 shrink-0 whitespace-nowrap"
                 style={{ color: isActive ? dash.accentBlue : dash.faint }}
               >
                 {item.label}
               </Text>
               <Text
-                className="text-[12px] font-semibold max-w-[170px]"
+                className="text-[12px] font-semibold max-w-[170px] whitespace-nowrap"
                 style={{ color: isActive ? dash.ink : dash.inkSoft }}
                 numberOfLines={1}
               >
@@ -48,7 +48,7 @@ export default function FilterBar({ items }: { items: FilterBarItem[] }) {
                 name="expand-more"
                 size={16}
                 color={isActive ? dash.accentBlue : dash.faint}
-                style={{ marginLeft: 3 }}
+                style={{ marginLeft: 3, flexShrink: 0 }}
               />
             </Pressable>
           );

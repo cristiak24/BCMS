@@ -57,6 +57,12 @@ function approveManageAccessRequest(user, requestId) {
             role: request.requestedRole,
             status: 'active',
         });
+        return {
+            requestId: request.id,
+            clubId: club.id,
+            targetUserId: request.userId,
+            role: request.requestedRole,
+        };
     });
 }
 function denyManageAccessRequest(user, requestId) {
@@ -75,6 +81,12 @@ function denyManageAccessRequest(user, requestId) {
             role: request.requestedRole,
             status: 'disabled',
         });
+        return {
+            requestId: request.id,
+            clubId: club.id,
+            targetUserId: request.userId,
+            role: request.requestedRole,
+        };
     });
 }
 function toInviteLinkRecord(params) {

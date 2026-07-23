@@ -24,9 +24,9 @@ type AttendancePlayer = {
 };
 
 const STATUS_OPTIONS: { status: AttendanceStatus; label: string; icon: keyof typeof MaterialIcons.glyphMap; color: string }[] = [
-  { status: 'present', label: 'Present', icon: 'check-circle', color: '#047857' },
-  { status: 'absent', label: 'Absent', icon: 'cancel', color: '#B91C1C' },
-  { status: 'medical', label: 'Medical', icon: 'medical-services', color: '#B45309' },
+  { status: 'present', label: 'Present', icon: 'check-circle', color: 'var(--c-success-fg)' },
+  { status: 'absent', label: 'Absent', icon: 'cancel', color: 'var(--c-danger)' },
+  { status: 'medical', label: 'Medical', icon: 'medical-services', color: 'var(--c-warning-fg)' },
 ];
 
 function toAttendancePlayer(player: Player): AttendancePlayer {
@@ -62,10 +62,10 @@ function mergeAttendance(teamPlayers: Player[], attendanceRows: EventAttendance[
 
 function statusTone(status?: string | null) {
   const normalized = String(status ?? '').toLowerCase();
-  if (normalized === 'present' || normalized === 'prezent') return { label: 'Present', bg: '#DCFCE7', fg: '#047857' };
-  if (normalized === 'absent') return { label: 'Absent', bg: '#FEE2E2', fg: '#B91C1C' };
-  if (normalized === 'medical' || normalized === 'excused') return { label: 'Medical', bg: '#FEF3C7', fg: '#B45309' };
-  return { label: 'Pending', bg: '#E2E8F0', fg: '#64748B' };
+  if (normalized === 'present' || normalized === 'prezent') return { label: 'Present', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' };
+  if (normalized === 'absent') return { label: 'Absent', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger)' };
+  if (normalized === 'medical' || normalized === 'excused') return { label: 'Medical', bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' };
+  return { label: 'Pending', bg: 'var(--c-border)', fg: 'var(--c-muted)' };
 }
 
 function EventSelectorCard({ event, active, onPress }: { event: CalendarEvent; active: boolean; onPress: () => void }) {
@@ -73,7 +73,7 @@ function EventSelectorCard({ event, active, onPress }: { event: CalendarEvent; a
     <Pressable onPress={onPress} className={`rounded-[24px] border p-4 ${active ? 'bg-[#EBF4FF] border-[#0A2C93]' : 'bg-white border-[#E3ECF6]'}`}>
       <View className="flex-row items-start gap-3">
         <View className="h-11 w-11 rounded-2xl bg-white items-center justify-center border border-[#E3ECF6]">
-          <MaterialIcons name={event.type === 'match' ? 'sports-basketball' : 'fitness-center'} size={21} color="#0A2C93" />
+          <MaterialIcons name={event.type === 'match' ? 'sports-basketball' : 'fitness-center'} size={21} color="var(--c-brand-fg)" />
         </View>
         <View className="flex-1 min-w-0">
           <Text className="text-[#006092] text-[10px] font-black uppercase tracking-widest">{eventTypeLabel(event.type)}</Text>
@@ -180,13 +180,13 @@ export default function CoachAttendance() {
             <Text className="text-[#64748B] text-base md:text-lg font-semibold mt-3">Mark player availability for your sessions.</Text>
           </View>
           <Pressable onPress={() => loadEvents()} className="h-12 w-12 rounded-full bg-white border border-[#E3ECF6] items-center justify-center">
-            {loadingEvents ? <ActivityIndicator size="small" color="#0A2C93" /> : <MaterialIcons name="refresh" size={22} color="#0A2C93" />}
+            {loadingEvents ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={22} color="var(--c-brand-fg)" />}
           </Pressable>
         </View>
 
         {error ? (
           <View className="mb-6 rounded-[24px] border border-red-100 bg-white px-5 py-4 flex-row items-center gap-3">
-            <MaterialIcons name="error-outline" size={22} color="#DC2626" />
+            <MaterialIcons name="error-outline" size={22} color="var(--c-danger)" />
             <Text className="flex-1 text-red-600 font-bold">{error}</Text>
           </View>
         ) : null}
@@ -198,7 +198,7 @@ export default function CoachAttendance() {
 
             {loadingEvents ? (
               <View className="py-10 items-center">
-                <ActivityIndicator size="large" color="#0A2C93" />
+                <ActivityIndicator size="large" color="var(--c-brand-fg)" />
               </View>
             ) : events.length ? (
               <View className="gap-3">
@@ -240,7 +240,7 @@ export default function CoachAttendance() {
 
             {loadingAttendance ? (
               <View className="py-16 items-center">
-                <ActivityIndicator size="large" color="#0A2C93" />
+                <ActivityIndicator size="large" color="var(--c-brand-fg)" />
               </View>
             ) : players.length ? (
               <View className="gap-3">
@@ -281,7 +281,7 @@ export default function CoachAttendance() {
               </View>
             ) : (
               <View className="py-16 items-center">
-                <MaterialIcons name="groups" size={34} color="#8EA1B8" />
+                <MaterialIcons name="groups" size={34} color="var(--c-faint)" />
                 <Text className="text-[#64748B] font-bold text-center mt-3">No players found for this session team.</Text>
               </View>
             )}

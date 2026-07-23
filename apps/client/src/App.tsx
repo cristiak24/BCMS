@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import type { ReactElement } from 'react';
 import { FirebaseAuthProvider, useFirebaseAuth } from '../context/AuthContext';
+import { ThemeProvider } from '../context/ThemeContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
 import { getHomeRouteForRole, normalizeRole, type UserRole } from '../utils/authSession';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
@@ -57,6 +58,7 @@ function PlayerLayout() {
 export default function App() {
   return (
     <BrowserRouter>
+      <ThemeProvider>
       <FirebaseAuthProvider>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -111,6 +113,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </FirebaseAuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { firestore } from '../lib/firebaseAdmin';
+import { authenticate, requireRoles } from '../middleware/auth';
 
 type UserDoc = {
     id: number;
@@ -10,6 +11,8 @@ type UserDoc = {
 };
 
 const router = Router();
+
+router.use(authenticate, requireRoles(['admin']));
 
 router.get('/requests', async (_req, res) => {
     try {

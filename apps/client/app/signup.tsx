@@ -126,7 +126,7 @@ export default function Signup() {
   };
 
   if (initializing) {
-    return <LoadingScreen message="Checking your session..." backgroundColor="#FFFFFF" color="#2563EB" />;
+    return <LoadingScreen message="Checking your session..." backgroundColor="#FFFFFF" color="var(--c-blue)" />;
   }
 
   return (
@@ -142,7 +142,7 @@ export default function Signup() {
       >
         <View className="flex-1 px-4 py-10 items-center justify-center">
           <LinearGradient
-            colors={['#EFF6FF', '#F8FAFC', '#FFFFFF']}
+            colors={['var(--c-surface-tint)', 'var(--c-surface-2)', '#FFFFFF']}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
             style={StyleSheet.absoluteFillObject}
@@ -173,7 +173,7 @@ export default function Signup() {
               {/* Invite loading */}
               {inviteLoading ? (
                 <View className="items-center justify-center py-6">
-                  <ActivityIndicator size="small" color="#2563EB" />
+                  <ActivityIndicator size="small" color="var(--c-blue)" />
                   <Text className="text-slate-500 mt-2">Validating invite…</Text>
                 </View>
               ) : null}
@@ -203,7 +203,7 @@ export default function Signup() {
                     value={firstName}
                     onChangeText={setFirstName}
                     placeholder="Maria"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor="var(--c-faint)"
                     autoComplete="given-name"
                     textContentType="givenName"
                     returnKeyType="next"
@@ -219,7 +219,7 @@ export default function Signup() {
                     value={lastName}
                     onChangeText={setLastName}
                     placeholder="Popescu"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor="var(--c-faint)"
                     autoComplete="family-name"
                     textContentType="familyName"
                     returnKeyType="next"
@@ -241,7 +241,7 @@ export default function Signup() {
                     returnKeyType="next"
                     editable={!emailLocked}
                     placeholder="you@club.com"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor="var(--c-faint)"
                     className={`rounded-lg border px-4 py-4 text-slate-900 ${
                       emailLocked ? 'border-slate-200 bg-slate-100' : 'border-slate-200 bg-white'
                     }`}
@@ -257,7 +257,7 @@ export default function Signup() {
                     onChangeText={setPassword}
                     secureTextEntry
                     placeholder="Password"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor="var(--c-faint)"
                     autoComplete="new-password"
                     textContentType="newPassword"
                     returnKeyType="done"
@@ -294,7 +294,7 @@ export default function Signup() {
                                 <MaterialIcons
                                   name={option.icon}
                                   size={20}
-                                  color={active ? '#FFFFFF' : '#64748B'}
+                                  color={active ? '#FFFFFF' : 'var(--c-muted)'}
                                 />
                               </View>
                               <View className="flex-1">
@@ -307,7 +307,7 @@ export default function Signup() {
                               </View>
                             </View>
                             {active ? (
-                              <MaterialIcons name="check-circle" size={22} color="#2563EB" />
+                              <MaterialIcons name="check-circle" size={22} color="var(--c-blue)" />
                             ) : null}
                           </Pressable>
                         );

@@ -67,14 +67,14 @@ export default function ComplianceTable({ data, selectedIds, onToggleSelect, onS
     if (status === 'VALID') {
         return (
           <View className="flex-row items-center gap-2">
-            <CheckCircle size={16} color="#1D3E90" />
+            <CheckCircle size={16} color="var(--c-brand-fg)" />
             <Text className="text-[13px] font-bold text-[#0D2040]">Valid</Text>
           </View>
         );
     }
     return (
       <View className="flex-row items-center gap-2">
-        <AlertTriangle size={16} color="#dc2626" />
+        <AlertTriangle size={16} color="var(--c-danger)" />
         <Text className="text-[13px] font-bold text-red-600">Update Needed</Text>
       </View>
     );

@@ -7,7 +7,8 @@ import {
   MapPin,
   Search,
   ChevronLeft,
-  UserCheck
+  UserCheck,
+  MessageSquare
 } from 'lucide-react';
 import { eventsApi, CalendarEvent } from '../../../services/eventsApi';
 import { teamsApi, Team, Player } from '../../../services/teamsApi';
@@ -15,6 +16,12 @@ import { useResponsive } from '../../../hooks/useResponsive';
 
 type TabFilter = 'All Players' | 'Starters' | 'Injured Reserve';
 type AttendanceStatus = 'present' | 'absent' | 'medical';
+
+const TAB_LABELS: Record<TabFilter, string> = {
+  'All Players': 'Toți jucătorii',
+  Starters: 'Disponibili',
+  'Injured Reserve': 'Indisponibili',
+};
 
 export default function AttendanceScreen() {
   const { id } = useLocalSearchParams();
@@ -24,7 +31,7 @@ export default function AttendanceScreen() {
   const [loading, setLoading] = useState(true);
   const [event, setEvent] = useState<CalendarEvent | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
-  const [players, setPlayers] = useState<(Omit<Player, 'status'> & { status: AttendanceStatus | null })[]>([]);
+  const [players, setPlayers] = useState<(Omit<Player, 'status'> & { status: AttendanceStatus | null; note: string })[]>([]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<TabFilter>('All Players');
@@ -57,7 +64,7 @@ export default function AttendanceScreen() {
             if (record?.status === 'present') mappedStatus = 'present';
             if (record?.status === 'absent') mappedStatus = 'absent';
             if (record?.status === 'medical' || record?.status === 'excused') mappedStatus = 'medical';
-            return { ...p, status: mappedStatus };
+            return { ...p, status: mappedStatus, note: record?.note ?? '' };
           });
           setPlayers(mappedPlayers);
         }
@@ -75,22 +82,28 @@ export default function AttendanceScreen() {
     setHasChanges(true);
   };
 
+  const updatePlayerNote = (playerId: number, note: string) => {
+    setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, note } : p));
+    setHasChanges(true);
+  };
+
   const submitAttendance = async () => {
     if (!event) return;
     setIsSubmitting(true);
     try {
       const payload = players.map(p => ({
         playerId: p.id,
-        status: p.status || 'pending'
+        status: p.status || 'pending',
+        note: p.note.trim() ? p.note.trim() : null,
       }));
       await eventsApi.updateEventAttendance(event.id, payload);
       const updatedEvent = await eventsApi.updateEvent(event.id, { status: 'graded' });
       setEvent(updatedEvent);
       setHasChanges(false);
-      alert('Attendance saved successfully!');
+      alert('Prezența și notele au fost salvate.');
     } catch (err) {
       console.error('Submit failed', err);
-      alert('Failed to save attendance. Please try again.');
+      alert('Salvarea a eșuat. Încearcă din nou.');
     } finally {
       setIsSubmitting(false);
     }
@@ -124,7 +137,7 @@ export default function AttendanceScreen() {
   if (loading) {
     return (
       <View style={styles.centeredFull}>
-        <ActivityIndicator size="large" color="#1D3E90" />
+        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
       </View>
     );
   }
@@ -132,9 +145,9 @@ export default function AttendanceScreen() {
   if (!event) {
     return (
       <View style={styles.centeredFull}>
-        <Text style={styles.notFoundText}>Event Not Found</Text>
+        <Text style={styles.notFoundText}>Evenimentul nu a fost găsit</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.goBackBtn}>
-          <Text style={styles.goBackText}>Go Back</Text>
+          <Text style={styles.goBackText}>Înapoi</Text>
         </TouchableOpacity>
       </View>
     );
@@ -147,11 +160,11 @@ export default function AttendanceScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingHorizontal: px, paddingTop: isMobile ? 16 : 40, paddingBottom: isMobile ? 12 : 24 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <ChevronLeft size={20} color="#1E293B" />
+          <ChevronLeft size={20} color="var(--c-ink-soft)" />
         </TouchableOpacity>
         <View style={styles.headerText}>
           <Text style={[styles.headerTitle, { fontSize: isMobile ? 22 : 32 }]} numberOfLines={1}>
-            Session Attendance
+            Notare sesiune
           </Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
             {event.title}{team ? ` - ${team.name}` : ''}
@@ -166,24 +179,24 @@ export default function AttendanceScreen() {
       >
         {/* Event snapshot card — wraps on mobile */}
         <View style={[styles.snapshotCard, isMobile && styles.snapshotCardMobile]}>
-          <SnapshotItem icon={<Calendar size={18} color="#3B82F6" />} label="Date">
-            {new Date(event.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          <SnapshotItem icon={<Calendar size={18} color="var(--c-blue)" />} label="Data">
+            {new Date(event.startTime).toLocaleDateString('ro-RO', { month: 'short', day: 'numeric', year: 'numeric' })}
           </SnapshotItem>
-          <SnapshotItem icon={<Clock size={18} color="#3B82F6" />} label="Time">
-            {new Date(event.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} –{' '}
-            {new Date(event.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          <SnapshotItem icon={<Clock size={18} color="var(--c-blue)" />} label="Ora">
+            {new Date(event.startTime).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })} –{' '}
+            {new Date(event.endTime).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
           </SnapshotItem>
-          <SnapshotItem icon={<MapPin size={18} color="#3B82F6" />} label="Location">
-            {event.location || 'Main Gym'}
+          <SnapshotItem icon={<MapPin size={18} color="var(--c-blue)" />} label="Locație">
+            {event.location || 'Sală principală'}
           </SnapshotItem>
         </View>
 
         {/* Stats cards — 2×2 on small phones, 4-in-a-row on tablet/desktop */}
         <View style={[styles.statsRow, isSmallPhone && styles.statsRowWrap]}>
-          <StatCard label="Total" value={stats.total} color="#1D3E90" />
-          <StatCard label="Present" value={stats.present} color="#10B981" />
-          <StatCard label="Absent" value={stats.absent} color="#F43F5E" />
-          <StatCard label="Medical" value={stats.medical} color="#F59E0B" />
+          <StatCard label="Total" value={stats.total} color="var(--c-brand-fg)" />
+          <StatCard label="Prezenți" value={stats.present} color="var(--c-success)" />
+          <StatCard label="Absenți" value={stats.absent} color="var(--c-danger)" />
+          <StatCard label="Medical" value={stats.medical} color="var(--c-warning)" />
         </View>
 
         {/* Player list card */}
@@ -192,10 +205,10 @@ export default function AttendanceScreen() {
           <View style={[styles.listControls, isMobile && styles.listControlsMobile]}>
             {/* Search bar */}
             <View style={[styles.searchBar, isMobile && styles.searchBarMobile]}>
-              <Search size={16} color="#94A3B8" />
+              <Search size={16} color="var(--c-faint)" />
               <TextInput
-                placeholder={isMobile ? 'Search player...' : 'Search player by name or number...'}
-                placeholderTextColor="#94A3B8"
+                placeholder={isMobile ? 'Caută jucător...' : 'Caută jucător după nume sau număr...'}
+                placeholderTextColor="var(--c-faint)"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 style={styles.searchInput}
@@ -215,7 +228,7 @@ export default function AttendanceScreen() {
                   style={[styles.tab, activeTab === tab && styles.tabActive]}
                 >
                   <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                    {tab}
+                    {TAB_LABELS[tab]}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -225,11 +238,11 @@ export default function AttendanceScreen() {
           {/* Table header — hide position column on small phones */}
           <View style={styles.tableHeader}>
             <View style={styles.colPlayer}>
-              <Text style={styles.tableHeaderText}>Player</Text>
+              <Text style={styles.tableHeaderText}>Jucător</Text>
             </View>
             {!isSmallPhone && (
               <View style={styles.colPosition}>
-                <Text style={styles.tableHeaderText}>Position</Text>
+                <Text style={styles.tableHeaderText}>Poziție</Text>
               </View>
             )}
             <View style={styles.colStatus}>
@@ -240,18 +253,19 @@ export default function AttendanceScreen() {
           {/* Roster */}
           {filteredPlayers.length === 0 ? (
             <View style={styles.emptyState}>
-              <UserCheck size={40} color="#E2E8F0" />
-              <Text style={styles.emptyText}>No players found.</Text>
+              <UserCheck size={40} color="var(--c-border)" />
+              <Text style={styles.emptyText}>Niciun jucător găsit.</Text>
             </View>
           ) : (
             filteredPlayers.map((player, index) => (
               <View
                 key={player.id}
                 style={[
-                  styles.playerRow,
+                  styles.playerEntry,
                   index !== filteredPlayers.length - 1 && styles.playerRowBorder,
                 ]}
               >
+                <View style={styles.playerRow}>
                 {/* Player info */}
                 <View style={styles.colPlayer}>
                   <View style={styles.avatarWrap}>
@@ -269,7 +283,7 @@ export default function AttendanceScreen() {
                       {player.firstName} {player.lastName}
                     </Text>
                     <Text style={styles.playerMeta} numberOfLines={1}>
-                      #{player.number || '00'} · {team?.name || 'Roster'}
+                      #{player.number || '00'} · {team?.name || 'Lot'}
                     </Text>
                   </View>
                 </View>
@@ -278,7 +292,7 @@ export default function AttendanceScreen() {
                 {!isSmallPhone && (
                   <View style={styles.colPosition}>
                     <View style={styles.positionBadge}>
-                      <Text style={styles.positionText}>{player.position || 'Player'}</Text>
+                      <Text style={styles.positionText}>{player.position || 'Jucător'}</Text>
                     </View>
                   </View>
                 )}
@@ -291,7 +305,7 @@ export default function AttendanceScreen() {
                       style={[styles.segment, player.status === 'present' && styles.segmentPresent]}
                     >
                       <Text style={[styles.segmentText, player.status === 'present' && styles.segmentTextActive]}>
-                        {isMobile ? '✓' : 'Present'}
+                        {isMobile ? '✓' : 'Prezent'}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -312,6 +326,24 @@ export default function AttendanceScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
+                </View>
+
+                {/* Coach feedback / note for this player */}
+                <View style={styles.noteWrap}>
+                  <View style={styles.noteLabelRow}>
+                    <MessageSquare size={13} color="var(--c-faint)" />
+                    <Text style={styles.noteLabel}>Notă / feedback</Text>
+                    {player.note.trim() ? <View style={styles.noteDot} /> : null}
+                  </View>
+                  <TextInput
+                    value={player.note}
+                    onChangeText={(t: string) => updatePlayerNote(player.id, t)}
+                    placeholder="Adaugă o notiță despre jucător la acest eveniment…"
+                    placeholderTextColor="var(--c-faint)"
+                    multiline
+                    style={styles.noteInput}
+                  />
+                </View>
               </View>
             ))
           )}
@@ -319,7 +351,7 @@ export default function AttendanceScreen() {
           {/* Footer count */}
           <View style={styles.listFooter}>
             <Text style={styles.listFooterText}>
-              {filteredPlayers.length} / {players.length} players
+              {filteredPlayers.length} / {players.length} jucători
             </Text>
           </View>
         </View>
@@ -336,7 +368,7 @@ export default function AttendanceScreen() {
             {isSubmitting ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.fabText}>Submit Attendance</Text>
+              <Text style={styles.fabText}>Salvează notarea</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -371,33 +403,33 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: 'var(--c-surface-2)',
   },
   centeredFull: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F5F7FA',
+    backgroundColor: 'var(--c-surface-2)',
   },
   notFoundText: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#94A3B8',
+    color: 'var(--c-faint)',
   },
   goBackBtn: {
     marginTop: 16,
     paddingHorizontal: 24,
     paddingVertical: 8,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: 'var(--c-border)',
     borderRadius: 24,
   },
   goBackText: {
     fontWeight: '700',
-    color: '#475569',
+    color: 'var(--c-muted)',
   },
   // Header
   header: {
-    backgroundColor: '#F5F7FA',
+    backgroundColor: 'var(--c-surface-2)',
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -405,14 +437,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--c-surface)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: 'var(--c-surface-3)',
     marginRight: 12,
     flexShrink: 0,
-    shadowColor: '#0F172A',
+    shadowColor: 'var(--c-ink-strong)',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
@@ -429,12 +461,12 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1D3E90',
+    color: 'var(--c-brand-fg)',
     marginTop: 2,
   },
   // Event snapshot card
   snapshotCard: {
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--c-surface)',
     borderRadius: 24,
     padding: 20,
     flexDirection: 'row',
@@ -442,8 +474,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#0F172A',
+    borderColor: 'var(--c-surface-3)',
+    shadowColor: 'var(--c-ink-strong)',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
@@ -467,12 +499,12 @@ const styles = StyleSheet.create({
   },
   // Player list card
   playerListCard: {
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--c-surface)',
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: 'var(--c-surface-3)',
     overflow: 'hidden',
-    shadowColor: '#0F172A',
+    shadowColor: 'var(--c-ink-strong)',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -485,7 +517,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
+    borderBottomColor: 'var(--c-surface-2)',
     gap: 10,
   },
   listControlsMobile: {
@@ -496,9 +528,9 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'var(--c-surface-2)',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'var(--c-border)',
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -514,7 +546,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 13,
     fontWeight: '500',
-    color: '#334155',
+    color: 'var(--c-ink-soft)',
     // Remove outline on web
     outlineStyle: 'none',
   } as any,
@@ -530,31 +562,31 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   tabActive: {
-    backgroundColor: '#EBF1FF',
+    backgroundColor: 'var(--c-surface-tint)',
   },
   tabText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#94A3B8',
+    color: 'var(--c-faint)',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   tabTextActive: {
-    color: '#1D3E90',
+    color: 'var(--c-brand-fg)',
   },
   // Table header  
   tableHeader: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'var(--c-surface-2)',
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: 'var(--c-surface-3)',
   },
   tableHeaderText: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#94A3B8',
+    color: 'var(--c-faint)',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -576,6 +608,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   // Player row
+  playerEntry: {
+    paddingBottom: 6,
+  },
   playerRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -584,18 +619,54 @@ const styles = StyleSheet.create({
   },
   playerRowBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
+    borderBottomColor: 'var(--c-surface-3)',
+  },
+  noteWrap: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 6,
+  },
+  noteLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  noteLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: 'var(--c-faint)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  noteDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'var(--c-brand-surface)',
+  },
+  noteInput: {
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'var(--c-border)',
+    backgroundColor: 'var(--c-surface-2)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontWeight: '500',
+    color: 'var(--c-ink)',
+    textAlignVertical: 'top',
   },
   // Avatar
   avatarWrap: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: 'var(--c-surface-3)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'var(--c-border)',
     marginRight: 10,
     flexShrink: 0,
     position: 'relative',
@@ -608,7 +679,7 @@ const styles = StyleSheet.create({
   avatarInitials: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#94A3B8',
+    color: 'var(--c-faint)',
     textTransform: 'uppercase',
   },
   jerseyBadge: {
@@ -618,11 +689,11 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#1D3E90',
+    backgroundColor: 'var(--c-brand-surface)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#fff',
+    borderColor: 'var(--c-border)',
   },
   jerseyNum: {
     fontSize: 7,
@@ -639,15 +710,15 @@ const styles = StyleSheet.create({
   },
   playerMeta: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: 'var(--c-faint)',
     marginTop: 2,
   },
   // Position badge
   positionBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: 'var(--c-surface-3)',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'var(--c-border)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
@@ -655,16 +726,16 @@ const styles = StyleSheet.create({
   positionText: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#475569',
+    color: 'var(--c-muted)',
   },
   // Segmented attendance control
   segmentedControl: {
     flexDirection: 'row',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'var(--c-surface-2)',
     borderRadius: 24,
     padding: 3,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'var(--c-border)',
     width: '100%',
   },
   segmentedControlSmall: {
@@ -678,24 +749,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   segmentPresent: {
-    backgroundColor: '#10B981',
-    shadowColor: '#10B981',
+    backgroundColor: 'var(--c-success)',
+    shadowColor: 'var(--c-success)',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 2,
   },
   segmentAbsent: {
-    backgroundColor: '#F43F5E',
-    shadowColor: '#F43F5E',
+    backgroundColor: 'var(--c-danger)',
+    shadowColor: 'var(--c-danger)',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 2,
   },
   segmentMedical: {
-    backgroundColor: '#F59E0B',
-    shadowColor: '#F59E0B',
+    backgroundColor: 'var(--c-warning)',
+    shadowColor: 'var(--c-warning)',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
@@ -704,7 +775,7 @@ const styles = StyleSheet.create({
   segmentText: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#64748B',
+    color: 'var(--c-muted)',
   },
   segmentTextActive: {
     color: '#fff',
@@ -713,14 +784,14 @@ const styles = StyleSheet.create({
   listFooter: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'var(--c-surface-2)',
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: 'var(--c-surface-3)',
   },
   listFooterText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#94A3B8',
+    color: 'var(--c-faint)',
   },
   // Empty state
   emptyState: {
@@ -732,7 +803,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     fontWeight: '700',
-    color: '#94A3B8',
+    color: 'var(--c-faint)',
   },
   // FAB
   fab: {
@@ -740,13 +811,13 @@ const styles = StyleSheet.create({
     zIndex: 50,
   },
   fabBtn: {
-    backgroundColor: '#1D3E90',
+    backgroundColor: 'var(--c-brand-surface)',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 28,
     height: 56,
     borderRadius: 28,
-    shadowColor: '#1D3E90',
+    shadowColor: 'var(--c-brand-fg)',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
@@ -773,7 +844,7 @@ const snapStyles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: 'var(--c-surface-tint)',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -781,7 +852,7 @@ const snapStyles = StyleSheet.create({
   label: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#94A3B8',
+    color: 'var(--c-faint)',
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 2,
@@ -789,24 +860,24 @@ const snapStyles = StyleSheet.create({
   value: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1E293B',
+    color: 'var(--c-ink-soft)',
   },
 });
 
 const statStyles = StyleSheet.create({
   card: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--c-surface)',
     borderRadius: 20,
     padding: 14,
     borderLeftWidth: 4,
     borderTopWidth: 1,
     borderRightWidth: 1,
     borderBottomWidth: 1,
-    borderTopColor: '#F1F5F9',
-    borderRightColor: '#F1F5F9',
-    borderBottomColor: '#F1F5F9',
-    shadowColor: '#0F172A',
+    borderTopColor: 'var(--c-surface-3)',
+    borderRightColor: 'var(--c-surface-3)',
+    borderBottomColor: 'var(--c-surface-3)',
+    shadowColor: 'var(--c-ink-strong)',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
@@ -816,7 +887,7 @@ const statStyles = StyleSheet.create({
   label: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#94A3B8',
+    color: 'var(--c-faint)',
     marginBottom: 4,
   },
   value: {

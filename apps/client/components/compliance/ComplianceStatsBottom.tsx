@@ -7,7 +7,7 @@ export default function ComplianceStatsBottom() {
     <View className="flex-col md:flex-row gap-6 mt-8 w-full">
       <View className="flex-1 bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex-row items-center gap-4">
         <View className="w-12 h-12 rounded-full bg-blue-50 items-center justify-center">
-          <Users size={20} color="#1D3E90" />
+          <Users size={20} color="var(--c-brand-fg)" />
         </View>
         <View>
           <Text className="text-2xl font-black text-[#0D2040]">48</Text>
@@ -27,7 +27,7 @@ export default function ComplianceStatsBottom() {
 
       <View className="flex-1 bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex-row items-center gap-4">
         <View className="w-12 h-12 rounded-full bg-slate-100 items-center justify-center">
-          <ShieldCheck size={20} color="#0f172a" />
+          <ShieldCheck size={20} color="var(--c-ink-strong)" />
         </View>
         <View>
           <Text className="text-2xl font-black text-[#0D2040]">100%</Text>

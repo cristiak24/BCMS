@@ -30,7 +30,7 @@ export default function SuperAdminLayout() {
   }, [initializing, router, session]);
 
   if (initializing || !session || !isSuperadmin(session)) {
-    return <LoadingScreen message="Preparing platform control..." backgroundColor="#EEF3FF" color="#173AA8" />;
+    return <LoadingScreen message="Preparing platform control..." backgroundColor="var(--c-surface-tint)" color="var(--c-brand-fg)" />;
   }
 
   const initials = (session.name ?? 'SA')

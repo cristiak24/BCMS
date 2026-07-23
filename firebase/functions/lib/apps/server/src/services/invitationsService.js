@@ -12,6 +12,7 @@ exports.isInviteExpired = isInviteExpired;
 exports.isVisiblePendingInvite = isVisiblePendingInvite;
 exports.syncInvitationStatuses = syncInvitationStatuses;
 exports.createSuperAdminInvitation = createSuperAdminInvitation;
+exports.resendClubInvitation = resendClubInvitation;
 exports.validateInvitationToken = validateInvitationToken;
 exports.acceptInvitation = acceptInvitation;
 exports.completeUserRegistration = completeUserRegistration;
@@ -192,6 +193,67 @@ async function createSuperAdminInvitation(input, actor = {}) {
         clubId: club.id,
         clubName: club.name,
         fullName,
+        status: 'pending',
+        expiresAt: expiresAt.toISOString(),
+        inviteUrl,
+    };
+}
+async function resendClubInvitation(params, actor = {}) {
+    const rows = await db_1.db.select().from(schema_1.invites)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.invites.id, params.inviteId), (0, drizzle_orm_1.eq)(schema_1.invites.clubId, params.clubId)))
+        .limit(1);
+    const invite = rows[0];
+    if (!invite) {
+        throw new Error('Invitation not found.');
+    }
+    if (invite.status !== 'pending') {
+        throw new Error('Only pending invitations can be resent.');
+    }
+    const club = await findClubById(invite.clubId ?? params.clubId);
+    // Resending mints a fresh token + expiry on the same invite row, so any old
+    // link stops working and the recipient gets a link that is valid again.
+    const token = generateInviteToken();
+    const tokenHash = hashInviteToken(token);
+    const expiresAt = new Date(Date.now() + INVITE_TTL_MINUTES * 60 * 1000);
+    await db_1.db.update(schema_1.invites).set({
+        token,
+        tokenHash,
+        status: 'pending',
+        expiresAt: expiresAt.toISOString(),
+    }).where((0, drizzle_orm_1.eq)(schema_1.invites.id, invite.id));
+    const inviteUrl = buildInviteUrl(token);
+    try {
+        await sendInviteEmail({
+            to: invite.email,
+            clubName: club.name,
+            role: invite.role,
+            url: inviteUrl,
+            expiresAt,
+            fullName: invite.email.split('@')[0],
+        });
+    }
+    catch (error) {
+        await db_1.db.update(schema_1.invites).set({ status: 'revoked' }).where((0, drizzle_orm_1.eq)(schema_1.invites.id, invite.id));
+        throw error;
+    }
+    await (0, auditService_1.writeAuditLog)({
+        action: 'invitation.resent',
+        entityType: 'invitation',
+        entityId: invite.id,
+        actorUserId: actor.user?.id ?? null,
+        actorUid: actor.firebaseUser?.uid ?? null,
+        actorRole: actor.user?.role ?? actor.firebaseUser?.role ?? null,
+        clubId: club.id,
+        metadata: { email: invite.email, role: invite.role, clubId: club.id, clubName: club.name },
+        ipAddress: actor.ip ?? null,
+        userAgent: actor.userAgent ?? null,
+    });
+    return {
+        id: invite.id,
+        email: invite.email,
+        role: invite.role,
+        clubId: club.id,
+        clubName: club.name,
         status: 'pending',
         expiresAt: expiresAt.toISOString(),
         inviteUrl,

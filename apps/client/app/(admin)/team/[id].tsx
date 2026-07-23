@@ -4,13 +4,15 @@ import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import {
     ArrowLeft, Users, UserPlus, Copy, Check, Pencil, Calendar, ClipboardCheck,
     Search, X, Trash2, Shield, ListOrdered, History, Percent, Wallet,
-    CalendarClock, LayoutGrid, List,
+    CalendarClock, LayoutGrid, List, ShieldCheck, Receipt,
 } from 'lucide-react';
 import { teamsApi, Team, Player, Coach, TeamStats, TeamPlayerStat } from '../../../services/teamsApi';
 import {
     GENDER_LABELS, LEVEL_LABELS, isFrbTeam, computeAge, medicalStatus, MEDICAL_META,
 } from '../../../components/myclub/teamDisplay';
 import EditTeamModal from '../../../components/myclub/EditTeamModal';
+import TeamMedicalVisaModal from '../../../components/schedule/admin/TeamMedicalVisaModal';
+import TeamPaymentsReportModal from '../../../components/schedule/admin/TeamPaymentsReportModal';
 import TeamFrbPanel from '../../../components/myclub/team-detail/TeamFrbPanel';
 import TeamEventsPanel from '../../../components/myclub/team-detail/TeamEventsPanel';
 
@@ -18,10 +20,10 @@ type TabKey = 'roster' | 'events' | 'history' | 'frb';
 type RosterView = 'grid' | 'list';
 
 function attendanceColor(rate: number | null) {
-    if (rate == null) return '#94A3B8';
-    if (rate >= 75) return '#0B7A55';
-    if (rate >= 50) return '#B45309';
-    return '#B42318';
+    if (rate == null) return 'var(--c-faint)';
+    if (rate >= 75) return 'var(--c-success-fg)';
+    if (rate >= 50) return 'var(--c-warning-fg)';
+    return 'var(--c-danger-fg)';
 }
 
 export default function TeamDetailsScreen() {
@@ -41,6 +43,8 @@ export default function TeamDetailsScreen() {
     const [showAdd, setShowAdd] = useState(false);
     const [copied, setCopied] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
+    const [medicalVisaOpen, setMedicalVisaOpen] = useState(false);
+    const [paymentsReportOpen, setPaymentsReportOpen] = useState(false);
     const [removingId, setRemovingId] = useState<number | null>(null);
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -163,7 +167,7 @@ export default function TeamDetailsScreen() {
     if (loading) {
         return (
             <View className="flex-1 items-center justify-center bg-[#EDF4FB]">
-                <ActivityIndicator size="large" color="#1D3E90" />
+                <ActivityIndicator size="large" color="var(--c-brand-fg)" />
             </View>
         );
     }
@@ -180,8 +184,8 @@ export default function TeamDetailsScreen() {
     }
 
     const frb = isFrbTeam(team);
-    const accentColor = frb ? '#C62828' : '#0E9F6E';
-    const crestTint = frb ? '#FBEAEA' : '#E6F8F1';
+    const accentColor = frb ? 'var(--c-danger)' : 'var(--c-success)';
+    const crestTint = frb ? 'var(--c-danger-bg)' : 'var(--c-success-bg)';
     const monthlyAtt = stats?.monthlyAttendanceRate ?? null;
     const arrears = stats?.playersWithArrears ?? 0;
 
@@ -193,17 +197,25 @@ export default function TeamDetailsScreen() {
                     {/* Top bar */}
                     <View className="flex-row items-center justify-between mb-5">
                         <Pressable onPress={() => router.push('/admin/my-club-admin' as any)} className="flex-row items-center gap-2 h-9 pl-2 pr-3.5 rounded-full bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]">
-                            <ArrowLeft size={16} color="#0E2041" />
+                            <ArrowLeft size={16} color="var(--c-ink)" />
                             <Text className="text-[#0E2041] text-[12px] font-black">My Club</Text>
                         </Pressable>
                         <View className="flex-row items-center gap-2">
-                            <Pressable onPress={() => router.push('/admin/schedule' as any)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-full bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]">
-                                <Calendar size={14} color="#1D3E90" />
+                            <Pressable onPress={() => router.push(`/admin/schedule?teamId=${team.id}` as any)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-full bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]">
+                                <Calendar size={14} color="var(--c-brand-fg)" />
                                 <Text className="text-[#1D3E90] text-[12px] font-black">Program</Text>
                             </Pressable>
-                            <Pressable onPress={() => router.push(`/admin/attendance/${team.id}` as any)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-full bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]">
-                                <ClipboardCheck size={14} color="#1D3E90" />
+                            <Pressable onPress={() => router.push(`/admin/schedule?teamId=${team.id}&tab=attendance` as any)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-full bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]">
+                                <ClipboardCheck size={14} color="var(--c-brand-fg)" />
                                 <Text className="text-[#1D3E90] text-[12px] font-black">Prezență</Text>
+                            </Pressable>
+                            <Pressable onPress={() => setMedicalVisaOpen(true)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-full bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]">
+                                <ShieldCheck size={14} color="var(--c-success-fg)" />
+                                <Text className="text-[#1D3E90] text-[12px] font-black">Vize medicale</Text>
+                            </Pressable>
+                            <Pressable onPress={() => setPaymentsReportOpen(true)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-full bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]">
+                                <Receipt size={14} color="var(--c-brand-fg)" />
+                                <Text className="text-[#1D3E90] text-[12px] font-black">Raport plăți</Text>
                             </Pressable>
                             <Pressable onPress={() => setEditOpen(true)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-full bg-[#1D3E90] active:bg-[#15316f]">
                                 <Pencil size={14} color="#ffffff" />
@@ -222,10 +234,10 @@ export default function TeamDetailsScreen() {
                                 <Text className="text-[#0E2041] text-[22px] font-black leading-tight" numberOfLines={2}>{team.name}</Text>
                                 <View className="flex-row flex-wrap items-center gap-1.5 mt-2">
                                     <View className="flex-row items-center gap-1 px-2 py-1 rounded-full" style={{ backgroundColor: crestTint }}>
-                                        <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: frb ? '#8A1F1F' : '#0B7A55' }}>{frb ? 'Sincronizat FRB' : 'Administrat local'}</Text>
+                                        <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}>{frb ? 'Sincronizat FRB' : 'Administrat local'}</Text>
                                     </View>
                                     {team.gender && (
-                                        <View className="px-2 py-1 rounded-full" style={{ backgroundColor: team.gender === 'M' ? '#EEF1F8' : '#FBEAF2' }}>
+                                        <View className="px-2 py-1 rounded-full" style={{ backgroundColor: team.gender === 'M' ? 'var(--c-surface-tint)' : 'var(--c-danger-bg)' }}>
                                             <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: team.gender === 'M' ? '#28345E' : '#7C3560' }}>{GENDER_LABELS[team.gender]}</Text>
                                         </View>
                                     )}
@@ -247,42 +259,42 @@ export default function TeamDetailsScreen() {
                                 <Text className="text-[#1D3E90] text-[22px] font-black tracking-[2px]">{team.inviteCode}</Text>
                             </View>
                             <Pressable onPress={handleCopyInvite} className="w-10 h-10 rounded-[12px] items-center justify-center bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]" accessibilityLabel="Copiază codul">
-                                {copied ? <Check size={17} color="#0B7A55" /> : <Copy size={16} color="#1D3E90" />}
+                                {copied ? <Check size={17} color="var(--c-success-fg)" /> : <Copy size={16} color="var(--c-brand-fg)" />}
                             </Pressable>
                         </View>
                     </View>
 
                     {/* Stats row */}
                     <View className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
-                        <StatCard icon={<Users size={16} color="#1D3E90" />} value={String(players.length)} label="Jucători în lot" tint="#EBF1FF" />
+                        <StatCard icon={<Users size={16} color="var(--c-brand-fg)" />} value={String(players.length)} label="Jucători în lot" tint="var(--c-surface-tint)" />
                         <StatCard
                             icon={<Percent size={16} color={attendanceColor(monthlyAtt)} />}
                             value={monthlyAtt != null ? `${monthlyAtt}%` : '—'}
                             label="Prezență (luna curentă)"
-                            tint="#EBF1FF"
+                            tint="var(--c-surface-tint)"
                         />
                         <StatCard
-                            icon={<ClipboardCheck size={16} color={medicalIssues > 0 ? '#B45309' : '#0B7A55'} />}
+                            icon={<ClipboardCheck size={16} color={medicalIssues > 0 ? 'var(--c-warning-fg)' : 'var(--c-success-fg)'} />}
                             value={medicalIssues > 0 ? String(medicalIssues) : 'La zi'}
                             label={medicalIssues > 0 ? 'vizite de rezolvat' : 'vizite medicale'}
-                            tint={medicalIssues > 0 ? '#FCF3E3' : '#E6F8F1'}
+                            tint={medicalIssues > 0 ? 'var(--c-warning-bg)' : 'var(--c-success-bg)'}
                         />
                         <StatCard
-                            icon={<Wallet size={16} color={arrears > 0 ? '#B42318' : '#0B7A55'} />}
+                            icon={<Wallet size={16} color={arrears > 0 ? 'var(--c-danger-fg)' : 'var(--c-success-fg)'} />}
                             value={arrears > 0 ? String(arrears) : '0'}
                             label={arrears > 0 ? 'jucători cu restanțe' : 'plăți restante'}
-                            tint={arrears > 0 ? '#FBEAEA' : '#E6F8F1'}
+                            tint={arrears > 0 ? 'var(--c-danger-bg)' : 'var(--c-success-bg)'}
                         />
-                        <StatCard icon={<Calendar size={16} color="#1D3E90" />} value={avgAge ? `${avgAge} ani` : '—'} label="Vârstă medie" tint="#EBF1FF" />
+                        <StatCard icon={<Calendar size={16} color="var(--c-brand-fg)" />} value={avgAge ? `${avgAge} ani` : '—'} label="Vârstă medie" tint="var(--c-surface-tint)" />
                     </View>
 
                     {/* Tabs */}
                     <View className="flex-row flex-wrap bg-white p-1 rounded-[14px] border border-[#E3E9F2] self-start mb-4 gap-1">
-                        <TabButton active={tab === 'roster'} onPress={() => setTab('roster')} icon={<Users size={14} color={tab === 'roster' ? '#ffffff' : '#94A3B8'} />} label={`Lot (${players.length})`} />
-                        <TabButton active={tab === 'events'} onPress={() => setTab('events')} icon={<CalendarClock size={14} color={tab === 'events' ? '#ffffff' : '#94A3B8'} />} label="Evenimente" />
-                        <TabButton active={tab === 'history'} onPress={() => setTab('history')} icon={<History size={14} color={tab === 'history' ? '#ffffff' : '#94A3B8'} />} label="Istoric" />
+                        <TabButton active={tab === 'roster'} onPress={() => setTab('roster')} icon={<Users size={14} color={tab === 'roster' ? '#ffffff' : 'var(--c-faint)'} />} label={`Lot (${players.length})`} />
+                        <TabButton active={tab === 'events'} onPress={() => setTab('events')} icon={<CalendarClock size={14} color={tab === 'events' ? '#ffffff' : 'var(--c-faint)'} />} label="Evenimente" />
+                        <TabButton active={tab === 'history'} onPress={() => setTab('history')} icon={<History size={14} color={tab === 'history' ? '#ffffff' : 'var(--c-faint)'} />} label="Istoric" />
                         {frb && (
-                            <TabButton active={tab === 'frb'} onPress={() => setTab('frb')} icon={<ListOrdered size={14} color={tab === 'frb' ? '#ffffff' : '#94A3B8'} />} label="Competiție FRB" />
+                            <TabButton active={tab === 'frb'} onPress={() => setTab('frb')} icon={<ListOrdered size={14} color={tab === 'frb' ? '#ffffff' : 'var(--c-faint)'} />} label="Competiție FRB" />
                         )}
                     </View>
 
@@ -297,27 +309,27 @@ export default function TeamDetailsScreen() {
                             {/* Roster toolbar */}
                             <View className="flex-row flex-wrap items-center gap-3 mb-4">
                                 <View className="relative flex-1 min-w-[200px]">
-                                    <View className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"><Search size={15} color="#94A3B8" /></View>
+                                    <View className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"><Search size={15} color="var(--c-faint)" /></View>
                                     <TextInput
                                         value={rosterQuery}
                                         onChangeText={setRosterQuery}
                                         placeholder="Caută în lot"
-                                        placeholderTextColor="#94A3B8"
+                                        placeholderTextColor="var(--c-faint)"
                                         className="w-full h-10 rounded-[12px] border border-[#DDE7F5] bg-[#FBFDFF] pl-9 pr-3 text-[13px] font-semibold text-[#0E2041]"
                                     />
                                 </View>
                                 {players.length > 0 && (
                                     <View className="flex-row rounded-[12px] border border-[#DDE7F5] overflow-hidden flex-none">
                                         <Pressable onPress={() => setRosterView('grid')} className={`flex-row items-center gap-1.5 h-10 px-3 ${rosterView === 'grid' ? 'bg-[#1D3E90]' : 'bg-white'}`} accessibilityLabel="Vizualizare grid">
-                                            <LayoutGrid size={14} color={rosterView === 'grid' ? '#ffffff' : '#64748B'} />
+                                            <LayoutGrid size={14} color={rosterView === 'grid' ? '#ffffff' : 'var(--c-muted)'} />
                                         </Pressable>
                                         <Pressable onPress={() => setRosterView('list')} className={`flex-row items-center gap-1.5 h-10 px-3 border-l border-[#DDE7F5] ${rosterView === 'list' ? 'bg-[#1D3E90]' : 'bg-white'}`} accessibilityLabel="Vizualizare listă">
-                                            <List size={14} color={rosterView === 'list' ? '#ffffff' : '#64748B'} />
+                                            <List size={14} color={rosterView === 'list' ? '#ffffff' : 'var(--c-muted)'} />
                                         </Pressable>
                                     </View>
                                 )}
                                 <Pressable onPress={() => setShowAdd((v) => !v)} className={`flex-row items-center gap-1.5 h-10 px-4 rounded-[12px] ${showAdd ? 'bg-[#EBF1FF] border border-[#BFD3F5]' : 'bg-[#1D3E90]'}`}>
-                                    {showAdd ? <X size={15} color="#1D3E90" /> : <UserPlus size={15} color="#ffffff" />}
+                                    {showAdd ? <X size={15} color="var(--c-brand-fg)" /> : <UserPlus size={15} color="#ffffff" />}
                                     <Text className={`text-[12px] font-black uppercase tracking-wide ${showAdd ? 'text-[#1D3E90]' : 'text-white'}`}>{showAdd ? 'Închide' : 'Adaugă jucător'}</Text>
                                 </Pressable>
                             </View>
@@ -326,15 +338,15 @@ export default function TeamDetailsScreen() {
                             {showAdd && (
                                 <View className="rounded-[16px] bg-[#F7F9FC] border border-[#E3E9F2] p-4 mb-4">
                                     <View className="relative mb-2">
-                                        <View className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"><Search size={15} color="#94A3B8" /></View>
+                                        <View className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"><Search size={15} color="var(--c-faint)" /></View>
                                         <TextInput
                                             value={searchQuery}
                                             onChangeText={setSearchQuery}
                                             placeholder="Caută jucători existenți după nume"
-                                            placeholderTextColor="#94A3B8"
+                                            placeholderTextColor="var(--c-faint)"
                                             className="w-full h-10 rounded-[12px] border border-[#DDE7F5] bg-white pl-9 pr-9 text-[13px] font-semibold text-[#0E2041]"
                                         />
-                                        {isSearching && <View className="absolute right-3 top-2.5"><ActivityIndicator size="small" color="#1D3E90" /></View>}
+                                        {isSearching && <View className="absolute right-3 top-2.5"><ActivityIndicator size="small" color="var(--c-brand-fg)" /></View>}
                                     </View>
                                     {searchResults.length > 0 && (
                                         <View className="gap-1.5 max-h-[260px] overflow-y-auto">
@@ -363,7 +375,7 @@ export default function TeamDetailsScreen() {
                             {/* Roster grid */}
                             {players.length === 0 ? (
                                 <View className="items-center justify-center py-16">
-                                    <View className="w-14 h-14 rounded-full bg-[#F4F8FD] items-center justify-center mb-3"><Users size={26} color="#94A3B8" /></View>
+                                    <View className="w-14 h-14 rounded-full bg-[#F4F8FD] items-center justify-center mb-3"><Users size={26} color="var(--c-faint)" /></View>
                                     <Text className="text-[#0E2041] text-[14px] font-black mb-1">Niciun jucător în lot</Text>
                                     <Text className="text-[#94A3B8] text-[12.5px] font-semibold">Folosește „Adaugă jucător" pentru a construi lotul.</Text>
                                 </View>
@@ -417,6 +429,24 @@ export default function TeamDetailsScreen() {
                     onSaved={(updated) => { setTeam(updated); setEditOpen(false); }}
                 />
             )}
+
+            <TeamMedicalVisaModal
+                visible={medicalVisaOpen}
+                teamId={teamId}
+                teamName={team.name}
+                onClose={() => setMedicalVisaOpen(false)}
+                onSuccess={(updated, failed) => {
+                    if (updated > 0) loadData();
+                    if (failed > 0) Alert.alert('Eroare', `${failed} actualizări au eșuat.`);
+                }}
+            />
+
+            <TeamPaymentsReportModal
+                visible={paymentsReportOpen}
+                teamId={teamId}
+                teamName={team.name}
+                onClose={() => setPaymentsReportOpen(false)}
+            />
         </View>
     );
 }
@@ -450,9 +480,9 @@ type RowProps = {
 
 function PaymentPill({ status }: { status: 'paid' | 'due' | 'none' }) {
     const map = {
-        due: { bg: '#FBEAEA', fg: '#B42318', label: 'Restanță' },
-        paid: { bg: '#E6F8F1', fg: '#0B7A55', label: 'Achitat' },
-        none: { bg: '#F1F5F9', fg: '#94A3B8', label: 'Fără plăți' },
+        due: { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', label: 'Restanță' },
+        paid: { bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', label: 'Achitat' },
+        none: { bg: 'var(--c-surface-3)', fg: 'var(--c-faint)', label: 'Fără plăți' },
     }[status];
     return (
         <View className="px-2 py-0.5 rounded-full self-start" style={{ backgroundColor: map.bg }}>
@@ -465,10 +495,10 @@ function RowActions({ removing, onOpen, onRemove }: { removing: boolean; onOpen:
     return (
         <View className="flex-row items-center gap-0.5 flex-none">
             <Pressable onPress={onOpen} className="w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[#F1F5F9]" accessibilityLabel="Detalii jucător">
-                <Pencil size={14} color="#64748B" />
+                <Pencil size={14} color="var(--c-muted)" />
             </Pressable>
             <Pressable onPress={onRemove} disabled={removing} className="w-8 h-8 rounded-[9px] items-center justify-center hover:bg-red-50" accessibilityLabel="Scoate din echipă">
-                {removing ? <ActivityIndicator size="small" color="#DC2626" /> : <Trash2 size={14} color="#DC2626" />}
+                {removing ? <ActivityIndicator size="small" color="var(--c-danger)" /> : <Trash2 size={14} color="var(--c-danger)" />}
             </Pressable>
         </View>
     );

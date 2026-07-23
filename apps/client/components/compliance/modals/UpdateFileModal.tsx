@@ -133,7 +133,7 @@ export default function UpdateFileModal({ visible, onClose, onSuccess }: UpdateF
                <Text className="text-xs font-bold text-gray-500">Actualizați expirația (Selecție Multiplă)</Text>
             </View>
             <Pressable onPress={onClose} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center hover:bg-gray-50 transition-colors">
-              <X size={20} color="#64748B" />
+              <X size={20} color="var(--c-muted)" />
             </Pressable>
           </View>
 
@@ -164,14 +164,14 @@ export default function UpdateFileModal({ visible, onClose, onSuccess }: UpdateF
                    <Text className="text-[10px] font-black tracking-widest text-[#1D3E90] uppercase">Jucători Vizați</Text>
                    {players.length > 0 && !loadingPlayers && (
                       <Pressable onPress={handleSelectAllPlayers} className="flex-row items-center gap-1.5 bg-blue-50 px-2 py-1 rounded-md">
-                         <CheckSquare size={12} color="#1D3E90" />
+                         <CheckSquare size={12} color="var(--c-brand-fg)" />
                          <Text className="text-[10px] font-bold text-[#1D3E90] uppercase">{allSelected ? 'Deselectează' : 'Selectează Toți'}</Text>
                       </Pressable>
                    )}
                 </View>
                 
                 <View className="border border-gray-200 bg-white rounded-2xl overflow-hidden min-h-[60px] p-2 flex-row flex-wrap gap-2">
-                   {loadingPlayers && <ActivityIndicator size="small" color="#1D3E90" className="m-2" />}
+                   {loadingPlayers && <ActivityIndicator size="small" color="var(--c-brand-fg)" className="m-2" />}
                    {!loadingPlayers && players.length === 0 && selectedTeamIds.length > 0 && <Text className="p-2 text-gray-400 text-xs">Alegeți altă echipă, aceasta nu are jucători.</Text>}
                    {!loadingPlayers && selectedTeamIds.length === 0 && <Text className="p-2 text-gray-400 text-xs">Alegeți cel puțin o echipă.</Text>}
                    
@@ -200,11 +200,11 @@ export default function UpdateFileModal({ visible, onClose, onSuccess }: UpdateF
                     onPress={() => { if (Platform.OS !== 'web') setShowPicker(true); }}
                     className="flex-row items-center border border-gray-200 bg-gray-50 rounded-2xl px-4 h-14 focus-within:border-[#1D3E90]"
                   >
-                     <CalendarIcon size={18} color="#94A3B8" />
+                     <CalendarIcon size={18} color="var(--c-faint)" />
                      <TextInput 
                        placeholder="DD-MM-YYYY" 
                        className="flex-1 ml-3 text-[14px] font-bold text-[#0E2041] outline-none"
-                       placeholderTextColor="#9ca3af"
+                       placeholderTextColor="var(--c-faint)"
                        value={expiryDate} 
                        onChangeText={handleDateChange}
                        editable={Platform.OS === 'web'}

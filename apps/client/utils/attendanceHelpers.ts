@@ -125,18 +125,24 @@ export function computeDailyAttendance(
   }
 
   const totalEvents = eventsOnDay.length;
+  // A day counts as fully "present"/"absent"/"medical" only when EVERY session
+  // that day has that same status. If the player has several sessions in a day
+  // and only some are graded (or graded present) — e.g. 1 present + 2 still
+  // pending — the day reads as "partial", not "present". A day where nothing was
+  // graded at all reads as "pending" (excluded from the rate).
+  const takenCount = presentCount + absentCount + medicalCount;
   let finalStatus: CellStatus = 'no-session';
 
-  if (presentCount === totalEvents) {
+  if (takenCount === 0) {
+      finalStatus = 'pending';
+  } else if (presentCount === totalEvents) {
       finalStatus = 'present';
   } else if (absentCount === totalEvents) {
       finalStatus = 'absent';
   } else if (medicalCount === totalEvents) {
       finalStatus = 'medical';
-  } else if (presentCount > 0 || absentCount > 0 || medicalCount > 0) {
-      finalStatus = 'partial';
   } else {
-      finalStatus = 'pending';
+      finalStatus = 'partial';
   }
 
   return {

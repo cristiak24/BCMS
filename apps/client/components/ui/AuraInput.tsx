@@ -29,10 +29,10 @@ export default function AuraInput({ label, iconName, error, secureTextEntry, cla
                     error ? 'border-red-500' : isFocused ? 'border-blue-600' : 'border-slate-200'
                 } ${editable ? '' : 'opacity-70'}`}
             >
-                <MaterialIcons name={iconName} size={22} color="#2563EB" style={{ opacity: 0.8 }} />
+                <MaterialIcons name={iconName} size={22} color="var(--c-blue)" style={{ opacity: 0.8 }} />
                 <TextInput
                     className="flex-1 ml-3 text-slate-900 text-base outline-none min-h-[48px] placeholder:text-slate-400"
-                    placeholderTextColor="#9ca3af"
+                    placeholderTextColor="var(--c-faint)"
                     secureTextEntry={isPassword && !isPasswordVisible}
                     editable={editable}
                     accessibilityLabel={label}
@@ -56,7 +56,7 @@ export default function AuraInput({ label, iconName, error, secureTextEntry, cla
                         <MaterialIcons
                             name={isPasswordVisible ? "visibility" : "visibility-off"}
                             size={22}
-                            color="#2563EB"
+                            color="var(--c-blue)"
                         />
                     </Pressable>
                 )}

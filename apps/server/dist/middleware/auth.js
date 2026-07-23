@@ -60,7 +60,7 @@ const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
 });
 exports.authenticate = authenticate;
 const requireSuperadmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    if (!req.user || req.user.role !== 'superadmin') {
+    if (!req.user || req.user.status === 'disabled' || req.user.role !== 'superadmin') {
         return res.status(403).json({ error: 'Forbidden: Requires superadmin role' });
     }
     next();
@@ -70,6 +70,9 @@ const requireRoles = (allowedRoles) => {
     return (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
         if (!req.user) {
             return res.status(401).json({ error: 'Unauthorized: User not found' });
+        }
+        if (req.user.status === 'disabled') {
+            return res.status(403).json({ error: 'Forbidden: User account is disabled' });
         }
         if (req.user.role === 'superadmin') {
             return next();

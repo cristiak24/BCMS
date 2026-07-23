@@ -16,5 +16,5 @@ export default function Landing() {
     router.replace(session ? getHomeRouteForRole(normalizeRole(session.role)) : '/login');
   }, [initializing, router, session]);
 
-  return <LoadingScreen message="Opening BCMS..." backgroundColor="#FFFFFF" color="#2563EB" />;
+  return <LoadingScreen message="Opening BCMS..." backgroundColor="#FFFFFF" color="var(--c-blue)" />;
 }

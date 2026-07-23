@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from '@/src/web/reactNative';
 import { Clock, MapPin, Copy, Ban, RotateCcw } from 'lucide-react';
 import { CalendarEvent } from '../../../services/eventsApi';
-import { EVENT_TYPE_META, isCancelledEvent, formatTimeRange } from '../scheduleShared';
+import { EVENT_TYPE_META, isCancelledEvent, formatTimeRange, RO_LOCALE } from '../scheduleShared';
 
 export const ScheduleEventCard = React.memo(({
   item,
@@ -36,7 +36,7 @@ export const ScheduleEventCard = React.memo(({
       style={{ backgroundColor: meta.soft, borderColor: meta.soft }}
     >
       <Text className="text-[9px] font-black uppercase tracking-wider" style={{ color: meta.onSoft }}>
-        {eventDate.toLocaleString('default', { month: 'short' }).toUpperCase()}
+        {eventDate.toLocaleString(RO_LOCALE, { month: 'short' }).toUpperCase()}
       </Text>
       <Text className="text-[17px] font-black text-[#0E2041] leading-tight">{eventDate.getDate()}</Text>
     </View>
@@ -45,15 +45,15 @@ export const ScheduleEventCard = React.memo(({
   const meta_row = (
     <View className={`${stacked ? 'gap-1.5 mt-1.5' : 'flex-row items-center gap-4 mt-1'}`}>
       <View className="flex-row items-center gap-1.5">
-        <Clock size={13} color="#94A3B8" />
+        <Clock size={13} color="var(--c-faint)" />
         <Text className="text-[12px] text-slate-500 font-bold">
           {formatTimeRange(item.startTime, item.endTime)}
         </Text>
       </View>
       <View className="flex-row items-center gap-1.5 flex-1 min-w-0">
-        <MapPin size={13} color="#94A3B8" />
+        <MapPin size={13} color="var(--c-faint)" />
         <Text numberOfLines={1} className="text-[12px] text-slate-500 font-semibold flex-1">
-          {item.location || 'Main Arena'}
+          {item.location || 'Sală principală'}
         </Text>
       </View>
     </View>
@@ -75,7 +75,7 @@ export const ScheduleEventCard = React.memo(({
       className={`bg-white border border-[#E7EEF7] hover:border-[#C9DBF2] ${cancelled ? 'opacity-60' : ''} ${
         stacked ? 'rounded-[20px] px-4 py-4' : 'rounded-[20px] pl-5 pr-4 py-4 flex-row items-center gap-4'
       }`}
-      style={{ borderLeftWidth: 3, borderLeftColor: cancelled ? '#CBD5E1' : meta.solid }}
+      style={{ borderLeftWidth: 3, borderLeftColor: cancelled ? 'var(--c-border-strong)' : meta.solid }}
     >
       <TouchableOpacity
         onPress={onPress}
@@ -97,7 +97,7 @@ export const ScheduleEventCard = React.memo(({
               <View className="flex-row items-center gap-1.5">
                 {cancelled && (
                   <View className="bg-rose-50 rounded-full px-2.5 py-1 border border-rose-100">
-                    <Text className="text-[9px] font-black uppercase tracking-widest text-rose-500">Cancelled</Text>
+                    <Text className="text-[9px] font-black uppercase tracking-widest text-rose-500">Anulat</Text>
                   </View>
                 )}
                 {typeBadge}
@@ -123,7 +123,7 @@ export const ScheduleEventCard = React.memo(({
               onPress={() => onAttendance?.()}
               className="rounded-full bg-[#EAF1FB] border border-[#D6E4F7] px-3.5 py-2 hover:bg-[#DDE9F9]"
             >
-              <Text className="text-[#1D3E90] text-[10.5px] font-black uppercase tracking-widest">Attendance</Text>
+              <Text className="text-[#1D3E90] text-[10.5px] font-black uppercase tracking-widest">Prezență</Text>
             </TouchableOpacity>
           ) : null}
 
@@ -133,9 +133,9 @@ export const ScheduleEventCard = React.memo(({
                 <TouchableOpacity
                   onPress={() => onDuplicate()}
                   className="w-8 h-8 rounded-full bg-[#F4F7FC] items-center justify-center border border-[#E3EAF5] hover:bg-[#E9EFF8]"
-                  accessibilityLabel="Duplicate event"
+                  accessibilityLabel="Duplică evenimentul"
                 >
-                  <Copy size={14} color="#64748B" />
+                  <Copy size={14} color="var(--c-muted)" />
                 </TouchableOpacity>
               )}
               {onToggleCancelled && (
@@ -144,9 +144,9 @@ export const ScheduleEventCard = React.memo(({
                   className={`w-8 h-8 rounded-full items-center justify-center border ${
                     cancelled ? 'bg-emerald-50 border-emerald-100' : 'bg-[#F4F7FC] border-[#E3EAF5] hover:bg-[#E9EFF8]'
                   }`}
-                  accessibilityLabel={cancelled ? 'Reactivate event' : 'Cancel event'}
+                  accessibilityLabel={cancelled ? 'Reactivează evenimentul' : 'Anulează evenimentul'}
                 >
-                  {cancelled ? <RotateCcw size={14} color="#059669" /> : <Ban size={14} color="#64748B" />}
+                  {cancelled ? <RotateCcw size={14} color="var(--c-success-fg)" /> : <Ban size={14} color="var(--c-muted)" />}
                 </TouchableOpacity>
               )}
             </View>

@@ -137,7 +137,7 @@ export default function InviteUserForm({ onCreated, onCreateClub }: Props) {
             </Text>
           </View>
           <View className="w-12 h-12 rounded-2xl bg-[#E7EEFF] items-center justify-center">
-            <MaterialIcons name="person-add" size={24} color="#173AA8" />
+            <MaterialIcons name="person-add" size={24} color="var(--c-brand-fg)" />
           </View>
         </View>
       </View>
@@ -152,7 +152,7 @@ export default function InviteUserForm({ onCreated, onCreateClub }: Props) {
           placeholder="Full name *"
           autoCapitalize="words"
           className={`rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72] border ${errors.fullName ? 'border-red-300' : 'border-[#DDE6FF]'}`}
-          placeholderTextColor="#9AA7C2"
+          placeholderTextColor="var(--c-faint)"
         />
         {errors.fullName ? <Text className="-mt-2 text-xs font-bold text-red-600">{errors.fullName}</Text> : null}
 
@@ -166,7 +166,7 @@ export default function InviteUserForm({ onCreated, onCreateClub }: Props) {
           autoCapitalize="none"
           keyboardType="email-address"
           className={`rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72] border ${errors.email ? 'border-red-300' : 'border-[#DDE6FF]'}`}
-          placeholderTextColor="#9AA7C2"
+          placeholderTextColor="var(--c-faint)"
         />
         {errors.email ? <Text className="-mt-2 text-xs font-bold text-red-600">{errors.email}</Text> : null}
 
@@ -185,7 +185,7 @@ export default function InviteUserForm({ onCreated, onCreateClub }: Props) {
           <View className="rounded-[28px] border border-dashed border-[#DDE6FF] bg-[#F7F9FF] px-4 py-5 gap-3">
             <View className="flex-row items-start gap-3">
               <View className="w-11 h-11 rounded-2xl bg-[#E7EEFF] items-center justify-center">
-                <MaterialIcons name="apartment" size={22} color="#173AA8" />
+                <MaterialIcons name="apartment" size={22} color="var(--c-brand-fg)" />
               </View>
               <View className="flex-1">
                 <Text className="text-[#102A72] text-[15px] font-bold">No clubs available</Text>
@@ -237,7 +237,7 @@ export default function InviteUserForm({ onCreated, onCreateClub }: Props) {
               The invite will expire automatically after 10 minutes. If it expires, send a new one.
             </Text>
           </View>
-          <MaterialIcons name="schedule" size={22} color="#173AA8" />
+          <MaterialIcons name="schedule" size={22} color="var(--c-brand-fg)" />
         </View>
 
         <Pressable

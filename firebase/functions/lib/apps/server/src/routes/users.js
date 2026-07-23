@@ -4,6 +4,7 @@ const express_1 = require("express");
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 async function listUsers() {
     const rows = await db_1.db.select().from(schema_1.users).orderBy((0, drizzle_orm_1.asc)(schema_1.users.id));
@@ -17,22 +18,12 @@ async function findUserByUid(uid) {
     const rows = await db_1.db.select().from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.uid, uid)).limit(1);
     return rows[0] ?? undefined;
 }
+router.use(auth_1.authenticate);
 // GET /api/users/me
 router.get('/me', async (req, res) => {
-    // Usually set by auth middleware, but we can also check headers
-    const uid = req.headers['x-user-uid'] || req.headers['x-user-id'];
-    if (!uid) {
-        return res.status(401).json({ error: 'Unauthorized: missing uid' });
-    }
     try {
-        let user;
-        // Check if uid is a numeric string (id) or a firebase uid
-        if (!isNaN(Number(uid)) && String(Number(uid)) === uid) {
-            user = await findUserByNumericId(Number(uid));
-        }
-        else {
-            user = await findUserByUid(uid);
-        }
+        const uid = req.firebaseUser?.uid;
+        const user = req.user ?? (uid ? await findUserByUid(uid) : null);
         if (!user) {
             return res.status(404).json({ error: 'User profile not found' });
         }
@@ -56,7 +47,7 @@ router.get('/me', async (req, res) => {
     }
 });
 // GET /api/users
-router.get('/', async (_req, res) => {
+router.get('/', (0, auth_1.requireRoles)(['admin']), async (_req, res) => {
     try {
         const allUsers = await listUsers();
         res.json(allUsers.map((user) => ({
@@ -72,7 +63,7 @@ router.get('/', async (_req, res) => {
     }
 });
 // GET /api/users/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', (0, auth_1.requireRoles)(['admin']), async (req, res) => {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) {
         res.status(400).json({ error: 'Invalid user id' });
@@ -97,7 +88,7 @@ router.get('/:id', async (req, res) => {
     }
 });
 // PATCH /api/users/:id
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', (0, auth_1.requireRoles)(['admin']), async (req, res) => {
     const id = Number(req.params.id);
     const { name, role } = req.body;
     if (Number.isNaN(id)) {

@@ -8,10 +8,10 @@ type TypeFilter = 'all' | 'training' | 'match';
 type Scope = 'past' | 'upcoming';
 
 const TYPE_META: Record<string, { icon: typeof Dumbbell; accent: string; tint: string; label: string }> = {
-    training: { icon: Dumbbell, accent: '#1D3E90', tint: '#EBF1FF', label: 'Antrenament' },
-    match: { icon: Trophy, accent: '#B45309', tint: '#FCF3E3', label: 'Meci' },
-    camp: { icon: MapPin, accent: '#0B7A55', tint: '#E6F8F1', label: 'Cantonament' },
-    admin: { icon: CalendarDays, accent: '#64748B', tint: '#F1F5F9', label: 'Administrativ' },
+    training: { icon: Dumbbell, accent: 'var(--c-brand-fg)', tint: 'var(--c-surface-tint)', label: 'Antrenament' },
+    match: { icon: Trophy, accent: 'var(--c-warning-fg)', tint: 'var(--c-warning-bg)', label: 'Meci' },
+    camp: { icon: MapPin, accent: 'var(--c-success-fg)', tint: 'var(--c-success-bg)', label: 'Cantonament' },
+    admin: { icon: CalendarDays, accent: 'var(--c-muted)', tint: 'var(--c-surface-3)', label: 'Administrativ' },
 };
 
 function metaFor(type: string) {
@@ -85,13 +85,13 @@ export default function TeamEventsPanel({ teamId, scope }: { teamId: number; sco
             </View>
 
             {loading ? (
-                <View className="items-center justify-center py-12"><ActivityIndicator size="large" color="#1D3E90" /></View>
+                <View className="items-center justify-center py-12"><ActivityIndicator size="large" color="var(--c-brand-fg)" /></View>
             ) : error ? (
                 <Text className="text-[13px] font-bold text-[#94A3B8] py-8 text-center">{error}</Text>
             ) : list.length === 0 ? (
                 <View className="items-center justify-center py-14">
                     <View className="w-14 h-14 rounded-full bg-[#EBF1FF] items-center justify-center mb-3">
-                        <CalendarDays size={24} color="#1D3E90" />
+                        <CalendarDays size={24} color="var(--c-brand-fg)" />
                     </View>
                     <Text className="text-[#0E2041] text-[14px] font-black mb-1">
                         {scope === 'past' ? 'Niciun eveniment în istoric' : 'Niciun eveniment programat'}
@@ -119,19 +119,19 @@ export default function TeamEventsPanel({ teamId, scope }: { teamId: number; sco
                                     </View>
                                     <View className="flex-row items-center gap-3 mt-0.5">
                                         <View className="flex-row items-center gap-1">
-                                            <CalendarDays size={11} color="#94A3B8" />
+                                            <CalendarDays size={11} color="var(--c-faint)" />
                                             <Text className="text-[11px] font-bold text-[#94A3B8]">{formatDate(e.startTime)}</Text>
                                         </View>
                                         {e.location ? (
                                             <View className="flex-row items-center gap-1 min-w-0">
-                                                <MapPin size={11} color="#94A3B8" />
+                                                <MapPin size={11} color="var(--c-faint)" />
                                                 <Text className="text-[11px] font-bold text-[#94A3B8] truncate" numberOfLines={1}>{e.location}</Text>
                                             </View>
                                         ) : null}
                                     </View>
                                 </View>
-                                <View className="px-2.5 py-1 rounded-full flex-none" style={{ backgroundColor: scope === 'past' ? '#F1F5F9' : meta.tint }}>
-                                    <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: scope === 'past' ? '#64748B' : meta.accent }}>
+                                <View className="px-2.5 py-1 rounded-full flex-none" style={{ backgroundColor: scope === 'past' ? 'var(--c-surface-3)' : meta.tint }}>
+                                    <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: scope === 'past' ? 'var(--c-muted)' : meta.accent }}>
                                         {scope === 'past' ? 'Încheiat' : 'Programat'}
                                     </Text>
                                 </View>

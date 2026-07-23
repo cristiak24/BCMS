@@ -256,10 +256,10 @@ function ProfileActionsMenu({
               accessibilityRole="button"
             >
               <View className="w-9 h-9 rounded-[14px] bg-[#EAF2FF] items-center justify-center mr-3">
-                <MaterialIcons name="person-outline" size={20} color="#123A97" />
+                <MaterialIcons name="person-outline" size={20} color="var(--c-brand-fg)" />
               </View>
               <Text className="text-[#0E2041] text-[14px] font-black flex-1">View Profile</Text>
-              <MaterialIcons name="chevron-right" size={20} color="#94A3B8" />
+              <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
             </Pressable>
 
             <Pressable
@@ -270,9 +270,9 @@ function ProfileActionsMenu({
             >
               <View className="w-9 h-9 rounded-[14px] bg-[#FFE4E6] items-center justify-center mr-3">
                 {loggingOut ? (
-                  <ActivityIndicator size="small" color="#BE123C" />
+                  <ActivityIndicator size="small" color="var(--c-danger)" />
                 ) : (
-                  <MaterialIcons name="logout" size={20} color="#BE123C" />
+                  <MaterialIcons name="logout" size={20} color="var(--c-danger)" />
                 )}
               </View>
               <Text className="text-[#BE123C] text-[14px] font-black flex-1">

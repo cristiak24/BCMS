@@ -9,24 +9,28 @@ export default function TeamCard({
     team,
     selected,
     deleting,
+    syncing,
     onToggleSelect,
     onOpen,
     onEdit,
     onSchedule,
+    onSync,
     onDelete,
 }: {
     team: Team;
     selected: boolean;
     deleting: boolean;
+    syncing?: boolean;
     onToggleSelect: () => void;
     onOpen: () => void;
     onEdit: () => void;
     onSchedule: () => void;
+    onSync?: () => void;
     onDelete: () => void;
 }) {
     const frb = isFrbTeam(team);
-    const accentColor = frb ? '#C62828' : '#0E9F6E';
-    const crestTint = frb ? '#FBEAEA' : '#E6F8F1';
+    const accentColor = frb ? 'var(--c-danger)' : 'var(--c-success)';
+    const crestTint = frb ? 'var(--c-danger-bg)' : 'var(--c-success-bg)';
     const coachInitials = team.coachName
         ? team.coachName.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()
         : null;
@@ -62,13 +66,13 @@ export default function TeamCard({
             {/* Badges */}
             <View className="flex-row flex-wrap gap-1.5 mb-4">
                 <View className="flex-row items-center gap-1 px-2 py-1 rounded-full" style={{ backgroundColor: crestTint }}>
-                    {frb && <RefreshCw size={9} color={frb ? '#8A1F1F' : '#0B7A55'} />}
-                    <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: frb ? '#8A1F1F' : '#0B7A55' }}>
+                    {frb && <RefreshCw size={9} color={frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)'} />}
+                    <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}>
                         {frb ? 'Sincronizat FRB' : 'Administrat local'}
                     </Text>
                 </View>
                 {team.gender && (
-                    <View className="px-2 py-1 rounded-full" style={{ backgroundColor: team.gender === 'M' ? '#EEF1F8' : '#FBEAF2' }}>
+                    <View className="px-2 py-1 rounded-full" style={{ backgroundColor: team.gender === 'M' ? 'var(--c-surface-tint)' : 'var(--c-danger-bg)' }}>
                         <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: team.gender === 'M' ? '#28345E' : '#7C3560' }}>
                             {GENDER_LABELS[team.gender]}
                         </Text>
@@ -90,23 +94,23 @@ export default function TeamCard({
             <View className="flex-row gap-2.5 mb-4">
                 <View className="flex-1 rounded-[13px] bg-[#F7F9FC] px-3 py-2.5">
                     <View className="flex-row items-center gap-1.5">
-                        <Users size={13} color="#1D3E90" />
+                        <Users size={13} color="var(--c-brand-fg)" />
                         <Text className="text-[15px] font-black text-[#0E2041]">{team.playerCount}</Text>
                     </View>
                     <Text className="text-[10.5px] font-bold text-[#94A3B8] mt-0.5">jucători</Text>
                 </View>
-                <View className="flex-1 rounded-[13px] px-3 py-2.5" style={{ backgroundColor: team.staleMedicalChecks > 0 ? '#FCF3E3' : '#EEFaF4' }}>
+                <View className="flex-1 rounded-[13px] px-3 py-2.5" style={{ backgroundColor: team.staleMedicalChecks > 0 ? 'var(--c-warning-bg)' : 'var(--c-success-bg)' }}>
                     <View className="flex-row items-center gap-1.5">
                         {team.staleMedicalChecks > 0 ? (
                             <>
-                                <AlertTriangle size={13} color="#B45309" />
+                                <AlertTriangle size={13} color="var(--c-warning-fg)" />
                                 <Text className="text-[15px] font-black text-[#B45309]">{team.staleMedicalChecks}</Text>
                             </>
                         ) : (
                             <Text className="text-[13px] font-black text-[#0B7A55]">La zi</Text>
                         )}
                     </View>
-                    <Text className="text-[10.5px] font-bold mt-0.5" style={{ color: team.staleMedicalChecks > 0 ? '#B45309' : '#0B7A55' }}>
+                    <Text className="text-[10.5px] font-bold mt-0.5" style={{ color: team.staleMedicalChecks > 0 ? 'var(--c-warning-fg)' : 'var(--c-success-fg)' }}>
                         {team.staleMedicalChecks > 0 ? 'verificări expirate' : 'verificări medicale'}
                     </Text>
                 </View>
@@ -114,7 +118,7 @@ export default function TeamCard({
 
             {/* Updated timestamp */}
             <View className="flex-row items-center gap-1.5 mb-3.5">
-                <Clock size={12} color="#94A3B8" />
+                <Clock size={12} color="var(--c-faint)" />
                 <Text className="text-[11.5px] font-semibold text-[#94A3B8]">actualizat {formatRelativeDate(team.updatedAt)}</Text>
             </View>
 
@@ -123,9 +127,9 @@ export default function TeamCard({
                 <View className="flex-row items-center gap-2 min-w-0 flex-1">
                     <View
                         className="w-7 h-7 rounded-full items-center justify-center flex-none"
-                        style={{ backgroundColor: coachInitials ? '#EBF1FF' : '#F1F5F9' }}
+                        style={{ backgroundColor: coachInitials ? 'var(--c-surface-tint)' : 'var(--c-surface-3)' }}
                     >
-                        <Text className="text-[10px] font-black" style={{ color: coachInitials ? '#1D3E90' : '#94A3B8' }}>
+                        <Text className="text-[10px] font-black" style={{ color: coachInitials ? 'var(--c-brand-fg)' : 'var(--c-faint)' }}>
                             {coachInitials ?? '—'}
                         </Text>
                     </View>
@@ -133,11 +137,21 @@ export default function TeamCard({
                 </View>
 
                 <View className="flex-row items-center gap-0.5 flex-none">
+                    {frb && onSync && (
+                        <Pressable
+                            onPress={onSync}
+                            disabled={syncing}
+                            className="w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[#F1F5F9]"
+                            accessibilityLabel="Sincronizează din FRB"
+                        >
+                            {syncing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <RefreshCw size={14} color="var(--c-brand-fg)" />}
+                        </Pressable>
+                    )}
                     <Pressable onPress={onEdit} className="w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[#F1F5F9]" accessibilityLabel="Editează">
-                        <Pencil size={14} color="#64748B" />
+                        <Pencil size={14} color="var(--c-muted)" />
                     </Pressable>
                     <Pressable onPress={onSchedule} className="w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[#F1F5F9]" accessibilityLabel="Program">
-                        <Calendar size={14} color="#64748B" />
+                        <Calendar size={14} color="var(--c-muted)" />
                     </Pressable>
                     <Pressable
                         onPress={onDelete}
@@ -145,7 +159,7 @@ export default function TeamCard({
                         className="w-8 h-8 rounded-[9px] items-center justify-center hover:bg-red-50"
                         accessibilityLabel="Șterge"
                     >
-                        {deleting ? <ActivityIndicator size="small" color="#DC2626" /> : <Trash2 size={14} color="#DC2626" />}
+                        {deleting ? <ActivityIndicator size="small" color="var(--c-danger)" /> : <Trash2 size={14} color="var(--c-danger)" />}
                     </Pressable>
                 </View>
             </View>

@@ -18,6 +18,7 @@ export type FinancialSettings = {
     trainingLevy: number;
     facilityFee: number;
     autoAdjust: number; // 1 or 0
+    paymentDueDay: number; // day of month (1..31) the monthly fee is due
     updatedAt: string;
 };
 
@@ -153,8 +154,16 @@ export const financeApi = {
         return apiFetch<StripeAdminConfig>('/finance/stripe/config');
     },
 
-    async getAdminRecentPayments(limit = 12): Promise<AdminRecentPayment[]> {
-        return apiFetch<AdminRecentPayment[]>(`/finance/admin/recent-payments?limit=${limit}`);
+    async getAdminRecentPayments(limit = 12, teamId?: number | null): Promise<AdminRecentPayment[]> {
+        const teamQuery = teamId != null ? `&teamId=${teamId}` : '';
+        return apiFetch<AdminRecentPayment[]>(`/finance/admin/recent-payments?limit=${limit}${teamQuery}`);
+    },
+
+    async createManualPayment(payload: { playerId: number; amount: number; description?: string; method?: string; date?: string }): Promise<{ success: boolean }> {
+        return apiFetch<{ success: boolean }>('/finance/admin/manual-payment', {
+            method: 'POST',
+            body: JSON.stringify({ method: 'cash', ...payload }),
+        });
     },
 
     async getPlayerPaymentSummary(): Promise<PlayerPaymentSummary> {

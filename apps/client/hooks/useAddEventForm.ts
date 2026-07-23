@@ -3,7 +3,7 @@ import { Alert } from '@/src/web/reactNative';
 import AsyncStorage from '@/src/web/asyncStorage';
 import { eventsApi } from '../services/eventsApi';
 
-export type AddEventType = 'training' | 'match' | 'camp' | 'admin';
+export type AddEventType = 'training' | 'match' | 'camp' | 'admin' | 'medical';
 export type AddEventFormField = 'title' | 'description' | 'location' | 'team' | 'startTime' | 'endTime' | 'recurringDays';
 export type AddEventFormErrors = Partial<Record<AddEventFormField, string>>;
 
@@ -181,31 +181,30 @@ export function useAddEventForm(onCreated: () => void) {
     const location = newLocation.trim();
 
     if (!title) {
-      errors.title = 'Event title is required.';
+      errors.title = 'Titlul evenimentului este obligatoriu.';
     }
 
-    if (!description) {
-      errors.description = 'Add a short description so players and staff know what to expect.';
-    } else if (description.length < 12) {
-      errors.description = 'Description should be at least 12 characters.';
+    // Descrierea este opțională; validăm lungimea minimă doar dacă a fost completată.
+    if (description && description.length < 12) {
+      errors.description = 'Descrierea ar trebui să aibă cel puțin 12 caractere.';
     }
 
     if (!location) {
-      errors.location = 'Add a court, venue, or online meeting link.';
+      errors.location = 'Adaugă o sală, o locație sau un link de întâlnire online.';
     }
 
     if (!newTeamId) {
-      errors.team = 'Select the team or group this event belongs to.';
+      errors.team = 'Selectează echipa sau grupul căruia îi aparține evenimentul.';
     }
 
     const effectiveStartTime = normalizeTimeValue(newStartTime, '09:00');
     const effectiveEndTime = keepEndAfterStart(effectiveStartTime, normalizeTimeValue(newEndTime, '10:00'));
 
     if (!effectiveStartTime) {
-      errors.startTime = 'Start time is required.';
+      errors.startTime = 'Ora de început este obligatorie.';
     }
     if (!effectiveEndTime) {
-      errors.endTime = 'End time is required.';
+      errors.endTime = 'Ora de sfârșit este obligatorie.';
     }
 
     if (effectiveStartTime && effectiveEndTime) {
@@ -214,15 +213,15 @@ export function useAddEventForm(onCreated: () => void) {
       const end = getLocalDateTime(endDate, effectiveEndTime);
 
       if (Number.isNaN(start.getTime())) {
-        errors.startTime = 'Choose a valid start time.';
+        errors.startTime = 'Alege o oră de început validă.';
       }
       if (Number.isNaN(end.getTime()) || end <= start) {
-        errors.endTime = 'End time must be after the start time.';
+        errors.endTime = 'Ora de sfârșit trebuie să fie după ora de început.';
       }
     }
 
     if (newEventType === 'training' && isRecurring && recurringDays.length === 0) {
-      errors.recurringDays = 'Pick at least one weekday for recurring trainings.';
+      errors.recurringDays = 'Alege cel puțin o zi pentru antrenamentele recurente.';
     }
 
     setAddEventErrors(errors);

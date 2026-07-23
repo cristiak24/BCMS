@@ -3,8 +3,33 @@ import { admin, firestore, nextNumericId, toIso } from '../lib/firebaseAdmin';
 import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
+import { authenticate, requireRoles } from '../middleware/auth';
+import { db } from '../db';
+import { l12Documents } from '../db/schema';
+import { desc } from 'drizzle-orm';
 
 const router = Router();
+const MAX_L12_PLAYERS = 24;
+
+router.use(authenticate, requireRoles(['admin', 'coach']));
+
+function escapeHtml(value: unknown) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function safeFileSegment(value: unknown) {
+    return String(value ?? 'Necunoscut')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 80) || 'Necunoscut';
+}
 
 router.post('/generate-l12', async (req, res) => {
     try {
@@ -15,8 +40,20 @@ router.post('/generate-l12', async (req, res) => {
             return;
         }
 
-        const teamSnap = await firestore.collection('teams').doc(String(teamId)).get();
-        const team = teamSnap.exists ? (teamSnap.data() as { id: number; name: string }) : { id: Number(teamId), name: 'Echipă Necunoscută' };
+        if (players.length === 0 || players.length > MAX_L12_PLAYERS) {
+            res.status(400).json({ error: `L12 requires between 1 and ${MAX_L12_PLAYERS} players.` });
+            return;
+        }
+
+        let team = { id: Number(teamId), name: 'Echipă Necunoscută' };
+        try {
+            const teamSnap = await firestore.collection('teams').doc(String(teamId)).get();
+            if (teamSnap.exists) {
+                team = teamSnap.data() as { id: number; name: string };
+            }
+        } catch (teamError) {
+            console.error('Error loading team for L12:', teamError);
+        }
 
         const htmlContent = `
             <!DOCTYPE html>
@@ -41,13 +78,13 @@ router.post('/generate-l12', async (req, res) => {
             <body>
                 <div class="header">
                     <h1>Foaie de Joc L12</h1>
-                    <p>Echipa: ${team.name}</p>
+                    <p>Echipa: ${escapeHtml(team.name)}</p>
                 </div>
                 
                 <div class="match-info">
-                    <div>Adversar: ${matchDetails?.opponent || '-'}</div>
-                    <div>Data: ${matchDetails?.date || '-'}</div>
-                    <div>Competiție: ${matchDetails?.competition || '-'}</div>
+                    <div>Adversar: ${escapeHtml(matchDetails?.opponent || '-')}</div>
+                    <div>Data: ${escapeHtml(matchDetails?.date || '-')}</div>
+                    <div>Competiție: ${escapeHtml(matchDetails?.competition || '-')}</div>
                 </div>
 
                 <table>
@@ -64,9 +101,9 @@ router.post('/generate-l12', async (req, res) => {
                         ${players.map((p, index) => `
                             <tr>
                                 <td>${index + 1}</td>
-                                <td>${p.firstName || ''} ${p.lastName || p.name || ''}</td>
-                                <td>${p.category || 'M/F'}</td>
-                                <td>${p.number || '-'}</td>
+                                <td>${escapeHtml(`${p.firstName || ''} ${p.lastName || p.name || ''}`.trim())}</td>
+                                <td>${escapeHtml(p.category || 'M/F')}</td>
+                                <td>${escapeHtml(p.number || '-')}</td>
                                 <td>Valid</td>
                             </tr>
                         `).join('')}
@@ -93,8 +130,7 @@ router.post('/generate-l12', async (req, res) => {
         }
 
         const timestamp = Date.now();
-        const safeOpponentName = (matchDetails?.opponent || 'Necunoscut').replace(/[^a-zA-Z0-9]/g, '_');
-        const filename = `L12_${team.name.replace(/[^a-zA-Z0-9]/g, '_')}_${safeOpponentName}_${timestamp}.pdf`;
+        const filename = `L12_${safeFileSegment(team.name)}_${safeFileSegment(matchDetails?.opponent)}_${timestamp}.pdf`;
         const filePath = path.join(uploadsDir, filename);
 
         const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
@@ -113,15 +149,30 @@ router.post('/generate-l12', async (req, res) => {
         const pdfBuffer = fs.readFileSync(filePath);
         const matchTitle = `${team.name} vs ${matchDetails?.opponent || 'Adversar Necunoscut'}`;
         const documentUrl = `/uploads/l12/${filename}`;
-        const id = await nextNumericId('l12Documents');
 
-        await firestore.collection('l12Documents').doc(String(id)).set({
-            id,
-            teamId: Number(teamId),
-            matchTitle,
-            documentUrl,
-            createdAt: new Date(),
-        });
+        void (async () => {
+            try {
+                const id = await nextNumericId('l12Documents');
+                await firestore.collection('l12Documents').doc(String(id)).set({
+                    id,
+                    teamId: Number(teamId),
+                    matchTitle,
+                    documentUrl,
+                    createdAt: new Date(),
+                });
+            } catch (archiveError) {
+                console.error('Error saving L12 archive entry:', archiveError);
+                try {
+                    await db.insert(l12Documents).values({
+                        teamId: Number(teamId),
+                        matchTitle,
+                        documentUrl,
+                    });
+                } catch (dbArchiveError) {
+                    console.error('Error saving L12 archive entry to Postgres:', dbArchiveError);
+                }
+            }
+        })();
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -134,23 +185,32 @@ router.post('/generate-l12', async (req, res) => {
 
 router.get('/l12', async (_req, res) => {
     try {
-        const snap = await firestore.collection('l12Documents').orderBy('createdAt', 'desc').limit(50).get();
-        const docs = snap.docs.map((docSnap) => {
-            const data = docSnap.data() as {
-                id: number;
-                teamId: number;
-                matchTitle: string;
-                documentUrl: string;
-                createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
-            };
+        try {
+            const snap = await firestore.collection('l12Documents').orderBy('createdAt', 'desc').limit(50).get();
+            const docs = snap.docs.map((docSnap) => {
+                const data = docSnap.data() as {
+                    id: number;
+                    teamId: number;
+                    matchTitle: string;
+                    documentUrl: string;
+                    createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
+                };
 
-            return {
-                ...data,
-                createdAt: toIso(data.createdAt) ?? new Date().toISOString(),
-            };
-        });
+                return {
+                    ...data,
+                    createdAt: toIso(data.createdAt) ?? new Date().toISOString(),
+                };
+            });
 
-        res.json(docs);
+            res.json(docs);
+        } catch (firestoreError) {
+            console.error('[GET /api/documents/l12] Firestore fallback:', firestoreError);
+            const docs = await db.select().from(l12Documents).orderBy(desc(l12Documents.createdAt)).limit(50);
+            res.json(docs.map((doc) => ({
+                ...doc,
+                createdAt: toIso(doc.createdAt) ?? new Date().toISOString(),
+            })));
+        }
     } catch (error) {
         console.error('Error fetching L12 documents:', error);
         res.status(500).json({ error: 'Failed to fetch' });

@@ -52,7 +52,7 @@ function SidebarContent({ pathname, onClose }: { pathname: string; onClose?: () 
               onPress={onClose}
             >
               <Pressable className={`flex-row items-center rounded-2xl px-5 py-4 ${active ? 'bg-[#DCE6FF]' : 'bg-transparent'}`}>
-                <MaterialIcons name={item.icon} size={22} color={active ? '#173AA8' : '#7283A7'} />
+                <MaterialIcons name={item.icon} size={22} color={active ? 'var(--c-brand-fg)' : '#7283A7'} />
                 <Text className={`ml-4 text-[15px] font-semibold ${active ? 'text-[#173AA8]' : 'text-[#56627F]'}`}>
                   {item.label}
                 </Text>

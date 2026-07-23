@@ -12,7 +12,7 @@ export default function PublicRoute({ children }: PublicRouteProps) {
   const { initializing, session } = useFirebaseAuth();
 
   if (initializing) {
-    return <LoadingScreen message="Checking your session..." backgroundColor="#FFFFFF" color="#2563EB" />;
+    return <LoadingScreen message="Checking your session..." backgroundColor="#FFFFFF" color="var(--c-blue)" />;
   }
 
   if (session) {

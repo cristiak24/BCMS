@@ -87,7 +87,7 @@ export default function InviteForm({ onInviteCreated }: Props) {
           </Text>
         </View>
         <View className="w-12 h-12 rounded-2xl bg-blue-50 items-center justify-center">
-          <MaterialIcons name="admin-panel-settings" size={24} color="#1D4ED8" />
+          <MaterialIcons name="admin-panel-settings" size={24} color="var(--c-blue-deep)" />
         </View>
       </View>
 
@@ -101,7 +101,7 @@ export default function InviteForm({ onInviteCreated }: Props) {
               value={name}
               onChangeText={setName}
               placeholder="John Doe"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor="var(--c-faint)"
               className="text-slate-900 font-medium"
             />
           </View>
@@ -118,7 +118,7 @@ export default function InviteForm({ onInviteCreated }: Props) {
               autoCapitalize="none"
               keyboardType="email-address"
               placeholder="admin@club.com"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor="var(--c-faint)"
               className="text-slate-900 font-medium"
             />
           </View>
@@ -133,7 +133,7 @@ export default function InviteForm({ onInviteCreated }: Props) {
               value={clubName}
               onChangeText={setClubName}
               placeholder="Aurora FC"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor="var(--c-faint)"
               className="text-slate-900 font-medium"
             />
           </View>

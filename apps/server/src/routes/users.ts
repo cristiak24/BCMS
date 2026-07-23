@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { users } from '../db/schema';
 import { eq, asc } from 'drizzle-orm';
-import { authenticate } from '../middleware/auth'; // Ensure this exists, or we just rely on uid in headers
+import { authenticate, requireRoles, type AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -21,23 +21,13 @@ async function findUserByUid(uid: string) {
     return rows[0] ?? undefined;
 }
 
-// GET /api/users/me
-router.get('/me', async (req, res) => {
-    // Usually set by auth middleware, but we can also check headers
-    const uid = req.headers['x-user-uid'] as string || req.headers['x-user-id'] as string;
-    
-    if (!uid) {
-        return res.status(401).json({ error: 'Unauthorized: missing uid' });
-    }
+router.use(authenticate);
 
+// GET /api/users/me
+router.get('/me', async (req: AuthenticatedRequest, res) => {
     try {
-        let user;
-        // Check if uid is a numeric string (id) or a firebase uid
-        if (!isNaN(Number(uid)) && String(Number(uid)) === uid) {
-             user = await findUserByNumericId(Number(uid));
-        } else {
-             user = await findUserByUid(uid);
-        }
+        const uid = req.firebaseUser?.uid;
+        const user = req.user ?? (uid ? await findUserByUid(uid) : null);
 
         if (!user) {
             return res.status(404).json({ error: 'User profile not found' });
@@ -63,7 +53,7 @@ router.get('/me', async (req, res) => {
 });
 
 // GET /api/users
-router.get('/', async (_req, res) => {
+router.get('/', requireRoles(['admin']), async (_req, res) => {
     try {
         const allUsers = await listUsers();
         res.json(allUsers.map((user) => ({
@@ -79,7 +69,7 @@ router.get('/', async (_req, res) => {
 });
 
 // GET /api/users/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireRoles(['admin']), async (req, res) => {
     const id = Number(req.params.id);
 
     if (Number.isNaN(id)) {
@@ -108,7 +98,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PATCH /api/users/:id
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireRoles(['admin']), async (req, res) => {
     const id = Number(req.params.id);
     const { name, role } = req.body as { name?: string; role?: string };
 

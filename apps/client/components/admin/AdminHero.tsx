@@ -26,9 +26,14 @@ export default function AdminHero({ title, subtitle, children, className }: Admi
 
 export function AdminMetricCard({ label, value }: { label: string; value: string | number }) {
     return (
-        <View className="px-5 py-4 min-w-[150px] bg-white/95 border border-white/70 rounded-[24px] shadow-lg">
-            <Text className="text-[11px] uppercase tracking-[1.5px] font-black text-slate-500">{label}</Text>
-            <Text className="text-3xl font-black text-slate-900 mt-2">{value}</Text>
+        <View className="flex-1 min-w-[104px] px-4 py-3 md:px-5 md:py-4 bg-white/95 border border-white/70 rounded-[20px] md:rounded-[24px] shadow-lg">
+            <Text
+                numberOfLines={1}
+                className="text-[10px] md:text-[11px] uppercase tracking-[1.2px] md:tracking-[1.5px] font-black text-slate-500"
+            >
+                {label}
+            </Text>
+            <Text className="text-2xl md:text-3xl font-black text-slate-900 mt-1.5 md:mt-2">{value}</Text>
         </View>
     );
 }

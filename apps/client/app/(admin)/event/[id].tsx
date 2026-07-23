@@ -32,27 +32,27 @@ import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../../components/Heade
 const TYPE_META: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   training: {
     label: 'Training',
-    color: '#1D3E90',
-    bg: '#EBF1FF',
-    icon: <Dumbbell size={14} color="#1D3E90" />,
+    color: 'var(--c-brand-fg)',
+    bg: 'var(--c-surface-tint)',
+    icon: <Dumbbell size={14} color="var(--c-brand-fg)" />,
   },
   match: {
     label: 'Match',
     color: '#7C3AED',
-    bg: '#F3EEFF',
+    bg: 'var(--c-surface-tint)',
     icon: <Trophy size={14} color="#7C3AED" />,
   },
   camp: {
     label: 'Camp',
     color: '#0891B2',
-    bg: '#E0F2FE',
+    bg: 'var(--c-surface-tint)',
     icon: <Zap size={14} color="#0891B2" />,
   },
   admin: {
     label: 'Admin',
-    color: '#059669',
-    bg: '#D1FAE5',
-    icon: <Settings size={14} color="#059669" />,
+    color: 'var(--c-success-fg)',
+    bg: 'var(--c-success-bg)',
+    icon: <Settings size={14} color="var(--c-success-fg)" />,
   },
 };
 
@@ -87,7 +87,7 @@ const InfoRow = ({
       style={{
         fontSize: 10,
         fontWeight: '900',
-        color: '#94A3B8',
+        color: 'var(--c-faint)',
         textTransform: 'uppercase',
         letterSpacing: 1.2,
         marginBottom: 6,
@@ -102,7 +102,7 @@ const InfoRow = ({
           width: 36,
           height: 36,
           borderRadius: 12,
-          backgroundColor: '#F1F5F9',
+          backgroundColor: 'var(--c-surface-3)',
           alignItems: 'center',
           justifyContent: 'center',
         }}
@@ -113,7 +113,7 @@ const InfoRow = ({
         style={{
           fontSize: 16,
           fontWeight: '800',
-          color: '#1E293B',
+          color: 'var(--c-ink-soft)',
           flexShrink: 1,
         }}
       >
@@ -132,13 +132,13 @@ const SectionCard = ({
 }) => (
   <View
     style={{
-      backgroundColor: '#ffffff',
+      backgroundColor: 'var(--c-surface)',
       borderRadius: 28,
       padding: 24,
       marginBottom: 16,
       borderWidth: 1,
-      borderColor: '#F1F5F9',
-      shadowColor: '#0F172A',
+      borderColor: 'var(--c-surface-3)',
+      shadowColor: 'var(--c-ink-strong)',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.05,
       shadowRadius: 10,
@@ -149,7 +149,7 @@ const SectionCard = ({
       style={{
         fontSize: 18,
         fontWeight: '900',
-        color: '#1D3E90',
+        color: 'var(--c-brand-fg)',
         marginBottom: 20,
       }}
     >
@@ -171,12 +171,12 @@ const TeamCard = ({
     style={{
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#F8FAFC',
+      backgroundColor: 'var(--c-surface-2)',
       borderRadius: 18,
       padding: 16,
       marginBottom: 10,
       borderWidth: 1,
-      borderColor: '#E2E8F0',
+      borderColor: 'var(--c-border)',
     }}
   >
     {/* Team avatar */}
@@ -185,23 +185,23 @@ const TeamCard = ({
         width: 44,
         height: 44,
         borderRadius: 14,
-        backgroundColor: '#EBF1FF',
+        backgroundColor: 'var(--c-surface-tint)',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 14,
       }}
     >
-      <ShieldCheck size={20} color="#1D3E90" />
+      <ShieldCheck size={20} color="var(--c-brand-fg)" />
     </View>
     <View style={{ flex: 1 }}>
-      <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E293B', marginBottom: 2 }}>
+      <Text style={{ fontSize: 15, fontWeight: '800', color: 'var(--c-ink-soft)', marginBottom: 2 }}>
         {team.name}
       </Text>
       <Text
         style={{
           fontSize: 11,
           fontWeight: '700',
-          color: '#64748B',
+          color: 'var(--c-muted)',
           textTransform: 'uppercase',
           letterSpacing: 0.8,
         }}
@@ -210,14 +210,14 @@ const TeamCard = ({
       </Text>
     </View>
     <View style={{ alignItems: 'flex-end' }}>
-      <Text style={{ fontSize: 20, fontWeight: '900', color: '#1D3E90' }}>
+      <Text style={{ fontSize: 20, fontWeight: '900', color: 'var(--c-brand-fg)' }}>
         {playerCount}
       </Text>
       <Text
         style={{
           fontSize: 9,
           fontWeight: '800',
-          color: '#94A3B8',
+          color: 'var(--c-faint)',
           textTransform: 'uppercase',
           letterSpacing: 0.8,
         }}
@@ -364,14 +364,14 @@ export default function EventDetailScreen() {
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#F8FAFC',
+          backgroundColor: 'var(--c-surface-2)',
         }}
       >
-        <ActivityIndicator size="large" color="#1D3E90" />
+        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
         <Text
           style={{
             marginTop: 14,
-            color: '#94A3B8',
+            color: 'var(--c-faint)',
             fontWeight: '700',
             fontSize: 13,
             textTransform: 'uppercase',
@@ -391,7 +391,7 @@ export default function EventDetailScreen() {
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#F8FAFC',
+          backgroundColor: 'var(--c-surface-2)',
           padding: 32,
         }}
       >
@@ -399,7 +399,7 @@ export default function EventDetailScreen() {
           style={{
             fontSize: 18,
             fontWeight: '800',
-            color: '#1E293B',
+            color: 'var(--c-ink-soft)',
             marginBottom: 12,
             textAlign: 'center',
           }}
@@ -409,7 +409,7 @@ export default function EventDetailScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={{
-            backgroundColor: '#1D3E90',
+            backgroundColor: 'var(--c-brand-surface)',
             paddingHorizontal: 24,
             paddingVertical: 12,
             borderRadius: 20,
@@ -425,7 +425,7 @@ export default function EventDetailScreen() {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: '#F8FAFC' }}
+      style={{ flex: 1, backgroundColor: 'var(--c-surface-2)' }}
       contentContainerStyle={{
         padding: isDesktop ? 32 : 20,
         paddingBottom: 120,
@@ -452,24 +452,24 @@ export default function EventDetailScreen() {
             width: 38,
             height: 38,
             borderRadius: 19,
-            backgroundColor: '#fff',
+            backgroundColor: 'var(--c-surface)',
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: 1,
-            borderColor: '#E2E8F0',
-            shadowColor: '#0F172A',
+            borderColor: 'var(--c-border)',
+            shadowColor: 'var(--c-ink-strong)',
             shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.06,
             shadowRadius: 4,
           }}
         >
-          <ArrowLeft size={18} color="#1E293B" />
+          <ArrowLeft size={18} color="var(--c-ink-soft)" />
         </View>
         <Text
           style={{
             fontSize: 13,
             fontWeight: '700',
-            color: '#64748B',
+            color: 'var(--c-muted)',
             textTransform: 'uppercase',
             letterSpacing: 0.8,
           }}
@@ -491,19 +491,19 @@ export default function EventDetailScreen() {
               paddingHorizontal: 14,
               paddingVertical: 6,
               borderRadius: 20,
-              backgroundColor: isUpcoming ? '#1D3E90' : '#F1F5F9',
+              backgroundColor: isUpcoming ? 'var(--c-brand-surface)' : 'var(--c-surface-3)',
             }}
           >
             {isUpcoming ? (
               <Clock size={12} color="#fff" />
             ) : (
-              <CheckCircle2 size={12} color="#64748B" />
+              <CheckCircle2 size={12} color="var(--c-muted)" />
             )}
             <Text
               style={{
                 fontSize: 11,
                 fontWeight: '900',
-                color: isUpcoming ? '#fff' : '#64748B',
+                color: isUpcoming ? '#fff' : 'var(--c-muted)',
                 textTransform: 'uppercase',
                 letterSpacing: 0.8,
               }}
@@ -544,7 +544,7 @@ export default function EventDetailScreen() {
           style={{
             fontSize: isDesktop ? 38 : 30,
             fontWeight: '900',
-            color: '#1D3E90',
+            color: 'var(--c-brand-fg)',
             lineHeight: isDesktop ? 46 : 38,
             letterSpacing: -0.5,
           }}
@@ -557,7 +557,7 @@ export default function EventDetailScreen() {
           <Text
             style={{
               fontSize: 15,
-              color: '#64748B',
+              color: 'var(--c-muted)',
               fontWeight: '500',
               marginTop: 10,
               lineHeight: 22,
@@ -582,18 +582,18 @@ export default function EventDetailScreen() {
           {/* Event Summary Card */}
           <SectionCard title="Event Summary">
             <InfoRow
-              icon={<Calendar size={18} color="#1D3E90" />}
+              icon={<Calendar size={18} color="var(--c-brand-fg)" />}
               label="Date"
               value={startDate}
             />
             <InfoRow
-              icon={<Clock size={18} color="#1D3E90" />}
+              icon={<Clock size={18} color="var(--c-brand-fg)" />}
               label="Time & Duration"
               value={`${startTime} – ${endTime}  (${duration})`}
             />
             {/* Number of players, sourced from team players if available */}
             <InfoRow
-              icon={<Users size={18} color="#1D3E90" />}
+              icon={<Users size={18} color="var(--c-brand-fg)" />}
               label="Expected Players"
               value={
                 event.teamId && teamPlayers[event.teamId] !== undefined
@@ -611,20 +611,20 @@ export default function EventDetailScreen() {
                   width: 44,
                   height: 44,
                   borderRadius: 14,
-                  backgroundColor: '#EBF1FF',
+                  backgroundColor: 'var(--c-surface-tint)',
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginTop: 2,
                 }}
               >
-                <MapPin size={20} color="#1D3E90" />
+                <MapPin size={20} color="var(--c-brand-fg)" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text
                   style={{
                     fontSize: 17,
                     fontWeight: '800',
-                    color: '#1E293B',
+                    color: 'var(--c-ink-soft)',
                     marginBottom: 4,
                   }}
                 >
@@ -634,7 +634,7 @@ export default function EventDetailScreen() {
                   style={{
                     fontSize: 12,
                     fontWeight: '600',
-                    color: '#94A3B8',
+                    color: 'var(--c-faint)',
                     textTransform: 'uppercase',
                     letterSpacing: 0.6,
                   }}
@@ -650,12 +650,12 @@ export default function EventDetailScreen() {
                 marginTop: 16,
                 height: 110,
                 borderRadius: 18,
-                backgroundColor: '#F1F5F9',
+                backgroundColor: 'var(--c-surface-3)',
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden',
                 borderWidth: 1,
-                borderColor: '#E2E8F0',
+                borderColor: 'var(--c-border)',
               }}
             >
               {/* Simple placeholder that feels like a map */}
@@ -679,7 +679,7 @@ export default function EventDetailScreen() {
                       left: 0,
                       right: 0,
                       height: 1,
-                      backgroundColor: '#1D3E90',
+                      backgroundColor: 'var(--c-brand-surface)',
                     }}
                   />
                 ))}
@@ -692,7 +692,7 @@ export default function EventDetailScreen() {
                       top: 0,
                       bottom: 0,
                       width: 1,
-                      backgroundColor: '#1D3E90',
+                      backgroundColor: 'var(--c-brand-surface)',
                     }}
                   />
                 ))}
@@ -702,10 +702,10 @@ export default function EventDetailScreen() {
                   width: 36,
                   height: 36,
                   borderRadius: 18,
-                  backgroundColor: '#1D3E90',
+                  backgroundColor: 'var(--c-brand-surface)',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  shadowColor: '#1D3E90',
+                  shadowColor: 'var(--c-brand-fg)',
                   shadowOffset: { width: 0, height: 4 },
                   shadowOpacity: 0.4,
                   shadowRadius: 8,
@@ -726,7 +726,7 @@ export default function EventDetailScreen() {
               style={{
                 fontSize: 12,
                 fontWeight: '600',
-                color: '#94A3B8',
+                color: 'var(--c-faint)',
                 marginBottom: 16,
                 marginTop: -10,
               }}
@@ -761,12 +761,12 @@ export default function EventDetailScreen() {
                     justifyContent: 'center',
                   }}
                 >
-                  <Users size={36} color="#CBD5E1" />
+                  <Users size={36} color="var(--c-border-strong)" />
                   <Text
                     style={{
                       fontSize: 13,
                       fontWeight: '700',
-                      color: '#94A3B8',
+                      color: 'var(--c-faint)',
                       marginTop: 10,
                       textTransform: 'uppercase',
                       letterSpacing: 0.6,
@@ -783,15 +783,15 @@ export default function EventDetailScreen() {
           {event.coachName ? (
             <View
               style={{
-                backgroundColor: '#fff',
+                backgroundColor: 'var(--c-surface)',
                 borderRadius: 20,
                 padding: 18,
                 borderWidth: 1,
-                borderColor: '#F1F5F9',
+                borderColor: 'var(--c-surface-3)',
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 14,
-                shadowColor: '#0F172A',
+                shadowColor: 'var(--c-ink-strong)',
                 shadowOffset: { width: 0, height: 1 },
                 shadowOpacity: 0.04,
                 shadowRadius: 6,
@@ -802,7 +802,7 @@ export default function EventDetailScreen() {
                   width: 42,
                   height: 42,
                   borderRadius: 21,
-                  backgroundColor: '#1D3E90',
+                  backgroundColor: 'var(--c-brand-surface)',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -818,7 +818,7 @@ export default function EventDetailScreen() {
                   style={{
                     fontSize: 9,
                     fontWeight: '900',
-                    color: '#94A3B8',
+                    color: 'var(--c-faint)',
                     textTransform: 'uppercase',
                     letterSpacing: 1,
                     marginBottom: 3,
@@ -827,7 +827,7 @@ export default function EventDetailScreen() {
                   Assigned Coach
                 </Text>
                 <Text
-                  style={{ fontSize: 15, fontWeight: '800', color: '#1E293B' }}
+                  style={{ fontSize: 15, fontWeight: '800', color: 'var(--c-ink-soft)' }}
                 >
                   {event.coachName}
                 </Text>
@@ -842,7 +842,7 @@ export default function EventDetailScreen() {
             activeOpacity={0.85}
             style={{
               marginTop: 16,
-              backgroundColor: deleting ? '#FEE2E2' : '#FEF2F2',
+              backgroundColor: deleting ? 'var(--c-danger-bg)' : 'var(--c-danger-bg)',
               borderWidth: 1,
               borderColor: '#FCA5A5',
               borderRadius: 20,
@@ -856,13 +856,13 @@ export default function EventDetailScreen() {
             }}
           >
             {deleting ? (
-              <ActivityIndicator size="small" color="#DC2626" />
+              <ActivityIndicator size="small" color="var(--c-danger)" />
             ) : (
-              <Trash2 size={16} color="#DC2626" />
+              <Trash2 size={16} color="var(--c-danger)" />
             )}
             <Text
               style={{
-                color: '#B91C1C',
+                color: 'var(--c-danger)',
                 fontWeight: '900',
                 fontSize: 13,
                 textTransform: 'uppercase',

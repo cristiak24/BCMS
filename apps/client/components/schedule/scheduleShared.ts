@@ -21,10 +21,11 @@ export const EVENT_TYPE_META: Record<EventType, {
   onSoft: string;
   onSolid: string;
 }> = {
-  match: { label: 'Match', solid: '#1D3E90', border: '#0F3A8A', soft: '#EAF2FF', onSoft: '#1D3E90', onSolid: '#FFFFFF' },
-  training: { label: 'Training', solid: '#0EA5E9', border: '#1D9CE8', soft: '#E1F1FF', onSoft: '#0A5EA8', onSolid: '#FFFFFF' },
-  camp: { label: 'Camp', solid: '#7C3AED', border: '#7C3AED', soft: '#F1E8FF', onSoft: '#6D28D9', onSolid: '#FFFFFF' },
-  admin: { label: 'Admin', solid: '#475569', border: '#64748B', soft: '#F1F5F9', onSoft: '#475569', onSolid: '#FFFFFF' },
+  match: { label: 'Meci', solid: '#1D3E90', border: '#0F3A8A', soft: '#EAF2FF', onSoft: '#1D3E90', onSolid: '#FFFFFF' },
+  training: { label: 'Antrenament', solid: '#0EA5E9', border: '#1D9CE8', soft: '#E1F1FF', onSoft: '#0A5EA8', onSolid: '#FFFFFF' },
+  camp: { label: 'Cantonament', solid: '#7C3AED', border: '#7C3AED', soft: '#F1E8FF', onSoft: '#6D28D9', onSolid: '#FFFFFF' },
+  medical: { label: 'Vizită medicală', solid: '#0E9F6E', border: '#0B7A55', soft: '#E6F8F1', onSoft: '#0B7A55', onSolid: '#FFFFFF' },
+  admin: { label: 'Administrativ', solid: '#475569', border: '#64748B', soft: '#F1F5F9', onSoft: '#475569', onSolid: '#FFFFFF' },
 };
 
 export function getEventTypeMeta(type: EventType) {
@@ -156,15 +157,35 @@ export function groupEventsByDay(events: CalendarEvent[]): Map<string, CalendarE
   return byDay;
 }
 
-// ── Formatting ──────────────────────────────────────────────────────────────
+// ── Formatting (Romanian locale everywhere) ───────────────────────────────
+export const RO_LOCALE = 'ro-RO';
+
+/** Full month names in Romanian, indexed 0–11 (for month tabs/selectors). */
+export const RO_MONTHS = [
+  'Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie',
+  'Iulie', 'August', 'Septembrie', 'Octombrie', 'Noiembrie', 'Decembrie',
+];
+
 export function formatMonthYear(date: Date): string {
-  return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+  return date.toLocaleString(RO_LOCALE, { month: 'long', year: 'numeric' });
+}
+
+export function formatShortMonth(date: Date): string {
+  return date.toLocaleDateString(RO_LOCALE, { month: 'short' });
+}
+
+export function formatShortWeekday(date: Date): string {
+  return date.toLocaleDateString(RO_LOCALE, { weekday: 'short' });
+}
+
+export function formatDayMonth(date: Date): string {
+  return date.toLocaleDateString(RO_LOCALE, { month: 'short', day: 'numeric' });
 }
 
 export function formatEventTime(value: string): string {
   const date = getEventDate(value);
   if (!date) return value;
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleTimeString(RO_LOCALE, { hour: '2-digit', minute: '2-digit' });
 }
 
 export function formatTimeRange(start: string, end: string): string {

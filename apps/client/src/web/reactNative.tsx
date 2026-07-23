@@ -4,10 +4,13 @@ import React, {
   InputHTMLAttributes,
   ReactNode,
   TextareaHTMLAttributes,
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 
 type AnyProps = Record<string, any>;
 type StyleInput = CSSProperties | StyleInput[] | null | false | undefined;
@@ -161,6 +164,44 @@ function cx(...values: Array<string | undefined | false>) {
   return values.filter(Boolean).join(' ') || undefined;
 }
 
+/**
+ * Bridges RN's `onLayout` to the web: measures the element with a
+ * ResizeObserver and reports `{ nativeEvent: { layout: { x, y, width, height } } }`
+ * on mount and whenever the box resizes. Without this, every onLayout-driven
+ * measurement in the app (adaptive carousel heights, etc.) silently never fired.
+ */
+function useLayoutObserver(
+  onLayout?: (event: { nativeEvent: { layout: { x: number; y: number; width: number; height: number } } }) => void,
+) {
+  const onLayoutRef = useRef(onLayout);
+  onLayoutRef.current = onLayout;
+
+  return useCallback((node: HTMLElement | null) => {
+    if (!node || !onLayoutRef.current || typeof ResizeObserver === 'undefined') return undefined;
+    const report = () => {
+      onLayoutRef.current?.({
+        nativeEvent: {
+          layout: { x: node.offsetLeft, y: node.offsetTop, width: node.offsetWidth, height: node.offsetHeight },
+        },
+      });
+    };
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+}
+
+function mergeRefs<T>(...refs: Array<React.Ref<T> | ((node: T | null) => void | (() => void)) | undefined>) {
+  return (node: T | null) => {
+    for (const ref of refs) {
+      if (!ref) continue;
+      if (typeof ref === 'function') ref(node);
+      else (ref as React.MutableRefObject<T | null>).current = node;
+    }
+  };
+}
+
 function createBox(tag: keyof JSX.IntrinsicElements, defaultClassName?: string) {
   return React.forwardRef<HTMLElement, AnyProps>(function Box(props, ref) {
     const { rest, native } = omitNativeProps(props);
@@ -170,10 +211,13 @@ function createBox(tag: keyof JSX.IntrinsicElements, defaultClassName?: string) 
       disabled,
       href,
       onClick,
+      onLayout,
       role,
       style,
       ...domProps
     } = rest;
+
+    const layoutRef = useLayoutObserver(onLayout);
 
     const Element = tag as any;
     return (
@@ -182,7 +226,7 @@ function createBox(tag: keyof JSX.IntrinsicElements, defaultClassName?: string) 
         aria-disabled={disabled || undefined}
         aria-label={native.accessibilityLabel}
         data-testid={native.testID}
-        ref={ref}
+        ref={onLayout ? mergeRefs(ref, layoutRef) : ref}
         role={role || native.accessibilityRole}
         style={withPointerEvents(flattenStyle(style), native.pointerEvents)}
         className={cx(defaultClassName, className)}
@@ -236,10 +280,57 @@ export const Text = React.forwardRef<HTMLElement, AnyProps>(function Text(props,
   );
 });
 
+// Tracks whether we're already inside a Pressable. RN happily nests
+// touchables (backdrop wrapping a card, a card containing buttons, ...), but
+// on web a <button> inside a <button> is invalid HTML — it triggers hydration
+// errors AND the inner control's clicks misfire. So the top-level Pressable
+// renders a real <button> (keyboard, disabled, form submit all work) while any
+// nested Pressable degrades to a <div role="button"> that nests validly.
+const PressableNestingContext = React.createContext(false);
+
 export const Pressable = React.forwardRef<HTMLElement, AnyProps>(function Pressable(props, ref) {
   const { rest, native } = omitNativeProps(props);
   const { children, className, disabled, onClick, style, type, ...domProps } = rest;
-  return (
+  const nested = React.useContext(PressableNestingContext);
+
+  const handleClick = disabled
+    ? undefined
+    : (event: React.MouseEvent<HTMLElement>) => {
+        onClick?.(event);
+        if (!event.defaultPrevented) {
+          native.onPress?.(event);
+        }
+      };
+
+  const content = typeof children === 'function'
+    ? children({ pressed: false, hovered: false, focused: false })
+    : children;
+
+  const rendered = nested ? (
+    <div
+      {...domProps}
+      aria-disabled={disabled || undefined}
+      data-testid={native.testID}
+      ref={ref as any}
+      role="button"
+      tabIndex={disabled ? undefined : 0}
+      onClick={handleClick}
+      onKeyDown={
+        disabled
+          ? undefined
+          : (event: React.KeyboardEvent<HTMLDivElement>) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handleClick?.(event as unknown as React.MouseEvent<HTMLElement>);
+              }
+            }
+      }
+      style={flattenStyle(style)}
+      className={cx('rn-pressable', disabled && 'rn-pressable-disabled', className)}
+    >
+      {content}
+    </div>
+  ) : (
     <button
       {...domProps}
       aria-disabled={disabled || undefined}
@@ -247,22 +338,15 @@ export const Pressable = React.forwardRef<HTMLElement, AnyProps>(function Pressa
       disabled={disabled}
       ref={ref as any}
       type={type || 'button'}
-      onClick={
-        disabled
-          ? undefined
-          : (event) => {
-              onClick?.(event);
-              if (!event.defaultPrevented) {
-                native.onPress?.(event);
-              }
-            }
-      }
+      onClick={handleClick}
       style={flattenStyle(style)}
       className={cx('rn-pressable', className)}
     >
-      {typeof children === 'function' ? children({ pressed: false, hovered: false, focused: false }) : children}
+      {content}
     </button>
   );
+
+  return <PressableNestingContext.Provider value={true}>{rendered}</PressableNestingContext.Provider>;
 });
 
 export const TouchableOpacity = Pressable;
@@ -275,8 +359,28 @@ export type ScrollViewHandle = {
 
 export const ScrollView = React.forwardRef<ScrollViewHandle, AnyProps>(function ScrollView(props, ref) {
   const { rest, native } = omitNativeProps(props);
-  const { children, className, horizontal, style, onScroll, scrollEventThrottle, ...domProps } = rest;
+  const {
+    children,
+    className,
+    horizontal,
+    style,
+    onScroll,
+    scrollEventThrottle,
+    // RN-only scroll props — consumed here so they don't leak onto the DOM node
+    // (React warns about each) and so paging/snap actually work on web.
+    pagingEnabled,
+    snapToInterval,
+    snapToAlignment,
+    snapToOffsets,
+    decelerationRate,
+    onMomentumScrollBegin,
+    onMomentumScrollEnd,
+    onScrollBeginDrag,
+    onScrollEndDrag,
+    ...domProps
+  } = rest;
   const innerRef = React.useRef<HTMLDivElement>(null);
+  const snap = Boolean(pagingEnabled || snapToInterval || snapToOffsets);
 
   React.useImperativeHandle(ref, () => ({
     scrollTo: ({ x, y, animated = true }) => {
@@ -297,12 +401,41 @@ export const ScrollView = React.forwardRef<ScrollViewHandle, AnyProps>(function 
     },
   }), [horizontal]);
 
+  // The web has no momentum-scroll lifecycle; approximate "scroll ended" by
+  // firing the end handlers once scrolling has been idle briefly. This is what
+  // makes swipe-driven carousels update their active index/height on web.
+  const endHandlersRef = useRef({ onMomentumScrollEnd, onScrollEndDrag });
+  endHandlersRef.current = { onMomentumScrollEnd, onScrollEndDrag };
+  useEffect(() => {
+    const node = innerRef.current;
+    if (!node) return;
+    const { onMomentumScrollEnd: end, onScrollEndDrag: drag } = endHandlersRef.current;
+    if (!end && !drag) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const handleScroll = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const evt = { nativeEvent: { contentOffset: { x: node.scrollLeft, y: node.scrollTop } } };
+        endHandlersRef.current.onScrollEndDrag?.(evt);
+        endHandlersRef.current.onMomentumScrollEnd?.(evt);
+      }, 120);
+    };
+    node.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      if (timer) clearTimeout(timer);
+      node.removeEventListener('scroll', handleScroll);
+    };
+  }, [Boolean(onMomentumScrollEnd), Boolean(onScrollEndDrag)]);
+
   return (
     <div
       {...domProps}
       ref={innerRef}
       className={cx('rn-scroll-view', horizontal && 'rn-scroll-horizontal', className)}
-      style={flattenStyle(style)}
+      style={{
+        ...flattenStyle(style),
+        ...(snap ? { scrollSnapType: horizontal ? 'x mandatory' : 'y mandatory' } : null),
+      }}
       onScroll={
         onScroll
           ? (event: React.UIEvent<HTMLDivElement>) => {
@@ -319,7 +452,12 @@ export const ScrollView = React.forwardRef<ScrollViewHandle, AnyProps>(function 
       }
     >
       <div
-        className={cx('rn-scroll-content', native.contentContainerClassName)}
+        className={cx(
+          'rn-scroll-content',
+          horizontal && 'rn-scroll-content-horizontal',
+          snap && 'rn-scroll-snap',
+          native.contentContainerClassName,
+        )}
         style={flattenStyle(native.contentContainerStyle)}
       >
         {children}
@@ -449,9 +587,29 @@ export function ActivityIndicator({ size = 'small', color = '#2563EB', className
   );
 }
 
-export function Modal({ visible, children }: { visible?: boolean; children?: ReactNode }) {
-  if (!visible) return null;
-  return <div className="rn-modal">{children}</div>;
+export function Modal({
+  visible,
+  children,
+  onRequestClose,
+}: {
+  visible?: boolean;
+  children?: ReactNode;
+  onRequestClose?: () => void;
+}) {
+  useEffect(() => {
+    if (!visible || !onRequestClose) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onRequestClose();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [visible, onRequestClose]);
+
+  if (!visible || typeof document === 'undefined') return null;
+  // Render into document.body so `position: fixed` resolves against the viewport
+  // instead of any ancestor that establishes a containing block (e.g. an element
+  // with backdrop-filter/transform/filter such as the blurred app header).
+  return createPortal(<div className="rn-modal">{children}</div>, document.body);
 }
 
 export function Switch({ value, onValueChange, disabled, className }: AnyProps) {

@@ -158,9 +158,9 @@ export function GameCard(props: BaseEventCardProps) {
 export function ResultCard({ homeTeam, awayTeam, score, context, dateLabel, result, compact }: ResultCardProps) {
   const resultTone =
     result === 'W'
-      ? { bg: 'rgba(16,185,129,0.1)', fg: '#059669', border: 'rgba(16,185,129,0.22)', bar: 'linear-gradient(90deg,#10B981,#34D399)', label: 'VICTORIE' }
+      ? { bg: 'rgba(16,185,129,0.1)', fg: 'var(--c-success-fg)', border: 'rgba(16,185,129,0.22)', bar: 'linear-gradient(90deg,#10B981,#34D399)', label: 'VICTORIE' }
       : result === 'L'
-        ? { bg: 'rgba(239,68,68,0.08)', fg: '#DC2626', border: 'rgba(239,68,68,0.16)', bar: 'linear-gradient(90deg,#EF4444,#F87171)', label: 'ÎNFRÂNGERE' }
+        ? { bg: 'rgba(239,68,68,0.08)', fg: 'var(--c-danger)', border: 'rgba(239,68,68,0.16)', bar: 'linear-gradient(90deg,#EF4444,#F87171)', label: 'ÎNFRÂNGERE' }
         : { bg: 'rgba(99,91,255,0.08)', fg: dash.accent, border: 'rgba(99,91,255,0.16)', bar: 'linear-gradient(90deg,#635BFF,#A78BFA)', label: 'FINAL' };
   const showResult = result && result !== 'N/A';
 

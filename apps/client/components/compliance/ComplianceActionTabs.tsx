@@ -31,7 +31,7 @@ export default function ComplianceActionTabs({ activeTab, onChangeTab }: Complia
 
         {/* Filter Button */}
         <Pressable className="bg-gray-50 border border-gray-200 px-4 py-2.5 rounded-full flex-row items-center gap-2 hover:bg-gray-100 transition-colors">
-           <Filter size={16} color="#64748b" />
+           <Filter size={16} color="var(--c-muted)" />
            <Text className="text-[13px] font-bold text-gray-600">Filter</Text>
         </Pressable>
       </View>

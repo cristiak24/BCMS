@@ -37,7 +37,7 @@ export default function ClubSelect({
       <Pressable
         onPress={() => !disabled && setOpen(true)}
         className={`rounded-2xl border px-4 py-4 bg-[#F7F9FF] flex-row items-center justify-between ${disabled ? 'opacity-60' : ''}`}
-        style={{ borderColor: '#DDE6FF' }}
+        style={{ borderColor: 'var(--c-border)' }}
       >
         <View className="flex-1 pr-3">
           <Text className="text-[11px] font-black uppercase tracking-[0.18em] text-[#6B7AA6] mb-1">
@@ -49,9 +49,9 @@ export default function ClubSelect({
         </View>
 
         {loading ? (
-          <ActivityIndicator color="#173AA8" />
+          <ActivityIndicator color="var(--c-brand-fg)" />
         ) : (
-          <MaterialIcons name="keyboard-arrow-down" size={24} color="#6B7AA6" />
+          <MaterialIcons name="keyboard-arrow-down" size={24} color="var(--c-muted)" />
         )}
       </Pressable>
 
@@ -67,7 +67,7 @@ export default function ClubSelect({
                 <Text className="text-[#7483A6] text-[12px] mt-1">The user will be linked to the selected club.</Text>
               </View>
               <Pressable onPress={() => setOpen(false)} className="w-10 h-10 rounded-full bg-[#F4F7FF] items-center justify-center">
-                <MaterialIcons name="close" size={20} color="#6B7AA6" />
+                <MaterialIcons name="close" size={20} color="var(--c-muted)" />
               </Pressable>
             </View>
 
@@ -95,7 +95,7 @@ export default function ClubSelect({
                             {club.usersCount ?? club.userCount} users • {club.adminsCount ?? club.adminCount} admins • {club.pendingInviteCount} pending invites
                           </Text>
                         </View>
-                        {active ? <MaterialIcons name="check-circle" size={22} color="#173AA8" /> : null}
+                        {active ? <MaterialIcons name="check-circle" size={22} color="var(--c-brand-fg)" /> : null}
                       </View>
                     </Pressable>
                   );

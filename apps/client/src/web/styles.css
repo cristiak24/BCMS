@@ -53,7 +53,8 @@ body {
   text-align: inherit;
 }
 
-.rn-pressable:disabled {
+.rn-pressable:disabled,
+.rn-pressable-disabled {
   cursor: default;
   opacity: 0.65;
 }
@@ -80,12 +81,41 @@ body {
   flex-direction: row;
   overflow-x: auto;
   overflow-y: hidden;
+  /* Native horizontal scrollers don't show a scrollbar track; the app supplies
+     its own nav arrows / page dots. A visible web scrollbar looked unpolished
+     and overlapped card content. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.rn-scroll-horizontal::-webkit-scrollbar {
+  display: none;
 }
 
 .rn-scroll-content {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.rn-scroll-content-horizontal {
+  /* A horizontal ScrollView lays its children out in a row (RN semantics).
+     Without this the content container stayed column and every horizontal
+     carousel that didn't add its own flex-row wrapper stacked vertically. */
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.rn-scroll-content-horizontal > * {
+  /* Keep each card/child at its own width so the row overflows and scrolls
+     (paging) instead of flexbox shrinking every child to fit the viewport. */
+  flex-shrink: 0;
+}
+
+.rn-scroll-snap > * {
+  /* pagingEnabled / snapToInterval: each direct child is a snap target. */
+  scroll-snap-align: start;
 }
 
 .rn-text-input {

@@ -36,6 +36,41 @@
       "when": 1777248000002,
       "tag": "0004_create_audit_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777248000003,
+      "tag": "0005_scope_teams_by_club",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777248000004,
+      "tag": "0006_myclub_team_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777248000005,
+      "tag": "0007_scope_finance_documents_by_club",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777248000006,
+      "tag": "0008_attendance_note",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777248000007,
+      "tag": "0009_payment_due_day",
+      "breakpoints": true
     }
   ]
 }

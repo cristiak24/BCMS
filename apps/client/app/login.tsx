@@ -123,13 +123,13 @@ function PageBackdrop() {
             <div className="absolute bottom-0 right-0 h-[48%] w-[62%] skew-x-[-14deg] bg-[#FFF7E8]/52" />
 
             <svg className="absolute inset-0 h-full w-full opacity-80" viewBox="0 0 1440 900" fill="none" preserveAspectRatio="none">
-                <path d="M-80 713C154 585 302 635 472 517C638 402 795 317 1057 374C1222 410 1340 351 1510 268" stroke="#123B95" strokeOpacity="0.10" strokeWidth="3" />
-                <path d="M-92 252C145 334 279 279 463 355C643 429 688 552 905 555C1100 558 1217 482 1510 533" stroke="#059669" strokeOpacity="0.13" strokeWidth="3" />
-                <path d="M83 108H587V365H83V108Z" stroke="#123B95" strokeOpacity="0.08" strokeWidth="2" />
-                <path d="M942 570H1390V874H942V570Z" stroke="#D97706" strokeOpacity="0.10" strokeWidth="2" />
-                <circle cx="336" cy="236" r="72" stroke="#123B95" strokeOpacity="0.08" strokeWidth="2" />
-                <circle cx="1167" cy="722" r="96" stroke="#D97706" strokeOpacity="0.10" strokeWidth="2" />
-                <path d="M336 108V365M83 236H587M1167 570V874M942 722H1390" stroke="#123B95" strokeOpacity="0.055" strokeWidth="2" />
+                <path d="M-80 713C154 585 302 635 472 517C638 402 795 317 1057 374C1222 410 1340 351 1510 268" stroke="var(--c-brand-fg)" strokeOpacity="0.10" strokeWidth="3" />
+                <path d="M-92 252C145 334 279 279 463 355C643 429 688 552 905 555C1100 558 1217 482 1510 533" stroke="var(--c-success-fg)" strokeOpacity="0.13" strokeWidth="3" />
+                <path d="M83 108H587V365H83V108Z" stroke="var(--c-brand-fg)" strokeOpacity="0.08" strokeWidth="2" />
+                <path d="M942 570H1390V874H942V570Z" stroke="var(--c-warning)" strokeOpacity="0.10" strokeWidth="2" />
+                <circle cx="336" cy="236" r="72" stroke="var(--c-brand-fg)" strokeOpacity="0.08" strokeWidth="2" />
+                <circle cx="1167" cy="722" r="96" stroke="var(--c-warning)" strokeOpacity="0.10" strokeWidth="2" />
+                <path d="M336 108V365M83 236H587M1167 570V874M942 722H1390" stroke="var(--c-brand-fg)" strokeOpacity="0.055" strokeWidth="2" />
             </svg>
         </div>
     );
@@ -141,26 +141,26 @@ function TacticsCanvas() {
             <svg aria-hidden="true" className="absolute inset-x-0 top-0 h-[420px] w-full" viewBox="0 0 720 420" fill="none">
                 <defs>
                     <linearGradient id="courtWash" x1="70" x2="690" y1="30" y2="370" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#EAF2FF" />
-                        <stop offset="0.48" stopColor="#F7FAFD" />
-                        <stop offset="1" stopColor="#FFF2D9" />
+                        <stop stopColor="var(--c-tint-fg)" />
+                        <stop offset="0.48" stopColor="var(--c-surface-2)" />
+                        <stop offset="1" stopColor="var(--c-warning-bg)" />
                     </linearGradient>
                     <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-                        <feDropShadow dx="0" dy="18" stdDeviation="22" floodColor="#123B95" floodOpacity="0.16" />
+                        <feDropShadow dx="0" dy="18" stdDeviation="22" floodColor="var(--c-brand-fg)" floodOpacity="0.16" />
                     </filter>
                 </defs>
                 <rect x="22" y="24" width="676" height="366" rx="8" fill="url(#courtWash)" filter="url(#softShadow)" />
-                <rect x="46" y="48" width="628" height="318" rx="8" stroke="#123B95" strokeOpacity="0.16" strokeWidth="2" />
-                <path d="M360 48V366" stroke="#123B95" strokeOpacity="0.12" strokeWidth="2" />
-                <circle cx="360" cy="207" r="54" stroke="#123B95" strokeOpacity="0.14" strokeWidth="2" />
-                <path d="M46 126H158V288H46" stroke="#123B95" strokeOpacity="0.14" strokeWidth="2" />
-                <path d="M674 126H562V288H674" stroke="#123B95" strokeOpacity="0.14" strokeWidth="2" />
-                <path d="M158 158C218 177 218 237 158 256" stroke="#123B95" strokeOpacity="0.14" strokeWidth="2" />
-                <path d="M562 158C502 177 502 237 562 256" stroke="#123B95" strokeOpacity="0.14" strokeWidth="2" />
+                <rect x="46" y="48" width="628" height="318" rx="8" stroke="var(--c-brand-fg)" strokeOpacity="0.16" strokeWidth="2" />
+                <path d="M360 48V366" stroke="var(--c-brand-fg)" strokeOpacity="0.12" strokeWidth="2" />
+                <circle cx="360" cy="207" r="54" stroke="var(--c-brand-fg)" strokeOpacity="0.14" strokeWidth="2" />
+                <path d="M46 126H158V288H46" stroke="var(--c-brand-fg)" strokeOpacity="0.14" strokeWidth="2" />
+                <path d="M674 126H562V288H674" stroke="var(--c-brand-fg)" strokeOpacity="0.14" strokeWidth="2" />
+                <path d="M158 158C218 177 218 237 158 256" stroke="var(--c-brand-fg)" strokeOpacity="0.14" strokeWidth="2" />
+                <path d="M562 158C502 177 502 237 562 256" stroke="var(--c-brand-fg)" strokeOpacity="0.14" strokeWidth="2" />
 
-                <path d="M126 276C206 190 278 244 350 168C411 103 487 113 568 74" stroke="#2563EB" strokeWidth="5" strokeLinecap="round" strokeDasharray="2 14" />
-                <path d="M152 116C226 156 284 147 339 214C389 275 466 288 591 244" stroke="#059669" strokeWidth="4" strokeLinecap="round" />
-                <path d="M248 318C310 282 344 300 407 253C453 219 511 205 610 212" stroke="#D97706" strokeWidth="4" strokeLinecap="round" />
+                <path d="M126 276C206 190 278 244 350 168C411 103 487 113 568 74" stroke="var(--c-blue)" strokeWidth="5" strokeLinecap="round" strokeDasharray="2 14" />
+                <path d="M152 116C226 156 284 147 339 214C389 275 466 288 591 244" stroke="var(--c-success-fg)" strokeWidth="4" strokeLinecap="round" />
+                <path d="M248 318C310 282 344 300 407 253C453 219 511 205 610 212" stroke="var(--c-warning)" strokeWidth="4" strokeLinecap="round" />
             </svg>
 
             <div className="absolute left-[14%] top-[64%] flex h-12 w-12 items-center justify-center rounded-lg bg-[#2563EB] text-white shadow-lg shadow-blue-500/25">
@@ -250,7 +250,7 @@ export default function Login() {
     }, [initializing, navigate, session]);
 
     if (initializing) {
-        return <LoadingScreen message="Verificam sesiunea..." backgroundColor="#FFFFFF" color="#2563EB" />;
+        return <LoadingScreen message="Verificam sesiunea..." backgroundColor="#FFFFFF" color="var(--c-blue)" />;
     }
 
     return (

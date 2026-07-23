@@ -260,6 +260,9 @@ export default function FinancialSettingsPage() {
     const [monthlyFeeInput, setMonthlyFeeInput] = useState('');
     const [editingFee, setEditingFee] = useState(false);
     const [savingFee, setSavingFee] = useState(false);
+    const [dueDayInput, setDueDayInput] = useState('');
+    const [editingDueDay, setEditingDueDay] = useState(false);
+    const [savingDueDay, setSavingDueDay] = useState(false);
     const [stripeConfig, setStripeConfig] = useState<StripeAdminConfig | null>(null);
     const [recentPayments, setRecentPayments] = useState<AdminRecentPayment[]>([]);
     const [loadingStripeConfig, setLoadingStripeConfig] = useState(false);
@@ -292,6 +295,7 @@ export default function FinancialSettingsPage() {
             .then((settingsResponse) => {
                 setSettings(settingsResponse);
                 setMonthlyFeeInput(String(settingsResponse.monthlyPlayerFee || 0));
+                setDueDayInput(String(settingsResponse.paymentDueDay || 25));
             })
             .catch((error) => console.error('Failed to load financial settings:', error))
             .finally(() => setLoadingSettings(false));
@@ -501,6 +505,25 @@ export default function FinancialSettingsPage() {
             Alert.alert('Eroare', 'Nu s-a putut actualiza cotizația.');
         } finally {
             setSavingFee(false);
+        }
+    };
+
+    const handleSaveDueDay = async () => {
+        const day = parseInt(dueDayInput, 10);
+        if (isNaN(day) || day < 1 || day > 31) {
+            Alert.alert('Eroare', 'Introduceți o zi validă (între 1 și 31).');
+            return;
+        }
+        setSavingDueDay(true);
+        try {
+            await financeApi.updateSettings({ paymentDueDay: day });
+            setSettings(prev => prev ? { ...prev, paymentDueDay: day } : prev);
+            setEditingDueDay(false);
+            Alert.alert('Succes', `Ziua limită de plată a fost setată la ${day}.`);
+        } catch {
+            Alert.alert('Eroare', 'Nu s-a putut actualiza ziua limită.');
+        } finally {
+            setSavingDueDay(false);
         }
     };
 
@@ -888,10 +911,74 @@ export default function FinancialSettingsPage() {
                                 )}
                             </View>
 
+                            {/* Payment due day */}
+                            <View className="rounded-[18px] p-5 border mb-4" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
+                                <View className="flex-row justify-between items-center mb-3">
+                                    <Text className="font-bold text-[11px] uppercase tracking-wider" style={{ color: dash.muted }}>Zi limită de plată</Text>
+                                    {!editingDueDay && (
+                                        <Pressable onPress={() => setEditingDueDay(true)} className="flex-row items-center gap-1 px-3 py-1.5 rounded-[10px]" style={{ backgroundColor: 'rgba(99,91,255,0.08)' }}>
+                                            <MaterialIcons name="edit" size={12} color={dash.accent} />
+                                            <Text className="text-[12px] font-bold" style={{ color: dash.accent }}>Modifică</Text>
+                                        </Pressable>
+                                    )}
+                                </View>
+
+                                {editingDueDay ? (
+                                    <View>
+                                        <View className="flex-row items-center mb-3">
+                                            <Text className="text-[15px] font-bold mr-3" style={{ color: dash.faint }}>Ziua</Text>
+                                            <TextInput
+                                                value={dueDayInput}
+                                                onChangeText={setDueDayInput}
+                                                keyboardType="numeric"
+                                                maxLength={2}
+                                                className="w-[80px] rounded-[14px] h-[50px] px-4 text-[20px] font-black border text-center"
+                                                style={{ backgroundColor: dash.surface, borderColor: dash.hairlineStrong, color: dash.ink }}
+                                                placeholder="25"
+                                                placeholderTextColor={dash.faint}
+                                            />
+                                            <Text className="text-[15px] font-bold ml-3 flex-1" style={{ color: dash.faint }}>a lunii următoare</Text>
+                                        </View>
+                                        <View className="flex-row gap-3">
+                                            <Pressable
+                                                onPress={handleSaveDueDay}
+                                                disabled={savingDueDay}
+                                                className="flex-1 h-[46px] rounded-[14px] items-center justify-center flex-row gap-1.5"
+                                                style={{ backgroundColor: dash.ink }}
+                                            >
+                                                {savingDueDay
+                                                    ? <ActivityIndicator color="white" size="small" />
+                                                    : <><MaterialIcons name="save" size={14} color="#fff" /><Text className="text-white font-bold">Salvează</Text></>
+                                                }
+                                            </Pressable>
+                                            <Pressable
+                                                onPress={() => {
+                                                    setEditingDueDay(false);
+                                                    setDueDayInput(String(settings?.paymentDueDay || 25));
+                                                }}
+                                                className="flex-1 h-[46px] rounded-[14px] items-center justify-center"
+                                                style={{ backgroundColor: dash.lineSoft }}
+                                            >
+                                                <Text className="font-bold" style={{ color: dash.muted }}>Anulează</Text>
+                                            </Pressable>
+                                        </View>
+                                    </View>
+                                ) : (
+                                    loadingSettings ? (
+                                        <SkeletonBlock width={120} height={32} />
+                                    ) : (
+                                        <View className="flex-row items-end">
+                                            <Text className="text-[32px] font-black leading-none" style={{ color: dash.ink }}>{settings?.paymentDueDay || 25}</Text>
+                                            <Text className="text-[15px] font-bold ml-2 mb-1" style={{ color: dash.faint }}>a lunii următoare</Text>
+                                        </View>
+                                    )
+                                )}
+                            </View>
+
                             <View className="flex-row items-center p-3 rounded-[14px]" style={{ backgroundColor: 'rgba(37,99,235,0.06)' }}>
                                 <MaterialIcons name="info-outline" size={16} color={dash.accentBlue} style={{ marginRight: 8 }} />
                                 <Text className="text-[12px] font-medium flex-1" style={{ color: dash.accentBlue }}>
-                                    Modificarea se aplică pentru clubul tău și este folosită de toți jucătorii din echipele administrate.
+                                    Ex: ziua 25 înseamnă că, până pe 25 august, jucătorii pot plăti cotizația pe luna iulie.
                                 </Text>
                             </View>
                         </View>

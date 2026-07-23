@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, integer, text, timestamp, unique, foreignKey, pgEnum } from "drizzle-orm/pg-core"
+import { pgTable, serial, varchar, integer, text, timestamp, unique, foreignKey, pgEnum, boolean } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const role = pgEnum("role", ['admin', 'coach', 'accountant', 'player', 'parent', 'staff', 'superadmin'])
@@ -6,6 +6,8 @@ export const status = pgEnum("status", ['pending', 'processed', 'rejected'])
 export const userStatus = pgEnum("user_status", ['active', 'pending', 'disabled'])
 export const accessRequestStatus = pgEnum("access_request_status", ['pending', 'approved', 'denied'])
 export const inviteStatus = pgEnum("invite_status", ['pending', 'accepted', 'expired', 'revoked'])
+export const teamGender = pgEnum("team_gender", ['M', 'F'])
+export const teamLevel = pgEnum("team_level", ['national', 'municipal', 'initiere'])
 
 
 
@@ -17,7 +19,14 @@ export const financialDocuments = pgTable("financial_documents", {
 	date: timestamp({ mode: 'string' }).defaultNow().notNull(),
 	documentUrl: text("document_url"),
 	status: status().default('pending').notNull(),
-});
+	clubId: integer("club_id"),
+}, (table) => [
+	foreignKey({
+			columns: [table.clubId],
+			foreignColumns: [clubs.id],
+			name: "financial_documents_club_id_clubs_id_fk"
+		}),
+]);
 
 export const users = pgTable("users", {
 	id: serial().primaryKey().notNull(),
@@ -73,13 +82,23 @@ export const teams = pgTable("teams", {
 	seasonName: varchar("season_name", { length: 255 }).notNull(),
 	inviteCode: varchar("invite_code", { length: 10 }).notNull(),
 	clubId: integer("club_id"),
+	gender: teamGender(),
+	level: teamLevel(),
+	coachId: integer("coach_id"),
+	isActive: boolean("is_active").default(true).notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	unique("teams_invite_code_unique").on(table.inviteCode),
 	foreignKey({
 			columns: [table.clubId],
 			foreignColumns: [clubs.id],
 			name: "teams_club_id_clubs_id_fk"
+		}),
+	foreignKey({
+			columns: [table.coachId],
+			foreignColumns: [users.id],
+			name: "teams_coach_id_users_id_fk"
 		}),
 ]);
 
@@ -123,6 +142,7 @@ export const financialSettings = pgTable("financial_settings", {
 	trainingLevy: integer("training_levy").default(0).notNull(),
 	facilityFee: integer("facility_fee").default(0).notNull(),
 	autoAdjust: integer("auto_adjust").default(1).notNull(),
+	paymentDueDay: integer("payment_due_day").default(25).notNull(),
 	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
 });
 
@@ -159,6 +179,8 @@ export const attendance = pgTable("attendance", {
 	date: timestamp({ mode: 'string' }).defaultNow().notNull(),
 	status: varchar({ length: 50 }).notNull(),
 	eventId: integer("event_id"),
+	// Per-player coach feedback for the session (optional free-text note).
+	note: text("note"),
 }, (table) => [
 	foreignKey({
 			columns: [table.playerId],

@@ -49,7 +49,7 @@ export default function ClubsDirectoryScreen() {
   if (loading && clubs.length === 0) {
     return (
       <View className="flex-1 items-center justify-center bg-[#EEF3FF]">
-        <ActivityIndicator size="large" color="#173AA8" />
+        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
       </View>
     );
   }
@@ -89,7 +89,7 @@ export default function ClubsDirectoryScreen() {
 
         {clubs.length === 0 ? (
           <View className="rounded-[28px] border border-dashed border-[#DDE6FF] bg-white px-6 py-8 items-center">
-            <MaterialIcons name="apartment" size={32} color="#173AA8" />
+            <MaterialIcons name="apartment" size={32} color="var(--c-brand-fg)" />
             <Text className="text-[#102A72] text-[18px] font-black mt-4">No clubs yet</Text>
             <Text className="text-[#7483A6] text-[13px] mt-2 text-center max-w-[520px] leading-6">
               Create the first club so super-admin invitations can be linked to it and the Create User dropdown can populate immediately.
@@ -115,7 +115,7 @@ export default function ClubsDirectoryScreen() {
                     </Text>
                   </View>
                   <View className="w-11 h-11 rounded-2xl bg-[#E7EEFF] items-center justify-center">
-                    <MaterialIcons name="verified" size={20} color="#173AA8" />
+                    <MaterialIcons name="verified" size={20} color="var(--c-brand-fg)" />
                   </View>
                 </View>
 

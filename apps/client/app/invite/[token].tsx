@@ -127,7 +127,7 @@ export default function InviteRegistrationScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-[#EEF3FF]">
-        <ActivityIndicator size="large" color="#173AA8" />
+        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
       </View>
     );
   }
@@ -146,7 +146,7 @@ export default function InviteRegistrationScreen() {
         showsVerticalScrollIndicator={false}
       >
         <LinearGradient
-          colors={['#EAF1FF', '#F7F9FF', '#EEF3FF']}
+          colors={['var(--c-surface-tint)', 'var(--c-surface-2)', 'var(--c-tint-fg)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
@@ -170,7 +170,7 @@ export default function InviteRegistrationScreen() {
                   </Text>
                 </View>
                 <View className="w-12 h-12 rounded-2xl bg-[#E7EEFF] items-center justify-center">
-                  <MaterialIcons name="verified-user" size={24} color="#173AA8" />
+                  <MaterialIcons name="verified-user" size={24} color="var(--c-brand-fg)" />
                 </View>
               </View>
 
@@ -228,14 +228,14 @@ export default function InviteRegistrationScreen() {
                   onChangeText={setFirstName}
                   placeholder="First name"
                   className="rounded-2xl bg-[#F7F9FF] px-4 py-4 border border-[#DDE6FF] text-[#102A72]"
-                  placeholderTextColor="#9AA7C2"
+                  placeholderTextColor="var(--c-faint)"
                 />
                 <TextInput
                   value={lastName}
                   onChangeText={setLastName}
                   placeholder="Last name"
                   className="rounded-2xl bg-[#F7F9FF] px-4 py-4 border border-[#DDE6FF] text-[#102A72]"
-                  placeholderTextColor="#9AA7C2"
+                  placeholderTextColor="var(--c-faint)"
                 />
                 <TextInput
                   value={phone}
@@ -243,7 +243,7 @@ export default function InviteRegistrationScreen() {
                   placeholder="Phone number"
                   keyboardType="phone-pad"
                   className="rounded-2xl bg-[#F7F9FF] px-4 py-4 border border-[#DDE6FF] text-[#102A72]"
-                  placeholderTextColor="#9AA7C2"
+                  placeholderTextColor="var(--c-faint)"
                 />
                 <TextInput
                   value={password}
@@ -251,7 +251,7 @@ export default function InviteRegistrationScreen() {
                   placeholder="Password"
                   secureTextEntry
                   className="rounded-2xl bg-[#F7F9FF] px-4 py-4 border border-[#DDE6FF] text-[#102A72]"
-                  placeholderTextColor="#9AA7C2"
+                  placeholderTextColor="var(--c-faint)"
                 />
                 <TextInput
                   value={confirmPassword}
@@ -259,7 +259,7 @@ export default function InviteRegistrationScreen() {
                   placeholder="Confirm password"
                   secureTextEntry
                   className="rounded-2xl bg-[#F7F9FF] px-4 py-4 border border-[#DDE6FF] text-[#102A72]"
-                  placeholderTextColor="#9AA7C2"
+                  placeholderTextColor="var(--c-faint)"
                 />
               </View>
 

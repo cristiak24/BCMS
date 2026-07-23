@@ -44,7 +44,7 @@ export function MobileBottomNavigation({
 }: MobileBottomNavigationProps) {
   return (
     <View
-      className="flex lg:hidden flex-row items-center bg-white border-t border-[#E6EEF8] absolute bottom-0 w-full z-20 px-2"
+      className="flex lg:hidden flex-row items-center bg-white border-t border-[#E6EEF8] fixed bottom-0 left-0 right-0 w-full z-20 px-2"
       style={{ paddingTop: 10, paddingBottom: Math.max(bottomInset, 12), ...theme.shadow.lift }}
     >
       {items.map((item) => {
@@ -53,7 +53,7 @@ export function MobileBottomNavigation({
         return (
           <RouterLink key={item.href} to={item.href} className="flex-1 no-underline">
             <View className="items-center justify-center py-1 px-1">
-              <View className="items-center justify-center rounded-[18px] px-2 py-2 min-h-[52px] w-full" style={{ backgroundColor: isActive ? '#EAF2FF' : 'transparent' }}>
+              <View className="items-center justify-center rounded-[18px] px-2 py-2 min-h-[52px] w-full" style={{ backgroundColor: isActive ? 'var(--c-surface-tint)' : 'transparent' }}>
                 <MaterialIcons name={item.icon} size={20} color={isActive ? theme.colors.royal : theme.colors.faint} />
                 <Text className="text-[10px] mt-1 font-black" style={{ color: isActive ? theme.colors.royal : theme.colors.faint }} numberOfLines={1}>
                   {item.label}
@@ -69,7 +69,7 @@ export function MobileBottomNavigation({
         accessibilityRole="button"
         accessibilityLabel="Open all admin pages"
       >
-        <View className="items-center justify-center rounded-[18px] px-2 py-2 min-h-[52px] w-full" style={{ backgroundColor: moreIsActive ? '#EAF2FF' : 'transparent' }}>
+        <View className="items-center justify-center rounded-[18px] px-2 py-2 min-h-[52px] w-full" style={{ backgroundColor: moreIsActive ? 'var(--c-surface-tint)' : 'transparent' }}>
           <MaterialIcons name="apps" size={20} color={moreIsActive ? theme.colors.royal : theme.colors.faint} />
           <Text className="text-[10px] mt-1 font-black" style={{ color: moreIsActive ? theme.colors.royal : theme.colors.faint }} numberOfLines={1}>
             More
@@ -116,11 +116,11 @@ export function MobileNavigationSheet({
                       }}
                       className="min-h-[58px] rounded-[22px] px-4 flex-row items-center border"
                       style={{
-                        backgroundColor: active ? '#0B1E3D' : '#FFFFFF',
-                        borderColor: active ? '#0B1E3D' : theme.colors.lineSoft,
+                        backgroundColor: active ? 'var(--c-brand-surface-deep)' : 'var(--c-surface)',
+                        borderColor: active ? 'var(--c-ink-strong)' : theme.colors.lineSoft,
                       }}
                     >
-                      <View className="w-10 h-10 rounded-[16px] items-center justify-center mr-3" style={{ backgroundColor: active ? 'rgba(255,255,255,0.14)' : '#F2F6FD' }}>
+                      <View className="w-10 h-10 rounded-[16px] items-center justify-center mr-3" style={{ backgroundColor: active ? 'rgba(255,255,255,0.14)' : 'var(--c-surface-2)' }}>
                         <MaterialIcons name={item.icon} size={19} color={active ? '#FFFFFF' : theme.colors.royal} />
                       </View>
                       <Text className="text-[14px] font-black flex-1" style={{ color: active ? '#FFFFFF' : theme.colors.text }}>

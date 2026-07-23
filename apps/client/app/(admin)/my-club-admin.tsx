@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable } from '@/src/web/reactNative';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, ScrollView, Pressable } from '@/src/web/reactNative';
 import { useRouter } from '@/src/web/expoRouter';
 import { RefreshCw, Plus } from 'lucide-react';
 import AdminHero from '../../components/admin/AdminHero';
@@ -8,13 +8,30 @@ import { teamsApi, Team, Coach } from '../../services/teamsApi';
 import { useTeamFilters } from '../../hooks/useTeamFilters';
 import { isFrbTeam } from '../../components/myclub/teamDisplay';
 import MyClubKpiStrip from '../../components/myclub/MyClubKpiStrip';
+import MyClubSkeleton from '../../components/myclub/MyClubSkeleton';
 import TeamFiltersBar from '../../components/myclub/TeamFiltersBar';
 import BulkActionBar from '../../components/myclub/BulkActionBar';
 import TeamCard from '../../components/myclub/TeamCard';
 import TeamTable from '../../components/myclub/TeamTable';
 import CreateTeamWizard from '../../components/myclub/CreateTeamWizard';
 import EditTeamModal from '../../components/myclub/EditTeamModal';
+import ThemedCheckbox from '../../components/myclub/ThemedCheckbox';
 import { NoTeamsEmptyState, NoResultsEmptyState } from '../../components/myclub/EmptyState';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { ToastHost, useToasts } from '../../components/ui/Toast';
+
+const VIEW_STORAGE_KEY = 'myclub.view.v1';
+
+/** Compare an FRB team against the federation source and rename if it drifted.
+ * Returns the updated team when a change was applied, otherwise null. */
+async function syncFrbTeam(team: Team): Promise<Team | null> {
+    const frbList = await basketballApi.getTeams(team.frbLeagueId, team.frbSeasonId);
+    const match = frbList.find((f) => f.id === team.frbTeamId);
+    if (match && match.name !== team.name) {
+        return teamsApi.updateTeam(team.id, { name: match.name });
+    }
+    return null;
+}
 
 export default function MyClubAdmin() {
     const router = useRouter();
@@ -22,19 +39,43 @@ export default function MyClubAdmin() {
     const [teams, setTeams] = useState<Team[]>([]);
     const [coaches, setCoaches] = useState<Coach[]>([]);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState<'grid' | 'table'>('grid');
+    const [view, setView] = useState<'grid' | 'table'>(() => {
+        if (typeof window === 'undefined') return 'grid';
+        return window.localStorage.getItem(VIEW_STORAGE_KEY) === 'table' ? 'table' : 'grid';
+    });
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
     const [bulkBusy, setBulkBusy] = useState(false);
-    const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [syncingId, setSyncingId] = useState<number | null>(null);
     const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+    const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
     const [wizardOpen, setWizardOpen] = useState(false);
     const [wizardSource, setWizardSource] = useState<'frb' | undefined>(undefined);
 
-    const { filters, setFilter, resetFilters, filteredTeams } = useTeamFilters(teams);
+    const { toasts, showToast, dismissToast } = useToasts();
+    const {
+        filters, setFilter, resetFilters, filteredTeams,
+        activeFilterCount, sort, setSort, toggleSort, counts, availableLevels,
+    } = useTeamFilters(teams);
+
+    // Pending soft-deletes: team is hidden immediately; the real API call fires
+    // after the undo window elapses so "Anulează" can fully restore it.
+    const pendingDeletes = useRef<Map<number, { team: Team; timer: ReturnType<typeof setTimeout> }>>(new Map());
 
     useEffect(() => {
         void loadAll();
+        // On unmount, commit any deletes still in their undo window.
+        return () => {
+            pendingDeletes.current.forEach(({ team, timer }) => {
+                clearTimeout(timer);
+                void teamsApi.deleteTeam(team.id).catch(() => {});
+            });
+            pendingDeletes.current.clear();
+        };
     }, []);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') window.localStorage.setItem(VIEW_STORAGE_KEY, view);
+    }, [view]);
 
     const loadAll = async () => {
         try {
@@ -47,6 +88,7 @@ export default function MyClubAdmin() {
             setCoaches(coachRows);
         } catch (e) {
             console.error('Failed to load club data', e);
+            showToast({ variant: 'error', message: 'Nu s-au putut încărca echipele. Reîncearcă.' });
         } finally {
             setLoading(false);
         }
@@ -62,28 +104,90 @@ export default function MyClubAdmin() {
 
     const clearSelection = () => setSelectedIds(new Set());
 
-    const openTeam = (id: number) => router.push(`/admin/team/${id}` as any);
-    const openSchedule = () => router.push('/admin/schedule' as any);
+    const allFilteredSelected = filteredTeams.length > 0 && filteredTeams.every((t) => selectedIds.has(t.id));
 
-    const handleDelete = async (team: Team) => {
-        if (!window.confirm(`Sigur vrei să ștergi echipa ${team.name}? Această acțiune este ireversibilă.`)) return;
-        try {
-            setDeletingId(team.id);
-            await teamsApi.deleteTeam(team.id);
-            setTeams((prev) => prev.filter((t) => t.id !== team.id));
-            setSelectedIds((prev) => {
+    const toggleSelectAll = () => {
+        setSelectedIds((prev) => {
+            if (allFilteredSelected) {
                 const next = new Set(prev);
-                next.delete(team.id);
+                filteredTeams.forEach((t) => next.delete(t.id));
                 return next;
-            });
+            }
+            const next = new Set(prev);
+            filteredTeams.forEach((t) => next.add(t.id));
+            return next;
+        });
+    };
+
+    const openTeam = (id: number) => router.push(`/admin/team/${id}` as any);
+    const openSchedule = (teamId: number) => router.push(`/admin/schedule?teamId=${teamId}` as any);
+
+    // ---- Delete with undo -------------------------------------------------
+    const commitDelete = async (id: number) => {
+        const entry = pendingDeletes.current.get(id);
+        if (!entry) return;
+        pendingDeletes.current.delete(id);
+        try {
+            await teamsApi.deleteTeam(id);
         } catch (e) {
-            window.alert(e instanceof Error ? e.message : 'Nu s-a putut șterge echipa.');
-        } finally {
-            setDeletingId(null);
+            // Restore on failure so the admin doesn't lose a team silently.
+            setTeams((prev) => (prev.some((t) => t.id === id) ? prev : [...prev, entry.team]));
+            showToast({ variant: 'error', message: e instanceof Error ? e.message : 'Nu s-a putut șterge echipa.' });
         }
     };
 
-    async function runBulkUpdate(ids: number[], updater: (id: number) => Promise<Team>) {
+    const undoDelete = (id: number) => {
+        const entry = pendingDeletes.current.get(id);
+        if (!entry) return;
+        clearTimeout(entry.timer);
+        pendingDeletes.current.delete(id);
+        setTeams((prev) => (prev.some((t) => t.id === id) ? prev : [...prev, entry.team]));
+    };
+
+    const performDelete = (team: Team) => {
+        setTeams((prev) => prev.filter((t) => t.id !== team.id));
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(team.id);
+            return next;
+        });
+        const timer = setTimeout(() => void commitDelete(team.id), 5000);
+        pendingDeletes.current.set(team.id, { team, timer });
+        showToast({
+            variant: 'info',
+            message: `Echipa „${team.name}” a fost ștearsă.`,
+            duration: 5000,
+            action: { label: 'Anulează', onPress: () => undoDelete(team.id) },
+        });
+    };
+
+    const confirmDelete = () => {
+        if (!teamToDelete) return;
+        performDelete(teamToDelete);
+        setTeamToDelete(null);
+    };
+
+    // ---- Single FRB sync --------------------------------------------------
+    const handleSyncTeam = async (team: Team) => {
+        setSyncingId(team.id);
+        try {
+            const updated = await syncFrbTeam(team);
+            if (updated) {
+                setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                showToast({ variant: 'success', message: `„${team.name}” a fost actualizată din FRB.` });
+            } else {
+                showToast({ variant: 'info', message: `„${team.name}” este deja la zi cu FRB.` });
+            }
+        } catch (e) {
+            console.error('FRB sync failed', e);
+            showToast({ variant: 'error', message: 'Sincronizarea din FRB a eșuat.' });
+        } finally {
+            setSyncingId(null);
+        }
+    };
+
+    // ---- Bulk actions -----------------------------------------------------
+    async function runBulkUpdate(ids: number[], updater: (id: number) => Promise<Team>, successMsg: (n: number) => string) {
         setBulkBusy(true);
         try {
             const results = await Promise.allSettled(ids.map(updater));
@@ -95,9 +199,10 @@ export default function MyClubAdmin() {
             });
             if (succeeded.length > 0) {
                 setTeams((prev) => prev.map((t) => succeeded.find((s) => s.id === t.id) ?? t));
+                showToast({ variant: 'success', message: successMsg(succeeded.length) });
             }
             if (failed > 0) {
-                window.alert(`${failed} ${failed === 1 ? 'echipă nu a putut fi actualizată' : 'echipe nu au putut fi actualizate'}.`);
+                showToast({ variant: 'error', message: `${failed} ${failed === 1 ? 'echipă nu a putut fi actualizată' : 'echipe nu au putut fi actualizate'}.` });
             }
         } finally {
             setBulkBusy(false);
@@ -105,49 +210,41 @@ export default function MyClubAdmin() {
         }
     }
 
-    const handleBulkArchive = () => runBulkUpdate(Array.from(selectedIds), (id) => teamsApi.updateTeam(id, { isActive: false }));
-    const handleBulkActivate = () => runBulkUpdate(Array.from(selectedIds), (id) => teamsApi.updateTeam(id, { isActive: true }));
-    const handleBulkReassignCoach = (coachId: number) => runBulkUpdate(Array.from(selectedIds), (id) => teamsApi.updateTeam(id, { coachId }));
+    const handleBulkArchive = () => runBulkUpdate(
+        Array.from(selectedIds),
+        (id) => teamsApi.updateTeam(id, { isActive: false }),
+        (n) => `${n} ${n === 1 ? 'echipă arhivată' : 'echipe arhivate'}.`,
+    );
+    const handleBulkActivate = () => runBulkUpdate(
+        Array.from(selectedIds),
+        (id) => teamsApi.updateTeam(id, { isActive: true }),
+        (n) => `${n} ${n === 1 ? 'echipă activată' : 'echipe activate'}.`,
+    );
+    const handleBulkReassignCoach = (coachId: number) => runBulkUpdate(
+        Array.from(selectedIds),
+        (id) => teamsApi.updateTeam(id, { coachId }),
+        (n) => `Antrenor schimbat pentru ${n} ${n === 1 ? 'echipă' : 'echipe'}.`,
+    );
 
     const handleBulkSyncFrb = async () => {
         const targets = teams.filter((t) => selectedIds.has(t.id) && isFrbTeam(t));
         if (targets.length === 0) {
-            window.alert('Selecția nu conține echipe importate din FRB.');
+            showToast({ variant: 'error', message: 'Selecția nu conține echipe importate din FRB.' });
             return;
         }
 
         setBulkBusy(true);
         try {
-            const groups = new Map<string, Team[]>();
-            targets.forEach((t) => {
-                const key = `${t.frbLeagueId}::${t.frbSeasonId}`;
-                const arr = groups.get(key) ?? [];
-                arr.push(t);
-                groups.set(key, arr);
-            });
-
+            const results = await Promise.allSettled(targets.map((t) => syncFrbTeam(t)));
             const updates: Team[] = [];
-            for (const [key, groupTeams] of groups) {
-                const [lId, sId] = key.split('::');
-                try {
-                    const frbList = await basketballApi.getTeams(lId, sId);
-                    for (const team of groupTeams) {
-                        const match = frbList.find((f) => f.id === team.frbTeamId);
-                        if (match && match.name !== team.name) {
-                            const updated = await teamsApi.updateTeam(team.id, { name: match.name });
-                            updates.push(updated);
-                        }
-                    }
-                } catch (e) {
-                    console.error('FRB sync failed for group', key, e);
-                }
-            }
-
+            results.forEach((r) => {
+                if (r.status === 'fulfilled' && r.value) updates.push(r.value);
+            });
             if (updates.length > 0) {
                 setTeams((prev) => prev.map((t) => updates.find((u) => u.id === t.id) ?? t));
-                window.alert(`${updates.length} ${updates.length === 1 ? 'echipă actualizată' : 'echipe actualizate'} din FRB.`);
+                showToast({ variant: 'success', message: `${updates.length} ${updates.length === 1 ? 'echipă actualizată' : 'echipe actualizate'} din FRB.` });
             } else {
-                window.alert('Toate echipele selectate sunt deja la zi cu FRB.');
+                showToast({ variant: 'info', message: 'Toate echipele selectate sunt deja la zi cu FRB.' });
             }
         } finally {
             setBulkBusy(false);
@@ -178,6 +275,7 @@ export default function MyClubAdmin() {
         link.download = `echipe-${new Date().toISOString().slice(0, 10)}.csv`;
         link.click();
         URL.revokeObjectURL(url);
+        showToast({ variant: 'success', message: `${targets.length} ${targets.length === 1 ? 'echipă exportată' : 'echipe exportate'} în CSV.` });
     };
 
     const openWizard = (source?: 'frb') => {
@@ -189,6 +287,11 @@ export default function MyClubAdmin() {
         setTeams((prev) => [...prev, team]);
         setWizardOpen(false);
     };
+
+    const selectAllLabel = useMemo(
+        () => (allFilteredSelected ? 'Deselectează tot' : 'Selectează tot'),
+        [allFilteredSelected],
+    );
 
     return (
         <View className="flex-1 w-full mx-auto bg-[#EDF4FB] pb-20">
@@ -204,7 +307,7 @@ export default function MyClubAdmin() {
                             onPress={() => openWizard('frb')}
                             className="flex-row items-center gap-2 h-11 px-4 rounded-[14px] bg-white/95 border border-white/70 active:bg-white"
                         >
-                            <RefreshCw size={14} color="#1D3E90" />
+                            <RefreshCw size={14} color="var(--c-brand-fg)" />
                             <Text className="text-[#1D3E90] text-[12px] font-black uppercase tracking-widest">Importă din FRB</Text>
                         </Pressable>
                         <Pressable
@@ -218,16 +321,26 @@ export default function MyClubAdmin() {
                 </AdminHero>
 
                 {loading ? (
-                    <View className="items-center justify-center p-16">
-                        <ActivityIndicator size="large" color="#1D3E90" />
-                    </View>
+                    <MyClubSkeleton />
                 ) : teams.length === 0 ? (
                     <NoTeamsEmptyState onImport={() => openWizard('frb')} onCreate={() => openWizard()} />
                 ) : (
                     <>
                         <MyClubKpiStrip teams={teams} />
 
-                        <TeamFiltersBar filters={filters} setFilter={setFilter} coaches={coaches} view={view} onViewChange={setView} />
+                        <TeamFiltersBar
+                            filters={filters}
+                            setFilter={setFilter}
+                            coaches={coaches}
+                            view={view}
+                            onViewChange={setView}
+                            activeFilterCount={activeFilterCount}
+                            onReset={resetFilters}
+                            sort={sort}
+                            setSort={setSort}
+                            counts={counts}
+                            availableLevels={availableLevels}
+                        />
 
                         <BulkActionBar
                             count={selectedIds.size}
@@ -241,7 +354,15 @@ export default function MyClubAdmin() {
                             onClear={clearSelection}
                         />
 
-                        <Text className="text-[12px] font-bold text-[#94A3B8] mb-3">{filteredTeams.length} din {teams.length} echipe</Text>
+                        <View className="flex-row items-center justify-between gap-3 mb-3">
+                            <Text className="text-[12px] font-bold text-[#64748B]">{filteredTeams.length} din {teams.length} echipe</Text>
+                            {filteredTeams.length > 0 && (
+                                <Pressable onPress={toggleSelectAll} className="flex-row items-center gap-2 px-1 py-1">
+                                    <ThemedCheckbox checked={allFilteredSelected} onToggle={toggleSelectAll} ariaLabel={selectAllLabel} size={17} />
+                                    <Text className="text-[12px] font-bold text-[#475569]">{selectAllLabel}</Text>
+                                </Pressable>
+                            )}
+                        </View>
 
                         {filteredTeams.length === 0 ? (
                             <NoResultsEmptyState onReset={resetFilters} />
@@ -252,12 +373,14 @@ export default function MyClubAdmin() {
                                         key={team.id}
                                         team={team}
                                         selected={selectedIds.has(team.id)}
-                                        deleting={deletingId === team.id}
+                                        deleting={false}
+                                        syncing={syncingId === team.id}
                                         onToggleSelect={() => toggleSelect(team.id)}
                                         onOpen={() => openTeam(team.id)}
                                         onEdit={() => setEditingTeam(team)}
-                                        onSchedule={openSchedule}
-                                        onDelete={() => handleDelete(team)}
+                                        onSchedule={() => openSchedule(team.id)}
+                                        onSync={() => handleSyncTeam(team)}
+                                        onDelete={() => setTeamToDelete(team)}
                                     />
                                 ))}
                             </View>
@@ -265,12 +388,16 @@ export default function MyClubAdmin() {
                             <TeamTable
                                 teams={filteredTeams}
                                 selectedIds={selectedIds}
-                                deletingId={deletingId}
+                                deletingId={null}
+                                sort={sort}
+                                onToggleSort={toggleSort}
+                                allSelected={allFilteredSelected}
+                                onToggleSelectAll={toggleSelectAll}
                                 onToggleSelect={toggleSelect}
                                 onOpen={openTeam}
                                 onEdit={(team) => setEditingTeam(team)}
                                 onSchedule={openSchedule}
-                                onDelete={handleDelete}
+                                onDelete={(team) => setTeamToDelete(team)}
                             />
                         )}
                     </>
@@ -297,6 +424,19 @@ export default function MyClubAdmin() {
                     }}
                 />
             )}
+
+            <ConfirmDialog
+                visible={teamToDelete !== null}
+                title="Ștergi echipa?"
+                message={teamToDelete ? `„${teamToDelete.name}” va fi ștearsă. Vei avea câteva secunde să anulezi.` : undefined}
+                confirmLabel="Șterge"
+                cancelLabel="Renunță"
+                destructive
+                onConfirm={confirmDelete}
+                onCancel={() => setTeamToDelete(null)}
+            />
+
+            <ToastHost toasts={toasts} onDismiss={dismissToast} />
         </View>
     );
 }

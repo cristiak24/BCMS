@@ -2,7 +2,7 @@ import { apiClient } from './apiClient';
 
 export interface CalendarEvent {
     id: number;
-    type: 'training' | 'match' | 'camp' | 'admin';
+    type: 'training' | 'match' | 'camp' | 'admin' | 'medical';
     title: string;
     description: string | null;
     location: string | null;
@@ -22,6 +22,7 @@ export interface EventAttendance {
     lastName: string;
     number: number | null;
     status: string | null;
+    note?: string | null;
 }
 
 export const eventsApi = {
@@ -54,7 +55,7 @@ export const eventsApi = {
         return response.data;
     },
 
-    async updateEventAttendance(id: number, playerAttendances: { playerId: number, status: string }[]) {
+    async updateEventAttendance(id: number, playerAttendances: { playerId: number, status: string, note?: string | null }[]) {
         const response = await apiClient.post(`/events/${id}/attendance`, { playerAttendances });
         return response.data;
     },

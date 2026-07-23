@@ -70,7 +70,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                         </Text>
                     </View>
                     <View className="w-12 h-12 rounded-2xl bg-[#E7EEFF] items-center justify-center">
-                        <MaterialIcons name="person-add-alt-1" size={24} color="#173AA8" />
+                        <MaterialIcons name="person-add-alt-1" size={24} color="var(--c-brand-fg)" />
                     </View>
                 </View>
             </View>
@@ -85,7 +85,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                     placeholder="Full name *"
                     autoCapitalize="words"
                     className={`rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72] border ${errors.fullName ? 'border-red-300' : 'border-[#DDE6FF]'}`}
-                    placeholderTextColor="#9AA7C2"
+                    placeholderTextColor="var(--c-faint)"
                 />
                 {errors.fullName ? <Text className="-mt-2 text-xs font-bold text-red-600">{errors.fullName}</Text> : null}
 
@@ -99,7 +99,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                     autoCapitalize="none"
                     keyboardType="email-address"
                     className={`rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72] border ${errors.email ? 'border-red-300' : 'border-[#DDE6FF]'}`}
-                    placeholderTextColor="#9AA7C2"
+                    placeholderTextColor="var(--c-faint)"
                 />
                 {errors.email ? <Text className="-mt-2 text-xs font-bold text-red-600">{errors.email}</Text> : null}
 
@@ -124,7 +124,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                                                 {option.description}
                                             </Text>
                                         </View>
-                                        {active ? <MaterialIcons name="check-circle" size={22} color="#173AA8" /> : null}
+                                        {active ? <MaterialIcons name="check-circle" size={22} color="var(--c-brand-fg)" /> : null}
                                     </View>
                                 </Pressable>
                             );
@@ -139,7 +139,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                             Invites expire automatically after 10 minutes and can be revoked from Manage Accounts.
                         </Text>
                     </View>
-                    <MaterialIcons name="schedule" size={22} color="#173AA8" />
+                    <MaterialIcons name="schedule" size={22} color="var(--c-brand-fg)" />
                 </View>
 
                 <Pressable

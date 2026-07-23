@@ -47,7 +47,7 @@ export default function UsersDirectoryScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-[#EEF3FF]">
-        <ActivityIndicator size="large" color="#173AA8" />
+        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
       </View>
     );
   }
@@ -58,7 +58,7 @@ export default function UsersDirectoryScreen() {
         <Text className="text-[#102A72] text-[22px] font-black">User Directory</Text>
         <Text className="text-[#7483A6] text-[13px] mt-1">Search, filter and manage club users across the platform.</Text>
         <View className="mt-4 gap-3">
-          <TextInput value={search} onChangeText={setSearch} placeholder="Search by name, email, club..." className="rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72]" placeholderTextColor="#9AA7C2" />
+          <TextInput value={search} onChangeText={setSearch} placeholder="Search by name, email, club..." className="rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72]" placeholderTextColor="var(--c-faint)" />
           <View className="flex-row flex-wrap gap-2">
             {ROLE_FILTERS.map((item) => (
               <Pressable key={item} onPress={() => setRoleFilter(item)} className={`px-4 py-3 rounded-full border ${roleFilter === item ? 'bg-[#173AA8] border-[#173AA8]' : 'bg-[#F7F9FF] border-[#E4EAF7]'}`}>

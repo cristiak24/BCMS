@@ -23,6 +23,9 @@ const firebaseAdmin_1 = require("../lib/firebaseAdmin");
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const router = (0, express_1.Router)();
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+const ALLOWED_AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_AVATAR_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 const uploadDir = path_1.default.join(__dirname, '../../uploads/avatars');
 if (!fs_1.default.existsSync(uploadDir)) {
     fs_1.default.mkdirSync(uploadDir, { recursive: true });
@@ -31,10 +34,22 @@ const storage = multer_1.default.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadDir),
     filename: (_req, file, cb) => {
         const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        cb(null, `${file.fieldname}-${uniqueSuffix}${path_1.default.extname(file.originalname)}`);
+        const extension = path_1.default.extname(file.originalname).toLowerCase();
+        cb(null, `${file.fieldname}-${uniqueSuffix}${extension}`);
     },
 });
-const upload = (0, multer_1.default)({ storage });
+const upload = (0, multer_1.default)({
+    storage,
+    limits: { fileSize: AVATAR_MAX_BYTES, files: 1 },
+    fileFilter: (_req, file, cb) => {
+        const extension = path_1.default.extname(file.originalname).toLowerCase();
+        if (!ALLOWED_AVATAR_MIME_TYPES.has(file.mimetype) || !ALLOWED_AVATAR_EXTENSIONS.has(extension)) {
+            cb(new Error('Only JPG, PNG or WebP images up to 2MB are allowed.'));
+            return;
+        }
+        cb(null, true);
+    },
+});
 function findUserByNumericId(userId) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a;
@@ -182,7 +197,14 @@ router.post('/me/password', (_req, res) => __awaiter(void 0, void 0, void 0, fun
         error: 'Password changes are handled by Firebase Auth on the client.',
     });
 }));
-router.post('/me/avatar', upload.single('image'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post('/me/avatar', (req, res, next) => {
+    upload.single('image')(req, res, (error) => {
+        if (error) {
+            return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid avatar upload.' });
+        }
+        next();
+    });
+}, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const requestUser = yield (0, requestContext_1.getRequestUser)(req);
         if (!requestUser) {

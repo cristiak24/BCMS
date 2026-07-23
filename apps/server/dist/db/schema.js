@@ -1,12 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.auditLogs = exports.invites = exports.inviteLinks = exports.accessRequests = exports.clubs = exports.l12Documents = exports.attendance = exports.events = exports.financialSettings = exports.playersToTeams = exports.playerPayments = exports.teams = exports.players = exports.users = exports.financialDocuments = exports.inviteStatus = exports.accessRequestStatus = exports.userStatus = exports.status = exports.role = void 0;
+exports.auditLogs = exports.invites = exports.inviteLinks = exports.accessRequests = exports.clubs = exports.l12Documents = exports.attendance = exports.events = exports.financialSettings = exports.playersToTeams = exports.playerPayments = exports.teams = exports.players = exports.users = exports.financialDocuments = exports.teamLevel = exports.teamGender = exports.inviteStatus = exports.accessRequestStatus = exports.userStatus = exports.status = exports.role = void 0;
 const pg_core_1 = require("drizzle-orm/pg-core");
 exports.role = (0, pg_core_1.pgEnum)("role", ['admin', 'coach', 'accountant', 'player', 'parent', 'staff', 'superadmin']);
 exports.status = (0, pg_core_1.pgEnum)("status", ['pending', 'processed', 'rejected']);
 exports.userStatus = (0, pg_core_1.pgEnum)("user_status", ['active', 'pending', 'disabled']);
 exports.accessRequestStatus = (0, pg_core_1.pgEnum)("access_request_status", ['pending', 'approved', 'denied']);
 exports.inviteStatus = (0, pg_core_1.pgEnum)("invite_status", ['pending', 'accepted', 'expired', 'revoked']);
+exports.teamGender = (0, pg_core_1.pgEnum)("team_gender", ['M', 'F']);
+exports.teamLevel = (0, pg_core_1.pgEnum)("team_level", ['national', 'municipal', 'initiere']);
 exports.financialDocuments = (0, pg_core_1.pgTable)("financial_documents", {
     id: (0, pg_core_1.serial)().primaryKey().notNull(),
     type: (0, pg_core_1.varchar)({ length: 50 }).notNull(),
@@ -15,7 +17,14 @@ exports.financialDocuments = (0, pg_core_1.pgTable)("financial_documents", {
     date: (0, pg_core_1.timestamp)({ mode: 'string' }).defaultNow().notNull(),
     documentUrl: (0, pg_core_1.text)("document_url"),
     status: (0, exports.status)().default('pending').notNull(),
-});
+    clubId: (0, pg_core_1.integer)("club_id"),
+}, (table) => [
+    (0, pg_core_1.foreignKey)({
+        columns: [table.clubId],
+        foreignColumns: [exports.clubs.id],
+        name: "financial_documents_club_id_clubs_id_fk"
+    }),
+]);
 exports.users = (0, pg_core_1.pgTable)("users", {
     id: (0, pg_core_1.serial)().primaryKey().notNull(),
     uid: (0, pg_core_1.varchar)({ length: 255 }), // Keep for backwards compatibility
@@ -68,13 +77,23 @@ exports.teams = (0, pg_core_1.pgTable)("teams", {
     seasonName: (0, pg_core_1.varchar)("season_name", { length: 255 }).notNull(),
     inviteCode: (0, pg_core_1.varchar)("invite_code", { length: 10 }).notNull(),
     clubId: (0, pg_core_1.integer)("club_id"),
+    gender: (0, exports.teamGender)(),
+    level: (0, exports.teamLevel)(),
+    coachId: (0, pg_core_1.integer)("coach_id"),
+    isActive: (0, pg_core_1.boolean)("is_active").default(true).notNull(),
     createdAt: (0, pg_core_1.timestamp)("created_at", { mode: 'string' }).defaultNow().notNull(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
     (0, pg_core_1.unique)("teams_invite_code_unique").on(table.inviteCode),
     (0, pg_core_1.foreignKey)({
         columns: [table.clubId],
         foreignColumns: [exports.clubs.id],
         name: "teams_club_id_clubs_id_fk"
+    }),
+    (0, pg_core_1.foreignKey)({
+        columns: [table.coachId],
+        foreignColumns: [exports.users.id],
+        name: "teams_coach_id_users_id_fk"
     }),
 ]);
 exports.playerPayments = (0, pg_core_1.pgTable)("player_payments", {
@@ -149,6 +168,8 @@ exports.attendance = (0, pg_core_1.pgTable)("attendance", {
     date: (0, pg_core_1.timestamp)({ mode: 'string' }).defaultNow().notNull(),
     status: (0, pg_core_1.varchar)({ length: 50 }).notNull(),
     eventId: (0, pg_core_1.integer)("event_id"),
+    // Per-player coach feedback for the session (optional free-text note).
+    note: (0, pg_core_1.text)("note"),
 }, (table) => [
     (0, pg_core_1.foreignKey)({
         columns: [table.playerId],

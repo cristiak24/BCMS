@@ -36,18 +36,18 @@ type GameFilters = {
 
 const ALL_FILTER_KEY = 'all';
 const palette = {
-  navy: '#07152F',
-  royal: '#123A97',
-  blue: '#2563EB',
+  navy: 'var(--c-ink-strong)',
+  royal: 'var(--c-brand-fg)',
+  blue: 'var(--c-blue)',
   sky: '#0EA5E9',
-  orange: '#F97316',
-  amber: '#FDBA2D',
-  green: '#087A2F',
-  slate: '#64748B',
-  muted: '#8EA1B8',
-  line: '#DDE8F5',
-  soft: '#F4F8FD',
-  page: '#EDF4FB',
+  orange: 'var(--c-warning)',
+  amber: 'var(--c-warning)',
+  green: 'var(--c-success-fg)',
+  slate: 'var(--c-muted)',
+  muted: 'var(--c-faint)',
+  line: 'var(--c-border)',
+  soft: 'var(--c-surface-2)',
+  page: 'var(--c-surface-2)',
   card: '#FFFFFF',
 };
 
@@ -417,18 +417,18 @@ function splitMatchTitle(title: string) {
 
 function getAttendanceTone(rate: number | null) {
   if (rate == null) {
-    return { label: 'Pending', color: '#475569', bg: '#F1F5F9' };
+    return { label: 'Pending', color: 'var(--c-muted)', bg: 'var(--c-surface-3)' };
   }
 
   if (rate >= 90) {
-    return { label: 'Elite rhythm', color: palette.green, bg: '#DCFCE7' };
+    return { label: 'Elite rhythm', color: palette.green, bg: 'var(--c-success-bg)' };
   }
 
   if (rate >= 80) {
-    return { label: 'On track', color: '#0369A1', bg: '#E0F2FE' };
+    return { label: 'On track', color: '#0369A1', bg: 'var(--c-surface-tint)' };
   }
 
-  return { label: 'Needs focus', color: '#B45309', bg: '#FEF3C7' };
+  return { label: 'Needs focus', color: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)' };
 }
 
 function PremiumCard({ children, className = '', style }: { children: ReactNode; className?: string; style?: StyleProp<ViewStyle> }) {
@@ -492,7 +492,7 @@ function PlayerHubHeader({
 }) {
   return (
     <LinearGradient
-      colors={['#06132C', '#123A97', '#0EA5E9']}
+      colors={['#06132C', 'var(--c-brand-fg)', '#0EA5E9']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.hero, isMobile ? styles.heroMobile : null]}
@@ -527,7 +527,7 @@ function PlayerHubHeader({
                 value={query}
                 onChangeText={onQueryChange}
                 placeholder="Search sessions, teams, venues..."
-                placeholderTextColor="#8EA1B8"
+                placeholderTextColor="var(--c-faint)"
                 className="flex-1 ml-3 text-[#07152F] text-[15px] font-semibold outline-none"
               />
             </View>
@@ -586,7 +586,7 @@ function AttendanceCard({
     <PremiumCard className="rounded-[28px] p-6 md:p-7 justify-between overflow-hidden" style={{ minHeight: isMobile ? 260 : 330 }}>
       <View className="absolute right-[-36px] top-[-42px] w-[150px] h-[150px] rounded-full bg-[#EAF2FF]" />
       <View className="flex-row items-start justify-between gap-4">
-        <IconBadge icon="insert-chart-outlined" color={palette.royal} bg="#EAF2FF" size={58} />
+        <IconBadge icon="insert-chart-outlined" color={palette.royal} bg="var(--c-surface-tint)" size={58} />
         <View className="rounded-full px-3.5 py-2" style={{ backgroundColor: tone.bg }}>
           <Text className="text-[10px] font-black uppercase tracking-widest" style={{ color: tone.color }}>
             {tone.label}
@@ -647,7 +647,7 @@ function NextEventCard({
       <View className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: accent }} />
       <View className="flex-row items-center justify-between gap-3">
         <Text className="text-[#64748B] text-[10px] font-black uppercase tracking-widest">{label}</Text>
-        <IconBadge icon={icon} color={accent} bg="#F4F8FD" size={38} />
+        <IconBadge icon={icon} color={accent} bg="var(--c-surface-2)" size={38} />
       </View>
       {event ? (
         <>
@@ -771,7 +771,7 @@ function EventCard({
               <Text className="text-[#07152F] text-[24px] font-black leading-none">{dateBlock.day}</Text>
             </View>
             {isMobile ? (
-              <View className="rounded-full px-3 py-1.5" style={{ backgroundColor: variant === 'game' ? '#FFF7ED' : '#EAF2FF' }}>
+              <View className="rounded-full px-3 py-1.5" style={{ backgroundColor: variant === 'game' ? 'var(--c-warning-bg)' : 'var(--c-surface-tint)' }}>
                 <Text className="text-[10px] font-black uppercase tracking-widest" style={{ color: accent }}>
                   {label}
                 </Text>
@@ -782,7 +782,7 @@ function EventCard({
           <View className="flex-1 min-w-0">
             <View className="flex-row flex-wrap gap-2 mb-2">
               {!isMobile ? (
-                <View className="rounded-full px-3 py-1.5" style={{ backgroundColor: variant === 'game' ? '#FFF7ED' : '#EAF2FF' }}>
+                <View className="rounded-full px-3 py-1.5" style={{ backgroundColor: variant === 'game' ? 'var(--c-warning-bg)' : 'var(--c-surface-tint)' }}>
                   <Text className="text-[10px] font-black uppercase tracking-widest" style={{ color: accent }}>
                     {label}
                   </Text>
@@ -844,7 +844,7 @@ function ResultCard({ event, isMobile }: { event: HubEvent; isMobile: boolean })
             {dateBlock.month} {dateBlock.day}
           </Text>
         </View>
-        <IconBadge icon="emoji-events" color={palette.green} bg="#DCFCE7" size={36} />
+        <IconBadge icon="emoji-events" color={palette.green} bg="var(--c-success-bg)" size={36} />
       </View>
       <Text className="text-[#64748B] text-[10px] font-black uppercase tracking-widest mt-5" numberOfLines={1}>
         {event.teamName || event.location || 'Match'}
@@ -873,7 +873,7 @@ function EmptySection({ message }: { message: string }) {
   return (
     <View className="bg-white rounded-[28px] border border-dashed border-[#BFD0EA] px-6 py-9 items-center justify-center min-h-[160px]">
       <View className="w-14 h-14 rounded-[20px] bg-[#F4F8FD] items-center justify-center border border-[#E8EEF7]">
-        <MaterialIcons name="event-busy" size={28} color="#8EA1B8" />
+        <MaterialIcons name="event-busy" size={28} color="var(--c-faint)" />
       </View>
       <Text className="text-[#64748B] font-bold text-center mt-4 leading-5">{message}</Text>
     </View>
@@ -1206,14 +1206,14 @@ function PlayerHomeScreen() {
           </View>
         ) : error ? (
           <View className="bg-white rounded-[28px] p-8 items-center border border-red-100" style={styles.cardShadow}>
-            <MaterialIcons name="error-outline" size={34} color="#EF4444" />
+            <MaterialIcons name="error-outline" size={34} color="var(--c-danger)" />
             <Text className="text-red-600 font-bold text-center mt-3">{error}</Text>
           </View>
         ) : (
           <View className="gap-10 md:gap-12">
             {attendanceWarning ? (
               <View className="bg-[#FFFBEB] rounded-[24px] border border-amber-200 px-5 py-4 flex-row items-center gap-3">
-                <MaterialIcons name="info-outline" size={22} color="#D97706" />
+                <MaterialIcons name="info-outline" size={22} color="var(--c-warning)" />
                 <Text className="text-[#92400E] font-bold flex-1">{attendanceWarning}</Text>
               </View>
             ) : null}
@@ -1305,7 +1305,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 36,
     padding: 30,
-    shadowColor: '#123A97',
+    shadowColor: 'var(--c-brand-fg)',
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.2,
     shadowRadius: 30,
@@ -1316,14 +1316,14 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   cardShadow: {
-    shadowColor: '#0F172A',
+    shadowColor: 'var(--c-ink-strong)',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.08,
     shadowRadius: 22,
     elevation: 4,
   },
   microShadow: {
-    shadowColor: '#0F172A',
+    shadowColor: 'var(--c-ink-strong)',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.06,
     shadowRadius: 12,

@@ -55,7 +55,7 @@ export default function CreateClubModal({ visible, onClose, onCreated }: Props) 
               <Text className="text-[#7483A6] text-[12px] mt-1">The club will be available instantly after save.</Text>
             </View>
             <Pressable onPress={onClose} className="w-10 h-10 rounded-full bg-[#F4F7FF] items-center justify-center">
-              <MaterialIcons name="close" size={20} color="#6B7AA6" />
+              <MaterialIcons name="close" size={20} color="var(--c-muted)" />
             </Pressable>
           </View>
 
@@ -66,7 +66,7 @@ export default function CreateClubModal({ visible, onClose, onCreated }: Props) 
               placeholder="Club name"
               autoCapitalize="words"
               className="rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72] border border-[#DDE6FF]"
-              placeholderTextColor="#9AA7C2"
+              placeholderTextColor="var(--c-faint)"
             />
 
             <View className="flex-row items-center justify-between rounded-2xl bg-[#F7F9FF] border border-dashed border-[#DDE6FF] px-4 py-3">
@@ -76,7 +76,7 @@ export default function CreateClubModal({ visible, onClose, onCreated }: Props) 
                   New clubs are created with active status and can be selected right away.
                 </Text>
               </View>
-              <MaterialIcons name="verified" size={22} color="#173AA8" />
+              <MaterialIcons name="verified" size={22} color="var(--c-brand-fg)" />
             </View>
 
             <Pressable

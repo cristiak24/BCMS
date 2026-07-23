@@ -86,7 +86,7 @@ function FeeCard({
     <View className="flex-1 min-w-[280px] rounded-[28px] border border-[#E6EDF7] bg-white px-6 py-5">
       <View className="flex-row items-center gap-5">
         <View className="h-16 w-16 rounded-full bg-[#EAF4F8] items-center justify-center">
-          <MaterialIcons name={feeIcon(fee.icon)} size={27} color="#006092" />
+          <MaterialIcons name={feeIcon(fee.icon)} size={27} color="var(--c-brand-fg)" />
         </View>
 
         <View className="flex-1 min-w-0">
@@ -101,7 +101,7 @@ function FeeCard({
           className={`h-14 min-w-[92px] px-6 rounded-full border-2 border-[#006092] items-center justify-center ${busy ? 'opacity-60' : ''}`}
         >
           {busy ? (
-            <ActivityIndicator size="small" color="#006092" />
+            <ActivityIndicator size="small" color="var(--c-brand-fg)" />
           ) : (
             <Text className="text-[#006092] text-lg font-black">Pay</Text>
           )}
@@ -124,7 +124,7 @@ function PaymentMethodCard({ method }: { method: PlayerPaymentMethod }) {
             {method.isDefault ? 'Primary' : 'Saved'} {method.expMonth && method.expYear ? `- Exp ${String(method.expMonth).padStart(2, '0')}/${method.expYear}` : ''}
           </Text>
         </View>
-        <MaterialIcons name="edit" size={22} color="#2D3345" />
+        <MaterialIcons name="edit" size={22} color="var(--c-ink-soft)" />
       </View>
     </View>
   );
@@ -136,7 +136,7 @@ function TransactionRow({ transaction }: { transaction: PlayerPaymentTransaction
   return (
     <View className="flex-row items-center gap-4 border-t border-[#E6EBF2] px-5 py-5">
       <View className="h-12 w-12 rounded-full bg-[#E8ECF1] items-center justify-center">
-        <MaterialIcons name={isSuccess ? 'receipt-long' : 'error-outline'} size={22} color="#2D3345" />
+        <MaterialIcons name={isSuccess ? 'receipt-long' : 'error-outline'} size={22} color="var(--c-ink-soft)" />
       </View>
 
       <View className="flex-[2] min-w-0">
@@ -310,7 +310,7 @@ function PlayerPaymentsScreen() {
   if (loading) {
     return (
       <View className="flex-1 bg-[#F4F8FF] items-center justify-center">
-        <ActivityIndicator size="large" color="#0A2C93" />
+        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
       </View>
     );
   }
@@ -325,27 +325,27 @@ function PlayerPaymentsScreen() {
           </View>
 
           <Pressable onPress={() => loadSummary(true)} className="h-12 w-12 rounded-full bg-white border border-[#E7EEF7] items-center justify-center">
-            {refreshing ? <ActivityIndicator size="small" color="#0A2C93" /> : <MaterialIcons name="refresh" size={22} color="#0A2C93" />}
+            {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={22} color="var(--c-brand-fg)" />}
           </Pressable>
         </View>
 
         {error ? (
           <View className="mb-6 rounded-[24px] border border-red-100 bg-white px-5 py-4 flex-row items-center gap-3">
-            <MaterialIcons name="error-outline" size={22} color="#DC2626" />
+            <MaterialIcons name="error-outline" size={22} color="var(--c-danger)" />
             <Text className="text-[#B91C1C] font-bold flex-1">{error}</Text>
           </View>
         ) : null}
 
         {notice ? (
           <View className="mb-6 rounded-[24px] border border-emerald-100 bg-white px-5 py-4 flex-row items-center gap-3">
-            <MaterialIcons name="check-circle" size={22} color="#087A2F" />
+            <MaterialIcons name="check-circle" size={22} color="var(--c-success-fg)" />
             <Text className="text-[#087A2F] font-bold flex-1">{notice}</Text>
           </View>
         ) : null}
 
         {summary && !summary.stripe.configured ? (
           <View className="mb-6 rounded-[24px] border border-amber-100 bg-white px-5 py-4 flex-row items-center gap-3">
-            <MaterialIcons name="warning-amber" size={22} color="#D97706" />
+            <MaterialIcons name="warning-amber" size={22} color="var(--c-warning)" />
             <Text className="text-[#92400E] font-bold flex-1">
               Stripe Checkout nu este configurat încă pentru club. Plățile vor fi disponibile după configurarea cheilor Stripe.
             </Text>
@@ -401,7 +401,7 @@ function PlayerPaymentsScreen() {
                 summary.paymentMethods.map((method) => <PaymentMethodCard key={method.id} method={method} />)
               ) : (
                 <View className="rounded-[28px] border border-[#E4EAF2] bg-white px-5 py-8 items-center">
-                  <MaterialIcons name="credit-card-off" size={28} color="#8EA1B8" />
+                  <MaterialIcons name="credit-card-off" size={28} color="var(--c-faint)" />
                   <Text className="text-[#53627A] font-bold text-center mt-3">No saved card yet.</Text>
                 </View>
               )}
@@ -426,7 +426,7 @@ function PlayerPaymentsScreen() {
             </View>
           ) : (
             <View className="rounded-[28px] border border-[#E6EDF7] bg-white px-6 py-10 items-center">
-              <MaterialIcons name="check-circle" size={30} color="#087A2F" />
+              <MaterialIcons name="check-circle" size={30} color="var(--c-success-fg)" />
               <Text className="text-[#53627A] text-base font-bold mt-3">No upcoming fees.</Text>
             </View>
           )}
@@ -437,7 +437,7 @@ function PlayerPaymentsScreen() {
             <Text className="text-[#050817] text-3xl font-black">Transaction History</Text>
             <Pressable onPress={openReceipts} className="hidden md:flex flex-row items-center gap-2">
               <Text className="text-[#006092] font-black">Download All Receipts</Text>
-              <MaterialIcons name="file-download" size={18} color="#006092" />
+              <MaterialIcons name="file-download" size={18} color="var(--c-brand-fg)" />
             </Pressable>
           </View>
 
@@ -455,7 +455,7 @@ function PlayerPaymentsScreen() {
               ))
             ) : (
               <View className="px-5 py-10 items-center">
-                <MaterialIcons name="receipt-long" size={30} color="#8EA1B8" />
+                <MaterialIcons name="receipt-long" size={30} color="var(--c-faint)" />
                 <Text className="text-[#53627A] font-bold mt-3">No transactions yet.</Text>
               </View>
             )}

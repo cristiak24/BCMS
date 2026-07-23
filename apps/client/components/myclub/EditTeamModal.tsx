@@ -60,7 +60,7 @@ export default function EditTeamModal({
                 <View className="flex-row items-center justify-between mb-5">
                     <Text className="text-[18px] font-black text-[#0E2041]">Editează echipa</Text>
                     <Pressable onPress={onClose} className="w-9 h-9 rounded-full bg-[#F8FAFC] items-center justify-center border border-gray-100">
-                        <X size={16} color="#64748B" />
+                        <X size={16} color="var(--c-muted)" />
                     </Pressable>
                 </View>
 

@@ -58,8 +58,12 @@ function createAllowedOrigins() {
         .filter((value): value is string => Boolean(value));
 
     const developmentOrigins = [
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
         'http://localhost:8081',
         'http://127.0.0.1:8081',
+        'http://localhost:8091',
+        'http://127.0.0.1:8091',
         'http://localhost:19006',
         'http://127.0.0.1:19006',
         'http://localhost:3000',
@@ -94,7 +98,11 @@ export function createServerApp() {
             try {
                 const parsedOrigin = new URL(origin);
                 const hostname = parsedOrigin.hostname.toLowerCase();
+                const isLocalDevelopment =
+                    process.env.NODE_ENV !== 'production' &&
+                    ['localhost', '127.0.0.1', '::1'].includes(hostname);
                 const trustedHostname =
+                    isLocalDevelopment ||
                     hostname === 'bcms.ro' ||
                     hostname === 'www.bcms.ro' ||
                     hostname.endsWith('.web.app') ||
@@ -117,9 +125,10 @@ export function createServerApp() {
     app.post('/api/finance/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);
     app.use(express.json());
 
-    console.log('Registering routes...');
     app.use((req, res, next) => {
-        console.log(`[Request] ${req.method} ${req.path}`);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`[Request] ${req.method} ${req.path}`);
+        }
         next();
     });
 
@@ -142,10 +151,17 @@ export function createServerApp() {
 
     app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-    console.log('Routes registered.');
-
     app.get('/', (_req, res) => {
         res.send('BCMS API is running');
+    });
+
+    app.use('/api', (_req, res) => {
+        res.status(404).json({ success: false, error: 'API route not found.' });
+    });
+
+    app.use((error: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+        console.error('[Unhandled API error]', error);
+        res.status(500).json({ success: false, error: 'Internal server error.' });
     });
 
     return app;

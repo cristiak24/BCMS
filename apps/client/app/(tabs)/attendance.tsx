@@ -39,18 +39,18 @@ function statusTone(status?: string | null) {
   const normalized = String(status ?? '').toLowerCase();
 
   if (isPresentAttendanceStatus(normalized)) {
-    return { label: 'Present', bg: 'bg-emerald-50', fg: 'text-emerald-700', color: '#047857', icon: 'check-circle' as const };
+    return { label: 'Present', bg: 'bg-emerald-50', fg: 'text-emerald-700', color: 'var(--c-success-fg)', icon: 'check-circle' as const };
   }
 
   if (normalized === 'absent') {
-    return { label: 'Absent', bg: 'bg-red-50', fg: 'text-red-700', color: '#B91C1C', icon: 'cancel' as const };
+    return { label: 'Absent', bg: 'bg-red-50', fg: 'text-red-700', color: 'var(--c-danger)', icon: 'cancel' as const };
   }
 
   if (normalized === 'medical' || normalized === 'excused') {
-    return { label: 'Medical', bg: 'bg-amber-50', fg: 'text-amber-700', color: '#B45309', icon: 'medical-services' as const };
+    return { label: 'Medical', bg: 'bg-amber-50', fg: 'text-amber-700', color: 'var(--c-warning-fg)', icon: 'medical-services' as const };
   }
 
-  return { label: 'Not marked', bg: 'bg-slate-100', fg: 'text-slate-500', color: '#64748B', icon: 'radio-button-unchecked' as const };
+  return { label: 'Not marked', bg: 'bg-slate-100', fg: 'text-slate-500', color: 'var(--c-muted)', icon: 'radio-button-unchecked' as const };
 }
 
 function PlayerAttendanceScreen() {
@@ -109,7 +109,7 @@ function PlayerAttendanceScreen() {
           </View>
 
           <Pressable onPress={() => loadData(true)} className="px-4 py-3 rounded-2xl bg-white border border-gray-100 shadow-sm flex-row items-center gap-2">
-            {refreshing ? <ActivityIndicator size="small" color="#2563EB" /> : <MaterialIcons name="refresh" size={20} color="#2563EB" />}
+            {refreshing ? <ActivityIndicator size="small" color="var(--c-blue)" /> : <MaterialIcons name="refresh" size={20} color="var(--c-blue)" />}
             <Text className="text-[#0E2041] font-bold">Refresh</Text>
           </Pressable>
         </View>
@@ -138,21 +138,21 @@ function PlayerAttendanceScreen() {
               <Text className="text-[#0E2041] text-xl font-black">Recent records</Text>
               <Text className="text-[#64748B] text-sm font-semibold mt-1">Sessions where your attendance was marked.</Text>
             </View>
-            <MaterialIcons name="fact-check" size={22} color="#2563EB" />
+            <MaterialIcons name="fact-check" size={22} color="var(--c-blue)" />
           </View>
 
           {loading ? (
             <View className="py-10 items-center justify-center">
-              <ActivityIndicator size="large" color="#2563EB" />
+              <ActivityIndicator size="large" color="var(--c-blue)" />
             </View>
           ) : error ? (
             <View className="py-8 items-center">
-              <MaterialIcons name="error-outline" size={32} color="#EF4444" />
+              <MaterialIcons name="error-outline" size={32} color="var(--c-danger)" />
               <Text className="text-red-600 font-bold text-center mt-3">{error}</Text>
             </View>
           ) : visibleRecords.length === 0 ? (
             <View className="py-8 items-center">
-              <MaterialIcons name="event-busy" size={32} color="#94A3B8" />
+              <MaterialIcons name="event-busy" size={32} color="var(--c-faint)" />
               <Text className="text-[#64748B] font-semibold text-center mt-3">No marked attendance found yet.</Text>
             </View>
           ) : (
@@ -163,7 +163,7 @@ function PlayerAttendanceScreen() {
                 return (
                   <View key={record.event.id} className="rounded-2xl border border-gray-100 bg-white p-4 flex-row gap-4 items-center">
                     <View className="w-12 h-12 rounded-2xl bg-[#EBF1FF] items-center justify-center">
-                      <MaterialIcons name={eventTypeIcon(record.event.type)} size={22} color="#2563EB" />
+                      <MaterialIcons name={eventTypeIcon(record.event.type)} size={22} color="var(--c-blue)" />
                     </View>
 
                     <View className="flex-1">

@@ -1,0 +1,20 @@
+/*
+ * Hand-maintained dark-mode fixes for cases the generator can't cover
+ * (Tailwind opacity-modifier utilities like bg-white/95, edge cases found
+ * during visual QA). Loaded AFTER dark.css so it wins. Never auto-generated.
+ */
+
+/* Semi-opaque white cards (stat tiles on colored heroes) — their text is
+   remapped to light ink, so the card itself must go dark to stay legible. */
+html[data-theme="dark"] .bg-white\/95,
+html[data-theme="dark"] .bg-white\/90,
+html[data-theme="dark"] .bg-white\/80,
+html[data-theme="dark"] .bg-white\/75,
+html[data-theme="dark"] .bg-white\/70,
+html[data-theme="dark"] .bg-white\/60,
+html[data-theme="dark"] .bg-white\/50 {
+  background-color: var(--c-surface);
+}
+
+/* Low-opacity white overlays (subtle inner panels on heroes) read fine as a
+   faint light wash on the dark hero — leave them translucent. */

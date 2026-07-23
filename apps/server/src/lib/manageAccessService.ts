@@ -57,6 +57,13 @@ export async function approveManageAccessRequest(user: AppUserContext, requestId
         role: request.requestedRole as InviteRole,
         status: 'active',
     });
+
+    return {
+        requestId: request.id,
+        clubId: club.id,
+        targetUserId: request.userId,
+        role: request.requestedRole as InviteRole,
+    };
 }
 
 export async function denyManageAccessRequest(user: AppUserContext, requestId: number) {
@@ -71,12 +78,18 @@ export async function denyManageAccessRequest(user: AppUserContext, requestId: n
         throw new Error('Only pending requests can be denied.');
     }
 
+    // Denying a request only rejects that request — it must NOT disable the user's
+    // account. The user stays in their current (pending) state so the admin can
+    // still approve a later request, exactly as the UI copy promises. Disabling an
+    // account is a separate, explicit action in Manage Accounts.
     await denyAccessRequest(request.id, club.id, user.isHardcodedAdmin ? null : user.id);
-    await updateUserAccess(request.userId, {
+
+    return {
+        requestId: request.id,
         clubId: club.id,
+        targetUserId: request.userId,
         role: request.requestedRole as InviteRole,
-        status: 'disabled',
-    });
+    };
 }
 
 function toInviteLinkRecord(params: {

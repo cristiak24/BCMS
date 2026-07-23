@@ -4,6 +4,7 @@ import { db } from '../db';
 import {
     attendance as pgAttendance,
     financialDocuments as pgFinancialDocuments,
+    financialSettings as pgFinancialSettings,
     playerPayments as pgPlayerPayments,
     players as pgPlayers,
     playersToTeams as pgPlayersToTeams,
@@ -13,8 +14,11 @@ import {
 import { eq, inArray } from 'drizzle-orm';
 import { getRequestUser } from '../lib/requestContext';
 import { normalizeRole } from '../lib/requestAuth';
+import { authenticate, requireRoles } from '../middleware/auth';
 
 const router = Router();
+
+router.use(authenticate, requireRoles(['admin', 'coach', 'accountant']));
 
 function normalizeStatus(status?: string | null) {
     return String(status ?? '').trim().toLowerCase();
@@ -28,6 +32,10 @@ function isPaidStatus(status?: string | null) {
 function isPresentStatus(status?: string | null) {
     const normalized = normalizeStatus(status);
     return normalized === 'present' || normalized === 'late' || normalized === 'medical' || normalized === 'excused';
+}
+
+function isExpenseType(type?: string | null) {
+    return normalizeStatus(type) === 'expense';
 }
 
 function amountOf(value: unknown) {
@@ -57,6 +65,23 @@ async function getFirestoreDocs(collectionName: string) {
         console.error(`[dashboard/summary] Firestore ${collectionName} fallback:`, error);
         return [];
     }
+}
+
+async function getDashboardFinancialSettings(clubId: number | null) {
+    if (canUseFirestoreDocuments()) {
+        try {
+            const docId = clubId != null ? `club:${clubId}` : '1';
+            const snap = await firestore.collection('financialSettings').doc(docId).get();
+            if (snap.exists) {
+                return snap.data() as { monthlyPlayerFee?: number; trainingLevy?: number; facilityFee?: number };
+            }
+        } catch (error) {
+            console.error('[dashboard/summary] financialSettings fallback:', error);
+        }
+    }
+
+    const rows = await db.select().from(pgFinancialSettings).where(eq(pgFinancialSettings.id, 1)).limit(1);
+    return rows[0] ?? null;
 }
 
 async function resolveDashboardScope(req: Request) {
@@ -110,6 +135,8 @@ router.get('/summary', async (req, res) => {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
         const scope = await resolveDashboardScope(req);
         const scopedPlayers = await getScopedPostgresPlayers(scope.clubId, scope.teamIds);
         const scopedPlayerIds = scopedPlayers.map((player) => player.id);
@@ -138,19 +165,30 @@ router.get('/summary', async (req, res) => {
         const financialDocs = financialDocDocs.map((docSnap) => docSnap.data() as {
             amount?: number;
             status?: string;
+            type?: string;
             date?: FirebaseFirestore.Timestamp | Date | string | null;
         });
 
-        const firestoreDocumentIncome = financialDocs
-            .filter((doc) => normalizeStatus(doc.status) === 'processed')
-            .reduce((sum, doc) => sum + Number(doc.amount ?? 0), 0);
+        const processedFirestoreDocs = financialDocs.filter((doc) => normalizeStatus(doc.status) === 'processed');
+        const firestoreIncomeDocs = processedFirestoreDocs.filter((doc) => !isExpenseType(doc.type));
+        const firestoreExpenseDocs = processedFirestoreDocs.filter((doc) => isExpenseType(doc.type));
 
-        const firestoreMonthlyDocumentIncome = financialDocs
-            .filter((doc) => normalizeStatus(doc.status) === 'processed')
-            .filter((doc) => {
-                const date = toDate(doc.date);
-                return date ? date >= startOfMonth && date <= endOfMonth : false;
-            })
+        const firestoreDocumentIncome = firestoreIncomeDocs.reduce((sum, doc) => sum + Number(doc.amount ?? 0), 0);
+        const firestoreDocumentExpense = firestoreExpenseDocs.reduce((sum, doc) => sum + Number(doc.amount ?? 0), 0);
+
+        const inRange = (date: Date | null, start: Date, end: Date) => (date ? date >= start && date <= end : false);
+
+        const firestoreMonthlyDocumentIncome = firestoreIncomeDocs
+            .filter((doc) => inRange(toDate(doc.date), startOfMonth, endOfMonth))
+            .reduce((sum, doc) => sum + Number(doc.amount ?? 0), 0);
+        const firestoreMonthlyDocumentExpense = firestoreExpenseDocs
+            .filter((doc) => inRange(toDate(doc.date), startOfMonth, endOfMonth))
+            .reduce((sum, doc) => sum + Number(doc.amount ?? 0), 0);
+        const firestorePrevMonthDocumentIncome = firestoreIncomeDocs
+            .filter((doc) => inRange(toDate(doc.date), startOfPrevMonth, endOfPrevMonth))
+            .reduce((sum, doc) => sum + Number(doc.amount ?? 0), 0);
+        const firestorePrevMonthDocumentExpense = firestoreExpenseDocs
+            .filter((doc) => inRange(toDate(doc.date), startOfPrevMonth, endOfPrevMonth))
             .reduce((sum, doc) => sum + Number(doc.amount ?? 0), 0);
 
         const firestorePaidPayments = paymentDocs
@@ -170,29 +208,56 @@ router.get('/summary', async (req, res) => {
             })
             .reduce((sum, payment) => sum + amountOf(payment.amount), 0);
 
-        const postgresDocumentIncome = pgFinancialDocs
-            .filter((doc) => normalizeStatus(doc.status) === 'processed')
+        const processedPgDocs = pgFinancialDocs.filter((doc) => normalizeStatus(doc.status) === 'processed');
+        const pgIncomeDocs = processedPgDocs.filter((doc) => !isExpenseType(doc.type));
+        const pgExpenseDocs = processedPgDocs.filter((doc) => isExpenseType(doc.type));
+
+        const postgresDocumentIncome = pgIncomeDocs.reduce((sum, doc) => sum + amountOf(doc.amount), 0);
+        const postgresDocumentExpense = pgExpenseDocs.reduce((sum, doc) => sum + amountOf(doc.amount), 0);
+        const postgresMonthlyDocumentIncome = pgIncomeDocs
+            .filter((doc) => inRange(toDate(doc.date), startOfMonth, endOfMonth))
             .reduce((sum, doc) => sum + amountOf(doc.amount), 0);
-        const postgresMonthlyDocumentIncome = pgFinancialDocs
-            .filter((doc) => normalizeStatus(doc.status) === 'processed')
-            .filter((doc) => {
-                const date = toDate(doc.date);
-                return date ? date >= startOfMonth && date <= endOfMonth : false;
-            })
+        const postgresMonthlyDocumentExpense = pgExpenseDocs
+            .filter((doc) => inRange(toDate(doc.date), startOfMonth, endOfMonth))
             .reduce((sum, doc) => sum + amountOf(doc.amount), 0);
-        const postgresPaymentIncome = pgPaymentRows
-            .filter((payment) => isPaidStatus(payment.status))
+        const postgresPrevMonthDocumentIncome = pgIncomeDocs
+            .filter((doc) => inRange(toDate(doc.date), startOfPrevMonth, endOfPrevMonth))
+            .reduce((sum, doc) => sum + amountOf(doc.amount), 0);
+        const postgresPrevMonthDocumentExpense = pgExpenseDocs
+            .filter((doc) => inRange(toDate(doc.date), startOfPrevMonth, endOfPrevMonth))
+            .reduce((sum, doc) => sum + amountOf(doc.amount), 0);
+
+        const paidPgPayments = pgPaymentRows.filter((payment) => isPaidStatus(payment.status));
+        const postgresPaymentIncome = paidPgPayments.reduce((sum, payment) => sum + amountOf(payment.amount), 0);
+        const postgresMonthlyPaymentIncome = paidPgPayments
+            .filter((payment) => inRange(toDate(payment.date ?? payment.createdAt), startOfMonth, endOfMonth))
             .reduce((sum, payment) => sum + amountOf(payment.amount), 0);
-        const postgresMonthlyPaymentIncome = pgPaymentRows
-            .filter((payment) => isPaidStatus(payment.status))
-            .filter((payment) => {
-                const date = toDate(payment.date ?? payment.createdAt);
-                return date ? date >= startOfMonth && date <= endOfMonth : false;
-            })
+        const postgresPrevMonthPaymentIncome = paidPgPayments
+            .filter((payment) => inRange(toDate(payment.date ?? payment.createdAt), startOfPrevMonth, endOfPrevMonth))
+            .reduce((sum, payment) => sum + amountOf(payment.amount), 0);
+
+        const firestorePrevMonthPaymentIncome = firestorePaidPayments
+            .filter((payment) => inRange(toDate(payment.date ?? payment.createdAt), startOfPrevMonth, endOfPrevMonth))
             .reduce((sum, payment) => sum + amountOf(payment.amount), 0);
 
         const totalIncome = postgresDocumentIncome + postgresPaymentIncome + firestoreDocumentIncome + firestorePaymentIncome;
+        const totalExpense = postgresDocumentExpense + firestoreDocumentExpense;
+        const profit = totalIncome - totalExpense;
+
         const monthlyIncome = postgresMonthlyDocumentIncome + postgresMonthlyPaymentIncome + firestoreMonthlyDocumentIncome + firestoreMonthlyPaymentIncome;
+        const monthlyExpense = postgresMonthlyDocumentExpense + firestoreMonthlyDocumentExpense;
+        const monthlyProfit = monthlyIncome - monthlyExpense;
+
+        const previousMonthIncome = postgresPrevMonthDocumentIncome + postgresPrevMonthPaymentIncome + firestorePrevMonthDocumentIncome + firestorePrevMonthPaymentIncome;
+        const incomeChangePercent = previousMonthIncome > 0
+            ? Math.round(((monthlyIncome - previousMonthIncome) / previousMonthIncome) * 100)
+            : null;
+
+        const previousMonthExpense = postgresPrevMonthDocumentExpense + firestorePrevMonthDocumentExpense;
+        const previousMonthProfit = previousMonthIncome - previousMonthExpense;
+        const profitChangePercent = previousMonthProfit !== 0
+            ? Math.round(((monthlyProfit - previousMonthProfit) / Math.abs(previousMonthProfit)) * 100)
+            : null;
 
         const pendingPaymentsCount = paymentDocs.filter((docSnap) => normalizeStatus((docSnap.data() as { status?: string }).status ?? 'pending') === 'pending').length
             + pgPaymentRows.filter((row) => normalizeStatus(row.status ?? 'pending') === 'pending').length;
@@ -223,29 +288,56 @@ router.get('/summary', async (req, res) => {
             ? Math.round((presentCount / totalAttendanceRecords) * 100)
             : null;
 
+        const prevMonthFirestoreAttendanceRows = attendanceRows.filter((row) => inRange(toDate(row.date), startOfPrevMonth, endOfPrevMonth));
+        const prevMonthPgAttendanceRows = pgAttendanceRows.filter((row) => inRange(toDate(row.date), startOfPrevMonth, endOfPrevMonth));
+        const previousPresentCount = prevMonthFirestoreAttendanceRows.filter((row) => isPresentStatus(row.status)).length
+            + prevMonthPgAttendanceRows.filter((row) => isPresentStatus(row.status)).length;
+        const previousTotalAttendanceRecords = prevMonthFirestoreAttendanceRows.length + prevMonthPgAttendanceRows.length;
+        const previousAttendanceRate = previousTotalAttendanceRecords > 0
+            ? Math.round((previousPresentCount / previousTotalAttendanceRecords) * 100)
+            : null;
+        const attendanceChangePoints = attendanceRate != null && previousAttendanceRate != null
+            ? attendanceRate - previousAttendanceRate
+            : null;
+
+        const firestorePlayerCreatedAt = playerDocs.map((docSnap) => docSnap.data() as {
+            createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
+        });
+        const newPlayersThisMonth = scopedPlayers.length > 0
+            ? scopedPlayers.filter((player) => inRange(toDate(player.createdAt), startOfMonth, endOfMonth)).length
+            : firestorePlayerCreatedAt.filter((player) => inRange(toDate(player.createdAt), startOfMonth, endOfMonth)).length;
+        const newPlayersLastMonth = scopedPlayers.length > 0
+            ? scopedPlayers.filter((player) => inRange(toDate(player.createdAt), startOfPrevMonth, endOfPrevMonth)).length
+            : firestorePlayerCreatedAt.filter((player) => inRange(toDate(player.createdAt), startOfPrevMonth, endOfPrevMonth)).length;
+        const playerCountChange = newPlayersThisMonth - newPlayersLastMonth;
+
         const todayTs = new Date();
         const in30Days = new Date();
         in30Days.setDate(todayTs.getDate() + 30);
 
-        const expiredVisasItems = playerDocs
-            .map((docSnap) => docSnap.data() as {
-                id: number;
-                firstName?: string | null;
-                lastName?: string | null;
-                medicalCheckExpiry?: FirebaseFirestore.Timestamp | Date | string | null;
-            })
+        type MedicalCheckCandidate = {
+            firstName?: string | null;
+            lastName?: string | null;
+            medicalCheckExpiry?: FirebaseFirestore.Timestamp | Date | string | null;
+        };
+
+        const medicalCheckCandidates: MedicalCheckCandidate[] = scopedPlayers.length > 0
+            ? scopedPlayers
+            : playerDocs.map((docSnap) => docSnap.data() as MedicalCheckCandidate);
+
+        const expiredVisasItems = medicalCheckCandidates
             .filter((player) => {
                 const expiry = toDate(player.medicalCheckExpiry);
                 return expiry ? expiry.getTime() <= todayTs.getTime() : false;
             });
 
-        const expiringItems = playerDocs
-            .map((docSnap) => docSnap.data() as {
-                id: number;
-                firstName?: string | null;
-                lastName?: string | null;
-                medicalCheckExpiry?: FirebaseFirestore.Timestamp | Date | string | null;
-            })
+        const expiringItems: Array<{
+            type: string;
+            name: string;
+            daysLeft: number | null;
+            expiryDate: string;
+            urgent: boolean;
+        }> = medicalCheckCandidates
             .filter((player) => {
                 const expiry = toDate(player.medicalCheckExpiry);
                 return expiry ? expiry >= todayTs && expiry <= in30Days : false;
@@ -254,7 +346,7 @@ router.get('/summary', async (req, res) => {
                 const expiry = toDate(player.medicalCheckExpiry);
                 const daysLeft = expiry ? Math.ceil((expiry.getTime() - todayTs.getTime()) / 86400000) : null;
                 return {
-                    type: 'VIZĂ MEDICALĂ' as const,
+                    type: 'VIZĂ MEDICALĂ',
                     name: `${player.firstName ?? ''} ${player.lastName ?? ''}`.trim(),
                     daysLeft,
                     expiryDate: expiry ? expiry.toLocaleDateString('ro-RO') : '',
@@ -262,13 +354,46 @@ router.get('/summary', async (req, res) => {
                 };
             });
 
+        const financialSettings = await getDashboardFinancialSettings(scope.clubId);
+        const hasRecurringFees = financialSettings != null && (
+            Number(financialSettings.monthlyPlayerFee ?? 0) > 0 ||
+            Number(financialSettings.trainingLevy ?? 0) > 0 ||
+            Number(financialSettings.facilityFee ?? 0) > 0
+        );
+
+        if (hasRecurringFees && pendingPaymentsCount > 0) {
+            const feeDueDate = new Date(now.getFullYear(), now.getMonth(), 28);
+            const daysLeft = Math.ceil((feeDueDate.getTime() - todayTs.getTime()) / 86400000);
+            if (daysLeft <= 14) {
+                expiringItems.push({
+                    type: 'COTIZAȚIE LUNARĂ',
+                    name: `${pendingPaymentsCount} ${pendingPaymentsCount === 1 ? 'plată restantă' : 'plăți restante'}`,
+                    daysLeft: daysLeft >= 0 ? daysLeft : null,
+                    expiryDate: feeDueDate.toLocaleDateString('ro-RO'),
+                    urgent: daysLeft <= 7,
+                });
+            }
+        }
+
+        expiringItems.sort((a, b) => (a.daysLeft ?? -Infinity) - (b.daysLeft ?? -Infinity));
+
         res.json({
             activePlayerCount,
+            playerCountChange,
             teamCount,
             totalIncome,
             monthlyIncome,
+            totalExpense,
+            monthlyExpense,
+            profit,
+            monthlyProfit,
+            previousMonthIncome,
+            incomeChangePercent,
+            profitChangePercent,
             pendingPaymentsCount,
             attendanceRate,
+            previousAttendanceRate,
+            attendanceChangePoints,
             presentCount,
             totalAttendanceRecords,
             expiredVisasCount: expiredVisasItems.length,

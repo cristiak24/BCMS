@@ -73,7 +73,7 @@ function AdminLayoutContent() {
             <Sidebar />
 
             <div className="flex flex-1 min-w-0 flex-col h-full relative">
-                <div className="lg:hidden">
+                <div className="lg:hidden sticky top-0 z-30">
                     <AppHeader
                         mobile
                         title={activeAdminItem.label}

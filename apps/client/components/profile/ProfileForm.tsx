@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Switch, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import AuraInput from '../ui/AuraInput';
@@ -9,23 +9,6 @@ type ProfileFormProps = {
   profile: ProfileRecord;
   onSave: (payload: UpdateProfilePayload) => Promise<ProfileRecord>;
 };
-
-function formatDate(value?: string | null) {
-  if (!value) {
-    return 'Not available';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date);
-}
 
 export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
   const [firstName, setFirstName] = useState('');
@@ -50,16 +33,6 @@ export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
     setError(null);
     setSuccess(null);
   }, [profile]);
-
-  const displayRows = useMemo(() => ([
-    { label: 'Email', value: profile.email },
-    { label: 'Role', value: profile.role },
-    { label: 'Club', value: profile.clubName ?? 'Not assigned' },
-    { label: 'Team', value: profile.teamName ?? 'Not assigned' },
-    { label: 'Account status', value: profile.status },
-    { label: 'Member since', value: formatDate(profile.createdAt) },
-    { label: 'Last login', value: formatDate(profile.lastLoginAt) },
-  ]), [profile]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -136,21 +109,12 @@ export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
                 <Switch
                   value={Boolean(notificationPreferences[item.key])}
                   onValueChange={(value) => setNotificationPreferences((current) => ({ ...current, [item.key]: value }))}
-                  trackColor={{ false: '#CBD5E1', true: '#C7D2FE' }}
-                  thumbColor={notificationPreferences[item.key] ? '#1D3E90' : '#F8FAFC'}
+                  trackColor={{ false: 'var(--c-border-strong)', true: '#C7D2FE' }}
+                  thumbColor={notificationPreferences[item.key] ? 'var(--c-brand-fg)' : 'var(--c-surface-2)'}
                 />
               </View>
             ))}
           </View>
-        </View>
-
-        <View className="mt-6 flex-row flex-wrap gap-3">
-          {displayRows.map((row) => (
-            <View key={row.label} className="min-w-[150px] flex-1 bg-[#F8FAFC] rounded-2xl px-4 py-3 border border-gray-100">
-              <Text className="text-[10px] font-black uppercase tracking-widest text-[#94A3B8]">{row.label}</Text>
-              <Text className="text-[#0E2041] font-semibold mt-1" numberOfLines={2}>{row.value}</Text>
-            </View>
-          ))}
         </View>
 
         {error ? (

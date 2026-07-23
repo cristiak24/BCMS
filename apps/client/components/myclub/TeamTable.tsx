@@ -2,13 +2,49 @@ import React from 'react';
 import { View, Text, Pressable, ActivityIndicator } from '@/src/web/reactNative';
 import { RefreshCw, Pencil, Calendar, Trash2, AlertTriangle } from 'lucide-react';
 import type { Team } from '../../services/teamsApi';
+import type { SortKey, SortState } from '../../hooks/useTeamFilters';
 import { GENDER_LABELS, LEVEL_LABELS, formatRelativeDate, isFrbTeam } from './teamDisplay';
 import ThemedCheckbox from './ThemedCheckbox';
+
+function SortableHeader({
+    label,
+    sortKey,
+    sort,
+    onToggle,
+    align = 'left',
+}: {
+    label: string;
+    sortKey: SortKey;
+    sort: SortState;
+    onToggle: (key: SortKey) => void;
+    align?: 'left' | 'right';
+}) {
+    const active = sort.key === sortKey;
+    return (
+        <th className={`px-3 py-3 ${align === 'right' ? 'text-right' : 'text-left'}`}>
+            <Pressable
+                onPress={() => onToggle(sortKey)}
+                className={`flex-row items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}
+            >
+                <Text className={`text-[10.5px] font-black uppercase tracking-widest ${active ? 'text-[#1D3E90]' : 'text-[#64748B]'}`}>
+                    {label}
+                </Text>
+                <Text className={`text-[11px] font-black ${active ? 'text-[#1D3E90]' : 'text-[#CBD5E1]'}`}>
+                    {active ? (sort.dir === 'asc' ? '↑' : '↓') : '↕'}
+                </Text>
+            </Pressable>
+        </th>
+    );
+}
 
 export default function TeamTable({
     teams,
     selectedIds,
     deletingId,
+    sort,
+    onToggleSort,
+    allSelected,
+    onToggleSelectAll,
     onToggleSelect,
     onOpen,
     onEdit,
@@ -18,10 +54,14 @@ export default function TeamTable({
     teams: Team[];
     selectedIds: Set<number>;
     deletingId: number | null;
+    sort: SortState;
+    onToggleSort: (key: SortKey) => void;
+    allSelected: boolean;
+    onToggleSelectAll: () => void;
     onToggleSelect: (id: number) => void;
     onOpen: (id: number) => void;
     onEdit: (team: Team) => void;
-    onSchedule: () => void;
+    onSchedule: (id: number) => void;
     onDelete: (team: Team) => void;
 }) {
     return (
@@ -29,15 +69,17 @@ export default function TeamTable({
             <table className="w-full min-w-[880px] border-collapse text-[13px]">
                 <thead>
                     <tr className="bg-[#F8FAFC]">
-                        <th className="w-10 px-3 py-3" />
-                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#94A3B8]">Echipă</th>
-                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#94A3B8]">Sursă</th>
-                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#94A3B8]">Sex</th>
-                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#94A3B8]">Nivel</th>
-                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#94A3B8]">Jucători</th>
-                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#94A3B8]">Antrenor</th>
-                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#94A3B8]">Actualizat</th>
-                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#94A3B8]">Status</th>
+                        <th className="w-10 px-3 py-3">
+                            <ThemedCheckbox checked={allSelected} onToggle={onToggleSelectAll} ariaLabel="Selectează toate echipele" size={18} />
+                        </th>
+                        <SortableHeader label="Echipă" sortKey="name" sort={sort} onToggle={onToggleSort} />
+                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#64748B]">Sursă</th>
+                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#64748B]">Sex</th>
+                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#64748B]">Nivel</th>
+                        <SortableHeader label="Jucători" sortKey="players" sort={sort} onToggle={onToggleSort} />
+                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#64748B]">Antrenor</th>
+                        <SortableHeader label="Actualizat" sortKey="updated" sort={sort} onToggle={onToggleSort} />
+                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#64748B]">Status</th>
                         <th className="w-32 px-3 py-3" />
                     </tr>
                 </thead>
@@ -56,14 +98,14 @@ export default function TeamTable({
                                 </td>
                                 <td className="px-3 py-2.5">
                                     <Pressable onPress={() => onOpen(team.id)} className="flex-row items-center gap-2">
-                                        <View className="w-2 h-2 rounded-full flex-none" style={{ backgroundColor: frb ? '#C62828' : '#0E9F6E' }} />
+                                        <View className="w-2 h-2 rounded-full flex-none" style={{ backgroundColor: frb ? 'var(--c-danger)' : 'var(--c-success)' }} />
                                         <Text className="font-black text-[#0E2041] text-[13px] text-left">{team.name}</Text>
                                     </Pressable>
                                 </td>
                                 <td className="px-3 py-2.5">
-                                    <View className="flex-row items-center gap-1 self-start px-2 py-0.5 rounded-full" style={{ backgroundColor: frb ? '#FBEAEA' : '#E6F8F1' }}>
-                                        {frb && <RefreshCw size={9} color="#8A1F1F" />}
-                                        <Text className="text-[10px] font-black uppercase" style={{ color: frb ? '#8A1F1F' : '#0B7A55' }}>{frb ? 'FRB' : 'Manual'}</Text>
+                                    <View className="flex-row items-center gap-1 self-start px-2 py-0.5 rounded-full" style={{ backgroundColor: frb ? 'var(--c-danger-bg)' : 'var(--c-success-bg)' }}>
+                                        {frb && <RefreshCw size={9} color="var(--c-danger-fg)" />}
+                                        <Text className="text-[10px] font-black uppercase" style={{ color: frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}>{frb ? 'FRB' : 'Manual'}</Text>
                                     </View>
                                 </td>
                                 <td className="px-3 py-2.5 text-[12.5px] font-bold text-[#475569]">{team.gender ? GENDER_LABELS[team.gender] : '—'}</td>
@@ -73,14 +115,14 @@ export default function TeamTable({
                                         <Text className="text-[12.5px] font-bold text-[#0E2041]">{team.playerCount}</Text>
                                         {team.staleMedicalChecks > 0 && (
                                             <View className="flex-row items-center gap-0.5">
-                                                <AlertTriangle size={11} color="#B45309" />
+                                                <AlertTriangle size={11} color="var(--c-warning-fg)" />
                                                 <Text className="text-[11px] font-bold text-[#B45309]">{team.staleMedicalChecks}</Text>
                                             </View>
                                         )}
                                     </View>
                                 </td>
                                 <td className="px-3 py-2.5 text-[12.5px] font-semibold text-[#475569]">{team.coachName ?? '—'}</td>
-                                <td className="px-3 py-2.5 text-[12px] font-semibold text-[#94A3B8]">{formatRelativeDate(team.updatedAt)}</td>
+                                <td className="px-3 py-2.5 text-[12px] font-semibold text-[#64748B]">{formatRelativeDate(team.updatedAt)}</td>
                                 <td className="px-3 py-2.5">
                                     <View className={`self-start px-2 py-0.5 rounded-full ${team.isActive ? 'bg-emerald-50' : 'bg-slate-100'}`}>
                                         <Text className={`text-[10px] font-black uppercase ${team.isActive ? 'text-emerald-700' : 'text-slate-500'}`}>
@@ -91,10 +133,10 @@ export default function TeamTable({
                                 <td className="px-3 py-2.5">
                                     <View className="flex-row items-center justify-end gap-0.5">
                                         <Pressable onPress={() => onEdit(team)} className="w-7 h-7 rounded-lg items-center justify-center hover:bg-[#F1F5F9]" accessibilityLabel="Editează">
-                                            <Pencil size={13} color="#64748B" />
+                                            <Pencil size={13} color="var(--c-muted)" />
                                         </Pressable>
-                                        <Pressable onPress={onSchedule} className="w-7 h-7 rounded-lg items-center justify-center hover:bg-[#F1F5F9]" accessibilityLabel="Program">
-                                            <Calendar size={13} color="#64748B" />
+                                        <Pressable onPress={() => onSchedule(team.id)} className="w-7 h-7 rounded-lg items-center justify-center hover:bg-[#F1F5F9]" accessibilityLabel="Program">
+                                            <Calendar size={13} color="var(--c-muted)" />
                                         </Pressable>
                                         <Pressable
                                             onPress={() => onDelete(team)}
@@ -102,7 +144,7 @@ export default function TeamTable({
                                             className="w-7 h-7 rounded-lg items-center justify-center hover:bg-red-50"
                                             accessibilityLabel="Șterge"
                                         >
-                                            {deletingId === team.id ? <ActivityIndicator size="small" color="#DC2626" /> : <Trash2 size={13} color="#DC2626" />}
+                                            {deletingId === team.id ? <ActivityIndicator size="small" color="var(--c-danger)" /> : <Trash2 size={13} color="var(--c-danger)" />}
                                         </Pressable>
                                     </View>
                                 </td>

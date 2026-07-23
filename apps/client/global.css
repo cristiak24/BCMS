@@ -81,7 +81,12 @@
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    /* Deliberately NOT re-declaring `transform` here. With `animation-fill-mode:
+       both` a `transform: translateY(0)` would linger forever, leaving every
+       card as a promoted compositing layer. Inside nested/oversized scroll
+       containers Chromium then failed to repaint those layers — content stayed
+       blank white (notably the Finances tab). Omitting transform lets the
+       resting state fall back to `none`, so no layer is promoted at rest. */
   }
 }
 

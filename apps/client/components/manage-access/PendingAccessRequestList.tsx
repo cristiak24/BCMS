@@ -1,6 +1,7 @@
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import { ActivityIndicator, FlatList, Text, View } from '@/src/web/reactNative';
+import { FlatList, Text, View } from '@/src/web/reactNative';
 import GlassCard from '../ui/GlassCard';
+import { SkeletonList } from '../ui/Skeleton';
 import type { AccessRequestItem } from '../../types/manageAccess';
 import ApproveDenyButtons from './ApproveDenyButtons';
 
@@ -30,18 +31,13 @@ export default function PendingAccessRequestList({
     onRetry,
 }: Props) {
     if (loading) {
-        return (
-            <GlassCard className="items-center py-12">
-                <ActivityIndicator size="large" color="#1D4ED8" />
-                <Text className="text-slate-500 mt-4">Loading club access requests…</Text>
-            </GlassCard>
-        );
+        return <SkeletonList count={3} />;
     }
 
     if (error) {
         return (
             <GlassCard className="items-center py-10">
-                <MaterialIcons name="error-outline" size={36} color="#DC2626" />
+                <MaterialIcons name="error-outline" size={36} color="var(--c-danger)" />
                 <Text className="text-slate-900 font-bold text-lg mt-3">Could not load requests</Text>
                 <Text className="text-slate-500 text-center mt-2">{error}</Text>
                 <Text onPress={onRetry} className="text-[#1D4ED8] font-bold mt-4">Try again</Text>
@@ -52,7 +48,7 @@ export default function PendingAccessRequestList({
     if (items.length === 0) {
         return (
             <GlassCard className="items-center py-12">
-                <MaterialIcons name="mark-email-read" size={42} color="#64748B" />
+                <MaterialIcons name="mark-email-read" size={42} color="var(--c-muted)" />
                 <Text className="text-slate-900 font-bold text-lg mt-3">No access requests yet</Text>
                 <Text className="text-slate-500 text-center mt-2">
                     New club registrations that need approval will show up here.
@@ -95,7 +91,7 @@ export default function PendingAccessRequestList({
                         ) : (
                             <View className="rounded-2xl bg-slate-50 px-4 py-3">
                                 <Text className="text-slate-600">
-                                    {item.status === 'approved' ? 'This user now has access to the club.' : 'This user remains blocked from the club.'}
+                                    {item.status === 'approved' ? 'This user now has access to the club.' : 'This request was denied. The account was not disabled.'}
                                 </Text>
                             </View>
                         )}

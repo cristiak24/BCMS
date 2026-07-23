@@ -17,7 +17,7 @@ export default function CreateAccountScreen() {
                     onPress={() => router.push('/admin/manage-accounts')}
                     className="bg-white border border-gray-200 px-5 py-2.5 rounded-[14px] flex-row items-center gap-2 shadow-sm"
                 >
-                    <MaterialIcons name="groups" size={16} color="#0D2040" />
+                    <MaterialIcons name="groups" size={16} color="var(--c-ink)" />
                     <Text className="text-[#0D2040] font-black text-[12px] uppercase tracking-wider">Manage Accounts</Text>
                 </Pressable>
             </View>
@@ -56,14 +56,14 @@ export default function CreateAccountScreen() {
                         onPress={() => router.push('/admin/manage-access')}
                         className="rounded-2xl border border-slate-200 bg-white px-4 py-3 flex-row items-center"
                     >
-                        <MaterialIcons name="verified-user" size={18} color="#334155" />
+                        <MaterialIcons name="verified-user" size={18} color="var(--c-ink-soft)" />
                         <Text className="text-slate-700 font-bold ml-2">Manage Access</Text>
                     </Pressable>
                     <Pressable
                         onPress={() => router.push('/admin/manage-accounts')}
                         className="rounded-2xl border border-slate-200 bg-white px-4 py-3 flex-row items-center"
                     >
-                        <MaterialIcons name="groups" size={18} color="#334155" />
+                        <MaterialIcons name="groups" size={18} color="var(--c-ink-soft)" />
                         <Text className="text-slate-700 font-bold ml-2">Manage Accounts</Text>
                     </Pressable>
                 </View>

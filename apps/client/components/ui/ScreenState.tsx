@@ -16,8 +16,8 @@ type ErrorStateProps = {
 
 export function LoadingScreen({
   message = 'Loading your workspace...',
-  backgroundColor = '#F8FAFC',
-  color = '#1D3E90',
+  backgroundColor = 'var(--c-surface-2)',
+  color = 'var(--c-brand-fg)',
 }: LoadingScreenProps) {
   return (
     <View
@@ -42,7 +42,7 @@ export function ErrorState({
 }: ErrorStateProps) {
   return (
     <View className="rounded-lg border border-red-100 bg-white px-6 py-6 items-center">
-      <MaterialIcons name="error-outline" size={34} color="#DC2626" />
+      <MaterialIcons name="error-outline" size={34} color="var(--c-danger)" />
       <Text className="mt-3 text-center text-[#0E2041] text-xl font-black">{title}</Text>
       <Text className="mt-2 text-center text-slate-500 font-semibold">{message}</Text>
       {actionLabel && onAction ? (

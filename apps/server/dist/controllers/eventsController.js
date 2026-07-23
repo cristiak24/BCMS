@@ -297,7 +297,7 @@ exports.eventsController = {
                     }
                 });
                 res.json(attendanceRows.map((row) => {
-                    var _a, _b, _c;
+                    var _a, _b, _c, _d;
                     const player = playersById.get(row.playerId);
                     return {
                         playerId: row.playerId,
@@ -305,6 +305,7 @@ exports.eventsController = {
                         lastName: (_b = player === null || player === void 0 ? void 0 : player.lastName) !== null && _b !== void 0 ? _b : '',
                         number: (_c = player === null || player === void 0 ? void 0 : player.number) !== null && _c !== void 0 ? _c : null,
                         status: row.status,
+                        note: (_d = row.note) !== null && _d !== void 0 ? _d : null,
                     };
                 }));
             }
@@ -334,10 +335,17 @@ exports.eventsController = {
                 for (const item of playerAttendances) {
                     const playerId = Number(item.playerId);
                     const status = String(item.status);
+                    // Note is optional: only touch it when the caller explicitly sends
+                    // a `note` key, so status-only updates (e.g. the quick toggle modal)
+                    // never wipe an existing coach note.
+                    const hasNote = Object.prototype.hasOwnProperty.call(item, 'note');
+                    const note = hasNote ? (item.note == null ? null : String(item.note)) : undefined;
                     const existingRows = yield db_1.db.select().from(schema_1.attendance).where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.attendance.eventId, eventId), (0, drizzle_orm_1.eq)(schema_1.attendance.playerId, playerId))).limit(1);
                     const existing = existingRows[0];
                     if ((existing === null || existing === void 0 ? void 0 : existing.id) != null) {
-                        yield db_1.db.update(schema_1.attendance).set({ status, date: new Date().toISOString() }).where((0, drizzle_orm_1.eq)(schema_1.attendance.id, existing.id));
+                        yield db_1.db.update(schema_1.attendance)
+                            .set(Object.assign({ status, date: new Date().toISOString() }, (hasNote ? { note } : {})))
+                            .where((0, drizzle_orm_1.eq)(schema_1.attendance.id, existing.id));
                     }
                     else {
                         yield db_1.db.insert(schema_1.attendance).values({
@@ -346,6 +354,7 @@ exports.eventsController = {
                             teamId: (_b = event.teamId) !== null && _b !== void 0 ? _b : 0,
                             status,
                             date: new Date().toISOString(),
+                            note: note !== null && note !== void 0 ? note : null,
                         });
                     }
                 }

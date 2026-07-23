@@ -36,21 +36,21 @@ function CoachEventCard({ event }: { event: CalendarEvent }) {
           <Text className="mt-3 text-[#050817] text-xl font-black" numberOfLines={2}>{event.title}</Text>
         </View>
         <View className="h-12 w-12 rounded-2xl bg-[#EBF4FF] items-center justify-center">
-          <MaterialIcons name={event.type === 'match' ? 'sports-basketball' : 'fitness-center'} size={23} color="#0A2C93" />
+          <MaterialIcons name={event.type === 'match' ? 'sports-basketball' : 'fitness-center'} size={23} color="var(--c-brand-fg)" />
         </View>
       </View>
 
       <View className="mt-6 gap-3">
         <View className="flex-row items-center gap-3">
-          <MaterialIcons name="calendar-today" size={17} color="#64748B" />
+          <MaterialIcons name="calendar-today" size={17} color="var(--c-muted)" />
           <Text className="text-[#1E293B] font-bold">{formatCoachDate(event.startTime)}</Text>
         </View>
         <View className="flex-row items-center gap-3">
-          <MaterialIcons name="schedule" size={18} color="#64748B" />
+          <MaterialIcons name="schedule" size={18} color="var(--c-muted)" />
           <Text className="text-[#1E293B] font-bold">{formatCoachTimeRange(event.startTime, event.endTime)}</Text>
         </View>
         <View className="flex-row items-center gap-3">
-          <MaterialIcons name="groups" size={18} color="#64748B" />
+          <MaterialIcons name="groups" size={18} color="var(--c-muted)" />
           <Text className="text-[#1E293B] font-bold flex-1" numberOfLines={1}>{event.teamName || 'Club team'}</Text>
         </View>
       </View>
@@ -60,7 +60,7 @@ function CoachEventCard({ event }: { event: CalendarEvent }) {
 
 function PlayerFocusRow({ player }: { player: Player }) {
   const rate = player.attendanceRate;
-  const tone = rate == null ? '#64748B' : rate >= 80 ? '#047857' : '#B45309';
+  const tone = rate == null ? 'var(--c-muted)' : rate >= 80 ? 'var(--c-success-fg)' : 'var(--c-warning-fg)';
 
   return (
     <View className="flex-row items-center gap-4 rounded-2xl border border-[#EDF2F7] bg-white px-4 py-3">
@@ -147,27 +147,27 @@ export default function CoachHome() {
           </View>
 
           <Pressable onPress={() => loadData(true)} className="h-12 w-12 rounded-full bg-white border border-[#EAF1FA] items-center justify-center">
-            {refreshing ? <ActivityIndicator size="small" color="#0A2C93" /> : <MaterialIcons name="refresh" size={22} color="#0A2C93" />}
+            {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={22} color="var(--c-brand-fg)" />}
           </Pressable>
         </View>
 
         {error ? (
           <View className="mb-6 rounded-[24px] border border-red-100 bg-white px-5 py-4 flex-row items-center gap-3">
-            <MaterialIcons name="error-outline" size={22} color="#DC2626" />
+            <MaterialIcons name="error-outline" size={22} color="var(--c-danger)" />
             <Text className="flex-1 text-red-600 font-bold">{error}</Text>
           </View>
         ) : null}
 
         <View className="flex-row flex-wrap gap-4 mb-8">
-          <CoachMetric label="Upcoming sessions" value={upcomingEvents.length} icon="event-available" color="#0A2C93" />
+          <CoachMetric label="Upcoming sessions" value={upcomingEvents.length} icon="event-available" color="var(--c-brand-fg)" />
           <CoachMetric label="Active teams" value={visibleTeamsCount} icon="groups" color="#007A99" />
           <CoachMetric label="Roster players" value={players.length} icon="sports-basketball" color="#7C3AED" />
-          <CoachMetric label="This week" value={upcomingEvents.filter((event) => getEventTimestamp(event) - Date.now() <= 7 * 24 * 3600000).length} icon="date-range" color="#047857" />
+          <CoachMetric label="This week" value={upcomingEvents.filter((event) => getEventTimestamp(event) - Date.now() <= 7 * 24 * 3600000).length} icon="date-range" color="var(--c-success-fg)" />
         </View>
 
         {loading ? (
           <View className="py-16 items-center justify-center">
-            <ActivityIndicator size="large" color="#0A2C93" />
+            <ActivityIndicator size="large" color="var(--c-brand-fg)" />
           </View>
         ) : (
           <View className="flex-col xl:flex-row gap-8">
@@ -189,7 +189,7 @@ export default function CoachHome() {
                   </View>
                 ) : (
                   <View className="rounded-[28px] border border-[#E3ECF6] bg-[#F8FBFF] px-6 py-10 items-center">
-                    <MaterialIcons name="event-busy" size={32} color="#8EA1B8" />
+                    <MaterialIcons name="event-busy" size={32} color="var(--c-faint)" />
                     <Text className="text-[#64748B] font-bold text-center mt-3">No upcoming sessions found.</Text>
                   </View>
                 )}
@@ -202,7 +202,7 @@ export default function CoachHome() {
                   <Text className="text-[#050817] text-2xl font-black">Roster focus</Text>
                   <Text className="text-[#64748B] text-sm font-semibold mt-1">Lowest recent attendance</Text>
                 </View>
-                <MaterialIcons name="monitor-heart" size={25} color="#0A2C93" />
+                <MaterialIcons name="monitor-heart" size={25} color="var(--c-brand-fg)" />
               </View>
 
               <View className="mt-6 gap-3">

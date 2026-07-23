@@ -170,7 +170,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                       >
                         <View
                           className="rounded-full"
-                          style={{ width: 10, height: 10, backgroundColor: active ? '#FFFFFF' : dash.line }}
+                          style={{ width: 10, height: 10, backgroundColor: active ? 'var(--c-surface)' : dash.line }}
                         />
                         <Text
                           className="flex-1 text-[12px] font-black leading-4"

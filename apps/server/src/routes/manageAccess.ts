@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireClubAdmin } from '../lib/requestContext';
+import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import {
     approveManageAccessRequest,
     denyManageAccessRequest,
@@ -7,9 +8,13 @@ import {
     getActiveClubInviteLink,
     listManageAccessRequests,
 } from '../lib/manageAccessService';
+import { rateLimit } from '../middleware/rateLimit';
+import { writeAuditLog } from '../services/auditService';
 import type { InviteRole } from '../types/manageAccess';
 
 const router = Router();
+
+router.use(authenticate);
 
 function readInviteRole(value: unknown): InviteRole | null {
     return value === 'player' || value === 'parent' || value === 'coach' ? value : null;
@@ -31,15 +36,41 @@ router.get('/requests', async (req, res) => {
     }
 });
 
-router.post('/requests/:id/approve', async (req, res) => {
+const mutateLimiter = rateLimit({ bucket: 'manage-access:mutate', limit: 30, windowMs: 60_000 });
+const inviteLimiter = rateLimit({ bucket: 'manage-access:invite', limit: 10, windowMs: 60_000 });
+
+function parseId(value: string): number | null {
+    const id = Number(value);
+    return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+router.post('/requests/:id/approve', mutateLimiter, async (req: AuthenticatedRequest, res) => {
     const user = await requireClubAdmin(req, res);
 
     if (!user) {
         return;
     }
 
+    const requestId = parseId(String(req.params.id));
+    if (requestId == null) {
+        res.status(400).json({ error: 'Invalid request id.' });
+        return;
+    }
+
     try {
-        await approveManageAccessRequest(user, Number(req.params.id));
+        const result = await approveManageAccessRequest(user, requestId);
+        await writeAuditLog({
+            action: 'manage_access.request_approved',
+            entityType: 'access_request',
+            entityId: result.requestId,
+            actorUserId: user.isHardcodedAdmin ? null : user.id,
+            actorUid: req.firebaseUser?.uid ?? null,
+            actorRole: user.role ?? null,
+            clubId: result.clubId,
+            metadata: { targetUserId: result.targetUserId, role: result.role },
+            ipAddress: req.ip ?? null,
+            userAgent: req.get('user-agent') ?? null,
+        });
         res.status(204).end();
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Could not approve the request.';
@@ -48,15 +79,33 @@ router.post('/requests/:id/approve', async (req, res) => {
     }
 });
 
-router.post('/requests/:id/deny', async (req, res) => {
+router.post('/requests/:id/deny', mutateLimiter, async (req: AuthenticatedRequest, res) => {
     const user = await requireClubAdmin(req, res);
 
     if (!user) {
         return;
     }
 
+    const requestId = parseId(String(req.params.id));
+    if (requestId == null) {
+        res.status(400).json({ error: 'Invalid request id.' });
+        return;
+    }
+
     try {
-        await denyManageAccessRequest(user, Number(req.params.id));
+        const result = await denyManageAccessRequest(user, requestId);
+        await writeAuditLog({
+            action: 'manage_access.request_denied',
+            entityType: 'access_request',
+            entityId: result.requestId,
+            actorUserId: user.isHardcodedAdmin ? null : user.id,
+            actorUid: req.firebaseUser?.uid ?? null,
+            actorRole: user.role ?? null,
+            clubId: result.clubId,
+            metadata: { targetUserId: result.targetUserId, role: result.role },
+            ipAddress: req.ip ?? null,
+            userAgent: req.get('user-agent') ?? null,
+        });
         res.status(204).end();
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Could not deny the request.';
@@ -87,7 +136,7 @@ router.get('/invite-links/active', async (req, res) => {
     }
 });
 
-router.post('/invite-links/generate', async (req, res) => {
+router.post('/invite-links/generate', inviteLimiter, async (req: AuthenticatedRequest, res) => {
     const user = await requireClubAdmin(req, res);
 
     if (!user) {
@@ -100,8 +149,26 @@ router.post('/invite-links/generate', async (req, res) => {
         return;
     }
 
+    const rawInterval = req.body?.refreshIntervalMinutes;
+    if (rawInterval != null && !Number.isFinite(Number(rawInterval))) {
+        res.status(400).json({ error: 'Refresh interval must be a number.' });
+        return;
+    }
+
     try {
-        const inviteLink = await generateClubInviteLink(user, role, Number(req.body?.refreshIntervalMinutes));
+        const inviteLink = await generateClubInviteLink(user, role, Number(rawInterval));
+        await writeAuditLog({
+            action: 'manage_access.invite_link_generated',
+            entityType: 'invite_link',
+            entityId: inviteLink.id,
+            actorUserId: user.isHardcodedAdmin ? null : user.id,
+            actorUid: req.firebaseUser?.uid ?? null,
+            actorRole: user.role ?? null,
+            clubId: inviteLink.clubId,
+            metadata: { role: inviteLink.role, refreshIntervalMinutes: inviteLink.refreshIntervalMinutes },
+            ipAddress: req.ip ?? null,
+            userAgent: req.get('user-agent') ?? null,
+        });
         res.status(201).json(inviteLink);
     } catch (error) {
         console.error('Failed to generate invite link:', error);

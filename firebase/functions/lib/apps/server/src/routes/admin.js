@@ -2,7 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const firebaseAdmin_1 = require("../lib/firebaseAdmin");
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
+router.use(auth_1.authenticate, (0, auth_1.requireRoles)(['admin']));
 router.get('/requests', async (_req, res) => {
     try {
         const pendingUsersSnap = await firebaseAdmin_1.firestore.collection('users').where('status', '==', 'pending').get();

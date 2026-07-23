@@ -1,6 +1,6 @@
 import { apiFetch } from './apiClient';
 
-export type ClubAdminAccountRole = 'coach' | 'player';
+export type ClubAdminAccountRole = 'coach' | 'player' | 'parent';
 
 export type ClubAdminAccount = {
     id: number | string;
@@ -48,6 +48,30 @@ export const clubAdminApi = {
 
     deactivateAccount(id: string | number) {
         return apiFetch<{ success: boolean; user?: ClubAdminAccount }>(`/club-admin/accounts/${id}/deactivate`, {
+            method: 'POST',
+        });
+    },
+
+    reactivateAccount(id: string | number) {
+        return apiFetch<{ success: boolean; user?: ClubAdminAccount }>(`/club-admin/accounts/${id}/reactivate`, {
+            method: 'POST',
+        });
+    },
+
+    resendInvitation(id: string | number) {
+        return apiFetch<{
+            success: boolean;
+            invitation: {
+                id: number;
+                email: string;
+                role: string;
+                clubId: number | null;
+                clubName: string | null;
+                status: string;
+                expiresAt: string;
+                inviteUrl: string;
+            };
+        }>(`/club-admin/accounts/${id}/resend`, {
             method: 'POST',
         });
     },

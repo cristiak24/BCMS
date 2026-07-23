@@ -15,6 +15,19 @@
     <link rel="icon" type="image/svg+xml" href="/pwa-icon.svg" />
     <link rel="apple-touch-icon" href="/pwa-icon.svg" />
     <title>BCMS</title>
+    <script>
+      // Apply the saved theme before first paint to avoid a light→dark flash.
+      (function () {
+        try {
+          var stored = localStorage.getItem('bcms.theme');
+          var mode = stored === 'dark' || stored === 'light' || stored === 'system' ? stored : 'light';
+          var dark = mode === 'dark' || (mode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

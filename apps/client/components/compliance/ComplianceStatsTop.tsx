@@ -26,7 +26,7 @@ export default function ComplianceStatsTop() {
       <View className="flex-1 bg-white rounded-3xl p-6 shadow-sm border-2 border-r-gray-100 border-b-gray-100 border-t-gray-100 border-l-red-600 relative overflow-hidden flex-col justify-between">
          <View className="flex-row justify-between items-start mb-4">
              <View className="w-8 h-8 rounded-full bg-red-50 items-center justify-center">
-                <AlertCircle size={18} color="#dc2626" />
+                <AlertCircle size={18} color="var(--c-danger)" />
              </View>
              <Text className="text-4xl font-black text-red-600">04</Text>
          </View>
@@ -40,7 +40,7 @@ export default function ComplianceStatsTop() {
       <View className="flex-1 bg-white rounded-3xl p-6 shadow-sm border-2 border-r-gray-100 border-b-gray-100 border-t-gray-100 border-l-[#3b82f6] relative overflow-hidden flex-col justify-between">
          <View className="flex-row justify-between items-start mb-4">
              <View className="w-8 h-8 rounded-full bg-blue-50 items-center justify-center">
-                <CalendarClock size={18} color="#3b82f6" />
+                <CalendarClock size={18} color="var(--c-blue)" />
              </View>
              <Text className="text-4xl font-black text-[#0D2040]">12</Text>
          </View>

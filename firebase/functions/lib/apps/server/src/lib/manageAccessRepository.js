@@ -17,6 +17,14 @@ exports.findInviteLinkByTokenHash = findInviteLinkByTokenHash;
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
+const manageAccessTokens_1 = require("./manageAccessTokens");
+/** Return the row with its `token` decrypted back to the raw invite token. */
+function withDecryptedToken(row) {
+    if (!row) {
+        return null;
+    }
+    return { ...row, token: (0, manageAccessTokens_1.decryptInviteToken)(row.token) };
+}
 function inviteLinkSelection() {
     return {
         id: schema_1.inviteLinks.id,
@@ -142,7 +150,7 @@ async function createInviteLink(payload) {
     const record = {
         clubId: payload.clubId,
         role: payload.role,
-        token: payload.token,
+        token: (0, manageAccessTokens_1.encryptInviteToken)(payload.token),
         tokenHash: payload.tokenHash,
         expiresAt: payload.expiresAt.toISOString(),
         refreshIntervalMinutes: payload.refreshIntervalMinutes,
@@ -158,27 +166,27 @@ async function createInviteLink(payload) {
     const rows = await db_1.db.select(inviteLinkSelection()).from(schema_1.inviteLinks)
         .where((0, drizzle_orm_1.eq)(schema_1.inviteLinks.id, createdId))
         .limit(1);
-    return rows[0] ?? null;
+    return withDecryptedToken(rows[0]);
 }
 async function getLatestInviteLinkForClubRole(clubId, role) {
     const rows = await db_1.db.select(inviteLinkSelection()).from(schema_1.inviteLinks)
         .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.inviteLinks.clubId, clubId), (0, drizzle_orm_1.eq)(schema_1.inviteLinks.role, role)))
         .orderBy((0, drizzle_orm_1.desc)(schema_1.inviteLinks.createdAt))
         .limit(1);
-    return rows[0] ?? null;
+    return withDecryptedToken(rows[0]);
 }
 async function getActiveInviteLinkForClubRole(clubId, role) {
     const rows = await db_1.db.select(inviteLinkSelection()).from(schema_1.inviteLinks)
         .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.inviteLinks.clubId, clubId), (0, drizzle_orm_1.eq)(schema_1.inviteLinks.role, role), (0, drizzle_orm_1.eq)(schema_1.inviteLinks.isActive, 1)))
         .orderBy((0, drizzle_orm_1.desc)(schema_1.inviteLinks.createdAt))
         .limit(1);
-    return rows[0] ?? null;
+    return withDecryptedToken(rows[0]);
 }
 async function findInviteLinkByTokenHash(tokenHash) {
     const rows = await db_1.db.select(inviteLinkSelection()).from(schema_1.inviteLinks)
         .where((0, drizzle_orm_1.eq)(schema_1.inviteLinks.tokenHash, tokenHash))
         .limit(1);
-    const invite = rows[0];
+    const invite = withDecryptedToken(rows[0]);
     if (!invite) {
         return null;
     }

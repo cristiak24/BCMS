@@ -157,9 +157,9 @@ function toneForEvent(type: CalendarEvent['type']): EventTone {
   if (type === 'match') {
     return {
       label: 'MATCH',
-      color: '#0A2C93',
-      pillBg: '#E7EEFF',
-      chipBg: '#E8EEFA',
+      color: 'var(--c-brand-fg)',
+      pillBg: 'var(--c-surface-tint)',
+      chipBg: 'var(--c-surface-tint)',
       icon: 'sports-basketball',
     };
   }
@@ -168,8 +168,8 @@ function toneForEvent(type: CalendarEvent['type']): EventTone {
     return {
       label: 'CAMP',
       color: '#007A99',
-      pillBg: '#DDF5FF',
-      chipBg: '#DCEEFF',
+      pillBg: 'var(--c-surface-tint)',
+      chipBg: 'var(--c-surface-tint)',
       icon: 'terrain',
     };
   }
@@ -177,18 +177,18 @@ function toneForEvent(type: CalendarEvent['type']): EventTone {
   if (type === 'admin') {
     return {
       label: 'INFO',
-      color: '#475569',
-      pillBg: '#EEF2F7',
-      chipBg: '#EDF2F7',
+      color: 'var(--c-muted)',
+      pillBg: 'var(--c-surface-2)',
+      chipBg: 'var(--c-surface-2)',
       icon: 'badge',
     };
   }
 
   return {
     label: 'TRAINING',
-    color: '#006092',
-    pillBg: '#DFF3FF',
-    chipBg: '#E7EFFB',
+    color: 'var(--c-brand-fg)',
+    pillBg: 'var(--c-surface-tint)',
+    chipBg: 'var(--c-surface-tint)',
     icon: 'fitness-center',
   };
 }
@@ -228,7 +228,7 @@ function getNextMatchLabel(match: CalendarEvent | null) {
 function EmptyState({ message }: { message: string }) {
   return (
     <View className="items-center justify-center rounded-[28px] border border-[#E3ECF6] bg-white px-6 py-10">
-      <MaterialIcons name="event-busy" size={30} color="#8EA1B8" />
+      <MaterialIcons name="event-busy" size={30} color="var(--c-faint)" />
       <Text className="mt-3 text-center text-[#64748B] font-bold">{message}</Text>
     </View>
   );
@@ -274,7 +274,7 @@ function PaginationButton({
       onPress={onPress}
       style={[styles.paginationButton, disabled ? styles.paginationButtonDisabled : null]}
     >
-      <MaterialIcons name={icon} size={24} color={disabled ? '#A7B4C6' : '#0A2C93'} />
+      <MaterialIcons name={icon} size={24} color={disabled ? '#A7B4C6' : 'var(--c-brand-fg)'} />
     </Pressable>
   );
 }
@@ -374,7 +374,7 @@ function UpcomingEventCard({ event, primary }: { event: CalendarEvent; primary?:
       </View>
 
       <View className="mt-7 flex-row items-center gap-3">
-        <MaterialIcons name="place" size={20} color="#6B7280" />
+        <MaterialIcons name="place" size={20} color="var(--c-muted)" />
         <Text className="flex-1 text-[#6B7280] text-base font-semibold" numberOfLines={1}>
           {event.location || event.teamName || 'Club court'}
         </Text>
@@ -385,7 +385,7 @@ function UpcomingEventCard({ event, primary }: { event: CalendarEvent; primary?:
       <View className="mt-5 flex-row items-center justify-between gap-4">
         <View className="flex-row items-center gap-2">
           {event.type === 'training' ? (
-            <MaterialIcons name="check-circle-outline" size={24} color="#006092" />
+            <MaterialIcons name="check-circle-outline" size={24} color="var(--c-brand-fg)" />
           ) : (
             <>
               <View className="h-9 w-9 rounded-full bg-[#0A2C93] items-center justify-center border-2 border-white">
@@ -404,7 +404,7 @@ function UpcomingEventCard({ event, primary }: { event: CalendarEvent; primary?:
         </View>
 
         {event.type === 'training' ? (
-          <MaterialIcons name="more-horiz" size={24} color="#6B7280" />
+          <MaterialIcons name="more-horiz" size={24} color="var(--c-muted)" />
         ) : (
           <Pressable
             onPress={handleAction}
@@ -449,11 +449,11 @@ function AllEventRow({ event }: { event: CalendarEvent }) {
         </View>
         <View className="mt-3 flex-row flex-wrap gap-x-5 gap-y-2">
           <View className="flex-row items-center gap-2">
-            <MaterialIcons name="schedule" size={17} color="#6B7280" />
+            <MaterialIcons name="schedule" size={17} color="var(--c-muted)" />
             <Text className="text-[#6B7280] font-semibold">{formatTimeRange(event.startTime, event.endTime)}</Text>
           </View>
           <View className="flex-row items-center gap-2">
-            <MaterialIcons name="place" size={17} color="#6B7280" />
+            <MaterialIcons name="place" size={17} color="var(--c-muted)" />
             <Text className="text-[#6B7280] font-semibold" numberOfLines={1}>
               {event.location || event.teamName || 'Club court'}
             </Text>
@@ -603,14 +603,14 @@ export default function ScheduleScreen() {
               />
             ))}
             <Pressable onPress={() => loadData(true)} className="h-[52px] w-[52px] rounded-full bg-white border border-[#BED0E5] items-center justify-center">
-              {refreshing ? <ActivityIndicator size="small" color="#0A2C93" /> : <MaterialIcons name="refresh" size={23} color="#0A2C93" />}
+              {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={23} color="var(--c-brand-fg)" />}
             </Pressable>
           </View>
         </View>
 
         {error ? (
           <View className="mb-6 rounded-[24px] border border-red-100 bg-white px-5 py-4 flex-row items-center gap-3">
-            <MaterialIcons name="error-outline" size={22} color="#DC2626" />
+            <MaterialIcons name="error-outline" size={22} color="var(--c-danger)" />
             <Text className="flex-1 text-red-600 font-bold">{error}</Text>
           </View>
         ) : null}
@@ -630,13 +630,13 @@ export default function ScheduleScreen() {
                     onPress={() => setViewDate((current) => addMonths(current, -1))}
                     className="h-11 w-11 rounded-full items-center justify-center"
                   >
-                    <MaterialIcons name="chevron-left" size={30} color="#050817" />
+                    <MaterialIcons name="chevron-left" size={30} color="var(--c-ink-strong)" />
                   </Pressable>
                   <Pressable
                     onPress={() => setViewDate((current) => addMonths(current, 1))}
                     className="h-11 w-11 rounded-full items-center justify-center"
                   >
-                    <MaterialIcons name="chevron-right" size={30} color="#050817" />
+                    <MaterialIcons name="chevron-right" size={30} color="var(--c-ink-strong)" />
                   </Pressable>
                 </View>
               </View>
@@ -653,7 +653,7 @@ export default function ScheduleScreen() {
 
               {loading ? (
                 <View className="min-h-[390px] items-center justify-center">
-                  <ActivityIndicator size="large" color="#0A2C93" />
+                  <ActivityIndicator size="large" color="var(--c-brand-fg)" />
                 </View>
               ) : (
                 <View className="flex-row flex-wrap">
@@ -707,7 +707,7 @@ export default function ScheduleScreen() {
 
               {loading ? (
                 <View className="py-12 items-center justify-center">
-                  <ActivityIndicator size="large" color="#0A2C93" />
+                  <ActivityIndicator size="large" color="var(--c-brand-fg)" />
                 </View>
               ) : filteredEvents.length ? (
                 <View className="gap-4">
@@ -736,7 +736,7 @@ export default function ScheduleScreen() {
 
             {loading ? (
               <View className="rounded-[30px] bg-white border border-[#DDE8F5] min-h-[220px] items-center justify-center">
-                <ActivityIndicator size="large" color="#0A2C93" />
+                <ActivityIndicator size="large" color="var(--c-brand-fg)" />
               </View>
             ) : visibleUpcomingCards.length ? (
               visibleUpcomingCards.map((event, index) => (
@@ -769,7 +769,7 @@ const styles = StyleSheet.create({
   filterChipActive: {
     backgroundColor: '#2BB6F6',
     borderColor: '#2BB6F6',
-    shadowColor: '#0A2C93',
+    shadowColor: 'var(--c-brand-fg)',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.12,
     shadowRadius: 18,
@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
     color: '#06385F',
   },
   filterChipTextIdle: {
-    color: '#111827',
+    color: 'var(--c-ink-strong)',
   },
   weekdayCell: {
     width: `${100 / 7}%`,
@@ -795,16 +795,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRightWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#E5EAF1',
+    borderColor: 'var(--c-border)',
   },
   calendarCell: {
     width: `${100 / 7}%`,
     padding: 12,
-    borderColor: '#E5EAF1',
-    backgroundColor: '#FFFFFF',
+    borderColor: 'var(--c-border)',
+    backgroundColor: 'var(--c-surface)',
   },
   calendarCellSelected: {
-    borderColor: '#0A2C93',
+    borderColor: 'var(--c-brand-fg)',
     borderWidth: 2,
   },
   dayNumber: {
@@ -815,10 +815,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dayNumberActive: {
-    backgroundColor: '#0A2C93',
+    backgroundColor: 'var(--c-brand-surface-deep)',
   },
   dayNumberText: {
-    color: '#050817',
+    color: 'var(--c-ink-strong)',
     fontSize: 16,
     fontWeight: '800',
   },
@@ -870,12 +870,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   cardActionPrimary: {
-    backgroundColor: '#0A2C93',
-    borderColor: '#0A2C93',
+    backgroundColor: 'var(--c-brand-surface-deep)',
+    borderColor: 'var(--c-brand-fg)',
   },
   cardActionSecondary: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#0A2C93',
+    backgroundColor: 'var(--c-surface)',
+    borderColor: 'var(--c-brand-fg)',
   },
   cardActionText: {
     fontSize: 15,
@@ -885,7 +885,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   cardActionTextSecondary: {
-    color: '#0A2C93',
+    color: 'var(--c-brand-fg)',
   },
   metricCard: {
     flex: 1,
@@ -900,12 +900,12 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     borderColor: '#BED0E5',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'var(--c-surface)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   paginationButtonDisabled: {
-    backgroundColor: '#F2F6FB',
-    borderColor: '#DDE8F5',
+    backgroundColor: 'var(--c-surface-2)',
+    borderColor: 'var(--c-border)',
   },
 });

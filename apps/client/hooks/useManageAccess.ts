@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isClubAdmin } from '../utils/authSession';
 import { useFirebaseAuth } from '../context/AuthContext';
 import { manageAccessApi } from '../services/manageAccessApi';
-import { profileApi } from '../services/profileApi';
 import type { AccessRequestItem, InviteLinkItem, InviteRole } from '../types/manageAccess';
 import { DEFAULT_REFRESH_INTERVAL_MINUTES, isInviteExpired } from '../utils/manageAccess';
 
@@ -34,6 +33,10 @@ export function useManageAccess() {
         };
     }, []);
 
+    // The session already carries a verified role + clubId (issued by the backend
+    // at login), so admin status is derived from it directly. There is no need for
+    // an extra profileApi.getProfile() round-trip on every session change — any
+    // admin-only endpoint this page calls is still enforced server-side.
     const resolveAccessState = useCallback(async () => {
         setAuthError(null);
 
@@ -59,28 +62,8 @@ export function useManageAccess() {
             setAuthError('Only club admins can manage access.');
             setRequestsLoading(false);
             setInviteLoading(false);
-            return;
         }
-
-        try {
-            const currentUser = await profileApi.getProfile();
-            if (!isMountedRef.current) {
-                return;
-            }
-            setVerifiedIsAdmin(isClubAdmin(currentUser, currentUser.clubId));
-        } catch (error) {
-            if (!isMountedRef.current) {
-                return;
-            }
-            if (sessionCanAdmin) {
-                setAuthError(null);
-                setVerifiedIsAdmin(true);
-            } else {
-                setVerifiedIsAdmin(false);
-                setAuthError(error instanceof Error ? error.message : 'Could not verify your admin access.');
-            }
-        }
-    }, [initializing, session]);
+    }, [initializing, session, sessionCanAdmin]);
 
     useEffect(() => {
         void resolveAccessState();
@@ -118,29 +101,43 @@ export function useManageAccess() {
         }
     }, []);
 
+    // Access requests don't depend on the selected role — load them once the
+    // session resolves, not on every role switch.
     useEffect(() => {
         if (!hasResolvedSession || !isAdmin) {
             setRequestsLoading(false);
-            setInviteLoading(false);
             return;
         }
 
         void loadRequests();
-        void loadInviteLink(selectedRole);
-    }, [hasResolvedSession, isAdmin, loadInviteLink, loadRequests, selectedRole]);
+    }, [hasResolvedSession, isAdmin, loadRequests]);
 
-    const regenerateInviteLink = useCallback(async (role: InviteRole, interval = refreshIntervalMinutes) => {
+    // The active invite link is role-scoped, so (re)load it whenever the selected
+    // role changes. This is the single source of the invite-link fetch — callers
+    // just call setSelectedRole and let this effect do the load (no duplicate).
+    useEffect(() => {
+        if (!hasResolvedSession || !isAdmin) {
+            setInviteLoading(false);
+            return;
+        }
+
+        void loadInviteLink(selectedRole);
+    }, [hasResolvedSession, isAdmin, loadInviteLink, selectedRole]);
+
+    const regenerateInviteLink = useCallback(async (role: InviteRole, interval = refreshIntervalMinutes): Promise<boolean> => {
         setRegenerating(true);
         setInviteError(null);
 
         try {
+            // generate returns the freshly created active link, so a follow-up
+            // getActiveInviteLink call would just repeat the same fetch.
             const nextLink = await manageAccessApi.generateInviteLink(role, interval);
-            const activeLink = await manageAccessApi.getActiveInviteLink(role);
-            const resolvedLink = activeLink ?? nextLink;
-            setInviteLink(resolvedLink);
-            setRefreshIntervalMinutes(resolvedLink.refreshIntervalMinutes);
+            setInviteLink(nextLink);
+            setRefreshIntervalMinutes(nextLink.refreshIntervalMinutes);
+            return true;
         } catch (error) {
             setInviteError(error instanceof Error ? error.message : 'Could not regenerate the invite link.');
+            return false;
         } finally {
             setRegenerating(false);
             setInviteLoading(false);
@@ -166,7 +163,7 @@ export function useManageAccess() {
         return () => clearTimeout(timer);
     }, [inviteLink, isAdmin]);
 
-    const approveRequest = useCallback(async (id: number) => {
+    const approveRequest = useCallback(async (id: number): Promise<boolean> => {
         setRequestAction({ id, type: 'approve' });
         setRequestsError(null);
 
@@ -177,14 +174,16 @@ export function useManageAccess() {
                     ? { ...request, status: 'approved', reviewedAt: new Date().toISOString() }
                     : request
             )));
+            return true;
         } catch (error) {
             setRequestsError(error instanceof Error ? error.message : 'Could not approve the request.');
+            return false;
         } finally {
             setRequestAction(null);
         }
     }, []);
 
-    const denyRequest = useCallback(async (id: number) => {
+    const denyRequest = useCallback(async (id: number): Promise<boolean> => {
         setRequestAction({ id, type: 'deny' });
         setRequestsError(null);
 
@@ -195,8 +194,10 @@ export function useManageAccess() {
                     ? { ...request, status: 'denied', reviewedAt: new Date().toISOString() }
                     : request
             )));
+            return true;
         } catch (error) {
             setRequestsError(error instanceof Error ? error.message : 'Could not deny the request.');
+            return false;
         } finally {
             setRequestAction(null);
         }

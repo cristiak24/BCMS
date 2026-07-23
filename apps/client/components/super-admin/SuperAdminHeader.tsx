@@ -52,7 +52,7 @@ export default function SuperAdminHeader({ initials, displayName, title = 'Aura 
               onPress={onMenuPress}
               className="w-11 h-11 rounded-2xl bg-[#F4F7FF] border border-[#E7ECFF] items-center justify-center md:hidden"
             >
-              <MaterialIcons name="menu" size={24} color="#173AA8" />
+              <MaterialIcons name="menu" size={24} color="var(--c-brand-fg)" />
             </Pressable>
           ) : null}
 
@@ -73,12 +73,12 @@ export default function SuperAdminHeader({ initials, displayName, title = 'Aura 
 
         <View className="hidden md:flex flex-row items-center gap-3 flex-1 max-w-[520px] mx-6">
           <View className="flex-1 flex-row items-center gap-3 rounded-full border border-[#DDE6FF] bg-[#F7F9FF] px-4 py-3">
-            <MaterialIcons name="search" size={20} color="#6B7AA6" />
+            <MaterialIcons name="search" size={20} color="var(--c-muted)" />
             <TextInput
               value={search}
               onChangeText={setSearch}
               placeholder="Search clubs, users, invites"
-              placeholderTextColor="#9AA7C2"
+              placeholderTextColor="var(--c-faint)"
               className="flex-1 text-[#102A72] text-[14px]"
             />
           </View>
@@ -86,7 +86,7 @@ export default function SuperAdminHeader({ initials, displayName, title = 'Aura 
 
         <View className="flex-row items-center gap-2 md:gap-3">
           <Pressable className="w-11 h-11 rounded-full bg-[#F4F7FF] border border-[#E7ECFF] items-center justify-center">
-            <MaterialIcons name="notifications-none" size={22} color="#173AA8" />
+            <MaterialIcons name="notifications-none" size={22} color="var(--c-brand-fg)" />
           </Pressable>
           <Pressable
             onPress={() => setAccountMenuVisible((value) => !value)}
@@ -119,11 +119,11 @@ export default function SuperAdminHeader({ initials, displayName, title = 'Aura 
                       <Text className="text-[#7483A6] text-[12px] mt-1">Super admin account</Text>
                     </View>
                     <Pressable onPress={handleGoProfile} className="flex-row items-center gap-3 px-4 py-4">
-                      <MaterialIcons name="person" size={20} color="#173AA8" />
+                      <MaterialIcons name="person" size={20} color="var(--c-brand-fg)" />
                       <Text className="text-[#102A72] font-semibold">Open profile</Text>
                     </Pressable>
                     <Pressable onPress={handleLogout} className="flex-row items-center gap-3 px-4 py-4 border-t border-[#F2F5FF]">
-                      <MaterialIcons name="logout" size={20} color="#B91C1C" />
+                      <MaterialIcons name="logout" size={20} color="var(--c-danger)" />
                       <Text className="text-[#B91C1C] font-semibold">Logout</Text>
                     </Pressable>
                   </View>
