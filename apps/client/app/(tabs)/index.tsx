@@ -39,7 +39,7 @@ const palette = {
   navy: 'var(--c-ink-strong)',
   royal: 'var(--c-brand-fg)',
   blue: 'var(--c-blue)',
-  sky: '#0EA5E9',
+  sky: 'var(--c-sky)',
   orange: 'var(--c-warning)',
   amber: 'var(--c-warning)',
   green: 'var(--c-success-fg)',
@@ -48,7 +48,7 @@ const palette = {
   line: 'var(--c-border)',
   soft: 'var(--c-surface-2)',
   page: 'var(--c-surface-2)',
-  card: '#FFFFFF',
+  card: 'var(--c-surface)',
 };
 
 function getSessionTeamIds(user: AuthUser | null) {
@@ -425,7 +425,7 @@ function getAttendanceTone(rate: number | null) {
   }
 
   if (rate >= 80) {
-    return { label: 'On track', color: '#0369A1', bg: 'var(--c-surface-tint)' };
+    return { label: 'On track', color: 'var(--c-sky)', bg: 'var(--c-surface-tint)' };
   }
 
   return { label: 'Needs focus', color: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)' };
@@ -492,7 +492,7 @@ function PlayerHubHeader({
 }) {
   return (
     <LinearGradient
-      colors={['#06132C', 'var(--c-brand-fg)', '#0EA5E9']}
+      colors={['#06132C', 'var(--c-brand-fg)', 'var(--c-sky)']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.hero, isMobile ? styles.heroMobile : null]}
@@ -818,7 +818,7 @@ function EventCard({
               className={`${isMobile ? 'w-full mt-1' : 'mt-4'} h-12 rounded-[18px] bg-[#07152F] px-5 items-center justify-center flex-row active:scale-95`}
             >
               <Text className="text-white text-[12px] font-black uppercase tracking-widest">{isMatch ? 'Fișă Meci' : 'Details'}</Text>
-              <MaterialIcons name="chevron-right" size={18} color="#FFFFFF" />
+              <MaterialIcons name="chevron-right" size={18} color="var(--c-surface)" />
             </Pressable>
           </View>
         </View>
@@ -907,7 +907,7 @@ function DropdownFilter({
         <Text className={`${open ? 'text-white' : 'text-[#0E2041]'} flex-1 text-[13px] font-black`} numberOfLines={1}>
           {selectedLabel}
         </Text>
-        <MaterialIcons name={open ? 'expand-less' : 'expand-more'} size={20} color={open ? '#FFFFFF' : palette.orange} />
+        <MaterialIcons name={open ? 'expand-less' : 'expand-more'} size={20} color={open ? 'var(--c-surface)' : palette.orange} />
       </Pressable>
 
       {open ? (

@@ -100,7 +100,7 @@ export default function AppHeader({
               accessibilityRole="button"
               accessibilityLabel="Open navigation menu"
             >
-              <MaterialIcons name="menu" size={23} color="#FFFFFF" />
+              <MaterialIcons name="menu" size={23} color="var(--c-surface)" />
             </Pressable>
           </View>
         </View>
@@ -133,9 +133,9 @@ export default function AppHeader({
   }
 
   return (
-    <View className="hidden lg:flex bg-white/60 px-6 flex-row items-center z-10 shrink-0 border-b border-white/70 backdrop-blur-xl" style={{ height: 68 } as any}>
-      <View style={{ flex: 1, maxWidth: 390 }}>
-        <View className="flex-row items-center bg-white/92 rounded-[17px] px-4 py-2.5 border border-white" style={{ boxShadow: '0 12px 26px rgba(11, 30, 61, 0.06)' } as any}>
+    <View className="hidden lg:flex px-6 flex-row items-center z-10 shrink-0 border-b" style={{ height: 60, backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
+      <View style={{ flex: 1, maxWidth: 380 }}>
+        <View className="flex-row items-center rounded-[10px] px-3 py-2 border" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
           <MaterialIcons name="search" size={18} color={theme.colors.faint} />
           <TextInput
             placeholder={searchPlaceholder}
@@ -151,12 +151,12 @@ export default function AppHeader({
         {headerActions ?? null}
       </View>
 
-      <View className="flex-row items-center gap-3">
-        <Pressable className="relative w-10 h-10 items-center justify-center rounded-[15px] bg-white/92 border border-white">
+      <View className="flex-row items-center gap-2.5">
+        <Pressable className="relative w-9 h-9 items-center justify-center rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
           <MaterialIcons name="notifications" size={19} color={theme.colors.muted} />
-          <View className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-[#38BDF8] rounded-full border-2 border-white" />
+          <View className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--c-sky)' }} />
         </Pressable>
-        <Pressable className="w-10 h-10 items-center justify-center rounded-[15px] bg-white/92 border border-white">
+        <Pressable className="w-9 h-9 items-center justify-center rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
           <MaterialIcons name="help-outline" size={19} color={theme.colors.muted} />
         </Pressable>
         <Pressable

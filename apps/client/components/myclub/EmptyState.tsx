@@ -18,7 +18,7 @@ export function NoTeamsEmptyState({ onImport, onCreate }: { onImport: () => void
                     <Text className="text-[#1D3E90] text-[12px] font-black uppercase tracking-widest">Importă din FRB</Text>
                 </Pressable>
                 <Pressable onPress={onCreate} className="flex-row items-center gap-2 h-11 px-4 rounded-[14px] bg-[#1D3E90] active:bg-[#152e6b]">
-                    <Plus size={14} color="#ffffff" />
+                    <Plus size={14} color="var(--c-surface)" />
                     <Text className="text-white text-[12px] font-black uppercase tracking-widest">Creează prima echipă</Text>
                 </Pressable>
             </View>

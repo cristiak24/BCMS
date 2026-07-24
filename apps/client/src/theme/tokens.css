@@ -1,123 +1,196 @@
 /*
- * BCMS semantic color tokens.
+ * BCMS design tokens.
  *
- * Light mode (:root) holds the EXACT colors the app shipped with, so switching
- * a hardcoded `#RRGGBB` to `var(--c-…)` is a no-op in light mode (zero visual
- * regression). Dark mode (`html[data-theme="dark"]`) remaps the same tokens to
- * a designed slate/navy palette tuned to the blue brand.
+ * ── Palette rationale ────────────────────────────────────────────────────
+ * The app used to be built on a single flat navy (#1D3E90) sitting on pale
+ * blue page backgrounds (#EAF1F8 / #EDF4FB / #E0F2FE). Everything was blue:
+ * chrome, surfaces, text, accents — which reads as clinical ("hospital blue")
+ * and leaves no contrast budget for the one colour that should actually pull
+ * the eye, the primary action.
  *
- * Buckets:
- *   surfaces  – page & card backgrounds (light → dark)
- *   ink       – text (dark → light)
- *   borders   – hairlines
- *   brand     – primary blue/navy, split by role (surface vs foreground vs border)
- *   status    – green / red / amber / sky / purple (kept legible on both)
+ * The system now separates the two jobs:
+ *   • NEUTRALS carry the interface. A near-achromatic grey ramp with a faint
+ *     cool cast — page, cards, hairlines, text. No page is tinted blue.
+ *   • BRAND is spent only on intent: the primary action, the active state,
+ *     the focused thing. One saturated indigo, used sparingly, reads as
+ *     deliberate rather than decorative.
+ *
+ * ── How theming works ────────────────────────────────────────────────────
+ * Every colour in the app resolves to a token here, via one of three paths:
+ *   1. `var(--c-…)` written directly in a component (preferred, new code);
+ *   2. the legacy-hex remap layer in `palette.css`, which points Tailwind's
+ *      arbitrary `[#hex]` utilities at these tokens in BOTH themes;
+ *   3. `dark.css`, which only has to exist for utilities palette.css doesn't
+ *      cover.
+ * Consequence: retuning the product's look is an edit to THIS file, not a
+ * sweep across 200 components.
  */
 
 :root {
   color-scheme: light;
 
-  /* ── Surfaces ─────────────────────────────── */
-  --c-bg: #F5F7FB;            /* app page background */
-  --c-bg-alt: #EAF1F8;        /* alt page background (admin shell) */
+  /* ── Surfaces ─────────────────────────────────
+     Neutral, not blue. --c-bg is the page; --c-surface is what sits on it. */
+  --c-bg: #F7F8FA;            /* app page background */
+  --c-bg-alt: #F4F5F9;        /* alt page background (admin shell) */
   --c-surface: #FFFFFF;       /* cards / sheets */
-  --c-surface-2: #F8FAFC;     /* subtle raised / inputs */
-  --c-surface-3: #F1F5F9;     /* muted fill */
-  --c-surface-tint: #EEF3FF;  /* bluish highlight fill */
+  --c-surface-2: #F8F9FC;     /* subtle raised / inputs */
+  --c-surface-3: #F1F2F7;     /* muted fill */
+  --c-surface-tint: #EEEEFE;  /* brand-tinted highlight fill */
 
-  /* ── Ink / text ───────────────────────────── */
-  --c-ink: #0E2041;           /* primary text */
-  --c-ink-strong: #07152F;    /* headings / darkest */
-  --c-ink-soft: #1E293B;      /* secondary text */
-  --c-muted: #64748B;         /* muted text */
-  --c-faint: #94A3B8;         /* faint / placeholder */
+  /* ── Ink / text ───────────────────────────────
+     Ramp is tuned so --c-muted still clears 4.5:1 on --c-surface. */
+  --c-ink: #16192C;           /* primary text */
+  --c-ink-strong: #0A0C1B;    /* headings / darkest */
+  --c-ink-soft: #343A52;      /* secondary text */
+  --c-muted: #666D86;         /* muted text */
+  --c-faint: #949BB1;         /* faint / placeholder */
 
-  /* ── Borders ──────────────────────────────── */
-  --c-border: #E2E8F0;
-  --c-border-soft: #EEF2F9;
-  --c-border-strong: #CBD5E1;
+  /* ── Borders ──────────────────────────────────
+     Hairlines only. A visible border and a shadow are two ways of saying the
+     same thing; the app should pick one per element, not both. */
+  --c-border: #E7E8EF;
+  --c-border-soft: #F0F1F6;
+  --c-border-strong: #D3D6E1;
 
-  /* ── Brand (blue / navy) ──────────────────── */
-  --c-brand-surface: #1D3E90; /* navy hero / filled brand backgrounds */
-  --c-brand-surface-deep: #0B1E3D;
-  --c-brand-fg: #1D3E90;      /* brand text / icons on light surfaces */
-  --c-brand-border: #1D3E90;
-  --c-brand-strong: #102A72;  /* deep navy accents */
-  --c-blue: #2563EB;          /* blue-600 accent */
-  --c-blue-deep: #1D4ED8;
+  /* ── Brand (indigo) ───────────────────────────
+     -surface = filled brand backgrounds (primary button, active chip)
+     -fg      = brand text/icons ON light surfaces
+     -deep    = dark panels / heroes that stay dark in both themes */
+  --c-brand-surface: #4F46E5;
+  --c-brand-surface-deep: #1B1A3D;
+  --c-brand-fg: #4F46E5;
+  --c-brand-border: #4F46E5;
+  --c-brand-strong: #3F37C9;
+  --c-blue: #4F46E5;
+  --c-blue-deep: #4338CA;
   --c-sky: #0EA5E9;
-  --c-purple: #635BFF;
+  --c-purple: #7C6CFF;
 
-  /* ── Status ───────────────────────────────── */
-  --c-success: #10B981;
-  --c-success-fg: #047857;
-  --c-success-bg: #E6F8F1;
-  --c-danger: #DC2626;
+  /* ── Status ───────────────────────────────────
+     -fg is the text weight (AA on -bg), plain is the dot/fill weight. */
+  --c-success: #12B76A;
+  --c-success-fg: #067647;
+  --c-success-bg: #ECFDF3;
+  --c-success-border: #ABEFC6;
+  --c-danger: #F04438;
   --c-danger-fg: #B42318;
-  --c-danger-bg: #FBEAEA;
-  --c-warning: #F59E0B;
-  --c-warning-fg: #B45309;
-  --c-warning-bg: #FEF3C7;
+  --c-danger-bg: #FEF3F2;
+  --c-danger-border: #FECDCA;
+  --c-warning: #F79009;
+  --c-warning-fg: #B54708;
+  --c-warning-bg: #FFFAEB;
+  --c-warning-border: #FEDF89;
 
   /* ── On-brand text (stays light in both modes) ── */
   --c-on-brand: #FFFFFF;
 
   /* Dark surfaces that stay dark in BOTH modes (hero cards, dark panels). */
-  --c-surface-inverse: #0E2041;
+  --c-surface-inverse: #1B1A3D;
 
   /* Light tint used as TEXT on colored/dark surfaces (hero subtitles, labels)
      — stays light in both modes. */
-  --c-tint-fg: #D6E6FF;
+  --c-tint-fg: #C9C7F7;
+
+  /* ── Radius scale ─────────────────────────────
+     The old UI ran on 24–32px radii at every size, which makes small controls
+     look inflated and large cards look like pill-shaped blobs. Radius should
+     scale with the element: chips stay round, cards stay crisp. */
+  --r-xs: 8px;
+  --r-sm: 10px;
+  --r-md: 12px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+  --r-2xl: 22px;
+
+  /* ── Elevation ────────────────────────────────
+     Short, tight shadows. The old 18–45px blurs read as haze, not lift. */
+  --e-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --e-sm: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --e-md: 0 4px 8px -2px rgba(16, 24, 40, 0.08), 0 2px 4px -2px rgba(16, 24, 40, 0.04);
+  --e-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
+  --e-brand: 0 1px 2px rgba(16, 24, 40, 0.06), 0 6px 14px -4px rgba(79, 70, 229, 0.35);
+
+  /* ── Layout rhythm ────────────────────────────
+     Single source of truth for the app shell's gutters and content width, so
+     screens don't each invent their own padding. */
+  --gutter: 16px;
+  --gutter-lg: 24px;
+  --content-max: 1560px;
+  --header-h: 56px;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --gutter: 24px;
+    --header-h: 60px;
+  }
 }
 
 html[data-theme="dark"] {
   color-scheme: dark;
 
-  /* ── Surfaces ─────────────────────────────── */
-  --c-bg: #0B1220;
-  --c-bg-alt: #0A1120;
-  --c-surface: #141E33;
-  --c-surface-2: #1B2740;
-  --c-surface-3: #202D48;
-  --c-surface-tint: #21304F;
+  /* ── Surfaces ─────────────────────────────────
+     Near-neutral charcoal with a violet cast, so the indigo brand still reads
+     as a colour rather than disappearing into a blue field. */
+  --c-bg: #0C0D14;
+  --c-bg-alt: #0A0B12;
+  --c-surface: #14161F;
+  --c-surface-2: #1B1D28;
+  --c-surface-3: #232634;
+  --c-surface-tint: #232152;
 
   /* ── Ink / text ───────────────────────────── */
-  --c-ink: #E9EEF7;
-  --c-ink-strong: #F3F6FC;
-  --c-ink-soft: #C6D2E6;
-  --c-muted: #95A4C0;
-  --c-faint: #6E7D9B;
+  --c-ink: #E9EAF0;
+  --c-ink-strong: #F7F8FB;
+  --c-ink-soft: #C6C9D6;
+  --c-muted: #949AAE;
+  --c-faint: #6B7186;
 
   /* ── Borders ──────────────────────────────── */
-  --c-border: #273450;
-  --c-border-soft: #1F2B45;
-  --c-border-strong: #384A6C;
+  --c-border: #262936;
+  --c-border-soft: #1E212C;
+  --c-border-strong: #363A4B;
 
-  /* ── Brand (blue / navy) ──────────────────── */
-  --c-brand-surface: #24448F;
-  --c-brand-surface-deep: #16294F;
-  --c-brand-fg: #7DA0E8;
-  --c-brand-border: #33508F;
-  --c-brand-strong: #2E4A8C;
-  --c-blue: #4F86F7;
-  --c-blue-deep: #6699FF;
+  /* ── Brand (indigo) ───────────────────────────
+     Lifted toward the light end: #4F46E5 on a near-black surface fails
+     contrast for text, so -fg brightens while -surface stays saturated
+     enough to hold white label text. */
+  --c-brand-surface: #5B54EB;
+  --c-brand-surface-deep: #1B1A3D;
+  --c-brand-fg: #A5A0FF;
+  --c-brand-border: #4A44A8;
+  --c-brand-strong: #6F68F0;
+  --c-blue: #7C75F5;
+  --c-blue-deep: #8F88FF;
   --c-sky: #38BDF8;
-  --c-purple: #8B84FF;
+  --c-purple: #A79BFF;
 
   /* ── Status ───────────────────────────────── */
-  --c-success: #34D399;
-  --c-success-fg: #4ADE9A;
-  --c-success-bg: #113026;
-  --c-danger: #F87171;
-  --c-danger-fg: #FCA5A5;
-  --c-danger-bg: #341A1A;
-  --c-warning: #FBBF24;
-  --c-warning-fg: #FCD34D;
-  --c-warning-bg: #33280F;
+  --c-success: #32D583;
+  --c-success-fg: #6CE9A6;
+  --c-success-bg: #0C2A1C;
+  --c-success-border: #1B4D33;
+  --c-danger: #F97066;
+  --c-danger-fg: #FDA29B;
+  --c-danger-bg: #2E1615;
+  --c-danger-border: #58231F;
+  --c-warning: #FDB022;
+  --c-warning-fg: #FEC84B;
+  --c-warning-bg: #2C1F0B;
+  --c-warning-border: #543B12;
 
   /* on-brand text stays light */
   --c-on-brand: #FFFFFF;
 
-  --c-surface-inverse: #10192B;
-  --c-tint-fg: #CAD8F4;
+  --c-surface-inverse: #191B26;
+  --c-tint-fg: #C9C7F7;
+
+  /* Shadows carry almost no signal on dark surfaces — borders do the work
+     there — so elevation is dialled down rather than deepened. */
+  --e-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --e-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --e-md: 0 4px 10px -2px rgba(0, 0, 0, 0.55);
+  --e-lg: 0 12px 20px -6px rgba(0, 0, 0, 0.6);
+  --e-brand: 0 6px 16px -6px rgba(91, 84, 235, 0.55);
 }

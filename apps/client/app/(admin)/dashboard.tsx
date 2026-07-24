@@ -165,6 +165,19 @@ function formatCurrency(amount: number): string {
     return `${amount.toLocaleString('ro-RO')} RON`;
 }
 
+/**
+ * Money for the tight 3-up financial tiles. The full "3.900 RON" form
+ * overflowed an ~85px column at 16px and got ellipsised to "3.900 …", so the
+ * unit is dropped here (shown once in the card header) and large values switch
+ * to compact K/M notation so the figure always fits on one line.
+ */
+function formatMoneyCompact(amount: number): string {
+    const abs = Math.abs(amount);
+    if (abs >= 1_000_000) return `${(amount / 1_000_000).toLocaleString('ro-RO', { maximumFractionDigits: 1 })}M`;
+    if (abs >= 100_000) return `${Math.round(amount / 1000).toLocaleString('ro-RO')}K`;
+    return amount.toLocaleString('ro-RO');
+}
+
 function polarToCartesian(cx: number, cy: number, radius: number, angleInDegrees: number) {
     const angleInRadians = (angleInDegrees - 90) * (Math.PI / 180);
     return {
@@ -253,14 +266,20 @@ function AttendanceRing({
                 {loading ? (
                     <ActivityIndicator size="small" color={dash.accent} />
                 ) : (
-                    <>
-                        <Text className="text-[20px] font-semibold tracking-tight" style={{ color: dash.ink }}>
-                            {rate !== null ? `${Math.round(rate)}%` : '0%'}
-                        </Text>
-                        <Text className="text-[8px] font-medium uppercase tracking-[0.08em] mt-1" style={{ color: dash.muted }}>
-                            PREZENȚĂ
-                        </Text>
-                    </>
+                    // Percentage only. The "PREZENȚĂ" caption used to stack under
+                    // it, but at the small (size 60 → 48px inner) ring the second
+                    // line collided with the bottom of the stroke and clipped to
+                    // "PREZENT". Both call sites already label the ring elsewhere
+                    // (card title / external caption), so the number stands alone.
+                    // Font scales with the ring so the digits never touch the edge.
+                    <Text
+                        className="font-semibold tracking-tight"
+                        style={{ color: dash.ink, fontSize: Math.round(size * 0.3), lineHeight: Math.round(size * 0.34) } as any}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                    >
+                        {rate !== null ? `${Math.round(rate)}%` : '0%'}
+                    </Text>
                 )}
             </View>
         </View>
@@ -472,7 +491,7 @@ const DropdownPicker = ({ visible, items, onSelect, onClose, title, icon = 'apps
                                 </Text>
                                 {isSelected ? (
                                     <View className="w-5 h-5 rounded-full items-center justify-center" style={{ backgroundColor: dash.accent }}>
-                                        <MaterialIcons name="check" size={12} color="#FFFFFF" />
+                                        <MaterialIcons name="check" size={12} color="var(--c-surface)" />
                                     </View>
                                 ) : null}
                             </Pressable>
@@ -559,7 +578,7 @@ const RiskManagementBlock = ({ expiringItems, expiredCount, loading, compact = f
                         <MaterialIcons name={expiredCount > 0 ? 'warning' : 'verified'} size={17} color={expiredCount > 0 ? dash.danger : dash.success} />
                     </View>
                     <View className="ml-3 flex-1">
-                        <Text className="text-[13px] font-semibold" style={{ color: expiredCount > 0 ? '#991B1B' : 'var(--c-success-fg)' }}>
+                        <Text className="text-[13px] font-semibold" style={{ color: expiredCount > 0 ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}>
                             Necesită atenție
                         </Text>
                         {compact ? (
@@ -697,7 +716,7 @@ const FinancialSummaryCard = ({ income, expense, profit, profitChangePercent, lo
         >
             <View pointerEvents="none" className="absolute top-0 left-0 right-0 h-[3px]" style={{ backgroundImage: 'linear-gradient(90deg, #10B981, #635BFF)' } as any} />
             <Text className="text-[10px] font-semibold uppercase tracking-[0.09em] mb-3" style={{ color: dash.muted }}>
-                Financiar · luna curentă
+                Financiar · luna curentă · RON
             </Text>
 
             {loading ? (
@@ -710,22 +729,22 @@ const FinancialSummaryCard = ({ income, expense, profit, profitChangePercent, lo
                 <View className="flex-row">
                     <View className="flex-1 pr-3">
                         <Text className="text-[10px] font-semibold" style={{ color: dash.muted }}>Venituri</Text>
-                        <Text className="text-[16px] font-bold mt-1" style={{ color: dash.successDeep }} numberOfLines={1}>
-                            {formatCurrency(income)}
+                        <Text className="text-[17px] font-bold mt-1 tabular" style={{ color: dash.successDeep }} numberOfLines={1}>
+                            {formatMoneyCompact(income)}
                         </Text>
                     </View>
                     <View className="w-px" style={{ backgroundColor: dash.line }} />
                     <View className="flex-1 px-3">
                         <Text className="text-[10px] font-semibold" style={{ color: dash.muted }}>Cheltuieli</Text>
-                        <Text className="text-[16px] font-bold mt-1" style={{ color: dash.warningDeep }} numberOfLines={1}>
-                            {formatCurrency(expense)}
+                        <Text className="text-[17px] font-bold mt-1 tabular" style={{ color: dash.warningDeep }} numberOfLines={1}>
+                            {formatMoneyCompact(expense)}
                         </Text>
                     </View>
                     <View className="w-px" style={{ backgroundColor: dash.line }} />
                     <View className="flex-1 pl-3">
                         <Text className="text-[10px] font-semibold" style={{ color: dash.muted }}>Profit</Text>
-                        <Text className="text-[16px] font-bold mt-1" style={{ color: profit >= 0 ? dash.ink : dash.danger }} numberOfLines={1}>
-                            {formatCurrency(profit)}
+                        <Text className="text-[17px] font-bold mt-1 tabular" style={{ color: profit >= 0 ? dash.ink : dash.danger }} numberOfLines={1}>
+                            {formatMoneyCompact(profit)}
                         </Text>
                         {trendTone && profitChangePercent != null ? (
                             <View className="flex-row items-center gap-0.5 mt-1">
@@ -1013,7 +1032,7 @@ function MobileWidgetStack({ children }: { children: React.ReactNode }) {
                         disabled={activeIndex === maxIndex}
                         className={`w-9 h-9 rounded-full items-center justify-center ${activeIndex === maxIndex ? 'bg-[#CBD5E1] opacity-60' : 'bg-[#0D2040]'}`}
                     >
-                        <MaterialIcons name="chevron-right" size={20} color="#FFFFFF" />
+                        <MaterialIcons name="chevron-right" size={20} color="var(--c-surface)" />
                     </Pressable>
                 </View>
             </View>
@@ -1305,7 +1324,7 @@ export default function Dashboard() {
                                 onPress={() => scrollResults('right')}
                                 className="w-10 h-10 rounded-full bg-[#0D2040] items-center justify-center shadow-sm dash-nav-btn"
                             >
-                                <MaterialIcons name="chevron-right" size={22} color="#FFFFFF" />
+                                <MaterialIcons name="chevron-right" size={22} color="var(--c-surface)" />
                             </Pressable>
                         </View>
                         <View className="flex lg:hidden flex-row gap-2">
@@ -1319,7 +1338,7 @@ export default function Dashboard() {
                                 onPress={() => scrollMobileResults('right')}
                                 className="w-9 h-9 rounded-full bg-[#0D2040] items-center justify-center shadow-sm dash-nav-btn"
                             >
-                                <MaterialIcons name="chevron-right" size={20} color="#FFFFFF" />
+                                <MaterialIcons name="chevron-right" size={20} color="var(--c-surface)" />
                             </Pressable>
                         </View>
                     </>
@@ -1437,7 +1456,7 @@ export default function Dashboard() {
                 <DropdownPicker visible={showMonth} title="Alege Luna" icon="calendar-today" selectedId={String(selectedMonth)} items={MONTHS} onSelect={handleMonthSelect} onClose={() => setShowMonth(false)} />
 
                 <View
-                    className="hidden lg:flex rounded-[24px] p-6 mb-6 overflow-hidden relative dash-fade-in"
+                    className="hidden lg:flex rounded-[20px] px-6 py-4 mb-4 overflow-hidden relative dash-fade-in"
                     style={{ backgroundImage: dash.gradients.heroInk, backgroundColor: dash.ink } as any}
                 >
                     <View pointerEvents="none" className="absolute inset-0 opacity-90 [background-image:linear-gradient(rgba(255,255,255,0.028)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] [background-size:30px_30px]" />
@@ -1445,12 +1464,12 @@ export default function Dashboard() {
                     <View pointerEvents="none" className="absolute -bottom-28 right-10 h-[300px] w-[300px] rounded-full opacity-70" style={{ backgroundImage: 'radial-gradient(circle, rgba(37,99,235,0.28) 0%, rgba(37,99,235,0) 68%)' } as any} />
                     <View className="relative flex-row items-center justify-between">
                         <View className="flex-1 pr-6">
-                            <View className="self-start flex-row items-center gap-2 rounded-full px-3 py-1.5 mb-3.5 border" style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.14)' }}>
+                            <View className="self-start flex-row items-center gap-2 rounded-full px-2.5 py-1 mb-2.5 border" style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.14)' }}>
                                 <View className="w-1.5 h-1.5 rounded-full dash-pulse-dot" style={{ backgroundColor: '#34D399' }} />
                                 <Text className="text-white/90 text-[10px] font-bold uppercase tracking-[0.14em]">Basketball Operations · Live</Text>
                             </View>
-                            <Text className="text-white text-[30px] font-bold tracking-tight leading-none">Dashboard Admin</Text>
-                            <View className="flex-row items-center gap-4 mt-3 flex-wrap">
+                            <Text className="text-white text-[24px] font-bold tracking-tight leading-none">Dashboard Admin</Text>
+                            <View className="flex-row items-center gap-4 mt-2.5 flex-wrap">
                                 <View className="flex-row items-center gap-1.5">
                                     <MaterialIcons name="event" size={14} color="rgba(255,255,255,0.55)" />
                                     <Text className="text-white/70 text-[13px] font-semibold">{scheduled.length} meciuri viitoare</Text>
@@ -1462,8 +1481,8 @@ export default function Dashboard() {
                                 </View>
                                 <View className="w-1 h-1 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.25)' }} />
                                 <View className="flex-row items-center gap-1.5">
-                                    <MaterialIcons name="warning" size={14} color={expiredCount > 0 ? '#FCA5A5' : 'rgba(255,255,255,0.55)'} />
-                                    <Text className="text-[13px] font-semibold" style={{ color: expiredCount > 0 ? '#FCA5A5' : 'rgba(255,255,255,0.7)' }}>{expiredCount} vize expirate</Text>
+                                    <MaterialIcons name="warning" size={14} color={expiredCount > 0 ? 'var(--c-danger-bg)' : 'rgba(255,255,255,0.55)'} />
+                                    <Text className="text-[13px] font-semibold" style={{ color: expiredCount > 0 ? 'var(--c-danger-bg)' : 'rgba(255,255,255,0.7)' }}>{expiredCount} vize expirate</Text>
                                 </View>
                             </View>
                         </View>
@@ -1637,8 +1656,8 @@ export default function Dashboard() {
                                 borderColor: mainView === 'matches' ? dash.ink : dash.hairline,
                             }}
                         >
-                            <MaterialIcons name="sports-basketball" size={16} color={mainView === 'matches' ? '#FFFFFF' : dash.faint} />
-                            <Text className="text-[13px] font-semibold" style={{ color: mainView === 'matches' ? '#FFFFFF' : dash.inkSoft }}>
+                            <MaterialIcons name="sports-basketball" size={16} color={mainView === 'matches' ? 'var(--c-surface)' : dash.faint} />
+                            <Text className="text-[13px] font-semibold" style={{ color: mainView === 'matches' ? 'var(--c-surface)' : dash.inkSoft }}>
                                 Meciuri &amp; Rezultate
                             </Text>
                         </Pressable>
@@ -1650,8 +1669,8 @@ export default function Dashboard() {
                                 borderColor: mainView === 'standings' ? dash.ink : dash.hairline,
                             }}
                         >
-                            <MaterialIcons name="leaderboard" size={16} color={mainView === 'standings' ? '#FFFFFF' : dash.faint} />
-                            <Text className="text-[13px] font-semibold" style={{ color: mainView === 'standings' ? '#FFFFFF' : dash.inkSoft }}>
+                            <MaterialIcons name="leaderboard" size={16} color={mainView === 'standings' ? 'var(--c-surface)' : dash.faint} />
+                            <Text className="text-[13px] font-semibold" style={{ color: mainView === 'standings' ? 'var(--c-surface)' : dash.inkSoft }}>
                                 Clasament
                             </Text>
                         </Pressable>

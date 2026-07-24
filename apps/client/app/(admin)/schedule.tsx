@@ -5,8 +5,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
 import { LinearGradient } from '@/src/web/linearGradient';
 import {
-  Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, RotateCw, LayoutGrid, List, CalendarDays, Download, Search, X,
-  SlidersHorizontal, TrendingUp, Trophy, Users, ShieldCheck, Receipt,
+  Calendar as CalendarIcon, Plus, TrendingUp, Trophy, ShieldCheck, Receipt,
 } from 'lucide-react';
 import { eventsApi, CalendarEvent, EventAttendance } from '../../services/eventsApi';
 import { AttendanceTab } from '../../components/schedule/AttendanceTab';
@@ -18,7 +17,8 @@ import { useAddEventForm } from '../../hooks/useAddEventForm';
 import {
   eventMatchesSearch, isCancelledEvent, buildICSCalendar, triggerFileDownload, toDateKey,
 } from '../../components/schedule/scheduleShared';
-import { MonthlyCalendarGrid, CalendarLegend } from '../../components/schedule/admin/ScheduleCalendarGrid';
+import { MonthlyCalendarGrid } from '../../components/schedule/admin/ScheduleCalendarGrid';
+import { ScheduleToolbar } from '../../components/schedule/admin/ScheduleToolbar';
 import { ScheduleEventCard } from '../../components/schedule/admin/ScheduleEventCard';
 import { ScheduleWeekView } from '../../components/schedule/admin/ScheduleWeekView';
 import { ScheduleAgendaList } from '../../components/schedule/admin/ScheduleAgendaList';
@@ -292,137 +292,95 @@ export default function ScheduleScreen() {
     ?? [...visibleEvents].filter((e) => e.type === 'match' && new Date(e.endTime || e.startTime) >= new Date())
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0];
 
-  const filterChips = [
-    { label: 'Toate', value: null },
-    { label: 'Antrenamente', value: 'training' },
-    { label: 'Meciuri', value: 'match' },
-    { label: 'Cantonamente', value: 'camp' },
-    { label: 'Vizite medicale', value: 'medical' },
-  ];
+  // Per-type counts feed the toolbar chips (which double as the calendar's
+  // legend). Computed off the search-filtered set, ignoring the active type
+  // filter, so each chip always shows its own total rather than 0 once another
+  // type is selected.
+  const typeCounts = useMemo(() => {
+    const base = events.filter(
+      (event) => (showCancelled || !isCancelledEvent(event)) && eventMatchesSearch(event, searchValue),
+    );
+    return base.reduce<Record<string, number>>((acc, event) => {
+      acc[event.type] = (acc[event.type] ?? 0) + 1;
+      return acc;
+    }, {});
+  }, [events, showCancelled, searchValue]);
+
+  // "Advanced" = the filters that live behind the sliders modal (coach, team,
+  // show-cancelled), separate from the always-visible type chips. Drives the
+  // badge on the filter button.
+  const advancedFilterCount = (filterCoachId != null ? 1 : 0) + (filterTeamId != null ? 1 : 0) + (showCancelled ? 1 : 0);
 
   const resetKey = `${toDateKey(currentDate).slice(0, 7)}|${filterType}|${filterCoachId}|${filterTeamId}|${showCancelled}|${searchValue}`;
 
-  const ViewSwitcher = () => (
-    <View className={`flex-row items-center bg-white rounded-2xl border border-[#DDE7F5] p-1 gap-1 ${isMobile ? 'w-full' : ''}`}>
-      {([
-        { key: 'month' as const, icon: LayoutGrid, label: 'Month' },
-        { key: 'week' as const, icon: CalendarDays, label: 'Week' },
-        { key: 'agenda' as const, icon: List, label: 'Agenda' },
-      ]).map(({ key, icon: Icon, label }) => (
-        <TouchableOpacity
-          key={key}
-          onPress={() => setScheduleView(key)}
-          className={`flex-row items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl ${isMobile ? 'flex-1' : ''} ${scheduleView === key ? 'bg-[#1D3E90]' : ''}`}
-        >
-          <Icon size={13} color={scheduleView === key ? '#fff' : 'var(--c-muted)'} />
-          <Text className={`text-[11px] font-black uppercase tracking-widest ${scheduleView === key ? 'text-white' : 'text-slate-500'}`}>{VIEW_LABELS[key]}</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-
   const MonthlyBody = () => (
-    <View className={`${isMobile ? 'px-4 pt-5' : 'px-6 xl:px-8 2xl:px-10 pt-8'} w-full`}>
+    <View className={`${isMobile ? 'px-4 pt-3' : 'px-6 xl:px-8 pt-4'} w-full`}>
       <View className="w-full">
-        <View className={`${isMobile ? 'gap-5' : 'flex-row items-end justify-between'} mb-6`}>
-          <View className="flex-1">
-            <Text className={`${isMobile ? 'text-[34px]' : 'text-[44px]'} font-black text-[#123A97] tracking-tight leading-tight`}>
-              Programul meu
-            </Text>
-            <View className="flex-row items-center flex-wrap gap-2 mt-3">
-              <View className="w-9 h-9 rounded-[14px] bg-white border border-[#DDE7F5] items-center justify-center shadow-sm">
-                <CalendarIcon size={17} color="var(--c-ink)" />
-              </View>
-              <Text className="text-[#0E2041] text-[15px] font-black">{monthName} {viewYear}</Text>
-              <Text className="text-slate-400 text-[11px] font-black uppercase tracking-widest">{visibleEvents.length} evenimente luna aceasta</Text>
-            </View>
+        {/* Mobile-only sub-tab switcher — on desktop these live in the app header. */}
+        {!isDesktop && (
+          <View
+            className="flex-row items-center rounded-[10px] p-[3px] gap-[2px] mb-3 self-start"
+            style={{ backgroundColor: 'var(--c-surface-3)' }}
+          >
+            {(['Monthly', 'Attendance', 'Grade'] as const).map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                onPress={() => setActiveTab(tab)}
+                className="px-3 h-7 rounded-[8px] justify-center"
+                style={activeTab === tab ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
+              >
+                <Text
+                  className="text-[12px] font-semibold"
+                  style={{ color: activeTab === tab ? 'var(--c-ink)' : 'var(--c-muted)' }}
+                >
+                  {TOP_TAB_LABELS[tab]}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
+        )}
 
-          {!isDesktop && (
-            <View className="flex-row items-center gap-4 flex-wrap">
-              {(['Monthly', 'Attendance', 'Grade'] as const).map((tab) => (
-                <TouchableOpacity key={tab} onPress={() => setActiveTab(tab)} className={`pb-1.5 ${activeTab === tab ? 'border-b-2 border-[#1D3E90]' : ''}`}>
-                  <Text className={`font-bold text-[15px] ${activeTab === tab ? 'text-[#1D3E90]' : 'text-slate-400'}`}>{TOP_TAB_LABELS[tab]}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          <View className={`${isMobile ? 'gap-2.5' : 'flex-row items-center gap-3'}`}>
-            <View className={`${isMobile ? '' : 'flex-1'} flex-row flex-wrap items-center gap-2`}>
-              {filterChips.map((chip) => {
-                const isActive = filterType === chip.value;
-                return (
-                  <TouchableOpacity
-                    key={chip.label}
-                    onPress={() => setFilterType(chip.value)}
-                    className={`${isMobile ? 'px-4 py-2' : 'px-5 py-3'} rounded-full border ${isActive ? 'bg-[#1D3E90] border-[#1D3E90]' : 'bg-white border-[#CFE0EF]'}`}
-                  >
-                    <Text className={`text-[12px] font-black ${isActive ? 'text-white' : 'text-[#0E2041]'}`}>{chip.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View className={`flex-row items-center gap-2 ${isMobile ? 'w-full justify-end' : ''}`}>
-              <TouchableOpacity onPress={() => setShowFilterModal(true)} className={`${isMobile ? 'w-9 h-9' : 'w-11 h-11'} rounded-full bg-white border border-[#CFE0EF] items-center justify-center shadow-sm`} accessibilityLabel="More filters">
-                <SlidersHorizontal size={isMobile ? 14 : 16} color="var(--c-brand-fg)" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleExport} className={`${isMobile ? 'w-9 h-9' : 'w-11 h-11'} rounded-full bg-white border border-[#CFE0EF] items-center justify-center shadow-sm`} accessibilityLabel="Export month as .ics">
-                <Download size={isMobile ? 14 : 16} color="var(--c-brand-fg)" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleSyncFRB} disabled={syncing} className={`${isMobile ? 'w-9 h-9' : 'w-11 h-11'} rounded-full bg-white border border-[#CFE0EF] items-center justify-center shadow-sm`} accessibilityLabel="Sync FRB matches">
-                <RotateCw size={isMobile ? 15 : 17} color="var(--c-brand-fg)" />
-              </TouchableOpacity>
-            </View>
-          </View>
+        <View className="mb-4">
+          <ScheduleToolbar
+            monthLabel={monthName}
+            year={viewYear}
+            eventCount={visibleEvents.length}
+            onNavigateMonth={navigateMonth}
+            onToday={() => setCurrentDate(new Date())}
+            view={scheduleView}
+            onViewChange={setScheduleView}
+            filterType={filterType}
+            onFilterTypeChange={setFilterType}
+            typeCounts={typeCounts}
+            activeFilterCount={advancedFilterCount}
+            onOpenFilters={() => setShowFilterModal(true)}
+            onExport={handleExport}
+            onSync={handleSyncFRB}
+            syncing={syncing}
+            isMobile={isMobile}
+            scopedTeamName={scopedTeamName}
+            onClearTeam={() => setFilterTeamId(null)}
+            searchValue={searchValue}
+            onClearSearch={() => setSearchValue('')}
+          />
         </View>
 
-        <View className={`${isMobile ? 'gap-3 mb-6' : 'flex-row items-center justify-between gap-3 mb-6'}`}>
-          <View className={isMobile ? 'w-full' : ''}>
-            <ViewSwitcher />
-          </View>
-          {!isMobile && <CalendarLegend />}
-          {scopedTeamName ? (
-            <View className="flex-row items-center gap-2 bg-[#1D3E90] rounded-full px-4 py-2 self-start">
-              <Users size={13} color="#BFD0FF" />
-              <Text className="text-[11px] font-black text-white uppercase tracking-wide">Echipă: {scopedTeamName}</Text>
-              <TouchableOpacity onPress={() => setFilterTeamId(null)} accessibilityLabel="Elimină filtrul de echipă">
-                <X size={13} color="#BFD0FF" />
-              </TouchableOpacity>
-            </View>
-          ) : null}
-          {searchValue ? (
-            <View className="flex-row items-center gap-2 bg-white rounded-full border border-[#DDE7F5] px-4 py-2 self-start">
-              <Search size={13} color="var(--c-faint)" />
-              <Text className="text-[11px] font-bold text-slate-500">Caut „{searchValue}”</Text>
-              <TouchableOpacity onPress={() => setSearchValue('')}>
-                <X size={13} color="var(--c-faint)" />
-              </TouchableOpacity>
-            </View>
-          ) : null}
-          {isMobile && (
-            <View className="w-full">
-              <CalendarLegend />
-            </View>
-          )}
-        </View>
-
+        {/* Team-scoped shortcuts, only present when a team filter is applied. */}
         {filterTeamId != null && (
-          <View className={`flex-row flex-wrap items-center gap-3 mb-6 ${isMobile ? '' : ''}`}>
+          <View className="flex-row flex-wrap items-center gap-2 mb-4">
             <TouchableOpacity
               onPress={() => setShowMedicalVisa(true)}
-              className="flex-row items-center gap-2 h-11 px-4 rounded-2xl bg-white border border-[#DDE7F5] shadow-sm"
+              className="flex-row items-center gap-2 h-9 px-3 rounded-[10px] bg-[var(--c-surface)] border border-[var(--c-border)]"
             >
-              <ShieldCheck size={15} color="var(--c-success-fg)" />
-              <Text className="text-[12px] font-black text-[#0E2041] uppercase tracking-wide">Vize medicale</Text>
+              <ShieldCheck size={14} color="var(--c-success-fg)" />
+              <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Vize medicale</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setShowPaymentsReport(true)}
-              className="flex-row items-center gap-2 h-11 px-4 rounded-2xl bg-white border border-[#DDE7F5] shadow-sm"
+              className="flex-row items-center gap-2 h-9 px-3 rounded-[10px] bg-[var(--c-surface)] border border-[var(--c-border)]"
             >
-              <Receipt size={15} color="var(--c-brand-fg)" />
-              <Text className="text-[12px] font-black text-[#0E2041] uppercase tracking-wide">Raport plăți</Text>
+              <Receipt size={14} color="var(--c-brand-fg)" />
+              <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Raport plăți</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -451,33 +409,18 @@ export default function ScheduleScreen() {
             onGrade={navigateToGrade}
           />
         ) : (
-          <View className={`${isDesktop ? 'flex-row gap-6 2xl:gap-8 items-start w-full' : 'gap-4'}`}>
+          <View className={`${isDesktop ? 'flex-row gap-5 items-start w-full' : 'gap-4'}`}>
             <View className="flex-1 min-w-0">
-              <View className="bg-white rounded-[32px] border border-[#DDE7F5] shadow-lg overflow-hidden">
-                <View className="px-6 py-5 flex-row items-center justify-between border-b border-[#DDE7F5]">
-                  <View>
-                    <Text className="text-[26px] font-black text-[#0E2041]">{monthName} {viewYear}</Text>
-                    <Text className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-1">{visibleEvents.length} evenimente luna aceasta</Text>
-                  </View>
-                  <View className="flex-row items-center gap-2">
-                    <TouchableOpacity onPress={() => navigateMonth(-1)} className="w-10 h-10 items-center justify-center rounded-xl bg-[#F4F8FD]">
-                      <ChevronLeft color="var(--c-ink)" size={18} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => navigateMonth(1)} className="w-10 h-10 items-center justify-center rounded-xl bg-[#F4F8FD]">
-                      <ChevronRight color="var(--c-ink)" size={18} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <MonthlyCalendarGrid currentDate={currentDate} events={visibleEvents} onSelectEvent={navigateToEvent} onSelectDay={openDaySchedule} />
-              </View>
+              {/* Month header removed — the toolbar above already owns the month
+                  label, count and stepper. The grid card is now just the grid. */}
+              <MonthlyCalendarGrid currentDate={currentDate} events={visibleEvents} onSelectEvent={navigateToEvent} onSelectDay={openDaySchedule} />
             </View>
 
-            <View className={`${isDesktop ? 'shrink-0' : 'w-full'} gap-5`} style={isDesktop ? { width: isWideDesktop ? 400 : 360 } : undefined}>
+            <View className={`${isDesktop ? 'shrink-0' : 'w-full'} gap-4`} style={isDesktop ? { width: isWideDesktop ? 380 : 340 } : undefined}>
               <View className="flex-row items-center justify-between">
-                <Text className="text-xl font-black text-[#0E2041]">Evenimente viitoare</Text>
+                <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Evenimente viitoare</Text>
                 <TouchableOpacity onPress={() => setScheduleView('agenda')}>
-                  <Text className="text-[#1D3E90] text-[12px] font-black">Vezi tot</Text>
+                  <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Vezi tot</Text>
                 </TouchableOpacity>
               </View>
 
@@ -492,7 +435,7 @@ export default function ScheduleScreen() {
 
               <View className="flex-row gap-3">
                 <LinearGradient
-                  colors={['#2B3FA8', '#4A5FD9']}
+                  colors={['var(--c-brand-surface)', 'var(--c-brand-strong)']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={{ borderRadius: 24, flex: 1, padding: 20, minHeight: 108, justifyContent: 'space-between' }}

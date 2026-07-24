@@ -25,15 +25,30 @@ export default function MyClubKpiStrip({ teams }: { teams: Team[] }) {
         { label: 'Echipe feminine', value: stats.feminine, dot: '#7C3560' },
     ];
 
+    // One row of compact stat cells rather than six tall cards. The numbers are
+    // reference, not the primary content of the page (the team grid is), so they
+    // get a single dense band separated by hairlines instead of six boxes that
+    // pushed the actual teams below the fold.
     return (
-        <View className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6 w-full">
-            {cards.map((card) => (
-                <View key={card.label} className="bg-white rounded-[18px] border border-[#DDE7F5] px-4 py-3.5 flex-col gap-1.5">
-                    <Text className="text-[#0E2041] text-[22px] font-black leading-none">{card.value}</Text>
-                    <View className="flex-row items-center gap-1.5">
-                        <View className="w-[7px] h-[7px] rounded-full" style={{ backgroundColor: card.dot }} />
-                        <Text className="text-[#64748B] text-[11px] font-bold">{card.label}</Text>
+        <View
+            className="grid grid-cols-3 xl:grid-cols-6 rounded-[14px] border overflow-hidden mb-5 w-full"
+            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
+        >
+            {cards.map((card, i) => (
+                <View
+                    key={card.label}
+                    className="px-3.5 py-3 border-b xl:border-b-0 border-r"
+                    style={{
+                        borderColor: 'var(--c-border-soft)',
+                        // Trim the outer edges so the band reads as one unit.
+                        borderRightWidth: (i % 3 === 2 && i >= 3) || i === 2 || i === 5 ? 0 : 1,
+                    } as any}
+                >
+                    <View className="flex-row items-baseline gap-1.5">
+                        <View className="w-[7px] h-[7px] rounded-full self-center" style={{ backgroundColor: card.dot }} />
+                        <Text className="text-[19px] font-bold leading-none tabular" style={{ color: 'var(--c-ink)' }}>{card.value}</Text>
                     </View>
+                    <Text className="text-[11px] font-medium mt-1.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{card.label}</Text>
                 </View>
             ))}
         </View>

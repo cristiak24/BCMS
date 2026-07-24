@@ -41,24 +41,49 @@ async function readJsonLike<T>(response: Response) {
   }
 }
 
+/** Error that carries the HTTP status so callers can branch on it. */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 async function buildError(response: Response) {
   const fallbackMessage = `Request failed with status ${response.status}`;
 
   try {
     const payload = await readJsonLike<unknown>(response);
     if (typeof payload === 'string' && payload.trim()) {
-      return new Error(payload);
+      return new ApiError(payload, response.status);
     }
 
     const payloadMessage = readMessageFromPayload(payload);
     if (payloadMessage) {
-      return new Error(payloadMessage);
+      return new ApiError(payloadMessage, response.status);
     }
   } catch {
-    return new Error(fallbackMessage);
+    return new ApiError(fallbackMessage, response.status);
   }
 
-  return new Error(fallbackMessage);
+  return new ApiError(fallbackMessage, response.status);
+}
+
+type UnauthorizedHandler = (status: 401 | 403) => void;
+
+let onUnauthorized: UnauthorizedHandler | null = null;
+
+/**
+ * Registered once by AuthContext. When the backend rejects a request because the
+ * session is gone or the account was deactivated, the app previously kept the
+ * stale session in memory and surfaced a raw error string on every screen; now
+ * it signs out and returns the user to the login page.
+ */
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
+  onUnauthorized = handler;
 }
 
 /** Get the current Firebase ID token, or null if not logged in */
@@ -154,7 +179,26 @@ export async function apiFetch<T>(
   });
 
   if (!response.ok) {
-    throw await buildError(response);
+    const error = await buildError(response);
+
+    // Only a 401 (no/expired credentials) or an explicit account-disabled 403
+    // ends the session. A plain 403 is an ordinary "you may not do that" —
+    // signing the user out of the whole app for it would be a worse bug than
+    // the stale-session one this handles.
+    //
+    // `/auth/me` is excluded because AuthContext calls it precisely to discover
+    // whether the session is still valid, and signing out from inside that call
+    // would race its own retry loop.
+    if (!path.startsWith('/auth/me')) {
+      const isDisabledAccount =
+        response.status === 403 && /account has been disabled|contul este dezactivat/i.test(error.message);
+
+      if (response.status === 401 || isDisabledAccount) {
+        onUnauthorized?.(response.status as 401 | 403);
+      }
+    }
+
+    throw error;
   }
 
   if (responseType === 'void' || response.status === 204) {

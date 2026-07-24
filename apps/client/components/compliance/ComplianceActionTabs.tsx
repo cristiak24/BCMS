@@ -9,30 +9,31 @@ interface ComplianceActionTabsProps {
 
 export default function ComplianceActionTabs({ activeTab, onChangeTab }: ComplianceActionTabsProps) {
   return (
-    <View className="flex-col md:flex-row justify-between items-center mb-6">
-      <Text className="text-2xl font-black text-[#0D2040] mb-4 md:mb-0 tracking-tight">Compliance Directory</Text>
-      
-      <View className="flex-row items-center gap-4">
-        {/* Tabs Container */}
-        <View className="bg-gray-100/80 p-1 rounded-full flex-row">
-          <Pressable 
+    <View className="flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4">
+      <Text className="text-[17px] font-bold tracking-tight" style={{ color: 'var(--c-ink)' }}>Compliance Directory</Text>
+
+      <View className="flex-row items-center gap-2">
+        {/* Segmented tabs */}
+        <View className="p-[3px] rounded-[10px] flex-row" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+          <Pressable
             onPress={() => onChangeTab('active')}
-            className={`px-6 py-2 rounded-full transition-colors ${activeTab === 'active' ? 'bg-white shadow-sm border border-gray-200' : ''}`}
+            className="px-3.5 h-8 rounded-[8px] justify-center"
+            style={activeTab === 'active' ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
           >
-            <Text className={`text-[13px] font-bold ${activeTab === 'active' ? 'text-[#1D3E90]' : 'text-gray-500'}`}>Active Roster</Text>
+            <Text className="text-[12px] font-semibold" style={{ color: activeTab === 'active' ? 'var(--c-ink)' : 'var(--c-muted)' }}>Active Roster</Text>
           </Pressable>
-          <Pressable 
+          <Pressable
             onPress={() => onChangeTab('archives')}
-            className={`px-6 py-2 rounded-full transition-colors ${activeTab === 'archives' ? 'bg-white shadow-sm border border-gray-200' : ''}`}
+            className="px-3.5 h-8 rounded-[8px] justify-center"
+            style={activeTab === 'archives' ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
           >
-            <Text className={`text-[13px] font-bold ${activeTab === 'archives' ? 'text-[#1D3E90]' : 'text-gray-500'}`}>Archives</Text>
+            <Text className="text-[12px] font-semibold" style={{ color: activeTab === 'archives' ? 'var(--c-ink)' : 'var(--c-muted)' }}>Archives</Text>
           </Pressable>
         </View>
 
-        {/* Filter Button */}
-        <Pressable className="bg-gray-50 border border-gray-200 px-4 py-2.5 rounded-full flex-row items-center gap-2 hover:bg-gray-100 transition-colors">
-           <Filter size={16} color="var(--c-muted)" />
-           <Text className="text-[13px] font-bold text-gray-600">Filter</Text>
+        <Pressable className="h-9 px-3 rounded-[10px] flex-row items-center gap-1.5 border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}>
+           <Filter size={14} color="var(--c-muted)" />
+           <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Filter</Text>
         </Pressable>
       </View>
     </View>

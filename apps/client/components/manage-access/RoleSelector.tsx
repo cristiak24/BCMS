@@ -27,7 +27,7 @@ export default function RoleSelector({ selectedRole, onSelectRole }: Props) {
                     >
                         <View className="flex-row items-center">
                             <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${isActive ? 'bg-[#1D4ED8]' : 'bg-slate-100'}`}>
-                                <MaterialIcons name={option.icon} size={20} color={isActive ? '#FFFFFF' : 'var(--c-muted)'} />
+                                <MaterialIcons name={option.icon} size={20} color={isActive ? 'var(--c-surface)' : 'var(--c-muted)'} />
                             </View>
                             <Text className={`font-bold capitalize ${isActive ? 'text-[#1D4ED8]' : 'text-slate-700'}`}>{option.label}</Text>
                         </View>

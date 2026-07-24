@@ -250,7 +250,7 @@ export default function Login() {
     }, [initializing, navigate, session]);
 
     if (initializing) {
-        return <LoadingScreen message="Verificam sesiunea..." backgroundColor="#FFFFFF" color="var(--c-blue)" />;
+        return <LoadingScreen message="Verificam sesiunea..." backgroundColor="var(--c-surface)" color="var(--c-blue)" />;
     }
 
     return (

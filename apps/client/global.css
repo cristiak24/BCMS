@@ -2,6 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  /*
+   * Visible keyboard focus (WCAG 2.4.7). The app had no focus indicator at all:
+   * every control is a real <button>/<input>, but tabbing through a screen gave
+   * no feedback about where you were, which made the admin panel unusable
+   * without a mouse. `:focus-visible` keeps mouse clicks clean.
+   */
+  :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"]), [role="button"]):focus-visible {
+    outline: 2px solid var(--c-blue);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  /* Inputs already carry a border, so a ring reads better than an outline. */
+  :where(input, select, textarea):focus-visible {
+    outline-offset: 0;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-blue) 28%, transparent);
+  }
+
+  /* Skip link: hidden until focused, then pinned to the top-left. */
+  .skip-link {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 200;
+    transform: translateY(-120%);
+    transition: transform 0.16s ease;
+    background: var(--c-brand-surface);
+    color: var(--c-on-brand);
+    font-weight: 800;
+    font-size: 13px;
+    padding: 10px 16px;
+    border-bottom-right-radius: 12px;
+  }
+
+  .skip-link:focus-visible {
+    transform: translateY(0);
+  }
+}
+
 @layer utilities {
   .dash-fade-in {
     animation: dashFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -18,8 +58,15 @@
   .dash-stagger > *:nth-child(5) { animation-delay: 0.22s; }
   .dash-stagger > *:nth-child(6) { animation-delay: 0.27s; }
 
+  /* Token-driven so the shimmer tracks the theme. Hardcoded greys here used to
+     render as bright light slabs over the dark surfaces. */
   .dash-skeleton {
-    background: linear-gradient(90deg, #eef2f8 0%, #e2e8f0 50%, #eef2f8 100%);
+    background: linear-gradient(
+      90deg,
+      var(--c-surface-2) 0%,
+      var(--c-surface-3) 50%,
+      var(--c-surface-2) 100%
+    );
     background-size: 200% 100%;
     animation: dashShimmer 1.5s ease-in-out infinite;
   }
@@ -43,7 +90,7 @@
   }
 
   .dash-filter-hover:hover {
-    background-color: rgba(255, 255, 255, 0.7);
+    background-color: var(--c-surface-2);
   }
 
   .dash-btn-hover {

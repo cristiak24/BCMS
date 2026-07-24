@@ -1,14 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from '@/src/web/reactNative';
 import { useRouter } from '@/src/web/expoRouter';
-import { Activity, CreditCard, Download, Plus, UserPlus, Users } from 'lucide-react';
+import { CreditCard, Download, Plus, UserPlus } from 'lucide-react';
 import { teamsApi, Player, RosterSummary, Team } from '../../services/teamsApi';
 import { useResponsive } from '../../hooks/useResponsive';
 import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../components/HeaderContext';
 import { dash } from '../../components/dashboard/dashboardTheme';
 import { EmptyState, ErrorState, SkeletonBlock } from '../../components/dashboard/ScreenStates';
 import AdminHero from '../../components/admin/AdminHero';
-import RosterSummaryCard from '../../components/roster/RosterSummaryCard';
 import PlayerRow from '../../components/roster/PlayerRow';
 import RosterPlayerCard from '../../components/roster/RosterPlayerCard';
 import RosterFilters from '../../components/roster/RosterFilters';
@@ -21,7 +20,6 @@ import PlayerActionSheet from '../../components/roster/PlayerActionSheet';
 import { ROSTER_TABLE_WIDTH, RosterSortColumn, RosterSortDirection } from '../../components/roster/rosterTableLayout';
 import { downloadRosterCsv } from '../../components/roster/rosterCsv';
 import {
-  buildAttendanceHelperText,
   getAttendanceRate,
   getCategoryLabel,
   getPaymentBucket,
@@ -437,7 +435,7 @@ export default function RosterScreen() {
           onPress={() => setShowAddModal(true)}
           style={styles.mobileFab}
         >
-          <UserPlus color="#FFFFFF" size={22} />
+          <UserPlus color="var(--c-surface)" size={22} />
         </TouchableOpacity>
       );
       return;
@@ -456,7 +454,7 @@ export default function RosterScreen() {
           className="dash-btn-hover h-11 flex-row items-center rounded-2xl px-4"
           style={{ backgroundColor: dash.accentBlue }}
         >
-          <Plus color="#FFFFFF" size={16} />
+          <Plus color="var(--c-surface)" size={16} />
           <Text className="ml-2 text-[13px] font-black text-white">Adaugă jucător</Text>
         </TouchableOpacity>
       </View>
@@ -492,84 +490,88 @@ export default function RosterScreen() {
     );
   }
 
-  const readinessPanel = (
-    <View className={`mt-6 ${isMobile ? 'gap-3' : 'flex-row items-center gap-4'}`}>
-      <View className="flex-1 rounded-[26px] border border-white/15 bg-white/10 p-4">
-        <View className="flex-row items-center justify-between">
-          <View>
-            <Text className="text-[10px] font-black uppercase tracking-widest text-blue-100">Pregătirea lotului</Text>
-            <Text className="mt-2 text-4xl font-black text-white">{rosterReadiness}%</Text>
-          </View>
-          <View className="h-14 w-14 items-center justify-center rounded-[20px] bg-white/15">
-            <Users color="#FFFFFF" size={24} />
-          </View>
+  // One compact stat band replaces both the old white-on-navy readiness panel
+  // (which turned into an invisible "ghost card" once AdminHero stopped being a
+  // navy slab) and the two oversized 42px summary cards. Same four numbers,
+  // a fraction of the vertical space, plus the payment-reminder action inline.
+  const statCells: { label: string; value: string; tone?: 'default' | 'danger'; bar?: number }[] = [
+    { label: 'Prezență generală', value: `${attendanceValue.toFixed(1)}%` },
+    { label: 'Pregătirea lotului', value: `${rosterReadiness}%`, bar: rosterReadiness },
+    { label: 'Sportivi în lot', value: String(players.length) },
+    { label: 'Plăți restante', value: String(pendingPayments), tone: pendingPayments > 0 ? 'danger' : 'default' },
+  ];
+
+  const statBand = (
+    <View
+      className="grid grid-cols-2 xl:grid-cols-4 rounded-[14px] border overflow-hidden mb-4 w-full"
+      style={{ backgroundColor: dash.surface, borderColor: dash.hairlineStrong }}
+    >
+      {statCells.map((cell, i) => (
+        <View
+          key={cell.label}
+          className="px-4 py-3.5 border-b xl:border-b-0 border-r"
+          style={{
+            borderColor: dash.hairline,
+            borderRightWidth: (i % 2 === 1 && i >= 2) || i === 3 ? 0 : 1,
+          } as any}
+        >
+          <Text className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: dash.faint }} numberOfLines={1}>
+            {cell.label}
+          </Text>
+          <Text
+            className="text-[22px] font-bold leading-none mt-1.5 tabular"
+            style={{ color: cell.tone === 'danger' ? dash.danger : dash.ink }}
+          >
+            {cell.value}
+          </Text>
+          {typeof cell.bar === 'number' ? (
+            <View className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: dash.surfaceSubtle }}>
+              <View className="h-full rounded-full" style={{ width: `${cell.bar}%`, backgroundColor: 'var(--c-brand-surface)' }} />
+            </View>
+          ) : null}
         </View>
-        <View className="mt-4 h-2 overflow-hidden rounded-full bg-white/20">
-          <View className="h-full rounded-full bg-white" style={{ width: `${rosterReadiness}%` }} />
-        </View>
-      </View>
-      <View className={`${isMobile ? 'flex-row' : ''} gap-3`}>
-        <View className="flex-1 rounded-2xl bg-white/10 px-4 py-3">
-          <Text className="text-[10px] font-black uppercase tracking-widest text-blue-100">Sportivi</Text>
-          <Text className="mt-1 text-lg font-black text-white">{players.length}</Text>
-        </View>
-        <View className="flex-1 rounded-2xl bg-white/10 px-4 py-3">
-          <Text className="text-[10px] font-black uppercase tracking-widest text-blue-100">Restanțe</Text>
-          <Text className="mt-1 text-lg font-black text-white">{pendingPayments}</Text>
-        </View>
-      </View>
+      ))}
     </View>
   );
 
   const headerContent = (
     <>
-      <AdminHero title="Lot de jucători" subtitle="Sportivi activi, vizibilitate asupra prezenței, alocare pe echipe și urmărirea plăților, într-o singură vedere operațională.">
-        {readinessPanel}
+      <AdminHero title="Lot de jucători" subtitle="Prezență, echipe și plăți, într-o singură vedere.">
+        {pendingPayments > 0 ? (
+          <TouchableOpacity
+            onPress={handleSendReminders}
+            disabled={sendingReminders}
+            className="flex-row items-center gap-2 h-10 px-3.5 rounded-[10px]"
+            style={{ backgroundColor: sendingReminders ? dash.surfaceSubtle : 'var(--c-brand-surface)', boxShadow: sendingReminders ? undefined : 'var(--e-brand)' } as any}
+          >
+            <CreditCard size={15} color={sendingReminders ? dash.faint : 'var(--c-on-brand)'} />
+            <Text className="text-[12px] font-semibold" style={{ color: sendingReminders ? dash.faint : 'var(--c-on-brand)' }}>
+              {sendingReminders ? 'Se trimite...' : `Trimite mementouri (${pendingPayments})`}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </AdminHero>
 
-      <View className={`mb-6 gap-4 ${isMobile ? '' : 'flex-row'}`}>
-        <RosterSummaryCard
-          title="Prezență generală"
-          value={`${attendanceValue.toFixed(1)}%`}
-          subtitle={`${attendanceAthleteCount} sportivi incluși în calculul prezenței.`}
-          helperText={buildAttendanceHelperText(summary)}
-          icon={Activity}
-          accent="blue"
-        />
-        <RosterSummaryCard
-          title="Alerte de plată"
-          value={String(pendingPayments)}
-          subtitle={
-            pendingPayments === 1
-              ? '1 sportiv are momentan o plată restantă.'
-              : `${pendingPayments} sportivi au momentan plăți restante.`
-          }
-          icon={CreditCard}
-          accent="red"
-          actionLabel={sendingReminders ? 'Se trimite...' : 'Trimite mementouri'}
-          onActionPress={handleSendReminders}
-          actionDisabled={sendingReminders}
-        />
-      </View>
+      {statBand}
 
-      <View className="rounded-[32px] p-5" style={{ backgroundColor: dash.surface, ...dash.shadow.card }}>
-        <View className={`mb-5 ${isMobile ? 'gap-4' : 'flex-row items-start justify-between'}`}>
+      <View className="rounded-[16px] p-4 border" style={{ backgroundColor: dash.surface, borderColor: dash.hairlineStrong, ...dash.shadow.sm }}>
+        <View className={`mb-4 ${isMobile ? 'gap-3' : 'flex-row items-center justify-between'}`}>
           <View>
-            <Text className="text-[30px] font-black" style={{ color: dash.ink }}>
+            <Text className="text-[17px] font-bold" style={{ color: dash.ink }}>
               Sportivi
             </Text>
-            <Text className="mt-1 text-[14px]" style={{ color: dash.muted }}>
+            <Text className="mt-0.5 text-[13px]" style={{ color: dash.muted }}>
               Afișezi {paginatedPlayers.length} din {sortedPlayers.length} sportivi
               {sortedPlayers.length !== players.length ? ` (lot total: ${players.length})` : ''}
             </Text>
           </View>
           <TouchableOpacity
             onPress={handleExportFilteredCsv}
-            className="dash-btn-hover flex-row items-center self-start rounded-2xl border px-4 py-3"
-            style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}
+            className="dash-btn-hover flex-row items-center self-start rounded-[10px] border h-9 px-3"
+            style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairlineStrong }}
           >
-            <Download color={dash.inkSoft} size={16} />
-            <Text className="ml-2 text-[13px] font-black" style={{ color: dash.inkSoft }}>
+            <Download color={dash.inkSoft} size={15} />
+            <Text className="ml-2 text-[12px] font-semibold" style={{ color: dash.inkSoft }}>
               Exportă CSV
             </Text>
           </TouchableOpacity>

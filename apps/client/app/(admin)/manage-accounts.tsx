@@ -45,9 +45,9 @@ const PAGE_SIZE = 8;
 const ROLE_VISUAL: Record<string, { tint: string; fg: string }> = {
     coach: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-fg)' },
     player: { tint: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },
-    parent: { tint: 'var(--c-surface-tint)', fg: '#6D28D9' },
-    admin: { tint: 'var(--c-surface-tint)', fg: '#4338CA' },
-    superadmin: { tint: 'var(--c-surface-tint)', fg: '#4338CA' },
+    parent: { tint: 'var(--c-surface-tint)', fg: 'var(--c-purple)' },
+    admin: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-strong)' },
+    superadmin: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-strong)' },
     accountant: { tint: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' },
     staff: { tint: 'var(--c-surface-3)', fg: 'var(--c-muted)' },
 };
@@ -69,10 +69,10 @@ function statusVisual(account: ClubAdminAccount): StatusVisual {
         return { dot: 'var(--c-warning)', bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', label: 'Pending invite' };
     }
     if (account.status === 'inactive') {
-        return { dot: '#E11D48', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger)', label: 'Inactive' };
+        return { dot: 'var(--c-danger)', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger)', label: 'Inactive' };
     }
     if (account.status === 'pending_registration') {
-        return { dot: '#0EA5E9', bg: 'var(--c-surface-tint)', fg: '#0369A1', label: 'Pending registration' };
+        return { dot: 'var(--c-sky)', bg: 'var(--c-surface-tint)', fg: 'var(--c-sky)', label: 'Pending registration' };
     }
     return { dot: 'var(--c-success)', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', label: 'Active' };
 }
@@ -105,7 +105,7 @@ function pageWindow(current: number, total: number): (number | 'gap')[] {
 const ACTION_STYLE = {
     coach: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-fg)' },
     player: { tint: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },
-    parent: { tint: 'var(--c-surface-tint)', fg: '#6D28D9' },
+    parent: { tint: 'var(--c-surface-tint)', fg: 'var(--c-purple)' },
     resend: { tint: 'var(--c-surface-tint)', fg: 'var(--c-blue-deep)' },
     reactivate: { tint: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },
     deactivate: { tint: 'var(--c-danger-bg)', fg: 'var(--c-danger)' },

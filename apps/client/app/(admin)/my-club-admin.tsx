@@ -300,22 +300,23 @@ export default function MyClubAdmin() {
                 <AdminHero
                     title="My Club"
                     subtitle="Administrarea echipelor clubului"
-                    className="md:mb-8 flex-col lg:flex-row justify-between items-start lg:items-center gap-5"
                 >
-                    <View className="flex-row gap-2.5">
+                    <View className="flex-row gap-2">
                         <Pressable
                             onPress={() => openWizard('frb')}
-                            className="flex-row items-center gap-2 h-11 px-4 rounded-[14px] bg-white/95 border border-white/70 active:bg-white"
+                            className="flex-row items-center gap-2 h-10 px-3.5 rounded-[10px] border"
+                            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
                         >
                             <RefreshCw size={14} color="var(--c-brand-fg)" />
-                            <Text className="text-[#1D3E90] text-[12px] font-black uppercase tracking-widest">Importă din FRB</Text>
+                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Importă din FRB</Text>
                         </Pressable>
                         <Pressable
                             onPress={() => openWizard()}
-                            className="flex-row items-center gap-2 h-11 px-4 rounded-[14px] bg-[#123A97] border border-white/40 active:bg-[#0d2c73]"
+                            className="flex-row items-center gap-2 h-10 px-3.5 rounded-[10px]"
+                            style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)' } as any}
                         >
-                            <Plus size={14} color="#ffffff" />
-                            <Text className="text-white text-[12px] font-black uppercase tracking-widest">Creează echipă</Text>
+                            <Plus size={14} color="var(--c-on-brand)" />
+                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-on-brand)' }}>Creează echipă</Text>
                         </Pressable>
                     </View>
                 </AdminHero>

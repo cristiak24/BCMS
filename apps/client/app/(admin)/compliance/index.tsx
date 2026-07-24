@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, ScrollView, Text, Pressable, ActivityIndicator } from '@/src/web/reactNative';
 import { useHeader } from '../../../components/HeaderContext';
 import { Plus, PenLine } from 'lucide-react';
@@ -10,6 +10,8 @@ import ComplianceTable from '../../../components/compliance/ComplianceTable';
 import ComplianceStatsBottom from '../../../components/compliance/ComplianceStatsBottom';
 import AddAppointmentModal from '../../../components/compliance/modals/AddAppointmentModal';
 import UpdateFileModal from '../../../components/compliance/modals/UpdateFileModal';
+
+import { computeComplianceMetrics } from '../../../components/compliance/complianceMetrics';
 
 import { teamsApi, Player } from '../../../services/teamsApi';
 
@@ -66,6 +68,10 @@ export default function ComplianceDashboard() {
       loadData();
   }, []);
 
+  // KPIs are derived from the loaded roster rather than hardcoded, so the
+  // headline figures always describe this club.
+  const metrics = useMemo(() => computeComplianceMetrics(players), [players]);
+
   const handleToggleSelect = (id: number) => {
     setSelectedIds(prev => 
       prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
@@ -74,14 +80,14 @@ export default function ComplianceDashboard() {
 
   return (
     <View className="flex-1 w-full mx-auto bg-[#F1F5F9] pb-20">
-      <ScrollView className="flex-1 w-full px-4 md:px-12 pt-10" showsVerticalScrollIndicator={false}>
-          
-          <View className="mb-8">
-            <Text className="text-[#1D3E90] text-[32px] font-black tracking-tight leading-tight">Compliance Manager</Text>
-            <Text className="text-[#64748B] text-[14px] font-semibold mt-1">Medical Clearances & Visa renewals</Text>
+      <ScrollView className="flex-1 w-full px-4 md:px-6 pt-5" showsVerticalScrollIndicator={false}>
+
+          <View className="mb-5">
+            <Text className="text-[24px] font-bold tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }}>Compliance Manager</Text>
+            <Text className="text-[13px] font-medium mt-1" style={{ color: 'var(--c-muted)' }}>Vize medicale & reînnoiri</Text>
           </View>
 
-          <ComplianceStatsTop />
+          <ComplianceStatsTop metrics={metrics} loading={loading} />
 
           <View className="mt-6">
             <ComplianceActionTabs activeTab={activeTab} onChangeTab={setActiveTab} />
@@ -101,7 +107,7 @@ export default function ComplianceDashboard() {
             </View>
           </View>
 
-          <ComplianceStatsBottom />
+          <ComplianceStatsBottom metrics={metrics} />
 
       </ScrollView>
 

@@ -23,9 +23,9 @@ interface AttendanceDetailsModalProps {
 }
 
 const STATUS_META: Record<string, { label: string; accent: string; bg: string; border: string; text: string; Icon: React.ComponentType<{ size?: number; color?: string }> }> = {
-    present: { label: 'Prezent', accent: 'var(--c-success)', bg: 'var(--c-success-bg)', border: '#A7F3D0', text: 'var(--c-success-fg)', Icon: CheckCircle },
+    present: { label: 'Prezent', accent: 'var(--c-success)', bg: 'var(--c-success-bg)', border: 'var(--c-success-bg)', text: 'var(--c-success-fg)', Icon: CheckCircle },
     absent: { label: 'Absent', accent: 'var(--c-danger)', bg: 'var(--c-danger-bg)', border: 'var(--c-danger-bg)', text: 'var(--c-danger)', Icon: XCircle },
-    medical: { label: 'Medical', accent: 'var(--c-warning)', bg: 'var(--c-warning-bg)', border: '#FDE68A', text: 'var(--c-warning-fg)', Icon: BriefcaseMedical },
+    medical: { label: 'Medical', accent: 'var(--c-warning)', bg: 'var(--c-warning-bg)', border: 'var(--c-warning-bg)', text: 'var(--c-warning-fg)', Icon: BriefcaseMedical },
     pending: { label: 'În așteptare', accent: 'var(--c-faint)', bg: 'var(--c-surface-2)', border: 'var(--c-border)', text: 'var(--c-muted)', Icon: Clock3 },
 };
 

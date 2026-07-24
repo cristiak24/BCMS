@@ -23,6 +23,9 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
   const [searchResults, setSearchResults] = useState<Player[]>([]);
   const [searching, setSearching] = useState(false);
   const [adding, setAdding] = useState<number | null>(null);
+  // Inline banner instead of window.alert: the modal stays open, the message
+  // appears next to the control that caused it, and it is themeable.
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -30,6 +33,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
       setSearchQuery('');
       setDebouncedQuery('');
       setSearchResults([]);
+      setError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
@@ -71,9 +75,11 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
 
   const addPlayerToRoster = async (player: Player) => {
     if (!selectedTeamId) {
-      window.alert('Alege o echipă înainte de a adăuga un sportiv în lot.');
+      setError('Alege o echipă înainte de a adăuga un sportiv în lot.');
       return;
     }
+
+    setError(null);
 
     try {
       setAdding(player.id);
@@ -82,7 +88,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
       onClose();
     } catch (addError: any) {
       console.error('Add player to roster error:', addError);
-      window.alert(addError?.message || 'Acest sportiv nu a putut fi adăugat la echipa selectată.');
+      setError(addError?.message || 'Acest sportiv nu a putut fi adăugat la echipa selectată.');
     } finally {
       setAdding(null);
     }
@@ -100,7 +106,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
               <View className="flex-1">
                 <View className="mb-3 flex-row items-center gap-2">
                   <View className="h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: dash.accentBlue }}>
-                    <UserPlus color="#FFFFFF" size={19} />
+                    <UserPlus color="var(--c-surface)" size={19} />
                   </View>
                   <View>
                     <Text className="text-[10px] font-black uppercase tracking-[2px]" style={{ color: dash.accentBlue }}>
@@ -174,7 +180,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                         />
                         <Text
                           className="flex-1 text-[12px] font-black leading-4"
-                          style={{ color: active ? '#FFFFFF' : dash.inkSoft }}
+                          style={{ color: active ? 'var(--c-surface)' : dash.inkSoft }}
                           numberOfLines={2}
                         >
                           {team.name}
@@ -214,6 +220,18 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                     />
                     {searching ? <ActivityIndicator size="small" color={dash.accentBlue} /> : null}
                   </View>
+
+                  {error ? (
+                    <View
+                      accessibilityRole="alert"
+                      className="mt-3 flex-row items-center gap-2 rounded-2xl border px-3.5 py-2.5"
+                      style={{ backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger)' }}
+                    >
+                      <Text className="flex-1 text-[12.5px] font-bold" style={{ color: 'var(--c-danger-fg)' }}>
+                        {error}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 <FlatList
@@ -252,7 +270,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                           className="h-9 w-9 items-center justify-center rounded-[14px]"
                           style={{ backgroundColor: dash.accentBlue }}
                         >
-                          {isAdding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Plus color="#FFFFFF" size={16} />}
+                          {isAdding ? <ActivityIndicator size="small" color="var(--c-surface)" /> : <Plus color="var(--c-surface)" size={16} />}
                         </View>
                       </Pressable>
                     );

@@ -77,7 +77,7 @@ export default function CreateClubAdminScreen() {
             onPress={signOut}
             className="rounded-2xl bg-slate-900 px-4 py-3 flex-row items-center gap-2"
           >
-            <MaterialIcons name="logout" size={18} color="#FFFFFF" />
+            <MaterialIcons name="logout" size={18} color="var(--c-surface)" />
             <Text className="font-black text-white uppercase tracking-[0.2em] text-[11px]">Logout</Text>
           </Pressable>
         </View>

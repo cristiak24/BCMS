@@ -214,7 +214,7 @@ export default function PlayerProfile() {
                 </View>
                 {displayStatus.toLowerCase() === 'active' && (
                   <View className="absolute -bottom-2 -right-2 h-8 w-8 items-center justify-center rounded-full border-4 border-[#1D3E90] bg-emerald-400">
-                    <CheckCircle color="#FFFFFF" size={15} />
+                    <CheckCircle color="var(--c-surface)" size={15} />
                   </View>
                 )}
               </View>
@@ -298,7 +298,7 @@ export default function PlayerProfile() {
                 <Text className="mt-1 text-[11px] font-bold text-blue-100" numberOfLines={1}>{matchesDesc}</Text>
               </View>
               <View className="h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
-                <ChevronRight color="#FFFFFF" size={18} />
+                <ChevronRight color="var(--c-surface)" size={18} />
               </View>
             </View>
             <View className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
@@ -338,7 +338,7 @@ export default function PlayerProfile() {
                 <View className="relative">
                   <TextInput className="h-12 rounded-2xl border border-[#DFE8F3] bg-[#F8FBFF] pl-12 pr-5 py-0 font-bold text-slate-900" value={email} onChangeText={setEmail} placeholder="player@academy.com" keyboardType="email-address" />
                   <View pointerEvents="none" className="absolute bottom-0 left-5 top-0 justify-center">
-                    <Mail color="#8BA0BC" size={17} />
+                    <Mail color="var(--c-faint)" size={17} />
                   </View>
                 </View>
               </View>
@@ -353,7 +353,7 @@ export default function PlayerProfile() {
                   <View className="relative">
                     <TextInput className="h-12 rounded-2xl border border-[#DFE8F3] bg-[#F8FBFF] pl-12 pr-5 py-0 font-black text-[#123B95]" value={number} onChangeText={setNumber} keyboardType="numeric" />
                     <View pointerEvents="none" className="absolute bottom-0 left-5 top-0 justify-center">
-                      <Hash color="#8BA0BC" size={17} />
+                      <Hash color="var(--c-faint)" size={17} />
                     </View>
                   </View>
                 </View>
@@ -392,7 +392,7 @@ export default function PlayerProfile() {
                 <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">Expires</Text>
                 <Text className="mt-1 text-2xl font-black text-[#0E2041]">{medicalExpiry ? new Date(medicalExpiry).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Set Date'}</Text>
                 <View className="mt-3 flex-row items-center">
-                  <Calendar size={13} color="#8BA0BC" />
+                  <Calendar size={13} color="var(--c-faint)" />
                   <Text className="ml-2 text-[11px] font-bold text-slate-400">Last check: {medicalExpiry || 'N/A'}</Text>
                 </View>
               </TouchableOpacity>
@@ -424,7 +424,7 @@ export default function PlayerProfile() {
             <View className="rounded-[30px] border border-[#E1EAF5] bg-[#0E2041] p-5 shadow-sm">
               <View className="mb-4 flex-row items-center gap-3">
                 <View className="h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
-                  <Shield color="#FFFFFF" size={18} />
+                  <Shield color="var(--c-surface)" size={18} />
                 </View>
                 <View>
                   <Text className="text-[10px] font-black uppercase tracking-widest text-blue-200">Admin snapshot</Text>

@@ -432,7 +432,7 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
   const renderStatusIcon = (status: AggregateAttendance['status']) => {
     const iconSize = isMobile ? 13 : 16;
     if (status === 'present') return <CheckCircle size={iconSize} color="var(--c-success-fg)" />;
-    if (status === 'absent') return <XCircle size={iconSize} color="#E11D48" />;
+    if (status === 'absent') return <XCircle size={iconSize} color="var(--c-danger)" />;
     if (status === 'medical') return <BriefcaseMedical size={iconSize} color="var(--c-warning)" />;
     if (status === 'partial') return <AlertCircle size={iconSize} color="var(--c-warning)" />;
     if (status === 'pending') return <View style={styles.pendingDot} />;
@@ -569,7 +569,7 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
 
           <View style={styles.mobileStatsRow}>
             <View style={styles.mobileStatCard}>
-              <BarChart3 size={20} color="#0E7490" />
+              <BarChart3 size={20} color="var(--c-sky)" />
               <Text style={styles.mobileStatValue}>{rateStats.rate}%</Text>
               <Text style={styles.mobileStatLabel}>RATĂ MEDIE</Text>
             </View>
@@ -589,7 +589,7 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
             </View>
 
             <View style={styles.mobileStatCard}>
-              <CalendarClock size={20} color="#0E7490" />
+              <CalendarClock size={20} color="var(--c-sky)" />
               <Text style={styles.mobileStatValue}>{statsLoading ? '—' : `${monthStat.rate.toFixed(1)}%`}</Text>
               <Text style={styles.mobileStatLabel}>PREZENȚĂ {months[viewMonth].toUpperCase()}</Text>
             </View>
@@ -732,7 +732,7 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
           <Text style={styles.statLabel}>Prezență {months[viewMonth]}</Text>
           <Text style={[styles.statValue, { fontSize: 32 }]}>{statsLoading ? '—' : `${monthStat.rate.toFixed(1)}%`}</Text>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${statsLoading ? 0 : monthStat.rate}%`, backgroundColor: '#0E7490' } as any]} />
+            <View style={[styles.progressFill, { width: `${statsLoading ? 0 : monthStat.rate}%`, backgroundColor: 'var(--c-sky)' } as any]} />
           </View>
           <Text style={styles.statMeta}>{monthStat.present} prezențe / {monthStat.denom} luate</Text>
         </View>
@@ -954,9 +954,9 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
 }
 
 function getStatusBubbleStyle(status: AggregateAttendance['status']): object {
-  if (status === 'present') return { backgroundColor: 'var(--c-success-bg)', borderColor: '#A7F3D0' };
+  if (status === 'present') return { backgroundColor: 'var(--c-success-bg)', borderColor: 'var(--c-success-bg)' };
   if (status === 'absent') return { backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-bg)' };
-  if (status === 'medical' || status === 'partial') return { backgroundColor: 'var(--c-warning-bg)', borderColor: '#FDE68A' };
+  if (status === 'medical' || status === 'partial') return { backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-bg)' };
   return { backgroundColor: 'var(--c-surface-3)', borderColor: 'var(--c-border)' };
 }
 
@@ -1010,7 +1010,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   mobileSegmentOptionActive: {
-    backgroundColor: '#2EA6F2',
+    backgroundColor: 'var(--c-sky)',
   },
   mobileSegmentText: {
     fontSize: 14,
@@ -1050,7 +1050,7 @@ const styles = StyleSheet.create({
   mobilePeriodLabel: {
     fontSize: 34,
     fontWeight: '900',
-    color: '#0E2F82',
+    color: 'var(--c-brand-fg)',
     letterSpacing: 0.2,
     textAlign: 'center',
   },
@@ -1095,13 +1095,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   mobileTeamPillActive: {
-    backgroundColor: '#2EA6F2',
-    borderColor: '#2EA6F2',
+    backgroundColor: 'var(--c-sky)',
+    borderColor: 'var(--c-sky)',
   },
   mobileTeamPillText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#4B5563',
+    color: 'var(--c-ink-soft)',
   },
   mobileTeamPillTextActive: {
     color: '#fff',
@@ -1125,7 +1125,7 @@ const styles = StyleSheet.create({
   mobileStatValue: {
     fontSize: 32,
     fontWeight: '900',
-    color: '#0E2F82',
+    color: 'var(--c-brand-fg)',
     marginTop: 6,
   },
   mobileStatLabel: {
@@ -1212,12 +1212,12 @@ const styles = StyleSheet.create({
   mobileRateValue: {
     fontSize: 42,
     fontWeight: '900',
-    color: '#0E2F82',
+    color: 'var(--c-brand-fg)',
   },
   mobileRateLabel: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#0369A1',
+    color: 'var(--c-sky)',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },

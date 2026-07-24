@@ -38,15 +38,15 @@ const TYPE_META: Record<string, { label: string; color: string; bg: string; icon
   },
   match: {
     label: 'Match',
-    color: '#7C3AED',
+    color: 'var(--c-purple)',
     bg: 'var(--c-surface-tint)',
-    icon: <Trophy size={14} color="#7C3AED" />,
+    icon: <Trophy size={14} color="var(--c-purple)" />,
   },
   camp: {
     label: 'Camp',
-    color: '#0891B2',
+    color: 'var(--c-sky)',
     bg: 'var(--c-surface-tint)',
-    icon: <Zap size={14} color="#0891B2" />,
+    icon: <Zap size={14} color="var(--c-sky)" />,
   },
   admin: {
     label: 'Admin',
@@ -844,7 +844,7 @@ export default function EventDetailScreen() {
               marginTop: 16,
               backgroundColor: deleting ? 'var(--c-danger-bg)' : 'var(--c-danger-bg)',
               borderWidth: 1,
-              borderColor: '#FCA5A5',
+              borderColor: 'var(--c-danger-bg)',
               borderRadius: 20,
               paddingVertical: 14,
               paddingHorizontal: 16,

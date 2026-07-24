@@ -69,7 +69,7 @@ function Chip({
       <Text className={`text-[11.5px] font-bold ${active ? 'text-white' : 'text-[#334155]'}`} numberOfLines={1}>
         {label}
       </Text>
-      {active ? <Check size={11} color="#FFFFFF" /> : null}
+      {active ? <Check size={11} color="var(--c-surface)" /> : null}
     </TouchableOpacity>
   );
 }

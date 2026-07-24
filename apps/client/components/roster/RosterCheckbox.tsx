@@ -30,8 +30,8 @@ export default function RosterCheckbox({ checked, indeterminate, onToggle, size 
         backgroundColor: active ? dash.accentBlue : dash.surface,
       }}
     >
-      {checked ? <Check color="#FFFFFF" size={Math.round(size * 0.65)} /> : null}
-      {!checked && indeterminate ? <Minus color="#FFFFFF" size={Math.round(size * 0.65)} /> : null}
+      {checked ? <Check color="var(--c-surface)" size={Math.round(size * 0.65)} /> : null}
+      {!checked && indeterminate ? <Minus color="var(--c-surface)" size={Math.round(size * 0.65)} /> : null}
     </Pressable>
   );
 }

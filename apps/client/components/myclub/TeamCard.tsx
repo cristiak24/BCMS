@@ -167,7 +167,7 @@ export default function TeamCard({
             {/* Open CTA */}
             <Pressable onPress={onOpen} className="flex-row items-center justify-center gap-1.5 mt-3.5 h-10 rounded-[12px] bg-[#1D3E90] active:bg-[#15316f] transition-colors">
                 <Text className="text-white text-[11px] font-black uppercase tracking-widest">Deschide echipa</Text>
-                <ArrowRight size={13} color="#ffffff" />
+                <ArrowRight size={13} color="var(--c-surface)" />
             </Pressable>
         </View>
     );

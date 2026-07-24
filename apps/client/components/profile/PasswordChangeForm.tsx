@@ -107,10 +107,10 @@ export default function PasswordChangeForm({ onChangePassword }: PasswordChangeF
           className={`min-w-[220px] rounded-2xl px-5 py-4 flex-row items-center justify-center ${loading ? 'bg-[#8FA3D8]' : 'bg-[#0E2041]'}`}
         >
           {loading ? (
-            <ActivityIndicator color="#ffffff" />
+            <ActivityIndicator color="var(--c-surface)" />
           ) : (
             <>
-              <MaterialIcons name="verified-user" size={18} color="#ffffff" />
+              <MaterialIcons name="verified-user" size={18} color="var(--c-surface)" />
               <Text className="text-white font-black text-[12px] uppercase tracking-widest ml-2">Update Password</Text>
             </>
           )}

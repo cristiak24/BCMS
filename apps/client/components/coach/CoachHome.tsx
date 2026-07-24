@@ -160,8 +160,8 @@ export default function CoachHome() {
 
         <View className="flex-row flex-wrap gap-4 mb-8">
           <CoachMetric label="Upcoming sessions" value={upcomingEvents.length} icon="event-available" color="var(--c-brand-fg)" />
-          <CoachMetric label="Active teams" value={visibleTeamsCount} icon="groups" color="#007A99" />
-          <CoachMetric label="Roster players" value={players.length} icon="sports-basketball" color="#7C3AED" />
+          <CoachMetric label="Active teams" value={visibleTeamsCount} icon="groups" color="var(--c-sky)" />
+          <CoachMetric label="Roster players" value={players.length} icon="sports-basketball" color="var(--c-purple)" />
           <CoachMetric label="This week" value={upcomingEvents.filter((event) => getEventTimestamp(event) - Date.now() <= 7 * 24 * 3600000).length} icon="date-range" color="var(--c-success-fg)" />
         </View>
 

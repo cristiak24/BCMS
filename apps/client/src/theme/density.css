@@ -1,0 +1,155 @@
+/*
+ * Global geometry pass — radius, elevation, typographic weight.
+ *
+ * WHY
+ * ---
+ * The app's "loose / low-density" feel wasn't caused by any single screen. It
+ * came from three habits applied uniformly everywhere:
+ *
+ *   1. One radius for every element size. A 28–32px corner on a 900px card
+ *      reads as a soft blob; the SAME 28px on a 40px-tall button makes the
+ *      button look inflated. Radius has to scale with the element, so the
+ *      large arbitrary radii are pulled down harder than the small ones.
+ *   2. Large, soft shadows (`0 18px 45px`). At that blur a shadow stops
+ *      reading as lift and starts reading as haze, which is what makes a page
+ *      of white cards look foggy rather than crisp.
+ *   3. `font-black` (900) on nearly every label. When everything is heaviest,
+ *      nothing is emphasised, and the page gains visual weight without gaining
+ *      hierarchy.
+ *
+ * Fixing these centrally is what lets the per-screen work be about layout
+ * rather than about restyling every card by hand.
+ *
+ * Specificity note: these are single-class selectors, same as Tailwind's, so
+ * they win purely on load order (imported after the Tailwind bundle).
+ */
+
+/* ── Radius ────────────────────────────────────────────────────────────────
+ * Compression is progressive: the bigger the original radius, the more it is
+ * reduced, so the visual hierarchy between a card and a chip is preserved. */
+
+.rounded-\[40px\] { border-radius: 24px; }
+.rounded-\[36px\] { border-radius: 22px; }
+.rounded-\[34px\] { border-radius: 22px; }
+.rounded-\[32px\] { border-radius: 20px; }
+.rounded-\[30px\] { border-radius: 20px; }
+.rounded-\[28px\] { border-radius: 18px; }
+.rounded-\[26px\] { border-radius: 18px; }
+.rounded-\[24px\] { border-radius: 16px; }
+.rounded-\[22px\] { border-radius: 14px; }
+.rounded-\[20px\] { border-radius: 14px; }
+.rounded-\[19px\] { border-radius: 13px; }
+.rounded-\[18px\] { border-radius: 12px; }
+.rounded-\[17px\] { border-radius: 12px; }
+.rounded-\[16px\] { border-radius: 11px; }
+.rounded-\[15px\] { border-radius: 11px; }
+.rounded-\[14px\] { border-radius: 10px; }
+
+.rounded-3xl { border-radius: 18px; }
+.rounded-2xl { border-radius: 12px; }
+.rounded-xl  { border-radius: 10px; }
+
+/* Corner-specific variants used by sheets and grouped controls. */
+.rounded-t-\[32px\] { border-top-left-radius: 20px; border-top-right-radius: 20px; }
+.rounded-t-\[28px\] { border-top-left-radius: 18px; border-top-right-radius: 18px; }
+.rounded-t-\[24px\] { border-top-left-radius: 16px; border-top-right-radius: 16px; }
+.rounded-t-3xl { border-top-left-radius: 18px; border-top-right-radius: 18px; }
+
+/* ── Elevation ────────────────────────────────────────────────────────────
+ * Tailwind's own shadow utilities are remapped onto the token ramp so light
+ * and dark get appropriately different treatments (dark leans on borders). */
+
+.shadow-sm { box-shadow: var(--e-xs); }
+.shadow    { box-shadow: var(--e-sm); }
+.shadow-md { box-shadow: var(--e-sm); }
+.shadow-lg { box-shadow: var(--e-md); }
+.shadow-xl { box-shadow: var(--e-lg); }
+.shadow-2xl { box-shadow: var(--e-lg); }
+
+/* ── Type ─────────────────────────────────────────────────────────────────
+ * `font-black` is used ~1,200 times, largely as "make this look important".
+ * Dropping it to 800 keeps labels emphatic while removing the slab-like
+ * density; real headings opt back in with an explicit weight. Tabular figures
+ * stop stat values from jittering as they update. */
+
+.font-black { font-weight: 800; }
+
+/* ── Type scale compression ────────────────────────────────────────────────
+ * Display sizes were used at poster scale — 44–56px page titles, 42–48px stat
+ * numbers — which is what made screens feel oversized and low-density (a 48px
+ * "83.5%" is louder than the data warrants). Only the LARGE end is pulled
+ * down, and progressively, so body text is untouched and the heading→number
+ * hierarchy is preserved. Anything that genuinely needs to shout can still set
+ * an inline fontSize (this only targets utilities). */
+.text-\[56px\] { font-size: 38px; line-height: 1.05; }
+.text-\[54px\] { font-size: 38px; line-height: 1.05; }
+.text-\[48px\] { font-size: 34px; line-height: 1.08; }
+.text-\[44px\] { font-size: 32px; line-height: 1.1; }
+.text-\[42px\] { font-size: 30px; line-height: 1.1; }
+.text-\[40px\] { font-size: 30px; line-height: 1.1; }
+.text-\[38px\] { font-size: 28px; line-height: 1.12; }
+.text-\[36px\] { font-size: 27px; line-height: 1.15; }
+.text-\[34px\] { font-size: 26px; line-height: 1.15; }
+.text-\[32px\] { font-size: 25px; line-height: 1.18; }
+.text-\[30px\] { font-size: 24px; line-height: 1.2; }
+.text-\[28px\] { font-size: 23px; line-height: 1.2; }
+
+.text-6xl { font-size: 40px; line-height: 1.05; }
+.text-5xl { font-size: 34px; line-height: 1.08; }
+.text-4xl { font-size: 27px; line-height: 1.15; }
+
+.tabular,
+[class*="text-["][class*="font-black"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Wide letter-spacing on tiny uppercase labels was set to `tracking-widest`
+ * (0.1em) across the app; at 9–10px that pushes labels past their container
+ * and forced the two-line wrapping seen in card headers. */
+.text-\[9px\].tracking-widest,
+.text-\[10px\].tracking-widest,
+.text-\[11px\].tracking-widest { letter-spacing: 0.06em; }
+
+/* ── Text safety ──────────────────────────────────────────────────────────
+ * Long unbroken strings — emails, invite codes, URLs — overflowed their
+ * containers instead of wrapping, because the RN-web shim emits
+ * `white-space: pre-wrap` without a break rule. This is what clipped the
+ * email on the profile screen. */
+
+.break-anywhere { overflow-wrap: anywhere; word-break: break-word; }
+
+/* ── Focus ────────────────────────────────────────────────────────────────
+ * Brand-tinted rather than the old flat blue, and offset so it never sits
+ * under an adjacent control. */
+
+:where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"]), [role="button"]):focus-visible {
+  outline: 2px solid var(--c-brand-surface);
+  outline-offset: 2px;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────
+ * Default Chrome scrollbars on light-grey panels were a hard 15px band that
+ * cut through card corners. */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-border-strong) transparent;
+}
+
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background-color: var(--c-border-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background-color: var(--c-faint); }
+
+/* ── Page chrome ──────────────────────────────────────────────────────────
+ * The page background is a token so the shell, the scroll overflow area and
+ * the browser's overscroll gutter all agree — previously the shell was
+ * #EAF1F8 while the body stayed white, showing a pale seam on rubber-band
+ * scroll. */
+
+html, body { background-color: var(--c-bg-alt); }

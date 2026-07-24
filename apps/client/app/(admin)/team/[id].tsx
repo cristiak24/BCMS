@@ -15,6 +15,7 @@ import TeamMedicalVisaModal from '../../../components/schedule/admin/TeamMedical
 import TeamPaymentsReportModal from '../../../components/schedule/admin/TeamPaymentsReportModal';
 import TeamFrbPanel from '../../../components/myclub/team-detail/TeamFrbPanel';
 import TeamEventsPanel from '../../../components/myclub/team-detail/TeamEventsPanel';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 
 type TabKey = 'roster' | 'events' | 'history' | 'frb';
 type RosterView = 'grid' | 'list';
@@ -46,6 +47,10 @@ export default function TeamDetailsScreen() {
     const [medicalVisaOpen, setMedicalVisaOpen] = useState(false);
     const [paymentsReportOpen, setPaymentsReportOpen] = useState(false);
     const [removingId, setRemovingId] = useState<number | null>(null);
+    // Removing a player from a team is destructive, so it goes through the shared
+    // ConfirmDialog rather than a native window.confirm (unstyled, not themeable,
+    // and blocks the whole tab).
+    const [playerPendingRemoval, setPlayerPendingRemoval] = useState<Player | null>(null);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Player[]>([]);
@@ -116,13 +121,18 @@ export default function TeamDetailsScreen() {
         }
     };
 
-    const handleRemovePlayer = async (player: Player) => {
-        if (!window.confirm(`Scoți ${player.firstName} ${player.lastName} din echipă?`)) return;
+    const handleRemovePlayer = (player: Player) => setPlayerPendingRemoval(player);
+
+    const confirmRemovePlayer = async () => {
+        const player = playerPendingRemoval;
+        if (!player) return;
+
         try {
             setRemovingId(player.id);
             await teamsApi.removePlayerFromTeam(teamId, player.id);
             setPlayers((prev) => prev.filter((p) => p.id !== player.id));
             void refreshStats();
+            setPlayerPendingRemoval(null);
         } catch (e) {
             Alert.alert('Eroare', e instanceof Error ? e.message : 'Nu am putut scoate jucătorul.');
         } finally {
@@ -218,7 +228,7 @@ export default function TeamDetailsScreen() {
                                 <Text className="text-[#1D3E90] text-[12px] font-black">Raport plăți</Text>
                             </Pressable>
                             <Pressable onPress={() => setEditOpen(true)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-full bg-[#1D3E90] active:bg-[#15316f]">
-                                <Pencil size={14} color="#ffffff" />
+                                <Pencil size={14} color="var(--c-surface)" />
                                 <Text className="text-white text-[12px] font-black">Editează</Text>
                             </Pressable>
                         </View>
@@ -290,11 +300,11 @@ export default function TeamDetailsScreen() {
 
                     {/* Tabs */}
                     <View className="flex-row flex-wrap bg-white p-1 rounded-[14px] border border-[#E3E9F2] self-start mb-4 gap-1">
-                        <TabButton active={tab === 'roster'} onPress={() => setTab('roster')} icon={<Users size={14} color={tab === 'roster' ? '#ffffff' : 'var(--c-faint)'} />} label={`Lot (${players.length})`} />
-                        <TabButton active={tab === 'events'} onPress={() => setTab('events')} icon={<CalendarClock size={14} color={tab === 'events' ? '#ffffff' : 'var(--c-faint)'} />} label="Evenimente" />
-                        <TabButton active={tab === 'history'} onPress={() => setTab('history')} icon={<History size={14} color={tab === 'history' ? '#ffffff' : 'var(--c-faint)'} />} label="Istoric" />
+                        <TabButton active={tab === 'roster'} onPress={() => setTab('roster')} icon={<Users size={14} color={tab === 'roster' ? 'var(--c-surface)' : 'var(--c-faint)'} />} label={`Lot (${players.length})`} />
+                        <TabButton active={tab === 'events'} onPress={() => setTab('events')} icon={<CalendarClock size={14} color={tab === 'events' ? 'var(--c-surface)' : 'var(--c-faint)'} />} label="Evenimente" />
+                        <TabButton active={tab === 'history'} onPress={() => setTab('history')} icon={<History size={14} color={tab === 'history' ? 'var(--c-surface)' : 'var(--c-faint)'} />} label="Istoric" />
                         {frb && (
-                            <TabButton active={tab === 'frb'} onPress={() => setTab('frb')} icon={<ListOrdered size={14} color={tab === 'frb' ? '#ffffff' : 'var(--c-faint)'} />} label="Competiție FRB" />
+                            <TabButton active={tab === 'frb'} onPress={() => setTab('frb')} icon={<ListOrdered size={14} color={tab === 'frb' ? 'var(--c-surface)' : 'var(--c-faint)'} />} label="Competiție FRB" />
                         )}
                     </View>
 
@@ -321,15 +331,15 @@ export default function TeamDetailsScreen() {
                                 {players.length > 0 && (
                                     <View className="flex-row rounded-[12px] border border-[#DDE7F5] overflow-hidden flex-none">
                                         <Pressable onPress={() => setRosterView('grid')} className={`flex-row items-center gap-1.5 h-10 px-3 ${rosterView === 'grid' ? 'bg-[#1D3E90]' : 'bg-white'}`} accessibilityLabel="Vizualizare grid">
-                                            <LayoutGrid size={14} color={rosterView === 'grid' ? '#ffffff' : 'var(--c-muted)'} />
+                                            <LayoutGrid size={14} color={rosterView === 'grid' ? 'var(--c-surface)' : 'var(--c-muted)'} />
                                         </Pressable>
                                         <Pressable onPress={() => setRosterView('list')} className={`flex-row items-center gap-1.5 h-10 px-3 border-l border-[#DDE7F5] ${rosterView === 'list' ? 'bg-[#1D3E90]' : 'bg-white'}`} accessibilityLabel="Vizualizare listă">
-                                            <List size={14} color={rosterView === 'list' ? '#ffffff' : 'var(--c-muted)'} />
+                                            <List size={14} color={rosterView === 'list' ? 'var(--c-surface)' : 'var(--c-muted)'} />
                                         </Pressable>
                                     </View>
                                 )}
                                 <Pressable onPress={() => setShowAdd((v) => !v)} className={`flex-row items-center gap-1.5 h-10 px-4 rounded-[12px] ${showAdd ? 'bg-[#EBF1FF] border border-[#BFD3F5]' : 'bg-[#1D3E90]'}`}>
-                                    {showAdd ? <X size={15} color="var(--c-brand-fg)" /> : <UserPlus size={15} color="#ffffff" />}
+                                    {showAdd ? <X size={15} color="var(--c-brand-fg)" /> : <UserPlus size={15} color="var(--c-surface)" />}
                                     <Text className={`text-[12px] font-black uppercase tracking-wide ${showAdd ? 'text-[#1D3E90]' : 'text-white'}`}>{showAdd ? 'Închide' : 'Adaugă jucător'}</Text>
                                 </Pressable>
                             </View>
@@ -446,6 +456,23 @@ export default function TeamDetailsScreen() {
                 teamId={teamId}
                 teamName={team.name}
                 onClose={() => setPaymentsReportOpen(false)}
+            />
+
+            <ConfirmDialog
+                visible={playerPendingRemoval != null}
+                destructive
+                icon="person-remove"
+                title="Scoți jucătorul din echipă?"
+                message={
+                    playerPendingRemoval
+                        ? `${playerPendingRemoval.firstName} ${playerPendingRemoval.lastName} va fi eliminat din ${team.name}. Istoricul de prezență rămâne salvat.`
+                        : undefined
+                }
+                confirmLabel="Scoate din echipă"
+                cancelLabel="Anulează"
+                loading={removingId != null}
+                onConfirm={() => void confirmRemovePlayer()}
+                onCancel={() => setPlayerPendingRemoval(null)}
             />
         </View>
     );

@@ -167,7 +167,7 @@ function toneForEvent(type: CalendarEvent['type']): EventTone {
   if (type === 'camp') {
     return {
       label: 'CAMP',
-      color: '#007A99',
+      color: 'var(--c-sky)',
       pillBg: 'var(--c-surface-tint)',
       chipBg: 'var(--c-surface-tint)',
       icon: 'terrain',
@@ -392,7 +392,7 @@ function UpcomingEventCard({ event, primary }: { event: CalendarEvent; primary?:
                 <Text className="text-white text-[11px] font-black">VS</Text>
               </View>
               <View className="-ml-3 h-9 w-9 rounded-full bg-[#007A99] items-center justify-center border-2 border-white">
-                <MaterialIcons name={tone.icon} size={17} color="#FFFFFF" />
+                <MaterialIcons name={tone.icon} size={17} color="var(--c-surface)" />
               </View>
             </>
           )}
@@ -748,7 +748,7 @@ export default function ScheduleScreen() {
 
             <View className="flex-row gap-4">
               <MiniMetric label="Upcoming" value={String(upcomingEvents.length)} color="#2949B9" />
-              <MiniMetric label="Next match" value={getNextMatchLabel(nextMatch)} color="#007A99" />
+              <MiniMetric label="Next match" value={getNextMatchLabel(nextMatch)} color="var(--c-sky)" />
             </View>
           </View>
         </View>
@@ -767,8 +767,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   filterChipActive: {
-    backgroundColor: '#2BB6F6',
-    borderColor: '#2BB6F6',
+    backgroundColor: 'var(--c-sky)',
+    borderColor: 'var(--c-sky)',
     shadowColor: 'var(--c-brand-fg)',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.12,
@@ -776,7 +776,7 @@ const styles = StyleSheet.create({
   },
   filterChipIdle: {
     backgroundColor: 'rgba(255,255,255,0.48)',
-    borderColor: '#BED0E5',
+    borderColor: 'var(--c-border-strong)',
   },
   filterChipText: {
     fontSize: 16,
@@ -823,7 +823,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   dayNumberTextActive: {
-    color: '#FFFFFF',
+    color: 'var(--c-surface)',
   },
   calendarEventPill: {
     borderLeftWidth: 4,
@@ -882,7 +882,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   cardActionTextPrimary: {
-    color: '#FFFFFF',
+    color: 'var(--c-surface)',
   },
   cardActionTextSecondary: {
     color: 'var(--c-brand-fg)',
@@ -899,7 +899,7 @@ const styles = StyleSheet.create({
     width: 44,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#BED0E5',
+    borderColor: 'var(--c-border-strong)',
     backgroundColor: 'var(--c-surface)',
     alignItems: 'center',
     justifyContent: 'center',

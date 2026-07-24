@@ -310,6 +310,7 @@ export const Pressable = React.forwardRef<HTMLElement, AnyProps>(function Pressa
     <div
       {...domProps}
       aria-disabled={disabled || undefined}
+      aria-label={native.accessibilityLabel}
       data-testid={native.testID}
       ref={ref as any}
       role="button"
@@ -334,6 +335,10 @@ export const Pressable = React.forwardRef<HTMLElement, AnyProps>(function Pressa
     <button
       {...domProps}
       aria-disabled={disabled || undefined}
+      // Without this, every icon-only button in the app (delete, edit, close,
+      // open menu) reached a screen reader as an unnamed "button": the prop was
+      // destructured out of `rest` but never rendered.
+      aria-label={native.accessibilityLabel}
       data-testid={native.testID}
       disabled={disabled}
       ref={ref as any}

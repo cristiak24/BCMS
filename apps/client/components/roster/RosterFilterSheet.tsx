@@ -98,7 +98,7 @@ export default function RosterFilterSheet({
                       className="w-5 h-5 rounded-full items-center justify-center"
                       style={{ backgroundColor: dash.accentBlue }}
                     >
-                      <MaterialIcons name="check" size={12} color="#FFFFFF" />
+                      <MaterialIcons name="check" size={12} color="var(--c-surface)" />
                     </View>
                   ) : null}
                 </Pressable>

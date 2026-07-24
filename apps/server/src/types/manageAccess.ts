@@ -9,7 +9,6 @@ export type AppUserContext = {
     role: 'admin' | 'superadmin' | 'player' | 'parent' | 'coach' | 'accountant' | 'staff';
     clubId: number | null;
     status?: UserAccessStatus;
-    isHardcodedAdmin?: boolean;
 };
 
 export type AccessRequestRecord = {

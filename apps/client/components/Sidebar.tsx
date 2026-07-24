@@ -17,6 +17,10 @@ export const ADMIN_MENU_ITEMS: { label: string; icon: AdminMenuIconName; href: s
     { label: 'Schedule', icon: 'calendar-today', href: '/admin/schedule' },
     { label: 'Create Club Admin', icon: 'admin-panel-settings', href: '/admin/create-club-admin', superadminOnly: true },
     { label: 'Finances', icon: 'payments', href: '/admin/finance' },
+    // Compliance and Users were reachable only by typing the URL: with no menu
+    // entry the header title also fell back to the first item ("Dashboard").
+    { label: 'Compliance', icon: 'verified-user', href: '/admin/compliance' },
+    { label: 'Users', icon: 'people', href: '/admin/users', superadminOnly: true },
 ];
 
 export default function Sidebar() {
@@ -30,15 +34,21 @@ export default function Sidebar() {
     }
 
     return (
-        <View className="w-[244px] h-full bg-[#F7FAFD]/95 flex flex-col shrink-0 border-r border-white/70" style={{ boxShadow: '12px 0 34px rgba(11, 30, 61, 0.06)' } as any}>
+        // Structural surfaces use tokens (not opacity-modifier utilities like
+        // bg-white/95, which the palette layer can't retarget) so the sidebar
+        // tracks light/dark like the rest of the shell.
+        <View
+            className="w-[244px] h-full flex flex-col shrink-0 border-r"
+            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+        >
             {/* Logo Area */}
             <View className="pt-5 px-4 pb-4 flex-row items-center gap-3">
-                <View className="w-10 h-10 rounded-[15px] bg-[#123B95] items-center justify-center border border-white" style={theme.shadow.lift}>
-                    <FontAwesome5 name="basketball-ball" size={16} color="#ffffff" />
+                <View className="w-10 h-10 rounded-[12px] items-center justify-center" style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)' } as any}>
+                    <FontAwesome5 name="basketball-ball" size={16} color="var(--c-on-brand)" />
                 </View>
                 <View className="flex-col">
-                    <Text className="text-[#07152F] text-[17px] font-black tracking-tight leading-tight">BCMS</Text>
-                    <Text className="text-[#2563EB] text-[9px] font-black tracking-widest uppercase mt-1">Club Workspace</Text>
+                    <Text className="text-[17px] font-black tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }}>BCMS</Text>
+                    <Text className="text-[9px] font-black tracking-widest uppercase mt-1" style={{ color: 'var(--c-brand-fg)' }}>Club Workspace</Text>
                 </View>
             </View>
 
@@ -59,34 +69,38 @@ export default function Sidebar() {
                                 className="block no-underline"
                             >
                                 <View
-                                    className={`flex-row items-center px-3 py-2.5 rounded-[17px] ${isActive ? 'bg-white border border-white' : 'border border-transparent'}`}
-                                    style={isActive ? { boxShadow: '0 18px 38px rgba(18, 59, 149, 0.10)' } as any : undefined}
+                                    className="flex-row items-center px-3 py-2.5 rounded-[12px] border"
+                                    style={isActive
+                                        ? { backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' } as any
+                                        : { borderColor: 'transparent' } as any}
                                 >
-                                    <View className={`w-8 h-8 rounded-[13px] items-center justify-center mr-2.5 ${isActive ? 'bg-[#123B95]' : 'bg-white border border-[#E4ECF7]'}`}>
+                                    <View
+                                        className="w-8 h-8 rounded-[10px] items-center justify-center mr-2.5 border"
+                                        style={isActive
+                                            ? { backgroundColor: 'var(--c-brand-surface)', borderColor: 'transparent' } as any
+                                            : { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
+                                    >
                                         <MaterialIcons
                                             name={item.icon}
                                             size={17}
-                                            color={isActive ? '#FFFFFF' : '#66809F'}
+                                            color={isActive ? 'var(--c-on-brand)' : 'var(--c-muted)'}
                                         />
                                     </View>
-                                    <Text className={`text-[13px] ${isActive ? 'font-black text-[#07152F]' : 'font-bold text-[#64748B]'}`} numberOfLines={1}>
+                                    <Text className="text-[13px]" style={{ color: isActive ? 'var(--c-brand-fg)' : 'var(--c-muted)', fontWeight: isActive ? '800' : '600' } as any} numberOfLines={1}>
                                         {item.label}
                                     </Text>
-                                    {isActive ? (
-                                        <View className="ml-auto w-2 h-2 rounded-full bg-[#D97706]" />
-                                    ) : null}
                                 </View>
                             </NavLink>
                             {isActive && (
-                                <View className="absolute -left-3 top-3 bottom-3 w-1 rounded-r-full bg-[#D97706]" />
+                                <View className="absolute -left-2.5 top-2.5 bottom-2.5 w-1 rounded-r-full" style={{ backgroundColor: 'var(--c-brand-surface)' }} />
                             )}
                         </View>
                     );
                 })}
             </View>
-            <View className="m-2.5 p-3 rounded-[18px] bg-white/92 border border-white" style={{ boxShadow: '0 12px 24px rgba(11, 30, 61, 0.06)' } as any}>
-                <Text className="text-[#07152F] text-[12px] font-black mb-1">Active Workspace</Text>
-                <Text className="text-[#94A3B8] text-[11px] font-black uppercase tracking-widest">
+            <View className="m-2.5 p-3 rounded-[12px] border" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
+                <Text className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--c-faint)' }}>Active Workspace</Text>
+                <Text className="text-[12px] font-bold" style={{ color: 'var(--c-ink) ' }} numberOfLines={1}>
                     {session?.clubName ?? 'Club workspace'}
                 </Text>
             </View>

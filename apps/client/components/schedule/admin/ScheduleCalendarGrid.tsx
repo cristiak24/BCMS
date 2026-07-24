@@ -171,20 +171,16 @@ export const MonthlyCalendarGrid = React.memo(({
   }, [currentDate, events]);
 
   return (
-    <View style={{ paddingVertical: 16, flex: 1 }}>
+    <View style={{ flex: 1 }}>
       <View
         style={{
           backgroundColor: 'var(--c-surface)',
-          borderRadius: 32,
+          borderRadius: 16,
           borderWidth: 1,
           borderColor: 'var(--c-border)',
           overflow: 'hidden',
-          shadowColor: 'var(--c-ink-strong)',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.08,
-          shadowRadius: 24,
-          elevation: 5,
-        }}
+          boxShadow: 'var(--e-sm)',
+        } as any}
       >
         <WeekdayHeader />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>

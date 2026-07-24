@@ -425,9 +425,9 @@ export default function CreateTeamWizard({
                             creating || (step === 0 && !canAdvanceFromStep1) || (step === 1 && !canAdvanceFromStep2) ? 'bg-gray-200' : 'bg-[#1D3E90]'
                         }`}
                     >
-                        {creating ? <ActivityIndicator size="small" color="#ffffff" /> : (
+                        {creating ? <ActivityIndicator size="small" color="var(--c-surface)" /> : (
                             <>
-                                {step === 3 && <Check size={14} color="#ffffff" />}
+                                {step === 3 && <Check size={14} color="var(--c-surface)" />}
                                 <Text className="text-white font-black uppercase tracking-widest text-[12px]">{step === 3 ? 'Creează echipa' : 'Continuă'}</Text>
                             </>
                         )}

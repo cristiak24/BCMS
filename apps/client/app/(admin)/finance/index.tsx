@@ -637,12 +637,25 @@ export default function FinancialSettingsPage() {
                 subtitle="Club billing, payments, documents, and L12 exports."
                 className={`${isMobile ? 'gap-5' : 'flex-row items-end justify-between'} mb-6`}
             >
-                <View className={`gap-2 bg-white/10 border border-white/20 rounded-[18px] p-1 ${isMobile ? 'flex-row flex-wrap self-start' : 'flex-row'}`}>
-                    {TABS.map(tab => (
-                        <Pressable key={tab} onPress={() => setActiveTab(tab)} className={`relative rounded-[14px] px-4 py-2 ${activeTab === tab ? 'bg-white' : ''}`}>
-                            <Text className={`text-[13px] font-black ${activeTab === tab ? 'text-[#123A97]' : 'text-[#D6E6FF]'}`}>{tab}</Text>
-                        </Pressable>
-                    ))}
+                {/* Segmented control on the page surface (was a white-on-navy
+                    bar that turned invisible once the hero stopped being navy). */}
+                <View
+                    className={`gap-[2px] rounded-[10px] p-[3px] ${isMobile ? 'flex-row flex-wrap self-start' : 'flex-row'}`}
+                    style={{ backgroundColor: 'var(--c-surface-3)' }}
+                >
+                    {TABS.map(tab => {
+                        const active = activeTab === tab;
+                        return (
+                            <Pressable
+                                key={tab}
+                                onPress={() => setActiveTab(tab)}
+                                className="rounded-[8px] px-3.5 h-8 justify-center"
+                                style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
+                            >
+                                <Text className="text-[12px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>{tab}</Text>
+                            </Pressable>
+                        );
+                    })}
                 </View>
             </AdminHero>
 

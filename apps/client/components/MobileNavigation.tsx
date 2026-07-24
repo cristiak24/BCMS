@@ -121,12 +121,12 @@ export function MobileNavigationSheet({
                       }}
                     >
                       <View className="w-10 h-10 rounded-[16px] items-center justify-center mr-3" style={{ backgroundColor: active ? 'rgba(255,255,255,0.14)' : 'var(--c-surface-2)' }}>
-                        <MaterialIcons name={item.icon} size={19} color={active ? '#FFFFFF' : theme.colors.royal} />
+                        <MaterialIcons name={item.icon} size={19} color={active ? 'var(--c-surface)' : theme.colors.royal} />
                       </View>
-                      <Text className="text-[14px] font-black flex-1" style={{ color: active ? '#FFFFFF' : theme.colors.text }}>
+                      <Text className="text-[14px] font-black flex-1" style={{ color: active ? 'var(--c-surface)' : theme.colors.text }}>
                         {item.label}
                       </Text>
-                      <MaterialIcons name="chevron-right" size={20} color={active ? '#FFFFFF' : theme.colors.faint} />
+                      <MaterialIcons name="chevron-right" size={20} color={active ? 'var(--c-surface)' : theme.colors.faint} />
                     </Pressable>
                 );
               })}

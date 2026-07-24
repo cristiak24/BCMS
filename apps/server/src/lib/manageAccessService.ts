@@ -27,9 +27,7 @@ export async function ensureClubForUser(user: AppUserContext) {
 
     const defaultClub = await ensureDefaultClub();
 
-    if (!user.isHardcodedAdmin) {
-        await assignUserClub(user.id, defaultClub.id);
-    }
+    await assignUserClub(user.id, defaultClub.id);
 
     return defaultClub;
 }
@@ -51,7 +49,7 @@ export async function approveManageAccessRequest(user: AppUserContext, requestId
         throw new Error('Only pending requests can be approved.');
     }
 
-    await approveAccessRequest(request.id, club.id, user.isHardcodedAdmin ? null : user.id);
+    await approveAccessRequest(request.id, club.id, user.id);
     await updateUserAccess(request.userId, {
         clubId: club.id,
         role: request.requestedRole as InviteRole,
@@ -82,7 +80,7 @@ export async function denyManageAccessRequest(user: AppUserContext, requestId: n
     // account. The user stays in their current (pending) state so the admin can
     // still approve a later request, exactly as the UI copy promises. Disabling an
     // account is a separate, explicit action in Manage Accounts.
-    await denyAccessRequest(request.id, club.id, user.isHardcodedAdmin ? null : user.id);
+    await denyAccessRequest(request.id, club.id, user.id);
 
     return {
         requestId: request.id,
@@ -130,7 +128,7 @@ export async function generateClubInviteLink(user: AppUserContext, role: InviteR
         tokenHash: token.tokenHash,
         expiresAt: token.expiresAt,
         refreshIntervalMinutes: interval,
-        createdBy: user.isHardcodedAdmin ? null : user.id,
+        createdBy: user.id,
     });
 
     if (!created) {

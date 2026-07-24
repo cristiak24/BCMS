@@ -119,7 +119,10 @@ export function createServerApp() {
             callback(new Error(`CORS blocked origin: ${origin}`));
         },
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-User-Id', 'X-User-Uid', 'X-User-Role', 'X-User-Club-Id'],
+        // Identity is proven by the Firebase ID token in `Authorization` only.
+        // The old `X-User-*` headers are no longer read by the server and are
+        // deliberately not allowed through CORS either.
+        allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
         exposedHeaders: ['Content-Length', 'Content-Type'],
     }));
     app.post('/api/finance/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);

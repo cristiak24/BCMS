@@ -27,7 +27,7 @@ export default function ThemedCheckbox({
             }`}
             style={{ width: size, height: size }}
         >
-            {checked && <Check size={Math.round(size * 0.62)} color="#ffffff" strokeWidth={3.5} />}
+            {checked && <Check size={Math.round(size * 0.62)} color="var(--c-surface)" strokeWidth={3.5} />}
         </Pressable>
     );
 }

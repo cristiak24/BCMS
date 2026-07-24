@@ -11,7 +11,8 @@
     "deploy": "npm run build:web && firebase deploy --only hosting,functions",
     "seed:superadmin": "tsx scripts/seedSuperadmin.ts",
     "functions:build": "npm run build --workspace=firebase/functions",
-    "functions:deploy": "npm run build --workspace=firebase/functions && firebase deploy --only functions"
+    "functions:deploy": "npm run build --workspace=firebase/functions && firebase deploy --only functions",
+    "test": "npm run test --workspace=apps/server && npm run test --workspace=apps/client"
   },
   "devDependencies": {
     "ajv": "^6.15.0",

@@ -9,7 +9,7 @@ export const theme = {
     blue: 'var(--c-blue)',
     sky: 'var(--c-sky)',
     accent: 'var(--c-sky)',
-    accentDark: '#0369A1',
+    accentDark: 'var(--c-sky)',
     glow: '#7DD3FC',
     mint: 'var(--c-success)',
     red: 'var(--c-danger)',
@@ -34,7 +34,7 @@ export const theme = {
         boxShadow: '0 18px 45px rgba(11, 30, 61, 0.08)',
       } as any,
       default: {
-        shadowColor: '#0B1E3D',
+        shadowColor: 'var(--c-brand-surface-deep)',
         shadowOffset: { width: 0, height: 12 },
         shadowOpacity: 0.1,
         shadowRadius: 22,
@@ -46,7 +46,7 @@ export const theme = {
         boxShadow: '0 22px 55px rgba(29, 62, 144, 0.16)',
       } as any,
       default: {
-        shadowColor: '#1D3E90',
+        shadowColor: 'var(--c-brand-fg)',
         shadowOffset: { width: 0, height: 14 },
         shadowOpacity: 0.18,
         shadowRadius: 24,

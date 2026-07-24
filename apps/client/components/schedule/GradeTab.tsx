@@ -472,7 +472,7 @@ export function GradeTab() {
                           </View>
                         ) : null}
                         <View className={`${graded ? 'bg-emerald-50 border-emerald-100' : 'bg-[#1D3E90] border-[#1D3E90]'} border px-5 py-3 rounded-2xl flex-row items-center justify-center`}>
-                          <UserCheck size={16} color={graded ? 'var(--c-success-fg)' : '#FFFFFF'} />
+                          <UserCheck size={16} color={graded ? 'var(--c-success-fg)' : 'var(--c-surface)'} />
                           <Text className={`${graded ? 'text-emerald-700' : 'text-white'} text-[10px] font-black uppercase tracking-widest ml-2`}>
                             {graded ? 'Notat' : 'Notează'}
                           </Text>

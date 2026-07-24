@@ -19,7 +19,7 @@ const EVENT_TYPE_OPTIONS = [
 ] as const;
 const REPEAT_DAY_LABELS = ['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'];
 
-const InlineSpinner = ({ color = '#FFFFFF' }: { color?: string }) => (
+const InlineSpinner = ({ color = 'var(--c-surface)' }: { color?: string }) => (
   <View
     className="w-7 h-7 rounded-full items-center justify-center"
     style={{ backgroundColor: color === 'var(--c-surface)' ? 'rgba(255,255,255,0.18)' : 'rgba(29,62,144,0.1)' }}
@@ -182,7 +182,7 @@ export function AddEventModal({
                     <View style={{ height: isMobile ? 256 : 420 }} className="relative p-7 justify-between">
                       <View className="flex-row justify-between items-start">
                         <View className="w-14 h-14 rounded-2xl bg-white/15 border border-white/20 items-center justify-center">
-                          <Dumbbell color="#FFFFFF" size={24} />
+                          <Dumbbell color="var(--c-surface)" size={24} />
                         </View>
                         <View className="bg-white/15 border border-white/20 px-4 py-2 rounded-full">
                           <Text className="text-white font-black text-[10px] uppercase tracking-widest">{selectedEventTypeLabel}</Text>
@@ -470,7 +470,7 @@ export function AddEventModal({
                   </View>
                 ) : (
                   <View className="flex-row items-center">
-                    <Send color="#FFFFFF" size={18} />
+                    <Send color="var(--c-surface)" size={18} />
                     <Text className="text-white font-black text-base ml-3">Publică evenimentul</Text>
                   </View>
                 )}
@@ -630,7 +630,7 @@ export function AddEventModal({
                       >
                         <View className="flex-row items-center">
                           <View className={`w-10 h-10 rounded-2xl items-center justify-center mr-3 ${selected ? 'bg-[#1D3E90]' : 'bg-slate-50'}`}>
-                            <Dumbbell size={18} color={selected ? '#FFFFFF' : 'var(--c-faint)'} />
+                            <Dumbbell size={18} color={selected ? 'var(--c-surface)' : 'var(--c-faint)'} />
                           </View>
                           <Text className={`font-black text-base ${selected ? 'text-[#1D3E90]' : 'text-slate-700'}`}>{option.label}</Text>
                         </View>
@@ -653,7 +653,7 @@ export function AddEventModal({
                       >
                         <View className="flex-row items-center flex-1">
                           <View className={`w-10 h-10 rounded-2xl items-center justify-center mr-3 ${selected ? 'bg-[#1D3E90]' : 'bg-slate-50'}`}>
-                            <MapPin size={18} color={selected ? '#FFFFFF' : 'var(--c-faint)'} />
+                            <MapPin size={18} color={selected ? 'var(--c-surface)' : 'var(--c-faint)'} />
                           </View>
                           <Text numberOfLines={1} className={`font-black text-base flex-1 ${selected ? 'text-[#1D3E90]' : 'text-slate-700'}`}>{location}</Text>
                         </View>
@@ -682,7 +682,7 @@ export function AddEventModal({
                         >
                           <View className="flex-row items-center flex-1">
                             <View className={`w-10 h-10 rounded-2xl items-center justify-center mr-3 ${selected ? 'bg-[#1D3E90]' : 'bg-slate-50'}`}>
-                              <Users size={18} color={selected ? '#FFFFFF' : 'var(--c-faint)'} />
+                              <Users size={18} color={selected ? 'var(--c-surface)' : 'var(--c-faint)'} />
                             </View>
                             <Text numberOfLines={1} className={`font-black text-base flex-1 ${selected ? 'text-[#1D3E90]' : 'text-slate-700'}`}>{team.name}</Text>
                           </View>

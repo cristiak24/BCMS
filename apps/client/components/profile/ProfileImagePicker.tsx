@@ -126,9 +126,9 @@ export default function ProfileImagePicker({
 
       <View className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-[#1D3E90] border-2 border-white items-center justify-center shadow-md">
         {uploading ? (
-          <ActivityIndicator size="small" color="#ffffff" />
+          <ActivityIndicator size="small" color="var(--c-surface)" />
         ) : (
-          <MaterialIcons name="photo-camera" size={18} color="#ffffff" />
+          <MaterialIcons name="photo-camera" size={18} color="var(--c-surface)" />
         )}
       </View>
     </Pressable>

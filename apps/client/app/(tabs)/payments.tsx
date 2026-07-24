@@ -378,7 +378,7 @@ function PlayerPaymentsScreen() {
                   className={`h-[72px] rounded-full bg-[#173EC1] items-center justify-center ${(!payableFees.length || !summary?.stripe.configured) ? 'opacity-50' : ''}`}
                 >
                   {actionTarget === 'all' ? (
-                    <ActivityIndicator color="#FFFFFF" />
+                    <ActivityIndicator color="var(--c-surface)" />
                   ) : (
                     <Text className="text-white text-2xl font-black">Pay All</Text>
                   )}

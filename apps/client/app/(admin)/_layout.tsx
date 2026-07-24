@@ -15,16 +15,46 @@ const MOBILE_NAV_ITEMS = [
     { href: '/admin/schedule' as const, label: 'Schedule', icon: 'calendar-today' as const, match: 'schedule' },
 ];
 
+/**
+ * Titles for admin screens that intentionally have no sidebar entry (detail
+ * pages and sub-flows reached from another screen).
+ *
+ * Without this, `getActiveAdminItem` fell through to `ADMIN_MENU_ITEMS[0]` and
+ * every one of these pages was labelled "Dashboard" in the header.
+ */
+const ADMIN_SECTION_TITLES: { prefix: string; label: string }[] = [
+    { prefix: '/admin/create-account', label: 'Create Account' },
+    { prefix: '/admin/create-club-admin', label: 'Create Club Admin' },
+    { prefix: '/admin/team/', label: 'Team Details' },
+    { prefix: '/admin/player/', label: 'Player Details' },
+    { prefix: '/admin/event/', label: 'Event Details' },
+    { prefix: '/admin/attendance/', label: 'Attendance' },
+    { prefix: '/admin/users/', label: 'User Details' },
+];
+
 function getAdminPath(pathname: string) {
     return pathname || '/admin/dashboard';
 }
 
 function getActiveAdminItem(pathname: string) {
     const normalizedPathname = getAdminPath(pathname);
-    return ADMIN_MENU_ITEMS.find((item) => {
-        const cleanHref = item.href;
-        return normalizedPathname.startsWith(cleanHref) || (cleanHref === '/admin/dashboard' && normalizedPathname === '/admin');
-    }) ?? ADMIN_MENU_ITEMS[0];
+
+    // Longest matching href wins, so /admin/users/12 does not match /admin/users
+    // before the more specific detail-page title below.
+    const menuMatch = ADMIN_MENU_ITEMS
+        .filter((item) => normalizedPathname.startsWith(item.href)
+            || (item.href === '/admin/dashboard' && normalizedPathname === '/admin'))
+        .sort((a, b) => b.href.length - a.href.length)[0];
+
+    const sectionMatch = ADMIN_SECTION_TITLES
+        .filter((section) => normalizedPathname.startsWith(section.prefix))
+        .sort((a, b) => b.prefix.length - a.prefix.length)[0];
+
+    if (sectionMatch && (!menuMatch || sectionMatch.prefix.length > menuMatch.href.length)) {
+        return { label: sectionMatch.label, href: sectionMatch.prefix };
+    }
+
+    return menuMatch ?? ADMIN_MENU_ITEMS[0];
 }
 
 // Split into two components so HeaderProvider wraps the consumer.

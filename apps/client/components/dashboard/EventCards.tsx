@@ -98,8 +98,8 @@ export function NextEventCard({
           <View className="flex-row flex-wrap gap-2 mb-2.5">
             {meta ? (
               <View className="rounded-full px-2.5 py-1 flex-row items-center gap-1" style={{ backgroundColor: 'rgba(14,165,233,0.1)' }}>
-                <MaterialIcons name="sports-basketball" size={11} color="#0284C7" />
-                <Text className="text-[9px] font-bold uppercase tracking-[0.06em]" style={{ color: '#0284C7' }}>
+                <MaterialIcons name="sports-basketball" size={11} color="var(--c-sky)" />
+                <Text className="text-[9px] font-bold uppercase tracking-[0.06em]" style={{ color: 'var(--c-sky)' }}>
                   {meta}
                 </Text>
               </View>
@@ -139,7 +139,7 @@ export function NextEventCard({
             style={{ backgroundImage: dash.gradients.heroInk, backgroundColor: dash.ink } as any}
           >
             <Text className="text-white text-[12px] font-semibold mr-1.5">{ctaLabel}</Text>
-            <MaterialIcons name="arrow-forward" size={15} color="#FFFFFF" />
+            <MaterialIcons name="arrow-forward" size={15} color="var(--c-surface)" />
           </View>
         </View>
       </View>

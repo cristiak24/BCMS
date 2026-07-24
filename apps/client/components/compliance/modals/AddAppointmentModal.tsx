@@ -146,7 +146,7 @@ export default function AddAppointmentModal({ visible, onClose, preSelectedPlaye
                                const isSelected = selectedTeamIds.includes(t.id);
                                return (
                                  <Pressable key={t.id} onPress={() => toggleTeam(t.id)} className={`px-3 py-2 rounded-[14px] flex-row items-center border ${isSelected ? 'bg-[#1D3E90] border-[#1D3E90]' : 'bg-gray-50 border-gray-200'}`}>
-                                     <Users size={12} color={isSelected ? '#ffffff' : 'var(--c-faint)'} />
+                                     <Users size={12} color={isSelected ? 'var(--c-surface)' : 'var(--c-faint)'} />
                                      <Text className={`text-[12px] ml-2 font-bold ${isSelected ? 'text-white' : 'text-[#0D2040]'}`}>{t.name}</Text>
                                  </Pressable>
                                );
@@ -212,7 +212,7 @@ export default function AddAppointmentModal({ visible, onClose, preSelectedPlaye
                   value={isSpecificPlayers} 
                   onValueChange={setIsSpecificPlayers} 
                   trackColor={{ false: 'var(--c-border-strong)', true: 'var(--c-brand-fg)' }}
-                  thumbColor="#ffffff"
+                  thumbColor="var(--c-surface)"
                 />
               </View>
 

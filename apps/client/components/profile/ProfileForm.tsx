@@ -136,10 +136,10 @@ export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
             className={`min-w-[180px] rounded-2xl px-5 py-4 flex-row items-center justify-center ${saving ? 'bg-[#8FA3D8]' : 'bg-[#1D3E90]'}`}
           >
             {saving ? (
-              <ActivityIndicator color="#ffffff" />
+              <ActivityIndicator color="var(--c-surface)" />
             ) : (
               <>
-                <MaterialIcons name="save" size={18} color="#ffffff" />
+                <MaterialIcons name="save" size={18} color="var(--c-surface)" />
                 <Text className="text-white font-black text-[12px] uppercase tracking-widest ml-2">Save Changes</Text>
               </>
             )}

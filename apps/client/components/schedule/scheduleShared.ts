@@ -21,11 +21,11 @@ export const EVENT_TYPE_META: Record<EventType, {
   onSoft: string;
   onSolid: string;
 }> = {
-  match: { label: 'Meci', solid: '#1D3E90', border: '#0F3A8A', soft: '#EAF2FF', onSoft: '#1D3E90', onSolid: '#FFFFFF' },
-  training: { label: 'Antrenament', solid: '#0EA5E9', border: '#1D9CE8', soft: '#E1F1FF', onSoft: '#0A5EA8', onSolid: '#FFFFFF' },
-  camp: { label: 'Cantonament', solid: '#7C3AED', border: '#7C3AED', soft: '#F1E8FF', onSoft: '#6D28D9', onSolid: '#FFFFFF' },
-  medical: { label: 'Vizită medicală', solid: '#0E9F6E', border: '#0B7A55', soft: '#E6F8F1', onSoft: '#0B7A55', onSolid: '#FFFFFF' },
-  admin: { label: 'Administrativ', solid: '#475569', border: '#64748B', soft: '#F1F5F9', onSoft: '#475569', onSolid: '#FFFFFF' },
+  match: { label: 'Meci', solid: 'var(--c-brand-fg)', border: '#0F3A8A', soft: 'var(--c-surface-tint)', onSoft: 'var(--c-brand-fg)', onSolid: 'var(--c-surface)' },
+  training: { label: 'Antrenament', solid: 'var(--c-sky)', border: '#1D9CE8', soft: '#E1F1FF', onSoft: '#0A5EA8', onSolid: 'var(--c-surface)' },
+  camp: { label: 'Cantonament', solid: 'var(--c-purple)', border: 'var(--c-purple)', soft: '#F1E8FF', onSoft: 'var(--c-purple)', onSolid: 'var(--c-surface)' },
+  medical: { label: 'Vizită medicală', solid: '#0E9F6E', border: 'var(--c-success-fg)', soft: 'var(--c-success-bg)', onSoft: 'var(--c-success-fg)', onSolid: 'var(--c-surface)' },
+  admin: { label: 'Administrativ', solid: 'var(--c-ink-soft)', border: 'var(--c-muted)', soft: 'var(--c-surface-3)', onSoft: 'var(--c-ink-soft)', onSolid: 'var(--c-surface)' },
 };
 
 export function getEventTypeMeta(type: EventType) {

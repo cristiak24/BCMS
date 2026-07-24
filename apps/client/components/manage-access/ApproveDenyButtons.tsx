@@ -23,7 +23,7 @@ export default function ApproveDenyButtons({ disabled, approving, denying, onApp
                 disabled={disabled || approving || denying}
                 className={`flex-1 rounded-2xl px-4 py-3 items-center justify-center ${disabled ? 'bg-[#1D4ED8]/60' : 'bg-[#1D4ED8]'}`}
             >
-                {approving ? <ActivityIndicator color="#FFFFFF" /> : <Text className="font-bold text-white">Approve</Text>}
+                {approving ? <ActivityIndicator color="var(--c-surface)" /> : <Text className="font-bold text-white">Approve</Text>}
             </Pressable>
         </View>
     );

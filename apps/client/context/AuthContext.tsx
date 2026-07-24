@@ -19,7 +19,7 @@ import {
   type AuthUser,
   type UserRole,
 } from '../utils/authSession';
-import { apiFetch } from '../services/apiClient';
+import { apiFetch, setUnauthorizedHandler } from '../services/apiClient';
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Types
@@ -213,6 +213,16 @@ export function FirebaseAuthProvider({ children }: PropsWithChildren) {
     setSession(null);
     await clearAuthSession();
   }, []);
+
+  // Tear the session down as soon as the backend says the credentials are no
+  // longer good (token revoked, account deactivated), instead of leaving the
+  // user in a shell that fails every request it makes.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      void signOut();
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [signOut]);
 
   const value = useMemo<FirebaseAuthContextValue>(
     () => ({ user, session, initializing, reloadSession, signOut }),

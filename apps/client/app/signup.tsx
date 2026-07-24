@@ -126,7 +126,7 @@ export default function Signup() {
   };
 
   if (initializing) {
-    return <LoadingScreen message="Checking your session..." backgroundColor="#FFFFFF" color="var(--c-blue)" />;
+    return <LoadingScreen message="Checking your session..." backgroundColor="var(--c-surface)" color="var(--c-blue)" />;
   }
 
   return (
@@ -142,7 +142,7 @@ export default function Signup() {
       >
         <View className="flex-1 px-4 py-10 items-center justify-center">
           <LinearGradient
-            colors={['var(--c-surface-tint)', 'var(--c-surface-2)', '#FFFFFF']}
+            colors={['var(--c-surface-tint)', 'var(--c-surface-2)', 'var(--c-surface)']}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
             style={StyleSheet.absoluteFillObject}
@@ -153,7 +153,7 @@ export default function Signup() {
               {/* Header */}
               <View className="items-center mb-6">
                 <View className="w-16 h-16 rounded-lg bg-blue-700 items-center justify-center mb-4">
-                  <MaterialIcons name="person-add-alt-1" size={30} color="#FFFFFF" />
+                  <MaterialIcons name="person-add-alt-1" size={30} color="var(--c-surface)" />
                 </View>
                 <Text className="text-3xl font-black text-slate-900 text-center">Create Account</Text>
                 <Text className="text-slate-500 text-center mt-2 text-sm">
@@ -294,7 +294,7 @@ export default function Signup() {
                                 <MaterialIcons
                                   name={option.icon}
                                   size={20}
-                                  color={active ? '#FFFFFF' : 'var(--c-muted)'}
+                                  color={active ? 'var(--c-surface)' : 'var(--c-muted)'}
                                 />
                               </View>
                               <View className="flex-1">

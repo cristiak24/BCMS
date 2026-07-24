@@ -41,9 +41,9 @@ export function useToasts() {
 }
 
 const VARIANT_META: Record<ToastVariant, { icon: typeof Info; fg: string; bg: string; border: string }> = {
-    success: { icon: CheckCircle2, fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)', border: '#B7E9CF' },
-    error: { icon: AlertTriangle, fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)', border: '#FDA29B' },
-    info: { icon: Info, fg: 'var(--c-brand-fg)', bg: 'var(--c-surface-tint)', border: '#BFD4FE' },
+    success: { icon: CheckCircle2, fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)', border: 'var(--c-success)' },
+    error: { icon: AlertTriangle, fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)', border: 'var(--c-danger)' },
+    info: { icon: Info, fg: 'var(--c-brand-fg)', bg: 'var(--c-surface-tint)', border: 'var(--c-brand-border)' },
 };
 
 function ToastItem({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: number) => void }) {
@@ -86,14 +86,24 @@ function ToastItem({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: num
     );
 }
 
-/** Fixed bottom-center stack of active toasts. Render once near the page root. */
+/**
+ * Fixed bottom-center stack of active toasts. Render once near the page root.
+ *
+ * The region is a live region so screen readers announce results (saved, failed,
+ * undo available) that were previously only conveyed visually. `assertive` is
+ * reserved for errors — successes should not interrupt what is being read.
+ */
 export function ToastHost({ toasts, onDismiss }: { toasts: ToastData[]; onDismiss: (id: number) => void }) {
-    if (toasts.length === 0) return null;
+    const hasError = toasts.some((toast) => toast.variant === 'error');
+
     return (
         <View
             className="fixed left-1/2 bottom-6 z-[100] flex-col gap-2.5 items-center"
             style={{ transform: 'translateX(-50%)' as any }}
             pointerEvents="box-none"
+            accessibilityRole={hasError ? 'alert' : 'status'}
+            aria-live={hasError ? 'assertive' : 'polite'}
+            aria-atomic="false"
         >
             {toasts.map((toast) => (
                 <ToastItem key={toast.id} toast={toast} onDismiss={onDismiss} />

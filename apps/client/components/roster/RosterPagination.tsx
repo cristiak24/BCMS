@@ -146,6 +146,6 @@ const styles = StyleSheet.create({
     color: dash.inkSoft,
   },
   pageLabelActive: {
-    color: '#FFFFFF',
+    color: 'var(--c-surface)',
   },
 });

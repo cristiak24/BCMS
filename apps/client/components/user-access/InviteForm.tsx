@@ -151,9 +151,9 @@ export default function InviteForm({ onInviteCreated }: Props) {
           className={`rounded-2xl px-5 py-4 flex-row items-center justify-center ${submitting ? 'bg-blue-500' : 'bg-blue-700'}`}
         >
           {submitting ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color="var(--c-surface)" />
           ) : (
-            <MaterialIcons name="send" size={18} color="#FFFFFF" />
+            <MaterialIcons name="send" size={18} color="var(--c-surface)" />
           )}
           <Text className="text-white font-black uppercase tracking-[0.2em] text-[11px] ml-2">
             {submitting ? 'Sending invite' : 'Send admin invite'}

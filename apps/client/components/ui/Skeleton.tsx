@@ -10,9 +10,22 @@ type SkeletonProps = {
     className?: string;
 };
 
-/** A single shimmering block. Size/shape is controlled via `className`. */
+/**
+ * A single shimmering block. Size/shape is controlled via `className`.
+ *
+ * The fill is token-driven rather than a fixed `bg-slate-200`, which stayed a
+ * bright light-grey slab on dark backgrounds. `aria-hidden` keeps the loading
+ * scaffold out of the accessibility tree — the surrounding region announces the
+ * loading state instead.
+ */
 export function Skeleton({ className }: SkeletonProps) {
-    return <View className={`bg-slate-200/80 rounded-lg animate-pulse ${className ?? ''}`} />;
+    return (
+        <View
+            aria-hidden="true"
+            className={`rounded-lg animate-pulse ${className ?? ''}`}
+            style={{ backgroundColor: 'var(--c-surface-3)' }}
+        />
+    );
 }
 
 /** Placeholder that mirrors an account / request card layout. */
@@ -38,7 +51,7 @@ export function SkeletonCard() {
 /** Renders `count` card skeletons with consistent spacing. */
 export function SkeletonList({ count = 3 }: { count?: number }) {
     return (
-        <View className="gap-4">
+        <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă...">
             {Array.from({ length: count }).map((_, index) => (
                 <SkeletonCard key={index} />
             ))}

@@ -6,6 +6,7 @@ import Stripe from 'stripe';
 import { admin, firestore, nextNumericId, toDate, toIso } from '../lib/firebaseAdmin';
 import { requireRequestUser } from '../lib/requestContext';
 import { normalizeRole } from '../lib/requestAuth';
+import { authenticate } from '../middleware/auth';
 import { db } from '../db';
 import {
     events as pgEvents,
@@ -20,6 +21,13 @@ import {
 import { desc, eq, inArray, sql } from 'drizzle-orm';
 
 const router = Router();
+
+// Every finance endpoint requires a verified Firebase ID token. Per-route checks
+// below narrow this further (admin/accountant vs. the player's own data). The
+// Stripe webhook is mounted separately in app.ts, before this router, because it
+// authenticates via the Stripe signature instead.
+router.use(authenticate);
+
 const DEFAULT_STRIPE_PUBLISHABLE_KEY = 'pk_test_51TP7NnCFpLYWSHx5i7EAuPRWUXgoP0lxHFIqDIGvyQOpNIbu4VOg2IMg7H8LW5HgTslJVudDxe3xnGXgRIubcVbA00swDdrRS0';
 const DEFAULT_PAYMENT_CURRENCY = (process.env.STRIPE_CURRENCY || 'ron').trim().toLowerCase();
 const FINANCE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;

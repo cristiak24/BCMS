@@ -23,7 +23,7 @@ export default function AuraButton({ label, loading, variant = 'primary', classN
         >
             {variant === 'primary' ? (
                 <LinearGradient
-                    colors={['#1e3a8a', '#0ea5e9']}
+                    colors={['#1e3a8a', 'var(--c-sky)']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     className="min-h-[52px] rounded-lg items-center justify-center w-full shadow-blue-500/30 px-5"
@@ -35,9 +35,9 @@ export default function AuraButton({ label, loading, variant = 'primary', classN
                         </View>
                     ) : (
                         <View className="flex-row items-center justify-center gap-2">
-                            {iconName ? <MaterialIcons name={iconName} size={19} color="#FFFFFF" /> : null}
+                            {iconName ? <MaterialIcons name={iconName} size={19} color="var(--c-surface)" /> : null}
                             <Text className="font-bold text-base text-white text-center">{label}</Text>
-                            <MaterialIcons name="arrow-forward" size={19} color="#FFFFFF" />
+                            <MaterialIcons name="arrow-forward" size={19} color="var(--c-surface)" />
                         </View>
                     )}
                 </LinearGradient>

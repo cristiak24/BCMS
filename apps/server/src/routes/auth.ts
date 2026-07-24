@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { ensureDefaultClub } from '../lib/manageAccessRepository';
 import { splitDisplayName, verifyPassword } from '../lib/password';
 import { authenticate, requireSuperadmin, AuthenticatedRequest } from '../middleware/auth';
+import { rateLimit } from '../middleware/rateLimit';
 import { acceptInvitation, createSuperAdminInvitation, validateInvitationToken } from '../services/invitationsService';
 import { createPendingAccessRequestForSignup, validateInviteToken } from '../lib/manageAccessService';
 import { loadServerEnv } from '../lib/loadEnv';
@@ -155,7 +156,7 @@ async function sendForgotPasswordEmail(email: string, resetLink: string, name?: 
 // POST /api/auth/legacy-login
 // Bridges existing DB-password accounts into Firebase Auth without forcing
 // users through a manual password reset first.
-router.post('/legacy-login', async (req: AuthenticatedRequest, res: any) => {
+router.post('/legacy-login', rateLimit({ bucket: 'auth:legacy-login', limit: 10, windowMs: 5 * 60_000 }), async (req: AuthenticatedRequest, res: any) => {
     try {
         const email = normalizeEmail(String(req.body?.email ?? ''));
         const password = String(req.body?.password ?? '');
@@ -224,7 +225,15 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res: any) => {
     }
 });
 
-router.post('/forgot-password', async (req: AuthenticatedRequest, res: any) => {
+// The response here is deliberately identical whether or not an account exists.
+// Returning "no account with this email" turned this endpoint into a free user
+// enumeration oracle for anyone who wanted to harvest valid club addresses.
+const FORGOT_PASSWORD_ACK = {
+    success: true,
+    message: 'Daca exista un cont cu acest email, vei primi un link de resetare.',
+};
+
+router.post('/forgot-password', rateLimit({ bucket: 'auth:forgot-password', limit: 5, windowMs: 15 * 60_000 }), async (req: AuthenticatedRequest, res: any) => {
     try {
         const email = normalizeEmail(String(req.body?.email ?? ''));
         if (!email) {
@@ -239,12 +248,10 @@ router.post('/forgot-password', async (req: AuthenticatedRequest, res: any) => {
 
         const existingUser = existingUsers[0];
 
-        if (!existingUser) {
-            return res.status(404).json({ error: 'Nu exista niciun cont creat cu acest email.' });
-        }
-
-        if (existingUser.status === 'disabled') {
-            return res.status(403).json({ error: 'Contul este dezactivat. Contacteaza administratorul clubului.' });
+        // Unknown or deactivated account: acknowledge without sending anything and
+        // without telling the caller which of the two it was.
+        if (!existingUser || existingUser.status === 'disabled') {
+            return res.json(FORGOT_PASSWORD_ACK);
         }
 
         let firebaseUserRecord;
@@ -286,10 +293,7 @@ router.post('/forgot-password', async (req: AuthenticatedRequest, res: any) => {
 
         await sendForgotPasswordEmail(email, resetLink, existingUser.firstName ?? existingUser.name ?? null);
 
-        res.json({
-            success: true,
-            message: 'Password reset email sent successfully.',
-        });
+        res.json(FORGOT_PASSWORD_ACK);
     } catch (error) {
         console.error('Forgot password error:', error);
         res.status(500).json({ error: 'Nu am putut trimite emailul de resetare a parolei.' });

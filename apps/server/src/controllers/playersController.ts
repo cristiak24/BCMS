@@ -3,6 +3,7 @@ import { db } from '../db';
 import { players, teams, playersToTeams, attendance, playerPayments, users } from '../db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { buildPlayerUpdate } from '../lib/playerUpdate';
 
 const DEFAULT_PAYMENT_CURRENCY = (process.env.STRIPE_CURRENCY || 'ron').trim().toLowerCase();
 
@@ -478,14 +479,12 @@ export const playersController = {
                 if (!await isPlayerAllowedForRequest(req, p)) return res.status(403).json({ error: 'Access denied' });
             }
 
-            const updateData: Partial<typeof players.$inferInsert> = { ...req.body };
-            if (req.body.medicalCheckExpiry) {
-                updateData.medicalCheckExpiry = new Date(String(req.body.medicalCheckExpiry)).toISOString();
+            const update = buildPlayerUpdate(req.body);
+            if (!update.ok) {
+                return res.status(400).json({ error: update.error });
             }
 
-            delete (updateData as any).id;
-
-            const [updated] = await db.update(players).set(updateData).where(eq(players.id, playerId)).returning();
+            const [updated] = await db.update(players).set(update.data).where(eq(players.id, playerId)).returning();
             res.json(updated);
         } catch (error) {
             console.error('Update player error:', error);

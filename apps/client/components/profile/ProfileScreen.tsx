@@ -35,7 +35,7 @@ function AppearanceCard() {
               accessibilityLabel={`Use ${opt.label} theme`}
               className={`flex-1 items-center justify-center rounded-2xl px-3 py-4 border ${active ? 'bg-[#1D3E90] border-[#1D3E90]' : 'bg-[#F8FAFC] border-slate-100'}`}
             >
-              <MaterialIcons name={opt.icon} size={22} color={active ? '#FFFFFF' : 'var(--c-muted)'} />
+              <MaterialIcons name={opt.icon} size={22} color={active ? 'var(--c-surface)' : 'var(--c-muted)'} />
               <Text className={`text-[12px] font-black mt-2 ${active ? 'text-white' : 'text-[#64748B]'}`}>{opt.label}</Text>
             </Pressable>
           );
@@ -276,52 +276,59 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
             accessibilityRole="button"
             accessibilityLabel="Logout"
           >
-            <MaterialIcons name="logout" size={18} color="#ffffff" />
+            <MaterialIcons name="logout" size={18} color="var(--c-surface)" />
             <Text className="ml-2 text-white font-black uppercase tracking-widest text-[11px]">
               {isMobile ? 'Exit' : 'Logout'}
             </Text>
           </Pressable>
         </View>
 
-        <View className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden mb-6">
-          <View className="h-24 bg-[#1D3E90]" />
-          <View className="px-6 pb-6 pt-6">
-            <View className={`${isMobile ? 'items-start' : 'flex-row items-end justify-between'} gap-4`}>
-              <View className="flex-row items-end gap-4 pt-6">
-                <View className="-mt-12">
+        <View className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden mb-5">
+          {/* Slim brand accent strip instead of the old 96px empty navy band. */}
+          <View className="h-2" style={{ backgroundColor: 'var(--c-brand-surface)' }} />
+          <View className="px-5 md:px-6 py-5">
+            <View className={`${isMobile ? 'items-start' : 'flex-row items-center justify-between'} gap-4`}>
+              <View className={`${isMobile ? 'items-start' : 'flex-row items-center'} gap-4 min-w-0`}>
                 <ProfileImagePicker
                   avatarUrl={profile.avatarUrl}
                   initials={getInitials(profile)}
                   onUploaded={handleAvatarUploaded}
                   onError={(message) => Alert.alert('Avatar upload', message)}
                 />
-                </View>
-                <View className="pb-1">
-                  <View className="flex-row items-center gap-2 mb-2 flex-wrap">
-                    <View className="bg-[#EBF1FF] px-3 py-1 rounded-full">
-                      <Text className="text-[#1D3E90] text-[10px] font-black uppercase tracking-widest">{profile.role}</Text>
+                <View className="min-w-0">
+                  <View className="flex-row items-center gap-2 mb-1.5 flex-wrap">
+                    <View className="px-2.5 py-0.5 rounded-full" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+                      <Text className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--c-brand-fg)' }}>{profile.role}</Text>
                     </View>
-                    <View className="bg-emerald-50 px-3 py-1 rounded-full">
-                      <Text className="text-emerald-700 text-[10px] font-black uppercase tracking-widest">{profile.status}</Text>
+                    <View className="px-2.5 py-0.5 rounded-full" style={{ backgroundColor: 'var(--c-success-bg)' }}>
+                      <Text className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--c-success-fg)' }}>{profile.status}</Text>
                     </View>
                   </View>
-                  <Text className={`text-[#0E2041] ${isMobile ? 'text-2xl' : 'text-3xl'} font-black leading-tight`} numberOfLines={2}>
+                  <Text className={`${isMobile ? 'text-2xl' : 'text-[26px]'} font-bold leading-tight`} style={{ color: 'var(--c-ink-strong)' }} numberOfLines={2}>
                     {profile.fullName || profile.name}
                   </Text>
-                  <Text className="text-slate-500 font-semibold mt-1" numberOfLines={1}>
+                  {/* break-anywhere: long emails must wrap, not clip. This was the
+                      profile "email cut off" bug — numberOfLines={1} truncated it. */}
+                  <Text className="text-[14px] font-medium mt-0.5 break-anywhere" style={{ color: 'var(--c-muted)' }}>
                     {profile.email}
                   </Text>
-                  <Text className="text-slate-400 text-sm mt-1">
-                    {headerSubtitle || 'No club or team assigned'}
-                  </Text>
+                  {headerSubtitle ? (
+                    <Text className="text-[13px] mt-0.5" style={{ color: 'var(--c-faint)' }}>
+                      {headerSubtitle}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
 
-              <View className="bg-[#F8FAFC] rounded-3xl border border-slate-100 px-4 py-3">
-                <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">Member since</Text>
-                <Text className="text-[#0E2041] font-bold mt-1">{formatDate(profile.createdAt)}</Text>
-                <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-3">Last login</Text>
-                <Text className="text-[#0E2041] font-bold mt-1">{formatDate(profile.lastLoginAt)}</Text>
+              <View className={`flex-row gap-2 ${isMobile ? 'w-full' : ''}`}>
+                <View className={`${isMobile ? 'flex-1' : ''} rounded-[12px] border px-3.5 py-2.5`} style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}>
+                  <Text className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-faint)' }}>Membru din</Text>
+                  <Text className="font-semibold mt-0.5 text-[13px]" style={{ color: 'var(--c-ink)' }}>{formatDate(profile.createdAt)}</Text>
+                </View>
+                <View className={`${isMobile ? 'flex-1' : ''} rounded-[12px] border px-3.5 py-2.5`} style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}>
+                  <Text className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-faint)' }}>Ultima logare</Text>
+                  <Text className="font-semibold mt-0.5 text-[13px]" style={{ color: 'var(--c-ink)' }}>{formatDate(profile.lastLoginAt)}</Text>
+                </View>
               </View>
             </View>
           </View>
@@ -336,21 +343,21 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
             <AppearanceCard />
             <PasswordChangeForm onChangePassword={handlePasswordChange} />
 
-            <View className="bg-white rounded-[28px] p-6 border border-slate-100 shadow-sm">
-              <Text className="text-[#0E2041] text-[12px] font-black uppercase tracking-widest mb-4">Account Details</Text>
-              <View className="flex-row flex-wrap gap-3">
+            {/* Account Details — only the fields NOT already shown in the header
+                (which carries name, email, role, status, member-since, last
+                login). Repeating all seven was the "we don't use the whole
+                page" bloat; this keeps just the workspace context. */}
+            <View className="bg-white rounded-[20px] p-5 border border-slate-100 shadow-sm">
+              <Text className="text-[12px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--c-muted)' }}>Cont</Text>
+              <View className="flex-row flex-wrap gap-2.5">
                 {[
                   { label: 'Email', value: profile.email },
-                  { label: 'Role', value: profile.role },
-                  { label: 'Club', value: profile.clubName ?? 'Not assigned' },
-                  { label: 'Team', value: profile.teamName ?? 'Not assigned' },
-                  { label: 'Status', value: profile.status },
-                  { label: 'Member since', value: formatDate(profile.createdAt) },
-                  { label: 'Last login', value: formatDate(profile.lastLoginAt) },
+                  { label: 'Club', value: profile.clubName ?? 'Neatribuit' },
+                  { label: 'Echipă', value: profile.teamName ?? 'Neatribuit' },
                 ].map((item) => (
-                  <View key={item.label} className="min-w-[150px] flex-1 bg-[#F8FAFC] rounded-2xl px-4 py-3 border border-slate-100">
-                    <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">{item.label}</Text>
-                    <Text className="text-[#0E2041] font-semibold mt-1" numberOfLines={2}>{item.value}</Text>
+                  <View key={item.label} className="min-w-[150px] flex-1 rounded-[12px] px-3.5 py-2.5 border" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}>
+                    <Text className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-faint)' }}>{item.label}</Text>
+                    <Text className="font-medium mt-0.5 text-[13px] break-anywhere" style={{ color: 'var(--c-ink)' }}>{item.value}</Text>
                   </View>
                 ))}
               </View>

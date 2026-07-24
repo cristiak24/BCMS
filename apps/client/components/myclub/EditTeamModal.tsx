@@ -137,7 +137,7 @@ export default function EditTeamModal({
                         disabled={saving}
                         className={`flex-1 h-[50px] rounded-[14px] items-center justify-center ${saving ? 'bg-[#93C5FD]' : 'bg-[#1D3E90]'}`}
                     >
-                        {saving ? <ActivityIndicator size="small" color="#ffffff" /> : <Text className="text-white font-black uppercase tracking-widest text-[12px]">Salvează</Text>}
+                        {saving ? <ActivityIndicator size="small" color="var(--c-surface)" /> : <Text className="text-white font-black uppercase tracking-widest text-[12px]">Salvează</Text>}
                     </Pressable>
                 </View>
             </Pressable>

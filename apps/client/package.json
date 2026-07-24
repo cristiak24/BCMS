@@ -7,7 +7,8 @@
     "build:web": "vite build",
     "preview": "vite preview",
     "deploy": "npm run build:web && cd ../.. && firebase deploy --only hosting",
-    "lint": "vite build"
+    "lint": "vite build",
+    "test": "tsx --test \"utils/**/*.test.ts\""
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.2",

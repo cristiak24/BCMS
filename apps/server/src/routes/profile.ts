@@ -3,8 +3,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { eq } from 'drizzle-orm';
-import { getRequestUser } from '../lib/requestContext';
-import { isDemoAdmin } from '../lib/requestAuth';
+import { requireRequestUser } from '../lib/requestContext';
+import { authenticate } from '../middleware/auth';
 import { toIso } from '../lib/firebaseAdmin';
 import { db } from '../db';
 import { clubs, players, playersToTeams, teams, users } from '../db/schema';
@@ -16,6 +16,12 @@ type NotificationPreferences = {
 };
 
 const router = Router();
+
+// Defence in depth: `requireRequestUser` already verifies the bearer token in
+// every handler, but rejecting unauthenticated calls at the router boundary
+// means a future handler cannot forget to do so.
+router.use(authenticate);
+
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED_AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const ALLOWED_AVATAR_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
@@ -53,13 +59,13 @@ async function findUserByNumericId(userId: number) {
     return rows[0] ?? null;
 }
 
-async function resolveProfileRecord(userId: number, reqClubId: string | undefined) {
+async function resolveProfileRecord(userId: number) {
     const user = await findUserByNumericId(userId);
     if (!user) {
         return null;
     }
 
-    const clubId = user.clubId ?? (reqClubId ? Number(reqClubId) : null);
+    const clubId = user.clubId ?? null;
     const clubRows = clubId == null
         ? []
         : await db.select({ name: clubs.name }).from(clubs).where(eq(clubs.id, clubId)).limit(1);
@@ -120,41 +126,13 @@ async function resolveProfileRecord(userId: number, reqClubId: string | undefine
 
 router.get('/me', async (req, res) => {
     try {
-        const requestUser = await getRequestUser(req);
+        const requestUser = await requireRequestUser(req, res);
 
         if (!requestUser) {
-            return res.status(401).json({ error: 'Not authenticated' });
+            return;
         }
 
-        if (requestUser.isHardcodedAdmin || (requestUser.id === 0 && isDemoAdmin(req))) {
-            const clubId = requestUser.clubId ?? (req.header('x-user-club-id') ? Number(req.header('x-user-club-id')) : null);
-            const clubRows = clubId == null
-                ? []
-                : await db.select({ name: clubs.name }).from(clubs).where(eq(clubs.id, clubId)).limit(1);
-            const clubName = clubRows[0]?.name ?? null;
-
-            return res.json({
-                id: 0,
-                email: 'admin@test.com',
-                name: 'Admin User',
-                firstName: 'Admin',
-                lastName: 'User',
-                fullName: 'Admin User',
-                role: 'admin',
-                status: 'processed',
-                clubId,
-                clubName,
-                teamName: null,
-                avatarUrl: null,
-                phone: null,
-                preferredLanguage: null,
-                notificationPreferences: { email: true, push: true, sms: false },
-                createdAt: null,
-                lastLoginAt: null,
-            });
-        }
-
-        const profile = await resolveProfileRecord(requestUser.id, req.header('x-user-club-id'));
+        const profile = await resolveProfileRecord(requestUser.id);
 
         if (!profile) {
             return res.status(404).json({ error: 'Profile not found' });
@@ -169,28 +147,40 @@ router.get('/me', async (req, res) => {
 
 router.patch('/me', async (req, res) => {
     try {
-        const requestUser = await getRequestUser(req);
+        const requestUser = await requireRequestUser(req, res);
 
         if (!requestUser) {
-            return res.status(401).json({ error: 'Not authenticated' });
+            return;
         }
 
-        if (requestUser.isHardcodedAdmin || (requestUser.id === 0 && isDemoAdmin(req))) {
-            return res.status(400).json({ error: 'Demo admin profile cannot be edited from the database-backed profile endpoint.' });
-        }
-
-        const { firstName, lastName, phone, preferredLanguage, notificationPreferences } = req.body as {
+        const { firstName, lastName, phone, preferredLanguage } = req.body as {
             firstName?: string;
             lastName?: string;
             phone?: string | null;
             preferredLanguage?: string | null;
-            notificationPreferences?: NotificationPreferences | null;
         };
 
         const trimmedFirstName = typeof firstName === 'string' ? firstName.trim() : undefined;
         const trimmedLastName = typeof lastName === 'string' ? lastName.trim() : undefined;
         const trimmedPhone = typeof phone === 'string' ? phone.trim() : phone === null ? null : undefined;
         const trimmedLanguage = typeof preferredLanguage === 'string' ? preferredLanguage.trim() : preferredLanguage === null ? null : undefined;
+
+        // Reject junk before it reaches the database: these values are rendered
+        // back into the UI and used in emails, so unbounded strings are not ok.
+        for (const [label, value, max] of [
+            ['firstName', trimmedFirstName, 80],
+            ['lastName', trimmedLastName, 80],
+            ['phone', trimmedPhone, 32],
+            ['preferredLanguage', trimmedLanguage, 16],
+        ] as const) {
+            if (typeof value === 'string' && value.length > max) {
+                return res.status(400).json({ error: `${label} must be at most ${max} characters.` });
+            }
+        }
+
+        if (typeof trimmedPhone === 'string' && trimmedPhone && !/^[+()\d\s-]{6,32}$/.test(trimmedPhone)) {
+            return res.status(400).json({ error: 'Phone number format is invalid.' });
+        }
 
         const existingUser = await findUserByNumericId(requestUser.id);
         if (!existingUser) {
@@ -211,7 +201,7 @@ router.patch('/me', async (req, res) => {
             updatedAt: new Date().toISOString(),
         }).where(eq(users.id, requestUser.id));
 
-        const profile = await resolveProfileRecord(requestUser.id, req.header('x-user-club-id'));
+        const profile = await resolveProfileRecord(requestUser.id);
         return res.json(profile);
     } catch (error) {
         console.error('[PATCH /api/profile/me] error:', error);
@@ -235,14 +225,13 @@ router.post('/me/avatar', (req, res, next) => {
     });
 }, async (req, res) => {
     try {
-        const requestUser = await getRequestUser(req);
+        const requestUser = await requireRequestUser(req, res);
 
         if (!requestUser) {
-            return res.status(401).json({ error: 'Not authenticated' });
-        }
-
-        if (requestUser.isHardcodedAdmin || (requestUser.id === 0 && isDemoAdmin(req))) {
-            return res.status(400).json({ error: 'Demo admin avatar cannot be changed from the database-backed profile endpoint.' });
+            if (req.file) {
+                fs.unlink(req.file.path, () => {});
+            }
+            return;
         }
 
         if (!req.file) {

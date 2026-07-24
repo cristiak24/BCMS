@@ -13,6 +13,7 @@ import {
 import { eventsApi, CalendarEvent } from '../../../services/eventsApi';
 import { teamsApi, Team, Player } from '../../../services/teamsApi';
 import { useResponsive } from '../../../hooks/useResponsive';
+import { ToastHost, useToasts } from '../../../components/ui/Toast';
 
 type TabFilter = 'All Players' | 'Starters' | 'Injured Reserve';
 type AttendanceStatus = 'present' | 'absent' | 'medical';
@@ -38,6 +39,7 @@ export default function AttendanceScreen() {
 
   const [hasChanges, setHasChanges] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toasts, showToast, dismissToast } = useToasts();
 
   useEffect(() => {
     async function loadData() {
@@ -100,10 +102,13 @@ export default function AttendanceScreen() {
       const updatedEvent = await eventsApi.updateEvent(event.id, { status: 'graded' });
       setEvent(updatedEvent);
       setHasChanges(false);
-      alert('Prezența și notele au fost salvate.');
+      showToast({ message: 'Prezența și notele au fost salvate.', variant: 'success' });
     } catch (err) {
       console.error('Submit failed', err);
-      alert('Salvarea a eșuat. Încearcă din nou.');
+      showToast({
+        message: err instanceof Error ? err.message : 'Salvarea a eșuat. Încearcă din nou.',
+        variant: 'error',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -373,6 +378,8 @@ export default function AttendanceScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </View>
   );
 }
@@ -456,7 +463,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontWeight: '900',
-    color: '#0B1B42',
+    color: 'var(--c-brand-surface-deep)',
   },
   headerSubtitle: {
     fontSize: 13,
@@ -706,7 +713,7 @@ const styles = StyleSheet.create({
   },
   playerName: {
     fontWeight: '900',
-    color: '#0B1B42',
+    color: 'var(--c-brand-surface-deep)',
   },
   playerMeta: {
     fontSize: 11,

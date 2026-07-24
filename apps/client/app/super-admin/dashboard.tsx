@@ -60,7 +60,7 @@ export default function SuperAdminDashboardScreen() {
                     <Text className="text-[#102A72] font-black text-[16px]">{club.name}</Text>
                     <Text className="text-[#7483A6] text-[12px] mt-1">{club.userCount} users • {club.adminCount} admins</Text>
                   </View>
-                  <MaterialIcons name="chevron-right" size={22} color="#8AA0D0" />
+                  <MaterialIcons name="chevron-right" size={22} color="var(--c-faint)" />
                 </View>
               </View>
             ))}
