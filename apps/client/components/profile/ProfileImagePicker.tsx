@@ -77,13 +77,13 @@ export default function ProfileImagePicker({
           };
         }
       } catch {
-        onError?.('Media library access is required to update the profile photo.');
+        onError?.('Accesul la galeria media este necesar pentru a actualiza fotografia de profil.');
         return;
       }
     }
 
     if (!asset) {
-      onError?.('Unable to read the selected image.');
+      onError?.('Imaginea selectată nu a putut fi citită.');
       return;
     }
 
@@ -104,7 +104,7 @@ export default function ProfileImagePicker({
       const response = await profileApi.uploadAvatar(formData);
       onUploaded(response.avatarUrl);
     } catch (error) {
-      onError?.(error instanceof Error ? error.message : 'Failed to upload avatar.');
+      onError?.(error instanceof Error ? error.message : 'Nu s-a putut încărca avatarul.');
     } finally {
       setUploading(false);
     }

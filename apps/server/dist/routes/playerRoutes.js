@@ -10,6 +10,8 @@ router.get('/roster/summary', playersController_1.playersController.getRosterSum
 router.get('/roster', playersController_1.playersController.getRoster);
 router.post('/payment-reminders', playersController_1.playersController.sendPaymentReminders);
 router.delete('/:id/roster', playersController_1.playersController.removeFromRoster);
+// Must come before /:id — otherwise "me" would be parsed as a numeric id.
+router.get('/me', playersController_1.playersController.getMe);
 router.get('/:id', playersController_1.playersController.getPlayerById);
 router.post('/add-to-team', playersController_1.playersController.addPlayerToTeam);
 router.put('/:id', playersController_1.playersController.updatePlayer);

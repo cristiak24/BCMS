@@ -169,12 +169,12 @@ export function GradeTab() {
   ];
 
   const renderSummaryCard = (label: string, value: number, icon: React.ReactNode, tone: string) => (
-    <View className={`flex-1 min-w-[150px] rounded-[24px] p-5 border ${tone}`}>
+    <View className={`rounded-[14px] p-3.5 border ${tone}`}>
       <View className="flex-row items-center justify-between">
-        <Text className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</Text>
+        <Text className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</Text>
         {icon}
       </View>
-      <Text className="text-[32px] font-black text-[#0E2041] mt-3">{value}</Text>
+      <Text className="text-[22px] font-bold text-[#0E2041] mt-2 tabular">{value}</Text>
     </View>
   );
 
@@ -212,40 +212,40 @@ export function GradeTab() {
     <View className="flex-1 bg-[#EDF4FB]">
       <View className={`${isMobile ? 'px-4 pt-5' : 'px-8 pt-8'} w-full`}>
         <View className="w-full max-w-[1180px] self-center">
-          <View className={`bg-[#123A97] rounded-[32px] p-6 md:p-8 shadow-xl border border-white/40 mb-6 ${isMobile ? 'gap-5' : 'flex-row items-end justify-between'}`}>
+          {/* Compact header on the page background (was a 32px navy slab that
+              repeated the section title and pushed content down). */}
+          <View className={`mb-4 ${isMobile ? 'gap-3' : 'flex-row items-center justify-between'}`}>
             <View className="flex-1">
-              <Text className={`${isMobile ? 'text-[32px]' : 'text-[40px]'} font-black text-white tracking-tight leading-tight`}>
+              <Text className="text-[22px] md:text-[26px] font-bold tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }}>
                 Centru de notare
               </Text>
-              <Text className="text-[#D6E6FF] text-[14px] font-semibold mt-2">
-                Notează antrenamentele și meciurile trecute, apoi revizuiește sesiunile notate.
+              <Text className="text-[13px] font-medium mt-1" style={{ color: 'var(--c-muted)' }}>
+                Notează sesiunile trecute și revizuiește-le pe cele notate.
               </Text>
             </View>
 
-            <View className={`flex-row items-center bg-white/10 rounded-[18px] p-1 border border-white/20 ${isMobile ? 'self-start' : ''}`}>
+            <View className="flex-row items-center rounded-[10px] p-[3px] self-start border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
               <TouchableOpacity
                 onPress={() => setCurrentDate(new Date(viewYear, viewMonth - 1, 1))}
-                className="w-10 h-10 items-center justify-center rounded-[14px]"
+                className="w-8 h-8 items-center justify-center rounded-[8px]"
               >
-                <ChevronLeft size={18} color="var(--c-tint-fg)" />
+                <ChevronLeft size={16} color="var(--c-ink-soft)" />
               </TouchableOpacity>
-
-              <View className="px-4 py-2 rounded-[14px] bg-white shadow-sm justify-center">
-                <Text className="text-[11px] font-black tracking-widest uppercase text-[#123A97]">
+              <View className="px-3 h-8 justify-center">
+                <Text className="text-[12px] font-semibold tracking-wide uppercase" style={{ color: 'var(--c-ink)' }}>
                   {RO_MONTHS[viewMonth]} {viewYear}
                 </Text>
               </View>
-
               <TouchableOpacity
                 onPress={() => setCurrentDate(new Date(viewYear, viewMonth + 1, 1))}
-                className="w-10 h-10 items-center justify-center rounded-[14px]"
+                className="w-8 h-8 items-center justify-center rounded-[8px]"
               >
-                <ChevronRight size={18} color="var(--c-tint-fg)" />
+                <ChevronRight size={16} color="var(--c-ink-soft)" />
               </TouchableOpacity>
             </View>
           </View>
 
-          <View className="flex-row flex-wrap gap-4 mb-6">
+          <View className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
             {renderSummaryCard('De notat', pendingEvents.length, <Star size={18} color="var(--c-warning)" />, 'bg-amber-50 border-amber-100')}
             {renderSummaryCard('Notate', gradedEvents.length, <CheckCircle2 size={18} color="var(--c-success-fg)" />, 'bg-emerald-50 border-emerald-100')}
             {renderSummaryCard('Antrenamente', trainingCount, <CalendarDays size={18} color="var(--c-brand-fg)" />, 'bg-white border-[#DDE7F5]')}

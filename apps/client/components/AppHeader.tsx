@@ -1,10 +1,13 @@
-import { ActivityIndicator, Image, Modal, Pressable, Text, TextInput, View } from '@/src/web/reactNative';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Text, TextInput, View } from '@/src/web/reactNative';
 import { useRouter } from '@/src/web/expoRouter';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { theme } from '../constants/designSystem';
 import { useFirebaseAuth } from '../context/AuthContext';
+import { useNotifications } from '../hooks/useNotifications';
+import { formatRelativeDate } from './myclub/teamDisplay';
+import type { AppNotification } from '../services/notificationsApi';
 
 type AppHeaderProps = {
   title: string;
@@ -41,10 +44,34 @@ export default function AppHeader({
   const { signOut } = useFirebaseAuth();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  // Mobile search is collapsed to an icon by default and expands to a full
+  // input row on tap, reclaiming the ~55px the always-on search bar used to
+  // cost on every screen.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const { unreadCount, notifications, loading: notificationsLoading, loadNotifications, markAsRead, markAllAsRead } = useNotifications();
 
   const openProfile = () => {
     setProfileMenuOpen(false);
     router.push('/profile');
+  };
+
+  const openNotifications = () => {
+    setNotificationsOpen(true);
+    loadNotifications();
+  };
+
+  const handleNotificationPress = (notification: AppNotification) => {
+    if (!notification.isRead) {
+      markAsRead(notification.id);
+    }
+    setNotificationsOpen(false);
+    // There is no deep-linkable per-event route on the player side (schedule
+    // detail opens as an in-page modal, not a URL) — send them to the tab
+    // that lists the event instead.
+    if (notification.eventId != null) {
+      router.push('/schedule');
+    }
   };
 
   const handleLogout = async () => {
@@ -63,58 +90,107 @@ export default function AppHeader({
   if (mobile) {
     return (
       <View
-        className="flex lg:hidden bg-[#F8FBFF] px-4 pb-3 z-10 w-full border-b border-[#DDE7F5]"
-        style={{ paddingTop: Math.max(topInset + 8, 18) }}
+        className="flex lg:hidden px-4 pb-3 z-10 w-full border-b"
+        style={{ paddingTop: Math.max(topInset + 8, 16), backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
       >
-        <View className="flex-row justify-between items-center">
-          <View className="flex-row items-center gap-3 flex-1 min-w-0">
+        {searchOpen ? (
+          // Search MODE — replaces the whole header row rather than adding a
+          // second one, so the search costs zero extra vertical space when
+          // it's not in use (the request: reclaim the always-on search bar).
+          <View className="flex-row items-center gap-2">
             <Pressable
-              onPress={() => setProfileMenuOpen(true)}
-              className="w-11 h-11 rounded-[18px] overflow-hidden items-center justify-center bg-[#E0F2FE] border border-white"
-              style={theme.shadow.card}
+              onPress={() => setSearchOpen(false)}
+              className="w-10 h-10 items-center justify-center rounded-[12px]"
               accessibilityRole="button"
-              accessibilityLabel="Open profile actions"
+              accessibilityLabel="Închide căutarea"
             >
-              {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} className="w-full h-full" />
-              ) : (
-                <Text className="font-black text-[#0369A1]">{initials}</Text>
-              )}
+              <MaterialIcons name="arrow-back" size={22} color={theme.colors.ink} />
             </Pressable>
-            <View className="flex-1 min-w-0">
-              <Text className="text-[#94A3B8] text-[10px] font-black uppercase tracking-widest">{subtitle}</Text>
-              <Text className="text-[#07152F] font-black text-[19px] tracking-tight leading-tight" numberOfLines={1}>
-                {title}
-              </Text>
+            <View className="flex-1 flex-row items-center rounded-[12px] px-3 h-11 border" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
+              <MaterialIcons name="search" size={20} color={theme.colors.faint} />
+              {/* No autoFocus: opening the field should NOT force the keyboard
+                  up — the user taps the field when they want to type. Font is
+                  16px so iOS Safari doesn't zoom the page on focus. */}
+              <TextInput
+                placeholder={searchPlaceholder}
+                value={searchValue}
+                onChangeText={onSearchChange}
+                className="flex-1 ml-2.5 text-[16px] font-medium outline-none"
+                style={{ color: 'var(--c-ink)' } as any}
+                placeholderTextColor={theme.colors.faint}
+                returnKeyType="search"
+              />
+              {searchValue.length > 0 ? (
+                <Pressable onPress={() => onSearchChange('')} accessibilityLabel="Golește căutarea" className="w-6 h-6 items-center justify-center">
+                  <MaterialIcons name="close" size={18} color={theme.colors.muted} />
+                </Pressable>
+              ) : null}
             </View>
           </View>
+        ) : (
+          <View className="flex-row justify-between items-center">
+            <View className="flex-row items-center gap-3 flex-1 min-w-0">
+              <Pressable
+                onPress={() => setProfileMenuOpen(true)}
+                className="w-10 h-10 rounded-[12px] overflow-hidden items-center justify-center border"
+                style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-border)' } as any}
+                accessibilityRole="button"
+                accessibilityLabel="Open profile actions"
+              >
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} className="w-full h-full" />
+                ) : (
+                  <Text className="font-black" style={{ color: 'var(--c-brand-fg)' }}>{initials}</Text>
+                )}
+              </Pressable>
+              <View className="flex-1 min-w-0">
+                <Text className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-faint)' }}>{subtitle}</Text>
+                <Text className="font-black text-[18px] tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }} numberOfLines={1}>
+                  {title}
+                </Text>
+              </View>
+            </View>
 
-          <View className="flex-row items-center gap-2">
-            <Pressable className="relative w-10 h-10 items-center justify-center rounded-[16px] bg-white border border-[#E5ECF6]">
-              <MaterialIcons name="notifications" size={21} color={theme.colors.navy} />
-              <View className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-[#38BDF8] rounded-full border-2 border-white" />
-            </Pressable>
-            <Pressable
-              onPress={onOpenMenu}
-              className="w-10 h-10 items-center justify-center rounded-[16px] bg-[#0B1E3D]"
-              accessibilityRole="button"
-              accessibilityLabel="Open navigation menu"
-            >
-              <MaterialIcons name="menu" size={23} color="var(--c-surface)" />
-            </Pressable>
+            <View className="flex-row items-center gap-1.5">
+              <Pressable
+                onPress={() => setSearchOpen(true)}
+                className="relative w-10 h-10 items-center justify-center rounded-[12px] border"
+                style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
+                accessibilityRole="button"
+                accessibilityLabel="Caută"
+              >
+                <MaterialIcons name="search" size={21} color={theme.colors.muted} />
+                {/* Dot signals an active search while the field is collapsed. */}
+                {searchValue.length > 0 ? (
+                  <View className="absolute top-2 right-2 w-2 h-2 rounded-full border-2" style={{ backgroundColor: 'var(--c-brand-surface)', borderColor: 'var(--c-surface)' } as any} />
+                ) : null}
+              </Pressable>
+              <Pressable
+                onPress={openNotifications}
+                className="relative w-10 h-10 items-center justify-center rounded-[12px] border"
+                style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
+                accessibilityRole="button"
+                accessibilityLabel="Notificări"
+              >
+                <MaterialIcons name="notifications" size={20} color={theme.colors.muted} />
+                {unreadCount > 0 ? (
+                  <View className="absolute top-2 right-2 w-2 h-2 rounded-full border-2" style={{ backgroundColor: 'var(--c-sky)', borderColor: 'var(--c-surface)' } as any} />
+                ) : null}
+              </Pressable>
+              {onOpenMenu ? (
+                <Pressable
+                  onPress={onOpenMenu}
+                  className="w-10 h-10 items-center justify-center rounded-[12px]"
+                  style={{ backgroundColor: 'var(--c-brand-surface-deep)' } as any}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open navigation menu"
+                >
+                  <MaterialIcons name="menu" size={22} color="#FFFFFF" />
+                </Pressable>
+              ) : null}
+            </View>
           </View>
-        </View>
-
-        <View className="mt-3 flex-row items-center bg-white rounded-[18px] px-4 h-11 border border-[#DDE7F5]">
-          <MaterialIcons name="search" size={20} color={theme.colors.faint} />
-          <TextInput
-            placeholder={searchPlaceholder}
-            value={searchValue}
-            onChangeText={onSearchChange}
-            className="flex-1 ml-3 text-[14px] font-semibold text-[#0E2041] outline-none"
-            placeholderTextColor={theme.colors.faint}
-          />
-        </View>
+        )}
         <ProfileActionsMenu
           visible={profileMenuOpen}
           onClose={() => setProfileMenuOpen(false)}
@@ -125,6 +201,16 @@ export default function AppHeader({
           initials={initials}
           userName={userName}
           role={role}
+          mobile
+          topInset={topInset}
+        />
+        <NotificationsPanel
+          visible={notificationsOpen}
+          onClose={() => setNotificationsOpen(false)}
+          notifications={notifications}
+          loading={notificationsLoading}
+          onPressNotification={handleNotificationPress}
+          onMarkAllAsRead={markAllAsRead}
           mobile
           topInset={topInset}
         />
@@ -152,9 +238,17 @@ export default function AppHeader({
       </View>
 
       <View className="flex-row items-center gap-2.5">
-        <Pressable className="relative w-9 h-9 items-center justify-center rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
+        <Pressable
+          onPress={openNotifications}
+          className="relative w-9 h-9 items-center justify-center rounded-[10px] border"
+          style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
+          accessibilityRole="button"
+          accessibilityLabel="Notificări"
+        >
           <MaterialIcons name="notifications" size={19} color={theme.colors.muted} />
-          <View className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--c-sky)' }} />
+          {unreadCount > 0 ? (
+            <View className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--c-sky)' }} />
+          ) : null}
         </Pressable>
         <Pressable className="w-9 h-9 items-center justify-center rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
           <MaterialIcons name="help-outline" size={19} color={theme.colors.muted} />
@@ -188,6 +282,14 @@ export default function AppHeader({
         initials={initials}
         userName={userName}
         role={role}
+      />
+      <NotificationsPanel
+        visible={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+        notifications={notifications}
+        loading={notificationsLoading}
+        onPressNotification={handleNotificationPress}
+        onMarkAllAsRead={markAllAsRead}
       />
     </View>
   );
@@ -280,6 +382,99 @@ function ProfileActionsMenu({
               </Text>
             </Pressable>
           </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function NotificationsPanel({
+  visible,
+  onClose,
+  notifications,
+  loading,
+  onPressNotification,
+  onMarkAllAsRead,
+  mobile = false,
+  topInset = 0,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  notifications: AppNotification[];
+  loading: boolean;
+  onPressNotification: (notification: AppNotification) => void;
+  onMarkAllAsRead: () => void;
+  mobile?: boolean;
+  topInset?: number;
+}) {
+  const hasUnread = notifications.some((n) => !n.isRead);
+
+  return (
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+      <Pressable className="flex-1 bg-black/10" onPress={onClose}>
+        <Pressable
+          onPress={(event) => event.stopPropagation()}
+          className="absolute rounded-[24px] border overflow-hidden"
+          style={[
+            theme.shadow.card,
+            { backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any,
+            mobile
+              ? { top: Math.max(topInset + 66, 82), left: 16, right: 16, maxHeight: '70%' }
+              : { top: 66, right: 24, width: 340, maxHeight: 440 },
+          ]}
+        >
+          <View className="px-4 py-3.5 border-b flex-row items-center justify-between" style={{ borderColor: 'var(--c-border)' } as any}>
+            <Text className="text-[14px] font-black" style={{ color: 'var(--c-ink-strong)' }}>Notificări</Text>
+            {hasUnread ? (
+              <Pressable onPress={onMarkAllAsRead} accessibilityRole="button">
+                <Text className="text-[12px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>Marchează toate ca citite</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: mobile ? undefined : 380 }}>
+            {loading && notifications.length === 0 ? (
+              <View className="py-10 items-center justify-center">
+                <ActivityIndicator size="small" color="var(--c-brand-fg)" />
+              </View>
+            ) : notifications.length === 0 ? (
+              <View className="py-10 px-4 items-center justify-center">
+                <MaterialIcons name="notifications-none" size={28} color={theme.colors.faint} />
+                <Text className="text-[13px] font-semibold mt-2" style={{ color: 'var(--c-muted)' }}>
+                  Nu ai nicio notificare
+                </Text>
+              </View>
+            ) : (
+              <View className="p-2">
+                {notifications.map((notification) => (
+                  <Pressable
+                    key={notification.id}
+                    onPress={() => onPressNotification(notification)}
+                    className="rounded-[16px] px-3 py-3 flex-row items-start gap-3"
+                    style={{ backgroundColor: notification.isRead ? 'transparent' : 'var(--c-surface-tint)' } as any}
+                  >
+                    <View className="w-9 h-9 rounded-[14px] items-center justify-center mt-0.5" style={{ backgroundColor: 'var(--c-surface-2)' } as any}>
+                      <MaterialIcons name="notifications" size={17} color="var(--c-brand-fg)" />
+                    </View>
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-[13px] font-black" style={{ color: 'var(--c-ink-strong)' }} numberOfLines={1}>
+                        {notification.title}
+                      </Text>
+                      <Text className="text-[12.5px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
+                        {notification.message}
+                      </Text>
+                      <Text className="text-[10.5px] font-bold mt-1" style={{ color: 'var(--c-faint)' }}>
+                        {formatRelativeDate(notification.createdAt)}
+                      </Text>
+                    </View>
+                    {!notification.isRead ? (
+                      <View className="w-2 h-2 rounded-full mt-1.5" style={{ backgroundColor: 'var(--c-sky)' } as any} />
+                    ) : null}
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>

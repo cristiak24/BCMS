@@ -19,6 +19,10 @@ const auditService_1 = require("../services/auditService");
 const rateLimit_1 = require("../middleware/rateLimit");
 const microCache_1 = require("../lib/microCache");
 const router = (0, express_1.Router)();
+// Roles that must never be demoted / deactivated from the club-admin screen —
+// this is what protects the club from an admin locking themselves (or the last
+// admin) out.
+const PRIVILEGED_ROLES = new Set(['admin', 'superadmin']);
 // Short-lived cache for the read-heavy accounts listing (invitation sync + a few
 // queries). Invalidated immediately on any mutation in this process.
 const ACCOUNTS_CACHE_TTL_MS = 15000;
@@ -41,6 +45,9 @@ const safeUserColumns = {
 };
 function normalizeClubAdminInviteRole(value) {
     return value === 'coach' || value === 'player' ? value : null;
+}
+function normalizeClubAdminAssignableRole(value) {
+    return value === 'coach' || value === 'player' || value === 'parent' ? value : null;
 }
 function ensureClubAdmin(req, res) {
     if (!req.user) {
@@ -129,18 +136,23 @@ router.post('/accounts/invitations', (0, rateLimit_1.rateLimit)({ bucket: 'club-
     }
 }));
 router.patch('/accounts/:id', (0, rateLimit_1.rateLimit)({ bucket: 'club-admin:mutate', limit: 30, windowMs: 60000 }), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const actor = ensureClubAdmin(req, res);
     if (!actor) {
         return;
     }
     const id = Number(req.params.id);
-    const nextRole = normalizeClubAdminInviteRole((_a = req.body) === null || _a === void 0 ? void 0 : _a.role);
+    const nextRole = normalizeClubAdminAssignableRole((_a = req.body) === null || _a === void 0 ? void 0 : _a.role);
     if (Number.isNaN(id)) {
         return res.status(400).json({ error: 'Invalid user id.' });
     }
     if (!nextRole) {
-        return res.status(400).json({ error: 'Only coach and player roles can be assigned from club admin.' });
+        return res.status(400).json({ error: 'Only coach, player, and parent roles can be assigned from club admin.' });
+    }
+    // Self-guard: an admin changing their own role could drop their admin rights
+    // and lock themselves out of every admin route (a 403 on the next request).
+    if (((_b = req.user) === null || _b === void 0 ? void 0 : _b.id) === id) {
+        return res.status(400).json({ error: 'You cannot change your own role from this screen.' });
     }
     try {
         const currentRows = yield db_1.db
@@ -152,6 +164,12 @@ router.patch('/accounts/:id', (0, rateLimit_1.rateLimit)({ bucket: 'club-admin:m
         if (!currentUser) {
             return res.status(404).json({ error: 'User not found in your club.' });
         }
+        // Never demote another admin/superadmin from this screen. Combined with the
+        // self-guard above, this guarantees the club can never lose its last admin
+        // through a role change.
+        if (PRIVILEGED_ROLES.has(currentUser.role)) {
+            return res.status(403).json({ error: 'Admin accounts cannot be reassigned from this screen.' });
+        }
         const updated = yield db_1.db.update(schema_1.users).set({
             role: nextRole,
             updatedAt: new Date().toISOString(),
@@ -160,9 +178,9 @@ router.patch('/accounts/:id', (0, rateLimit_1.rateLimit)({ bucket: 'club-admin:m
             action: 'club_admin.user_role_updated',
             entityType: 'user',
             entityId: id,
-            actorUserId: (_c = (_b = req.user) === null || _b === void 0 ? void 0 : _b.id) !== null && _c !== void 0 ? _c : null,
-            actorUid: (_e = (_d = req.firebaseUser) === null || _d === void 0 ? void 0 : _d.uid) !== null && _e !== void 0 ? _e : null,
-            actorRole: (_g = (_f = req.user) === null || _f === void 0 ? void 0 : _f.role) !== null && _g !== void 0 ? _g : null,
+            actorUserId: (_d = (_c = req.user) === null || _c === void 0 ? void 0 : _c.id) !== null && _d !== void 0 ? _d : null,
+            actorUid: (_f = (_e = req.firebaseUser) === null || _e === void 0 ? void 0 : _e.uid) !== null && _f !== void 0 ? _f : null,
+            actorRole: (_h = (_g = req.user) === null || _g === void 0 ? void 0 : _g.role) !== null && _h !== void 0 ? _h : null,
             clubId: actor.clubId,
             metadata: { previousRole: currentUser.role, nextRole },
         });
@@ -226,6 +244,11 @@ router.post('/accounts/:id/deactivate', (0, rateLimit_1.rateLimit)({ bucket: 'cl
         if (!targetUser) {
             return res.status(404).json({ error: 'User not found in your club.' });
         }
+        // Admin/superadmin accounts cannot be deactivated here — this prevents an
+        // admin from disabling the club's last admin and locking everyone out.
+        if (PRIVILEGED_ROLES.has(targetUser.role)) {
+            return res.status(403).json({ error: 'Admin accounts cannot be deactivated from this screen.' });
+        }
         const updated = yield db_1.db.update(schema_1.users).set({
             status: 'disabled',
             updatedAt: new Date().toISOString(),
@@ -246,6 +269,82 @@ router.post('/accounts/:id/deactivate', (0, rateLimit_1.rateLimit)({ bucket: 'cl
     catch (error) {
         console.error('Club admin deactivate account error:', error);
         res.status(500).json({ error: 'Could not update this account.' });
+    }
+}));
+router.post('/accounts/:id/resend', (0, rateLimit_1.rateLimit)({ bucket: 'club-admin:invite', limit: 10, windowMs: 60000 }), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const actor = ensureClubAdmin(req, res);
+    if (!actor) {
+        return;
+    }
+    const rawId = String(req.params.id);
+    if (!rawId.startsWith('invite-')) {
+        return res.status(400).json({ error: 'Only pending invitations can be resent.' });
+    }
+    const inviteId = Number(rawId.slice('invite-'.length));
+    if (Number.isNaN(inviteId)) {
+        return res.status(400).json({ error: 'Invalid invite id.' });
+    }
+    try {
+        const invitation = yield (0, invitationsService_1.resendClubInvitation)({ inviteId, clubId: actor.clubId }, {
+            user: req.user,
+            firebaseUser: req.firebaseUser,
+            ip: req.ip,
+            userAgent: (_a = req.get('user-agent')) !== null && _a !== void 0 ? _a : undefined,
+        });
+        (0, microCache_1.invalidate)(accountsCacheKey(actor.clubId));
+        res.json({ success: true, invitation });
+    }
+    catch (error) {
+        console.error('Club admin resend invitation error:', error);
+        const message = error instanceof Error ? error.message : 'Could not resend the invitation.';
+        const status = message.includes('not found') ? 404 : 400;
+        res.status(status).json({ error: message });
+    }
+}));
+router.post('/accounts/:id/reactivate', (0, rateLimit_1.rateLimit)({ bucket: 'club-admin:mutate', limit: 30, windowMs: 60000 }), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f;
+    const actor = ensureClubAdmin(req, res);
+    if (!actor) {
+        return;
+    }
+    try {
+        const id = Number(req.params.id);
+        if (Number.isNaN(id)) {
+            return res.status(400).json({ error: 'Invalid user id.' });
+        }
+        const userRows = yield db_1.db
+            .select()
+            .from(schema_1.users)
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, id), (0, drizzle_orm_1.eq)(schema_1.users.clubId, actor.clubId)))
+            .limit(1);
+        const targetUser = userRows[0];
+        if (!targetUser) {
+            return res.status(404).json({ error: 'User not found in your club.' });
+        }
+        if (targetUser.status !== 'disabled') {
+            return res.status(400).json({ error: 'Only deactivated accounts can be reactivated.' });
+        }
+        const updated = yield db_1.db.update(schema_1.users).set({
+            status: 'active',
+            updatedAt: new Date().toISOString(),
+        }).where((0, drizzle_orm_1.eq)(schema_1.users.id, id)).returning();
+        yield (0, auditService_1.writeAuditLog)({
+            action: 'club_admin.user_reactivated',
+            entityType: 'user',
+            entityId: id,
+            actorUserId: (_b = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id) !== null && _b !== void 0 ? _b : null,
+            actorUid: (_d = (_c = req.firebaseUser) === null || _c === void 0 ? void 0 : _c.uid) !== null && _d !== void 0 ? _d : null,
+            actorRole: (_f = (_e = req.user) === null || _e === void 0 ? void 0 : _e.role) !== null && _f !== void 0 ? _f : null,
+            clubId: actor.clubId,
+            metadata: { email: targetUser.email, role: targetUser.role },
+        });
+        (0, microCache_1.invalidate)(accountsCacheKey(actor.clubId));
+        res.json({ success: true, user: updated[0] });
+    }
+    catch (error) {
+        console.error('Club admin reactivate account error:', error);
+        res.status(500).json({ error: 'Could not reactivate this account.' });
     }
 }));
 exports.default = router;

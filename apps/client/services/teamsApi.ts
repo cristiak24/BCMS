@@ -1,5 +1,5 @@
 import { API_URL } from '../config/serverUrl';
-import { apiClient, apiFetch } from './apiClient';
+import { apiClient, apiFetch, ApiError } from './apiClient';
 
 const TEAMS_BASE_URL = '/teams';
 export { API_URL };
@@ -190,6 +190,17 @@ export const teamsApi = {
     async getPlayerById(id: number): Promise<Player> {
         const { data } = await apiClient.get<Player>(`/players/${id}`);
         return data;
+    },
+
+    /** Own player record (medical/compliance status, own team) — player/parent sessions only. */
+    async getMyPlayerRecord(): Promise<Player | null> {
+        try {
+            const { data } = await apiClient.get<Player>('/players/me');
+            return data;
+        } catch (error) {
+            if (error instanceof ApiError && error.status === 404) return null;
+            throw error;
+        }
     },
 
     async addPlayerToTeam(playerId: number, teamId: number): Promise<void> {

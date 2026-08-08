@@ -166,22 +166,21 @@ export default function ManageAccessScreen() {
         <View className="flex-1 bg-[#EDF4FB]">
             <ScrollView
                 className="flex-1"
-                contentContainerStyle={{ paddingTop: 40, paddingBottom: 120 }}
+                contentContainerStyle={{ paddingTop: 16, paddingBottom: 120 }}
                 showsVerticalScrollIndicator={false}
             >
-                <View className="w-full px-4 lg:px-10">
+                <View className="w-full px-4 lg:px-6">
                     <AdminHero
                         title="Manage Access"
-                        subtitle="Approve club access requests and generate role-based registration links."
-                        className="lg:flex-row lg:items-end lg:justify-between"
+                        subtitle="Aprobă cereri de acces și generează linkuri de înregistrare."
                     >
-                        <View className="mt-5 lg:mt-0 flex-row flex-wrap gap-3">
+                        <View className="flex-row flex-wrap gap-2">
                             <AdminMetricCard label="Pending" value={pendingCount} />
                             <AdminMetricCard label="Showing" value={filteredRequests.length} />
                         </View>
                     </AdminHero>
 
-                    <View className="gap-6">
+                    <View className="gap-4">
                         <View className="flex-row flex-wrap gap-3">
                             <AdminActionButton
                                 label="Manage Accounts"

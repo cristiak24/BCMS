@@ -149,30 +149,37 @@ export function AddEventModal({
             className={`bg-[#F4F7FC] shadow-2xl overflow-hidden ${isMobile ? 'rounded-t-[36px] max-h-[94%] w-full' : 'rounded-[36px] max-h-[92%] w-full'}`}
             style={isMobile ? undefined : { maxWidth: 1180 }}
           >
-            <View className={`${isMobile ? 'px-5 pt-5 pb-3' : 'px-10 pt-8 pb-5'} border-b border-white/80`}>
+            <View className={`${isMobile ? 'px-5 pt-4 pb-3' : 'px-10 pt-8 pb-5'} border-b`} style={{ borderColor: 'var(--c-border)' } as any}>
               <View className="flex-row justify-between items-start gap-4">
                 <View className="flex-1">
-                  <Text className="text-[12px] font-bold text-slate-400 mb-2">
-                    Program <Text className="text-slate-300">›</Text> <Text className="text-[#1D3E90]">Eveniment nou ({selectedEventTypeLabel.toLowerCase()})</Text>
+                  <Text className="text-[11px] font-semibold mb-1" style={{ color: 'var(--c-faint)' }}>
+                    Program › <Text style={{ color: 'var(--c-brand-fg)' }}>Eveniment nou ({selectedEventTypeLabel.toLowerCase()})</Text>
                   </Text>
-                  <Text className={`${isMobile ? 'text-3xl' : 'text-5xl'} font-black text-[#12309A]`}>Programează eveniment</Text>
-                  <Text className={`${isMobile ? 'text-sm' : 'text-lg'} text-slate-500 font-medium mt-2`}>
-                    Creează un antrenament, meci, cantonament sau eveniment intern de club.
-                  </Text>
+                  <Text className={`${isMobile ? 'text-[22px]' : 'text-[32px]'} font-bold`} style={{ color: 'var(--c-ink-strong)' }}>Programează eveniment</Text>
+                  {!isMobile && (
+                    <Text className="text-lg font-medium mt-2" style={{ color: 'var(--c-muted)' }}>
+                      Creează un antrenament, meci, cantonament sau eveniment intern de club.
+                    </Text>
+                  )}
                 </View>
                 <TouchableOpacity
                   onPress={() => { if (!addingEvent) onClose(); }}
                   disabled={addingEvent}
-                  className={`w-12 h-12 bg-white rounded-2xl items-center justify-center border border-slate-100 shadow-sm ${addingEvent ? 'opacity-60' : ''}`}
+                  className={`w-10 h-10 rounded-[12px] items-center justify-center border ${addingEvent ? 'opacity-60' : ''}`}
+                  style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
                 >
-                  <X color="var(--c-ink-soft)" size={22} />
+                  <X color="var(--c-ink-soft)" size={20} />
                 </TouchableOpacity>
               </View>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: isMobile ? 20 : 40, paddingTop: 24, paddingBottom: 28 }}>
               <View className={`${isMobile ? 'gap-6' : 'flex-row gap-8'}`}>
-                <View style={isMobile ? undefined : { width: 360 }} className="gap-5">
+                {/* Decorative live-preview + tips column. On mobile it pushed the
+                    actual form ~350px down the sheet, so it's desktop-only —
+                    the form is what a phone user came to fill in. */}
+                {!isMobile && (
+                <View style={{ width: 360 }} className="gap-5">
                   <LinearGradient
                     colors={['#111C3F', 'var(--c-brand-fg)', 'var(--c-sky)']}
                     start={{ x: 0, y: 0 }}
@@ -236,6 +243,7 @@ export function AddEventModal({
                     </View>
                   </View>
                 </View>
+                )}
 
                 <View className="flex-1 gap-6">
                   <View className="bg-white rounded-[32px] p-6 border border-white shadow-sm">

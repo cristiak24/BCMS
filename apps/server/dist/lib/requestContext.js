@@ -14,33 +14,18 @@ exports.requireRequestUser = requireRequestUser;
 exports.requireClubAdmin = requireClubAdmin;
 const requestAuth_1 = require("./requestAuth");
 const firebaseAdmin_1 = require("./firebaseAdmin");
-const firebaseAdmin_2 = require("./firebaseAdmin");
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
-const ADMIN_ROLES = new Set([
-    'admin',
-    'club_admin',
-    'club-admin',
-    'administrator',
-    'owner',
-    'superuser',
-]);
-function parseNumericHeader(value) {
-    if (!value) {
-        return null;
-    }
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-}
-function canUseFirestoreDocuments() {
-    var _a, _b, _c, _d;
-    return Boolean(((_a = process.env.FIREBASE_SERVICE_ACCOUNT_JSON) === null || _a === void 0 ? void 0 : _a.trim()) ||
-        (((_b = process.env.FIREBASE_CLIENT_EMAIL) === null || _b === void 0 ? void 0 : _b.trim()) && ((_c = process.env.FIREBASE_PRIVATE_KEY) === null || _c === void 0 ? void 0 : _c.trim())) ||
-        ((_d = process.env.GOOGLE_APPLICATION_CREDENTIALS) === null || _d === void 0 ? void 0 : _d.trim()) ||
-        process.env.K_SERVICE ||
-        process.env.FUNCTION_TARGET);
-}
+/**
+ * Resolve the caller from their Firebase ID token.
+ *
+ * This is the ONLY accepted proof of identity. An earlier revision also trusted
+ * `x-user-id` / `x-user-role` / `x-user-club-id` request headers as a fallback,
+ * which let any unauthenticated caller impersonate an arbitrary user (or mint a
+ * hardcoded admin with `x-user-id: 0`) simply by setting a header. Those headers
+ * are now ignored everywhere.
+ */
 function getBearerAuthenticatedUser(req) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a;
@@ -53,7 +38,7 @@ function getBearerAuthenticatedUser(req) {
             return null;
         }
         try {
-            const decodedToken = yield firebaseAdmin_2.firebaseAuth.verifyIdToken(token);
+            const decodedToken = yield firebaseAdmin_1.firebaseAuth.verifyIdToken(token);
             let userRows = yield db_1.db
                 .select()
                 .from(schema_1.users)
@@ -101,69 +86,7 @@ function getBearerAuthenticatedUser(req) {
 }
 function getRequestUser(req) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c;
-        const bearerUser = yield getBearerAuthenticatedUser(req);
-        if (bearerUser) {
-            return bearerUser;
-        }
-        const rawUserId = req.header('x-user-id');
-        const userId = parseNumericHeader(rawUserId);
-        const role = (0, requestAuth_1.normalizeRole)(req.header('x-user-role'));
-        const clubId = parseNumericHeader(req.header('x-user-club-id'));
-        if (userId == null || !role) {
-            return null;
-        }
-        if (userId === 0 && ADMIN_ROLES.has(role)) {
-            return {
-                id: 0,
-                email: 'admin@test.com',
-                name: 'Admin User',
-                role: 'admin',
-                clubId: clubId !== null && clubId !== void 0 ? clubId : 1,
-                status: 'processed',
-                isHardcodedAdmin: true,
-            };
-        }
-        let user = null;
-        if (canUseFirestoreDocuments()) {
-            try {
-                user = userId != null
-                    ? yield (0, firebaseAdmin_1.fetchDocByNumericId)('users', userId)
-                    : rawUserId
-                        ? yield (0, firebaseAdmin_1.fetchDocById)('users', rawUserId)
-                        : null;
-            }
-            catch (_d) {
-                user = null;
-            }
-        }
-        if (!user && userId != null) {
-            const userRows = yield db_1.db
-                .select()
-                .from(schema_1.users)
-                .where((0, drizzle_orm_1.eq)(schema_1.users.id, userId))
-                .limit(1);
-            user = (_a = userRows[0]) !== null && _a !== void 0 ? _a : null;
-        }
-        if (!user && rawUserId) {
-            const userRows = yield db_1.db
-                .select()
-                .from(schema_1.users)
-                .where((0, drizzle_orm_1.or)((0, drizzle_orm_1.eq)(schema_1.users.firebaseUid, rawUserId), (0, drizzle_orm_1.eq)(schema_1.users.uid, rawUserId)))
-                .limit(1);
-            user = (_b = userRows[0]) !== null && _b !== void 0 ? _b : null;
-        }
-        if (!user) {
-            return null;
-        }
-        return {
-            id: typeof user.id === 'number' ? user.id : Number(user.id) || 0,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            clubId: (_c = user.clubId) !== null && _c !== void 0 ? _c : clubId,
-            status: user.status === 'active' ? 'processed' : user.status === 'disabled' ? 'rejected' : user.status,
-        };
+        return getBearerAuthenticatedUser(req);
     });
 }
 function requireRequestUser(req, res) {
@@ -171,6 +94,10 @@ function requireRequestUser(req, res) {
         const user = yield getRequestUser(req);
         if (!user) {
             res.status(401).json({ error: 'Authentication required.' });
+            return null;
+        }
+        if (user.status === 'rejected') {
+            res.status(403).json({ error: 'This account has been disabled.' });
             return null;
         }
         return user;

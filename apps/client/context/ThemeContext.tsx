@@ -32,9 +32,9 @@ function prefersDark(): boolean {
 }
 
 function readStoredMode(): ThemeMode {
-  if (typeof window === 'undefined') return 'light';
+  if (typeof window === 'undefined') return 'system';
   const stored = window.localStorage.getItem(STORAGE_KEY);
-  return stored === 'dark' || stored === 'light' || stored === 'system' ? stored : 'light';
+  return stored === 'dark' || stored === 'light' || stored === 'system' ? stored : 'system';
 }
 
 function resolve(mode: ThemeMode): ResolvedTheme {

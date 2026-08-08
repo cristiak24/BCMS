@@ -11,19 +11,28 @@ import ProfileForm from './ProfileForm';
 import PasswordChangeForm from './PasswordChangeForm';
 import { useFirebaseAuth } from '../../context/AuthContext';
 import { useTheme, type ThemeMode } from '../../context/ThemeContext';
+import PageContainer from '../ui/PageContainer';
+import PageHeader from '../ui/PageHeader';
+import GlassCard from '../ui/GlassCard';
+import { Skeleton } from '../ui/Skeleton';
+import { ErrorState } from '../ui/ScreenState';
 
 const THEME_OPTIONS: { mode: ThemeMode; label: string; icon: string }[] = [
-  { mode: 'light', label: 'Light', icon: 'wb-sunny' },
-  { mode: 'dark', label: 'Dark', icon: 'nightlight' },
-  { mode: 'system', label: 'System', icon: 'settings' },
+  { mode: 'light', label: 'Luminos', icon: 'wb-sunny' },
+  { mode: 'dark', label: 'Întunecat', icon: 'nightlight' },
+  { mode: 'system', label: 'Sistem', icon: 'settings' },
 ];
 
 function AppearanceCard() {
   const { mode, setMode } = useTheme();
   return (
-    <View className="bg-white rounded-[28px] p-6 border border-slate-100 shadow-sm">
-      <Text className="text-[#0E2041] text-[12px] font-black uppercase tracking-widest mb-1">Appearance</Text>
-      <Text className="text-[#64748B] text-sm font-semibold mb-4">Choose how BCMS looks on this device.</Text>
+    <GlassCard>
+      <Text className="text-[10px] font-semibold uppercase tracking-[0.09em] mb-1" style={{ color: 'var(--c-muted)' }}>
+        Aspect
+      </Text>
+      <Text className="text-[13px] font-medium mb-3" style={{ color: 'var(--c-faint)' }}>
+        Alege cum arată BCMS pe acest dispozitiv.
+      </Text>
       <View className="flex-row gap-2">
         {THEME_OPTIONS.map((opt) => {
           const active = mode === opt.mode;
@@ -32,16 +41,27 @@ function AppearanceCard() {
               key={opt.mode}
               onPress={() => setMode(opt.mode)}
               accessibilityRole="button"
-              accessibilityLabel={`Use ${opt.label} theme`}
-              className={`flex-1 items-center justify-center rounded-2xl px-3 py-4 border ${active ? 'bg-[#1D3E90] border-[#1D3E90]' : 'bg-[#F8FAFC] border-slate-100'}`}
+              accessibilityLabel={`Folosește tema ${opt.label}`}
+              accessibilityState={{ selected: active }}
+              className="flex-1 items-center justify-center rounded-[12px] px-3 py-3 border"
+              style={
+                active
+                  ? ({ backgroundColor: 'var(--c-brand-surface)', borderColor: 'transparent' } as any)
+                  : ({ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any)
+              }
             >
-              <MaterialIcons name={opt.icon} size={22} color={active ? 'var(--c-surface)' : 'var(--c-muted)'} />
-              <Text className={`text-[12px] font-black mt-2 ${active ? 'text-white' : 'text-[#64748B]'}`}>{opt.label}</Text>
+              <MaterialIcons name={opt.icon} size={18} color={active ? 'var(--c-on-brand)' : 'var(--c-muted)'} />
+              <Text
+                className="text-[12px] font-semibold mt-1.5"
+                style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}
+              >
+                {opt.label}
+              </Text>
             </Pressable>
           );
         })}
       </View>
-    </View>
+    </GlassCard>
   );
 }
 
@@ -60,7 +80,7 @@ function sessionToProfile(session: AuthUser): ProfileRecord {
 
 function formatDate(value?: string | null) {
   if (!value) {
-    return 'Not available';
+    return 'Indisponibil';
   }
 
   const date = new Date(value);
@@ -68,7 +88,7 @@ function formatDate(value?: string | null) {
     return value;
   }
 
-  return new Intl.DateTimeFormat('en', {
+  return new Intl.DateTimeFormat('ro-RO', {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -138,7 +158,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
           return;
         }
 
-        setError(fetchError instanceof Error ? fetchError.message : 'Failed to load profile.');
+        setError(fetchError instanceof Error ? fetchError.message : 'Nu s-a putut încărca profilul.');
       } finally {
         if (active) {
           setLoading(false);
@@ -166,7 +186,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
         setProfile(data);
         setError(null);
       } catch (refreshError) {
-        setError(refreshError instanceof Error ? refreshError.message : 'Failed to refresh profile.');
+        setError(refreshError instanceof Error ? refreshError.message : 'Nu s-a putut reîmprospăta profilul.');
       } finally {
         setLoading(false);
       }
@@ -192,7 +212,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
   const handlePasswordChange = async (payload: Parameters<typeof profileApi.changePassword>[0]) => {
     const response = await profileApi.changePassword(payload);
     if (!response.success) {
-      throw new Error(response.message || 'Failed to update password.');
+      throw new Error(response.message || 'Nu s-a putut actualiza parola.');
     }
   };
 
@@ -211,29 +231,41 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
     router.replace('/login');
   };
 
+  // Skeleton mirrors the real grid (header band + 7/5 split) so the page does
+  // not reflow when data lands — the old full-screen spinner threw the layout
+  // away and rebuilt it.
   if (loading && !profile) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#F1F5F9]">
-        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
+      <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
+        <PageContainer>
+          <Skeleton className="h-9 w-56 rounded-[10px] mb-4" />
+          <Skeleton className="h-[132px] w-full rounded-[16px] mb-4" />
+          <View className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <View className="lg:col-span-7">
+              <Skeleton className="h-[420px] w-full rounded-[16px]" />
+            </View>
+            <View className="lg:col-span-5 gap-4">
+              <Skeleton className="h-[150px] w-full rounded-[16px]" />
+              <Skeleton className="h-[210px] w-full rounded-[16px]" />
+            </View>
+          </View>
+        </PageContainer>
       </View>
     );
   }
 
   if (error && !profile) {
     return (
-      <View className="flex-1 bg-[#F1F5F9] items-center justify-center px-6">
-        <View className="w-full max-w-xl bg-white rounded-[28px] p-6 border border-red-100 shadow-sm">
-          <Text className="text-[#0E2041] text-2xl font-black">Profile unavailable</Text>
-          <Text className="text-slate-500 mt-2">{error}</Text>
-          <View className="mt-6 flex-row gap-3">
-            <Pressable onPress={handleRefresh} className="bg-[#1D3E90] rounded-2xl px-5 py-3">
-              <Text className="text-white font-bold">Try Again</Text>
-            </Pressable>
-            <Pressable onPress={() => router.replace(getHomeRouteForRole(session?.role ?? 'admin'))} className="bg-white rounded-2xl px-5 py-3 border border-slate-200">
-              <Text className="text-[#0E2041] font-bold">Go Home</Text>
-            </Pressable>
-          </View>
-        </View>
+      <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
+        <PageContainer>
+          <PageHeader title="Profil" subtitle="Contul tău și datele personale." />
+          <ErrorState
+            title="Profil indisponibil"
+            message={error}
+            actionLabel="Reîncearcă"
+            onAction={handleRefresh}
+          />
+        </PageContainer>
       </View>
     );
   }
@@ -244,46 +276,57 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
 
   return (
     <ScrollView
-      className="flex-1 bg-[#F1F5F9]"
+      className="flex-1 bg-[var(--c-bg)]"
       contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 28, 40) }}
       showsVerticalScrollIndicator={false}
     >
-        <View
-          className="max-w-6xl mx-auto w-full px-4 md:px-8 pb-4 md:py-8"
+        <PageContainer
+          className="pb-4"
           style={isMobile ? { paddingTop: Math.max(insets.top + 18, 42) } : undefined}
         >
-        <View className="flex-row items-center justify-between mb-5 gap-3">
-          {showBackButton ? (
-            <Pressable
-              onPress={() => router.back()}
-              className={`${isMobile ? 'w-12 h-12 justify-center' : 'px-4 py-3'} flex-row items-center bg-white border border-slate-200 rounded-2xl shadow-sm`}
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-            >
-              <MaterialIcons name="arrow-back" size={isMobile ? 22 : 18} color="var(--c-ink)" />
-              {!isMobile ? <Text className="ml-2 text-[#0E2041] font-bold">Back</Text> : null}
-            </Pressable>
-          ) : (
-            <View className="flex-1">
-              <Text className="text-[#0E2041] text-3xl md:text-4xl font-black tracking-tight">Profile</Text>
-              <Text className="text-[#64748B] text-sm md:text-base font-semibold mt-2">Your account and personal details.</Text>
-            </View>
-          )}
+        {/* The title now renders on BOTH routes. Previously `showBackButton`
+            swapped the title out for the back button, so `/profile` (which
+            passes showBackButton) had no page title at all. The back button is
+            still route-conditional — only its exclusivity with the title is
+            gone. */}
+        <PageHeader
+          title="Profil"
+          subtitle="Contul tău și datele personale."
+          actions={
+            <>
+              {showBackButton ? (
+                <Pressable
+                  onPress={() => router.back()}
+                  className="h-9 px-3 flex-row items-center gap-1.5 rounded-[10px] border"
+                  style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+                  accessibilityRole="button"
+                  accessibilityLabel="Înapoi"
+                >
+                  <MaterialIcons name="arrow-back" size={16} color="var(--c-ink-soft)" />
+                  <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Înapoi</Text>
+                </Pressable>
+              ) : null}
 
-          <Pressable
-            onPress={handleLogout}
-            className={`${isMobile ? 'h-12 px-4' : 'px-4 py-3'} flex-row items-center bg-[#0E2041] rounded-2xl shadow-sm`}
-            accessibilityRole="button"
-            accessibilityLabel="Logout"
-          >
-            <MaterialIcons name="logout" size={18} color="var(--c-surface)" />
-            <Text className="ml-2 text-white font-black uppercase tracking-widest text-[11px]">
-              {isMobile ? 'Exit' : 'Logout'}
-            </Text>
-          </Pressable>
-        </View>
+              <Pressable
+                onPress={handleLogout}
+                className="h-9 px-3 flex-row items-center gap-1.5 rounded-[10px]"
+                style={{ backgroundColor: 'var(--c-brand-surface)' }}
+                accessibilityRole="button"
+                accessibilityLabel="Deconectare"
+              >
+                <MaterialIcons name="logout" size={16} color="var(--c-on-brand)" />
+                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-on-brand)' }}>
+                  {isMobile ? 'Ieși' : 'Deconectare'}
+                </Text>
+              </Pressable>
+            </>
+          }
+        />
 
-        <View className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden mb-5">
+        <View
+          className="rounded-[16px] border overflow-hidden mb-4"
+          style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
+        >
           {/* Slim brand accent strip instead of the old 96px empty navy band. */}
           <View className="h-2" style={{ backgroundColor: 'var(--c-brand-surface)' }} />
           <View className="px-5 md:px-6 py-5">
@@ -293,7 +336,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
                   avatarUrl={profile.avatarUrl}
                   initials={getInitials(profile)}
                   onUploaded={handleAvatarUploaded}
-                  onError={(message) => Alert.alert('Avatar upload', message)}
+                  onError={(message) => Alert.alert('Încărcare avatar', message)}
                 />
                 <View className="min-w-0">
                   <View className="flex-row items-center gap-2 mb-1.5 flex-wrap">
@@ -334,12 +377,17 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
           </View>
         </View>
 
-        <View className={`${isDesktop ? 'flex-row items-start' : ''} gap-6 mb-10`}>
-          <View className={isDesktop ? 'flex-1' : undefined}>
+        {/* 7/5 rather than the old 50/50 `flex-1` pair. The left column holds a
+            dense multi-field form; the right holds three short blocks. Equal
+            halves gave the form the same width as a three-button theme picker,
+            which is why the inputs looked cramped while the rail sat half
+            empty. Collapses to one column below lg. */}
+        <View className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-8">
+          <View className="lg:col-span-7 min-w-0">
             <ProfileForm profile={profile} onSave={handleSaveProfile} />
           </View>
 
-          <View className={`gap-6 ${isDesktop ? 'flex-1' : ''}`}>
+          <View className="lg:col-span-5 min-w-0 gap-4">
             <AppearanceCard />
             <PasswordChangeForm onChangePassword={handlePasswordChange} />
 
@@ -347,8 +395,8 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
                 (which carries name, email, role, status, member-since, last
                 login). Repeating all seven was the "we don't use the whole
                 page" bloat; this keeps just the workspace context. */}
-            <View className="bg-white rounded-[20px] p-5 border border-slate-100 shadow-sm">
-              <Text className="text-[12px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--c-muted)' }}>Cont</Text>
+            <GlassCard>
+              <Text className="text-[10px] font-semibold uppercase tracking-[0.09em] mb-2.5" style={{ color: 'var(--c-muted)' }}>Cont</Text>
               <View className="flex-row flex-wrap gap-2.5">
                 {[
                   { label: 'Email', value: profile.email },
@@ -361,10 +409,10 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
                   </View>
                 ))}
               </View>
-            </View>
+            </GlassCard>
           </View>
         </View>
-      </View>
+      </PageContainer>
     </ScrollView>
   );
 }

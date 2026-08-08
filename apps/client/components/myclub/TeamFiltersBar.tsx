@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput } from '@/src/web/reactNative';
-import { Search, LayoutGrid, Table2, ArrowUpDown, X, SlidersHorizontal } from 'lucide-react';
+import { Search, LayoutGrid, Table2, ArrowUpDown, X, SlidersHorizontal, AlertTriangle } from 'lucide-react';
 import type { Coach } from '../../services/teamsApi';
 import type {
     FilterCounts,
@@ -62,7 +62,7 @@ function ChipGroup<T extends string>({
                         className="flex-row items-center gap-1.5 px-2.5 h-7 rounded-[8px] border"
                         style={active
                             ? { backgroundColor: 'var(--c-brand-surface)', borderColor: 'transparent' }
-                            : { backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
+                            : { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}
                     >
                         {opt.dot ? <View className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: opt.dot }} /> : null}
                         <Text className="text-[12px] font-semibold" style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>{opt.label}</Text>
@@ -154,17 +154,30 @@ export default function TeamFiltersBar({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     ], [filters, counts, availableLevels]);
 
-    // Inline when the dimension partitions the data OR is currently non-default
-    // (so an active filter never hides itself).
-    const visibleDims = dims.filter((d) => isMeaningful(d.options) || d.value !== 'all');
-    const hiddenDims = dims.filter((d) => !isMeaningful(d.options) && d.value === 'all');
+    // Everything now lives in the tray (Tip/Sex/Nivel/Status included). A
+    // dimension is only offered when it can actually partition the set, or is
+    // currently active — the "synthesise" the user asked for, so the tray never
+    // shows dead controls like "Status: Toate 11 · Activă 11 · Inactivă 0".
+    const trayDims = dims.filter((d) => isMeaningful(d.options) || d.value !== 'all');
     const hasCoachFilter = coaches.length > 0;
+
+    // Compact summary of what's applied, shown while collapsed so the user can
+    // see and clear active filters without opening the tray. Search is excluded
+    // (it has its own inline clear button).
+    const activeChips: { key: string; label: string; clear: () => void }[] = [];
+    if (filters.source !== 'all') activeChips.push({ key: 'source', label: sourceOptions.find((o) => o.value === filters.source)?.label ?? '', clear: () => setFilter('source', 'all') });
+    if (filters.gender !== 'all') activeChips.push({ key: 'gender', label: genderOptions.find((o) => o.value === filters.gender)?.label ?? '', clear: () => setFilter('gender', 'all') });
+    if (filters.level !== 'all') activeChips.push({ key: 'level', label: levelOptions.find((o) => o.value === filters.level)?.label ?? '', clear: () => setFilter('level', 'all') });
+    if (filters.status !== 'all') activeChips.push({ key: 'status', label: statusOptions.find((o) => o.value === filters.status)?.label ?? '', clear: () => setFilter('status', 'all') });
+    if (filters.alert === 'medical') activeChips.push({ key: 'alert', label: 'Vize expirate', clear: () => setFilter('alert', 'all') });
+    if (filters.coachId !== 'all') activeChips.push({ key: 'coach', label: coaches.find((c) => c.id === filters.coachId)?.name ?? 'Antrenor', clear: () => setFilter('coachId', 'all') });
 
     return (
         <View className="rounded-[14px] border p-2.5 mb-5 w-full gap-2.5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}>
-            {/* Row 1 — search, sort, view toggle: always one line. */}
-            <View className="flex-row items-center gap-2 flex-wrap">
-                <View className="relative flex-1 min-w-[180px]">
+            {/* Row 1 — search, filters button, view toggle: one line (nowrap so
+                the toggle never orphans onto its own row on mobile). */}
+            <View className="flex-row items-center gap-2">
+                <View className="relative flex-1 min-w-[140px]">
                     <View className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
                         <Search size={14} color="var(--c-faint)" />
                     </View>
@@ -187,41 +200,25 @@ export default function TeamFiltersBar({
                     )}
                 </View>
 
-                <View className="flex-row items-center gap-1">
-                    <ArrowUpDown size={13} color="var(--c-muted)" />
-                    <select
-                        value={sort.key}
-                        onChange={(e) => setSort({ key: e.target.value as SortKey, dir: sort.dir })}
-                        className="h-9 rounded-[9px] border px-2 text-[12px] font-semibold"
-                        style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', color: 'var(--c-ink-soft)' }}
-                    >
-                        {SORT_OPTIONS.map((o) => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                    </select>
-                    <Pressable
-                        onPress={() => setSort({ key: sort.key, dir: sort.dir === 'asc' ? 'desc' : 'asc' })}
-                        accessibilityLabel="Schimbă ordinea de sortare"
-                        className="h-9 w-9 rounded-[9px] border items-center justify-center"
-                        style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
-                    >
-                        <Text className="text-[13px] font-bold" style={{ color: 'var(--c-ink-soft)' }}>{sort.dir === 'asc' ? '↑' : '↓'}</Text>
-                    </Pressable>
-                </View>
-
-                {(hiddenDims.length > 0 || hasCoachFilter) && (
-                    <Pressable
-                        onPress={() => setExpanded((v) => !v)}
-                        accessibilityLabel="Mai multe filtre"
-                        className="h-9 px-2.5 rounded-[9px] border flex-row items-center gap-1.5"
-                        style={expanded
-                            ? { backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' }
-                            : { backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
-                    >
-                        <SlidersHorizontal size={14} color={expanded ? 'var(--c-brand-fg)' : 'var(--c-muted)'} />
-                        <Text className="text-[12px] font-semibold" style={{ color: expanded ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)' }}>Filtre</Text>
-                    </Pressable>
-                )}
+                {/* Sort + the non-partitioning dimensions live behind this one
+                    button now — the inline sort dropdown used to eat a whole row
+                    on mobile and shove the view toggle onto its own line. */}
+                <Pressable
+                    onPress={() => setExpanded((v) => !v)}
+                    accessibilityLabel="Sortare și filtre"
+                    className="h-9 px-2.5 rounded-[9px] border flex-row items-center gap-1.5"
+                    style={expanded
+                        ? { backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' }
+                        : { backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
+                >
+                    <SlidersHorizontal size={14} color={expanded ? 'var(--c-brand-fg)' : 'var(--c-muted)'} />
+                    <Text className="text-[12px] font-semibold" style={{ color: expanded ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)' }}>Filtre</Text>
+                    {activeFilterCount > 0 ? (
+                        <View className="min-w-[16px] h-4 px-1 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-brand-surface)' }}>
+                            <Text className="text-[9px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{activeFilterCount}</Text>
+                        </View>
+                    ) : null}
+                </Pressable>
 
                 <View className="flex-row rounded-[9px] border overflow-hidden" style={{ borderColor: 'var(--c-border)' }}>
                     <Pressable
@@ -243,37 +240,36 @@ export default function TeamFiltersBar({
                 </View>
             </View>
 
-            {/* Row 2 — the filters that actually vary. */}
-            {(visibleDims.length > 0 || activeFilterCount > 0) && (
-                <View className="flex-row flex-wrap items-center gap-x-4 gap-y-2">
-                    {visibleDims.map((d) => (
-                        <ChipGroup
-                            key={d.key}
-                            label={d.label}
-                            value={d.value as any}
-                            onChange={(v) => setFilter(d.filterKey, v as any)}
-                            options={d.options as any}
-                        />
-                    ))}
-                    {activeFilterCount > 0 && (
+            {/* Row 2 — compact summary of applied filters (removable). Absent
+                entirely when nothing is filtered, so the default view is just
+                search + Filtre + view toggle. */}
+            {activeChips.length > 0 && (
+                <View className="flex-row flex-wrap items-center gap-1.5">
+                    {activeChips.map((c) => (
                         <Pressable
-                            onPress={onReset}
-                            className="flex-row items-center gap-1.5 h-7 px-2.5 rounded-[8px] border"
-                            style={{ backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-border)' }}
+                            key={c.key}
+                            onPress={c.clear}
+                            accessibilityLabel={`Elimină filtrul ${c.label}`}
+                            className="flex-row items-center gap-1 h-7 pl-2.5 pr-1.5 rounded-[8px] border"
+                            style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' }}
                         >
-                            <X size={12} color="var(--c-danger-fg)" />
-                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>
-                                Șterge ({activeFilterCount})
-                            </Text>
+                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{c.label}</Text>
+                            <X size={12} color="var(--c-brand-fg)" />
                         </Pressable>
-                    )}
+                    ))}
+                    <Pressable onPress={onReset} className="h-7 px-2 justify-center">
+                        <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>Șterge tot</Text>
+                    </Pressable>
                 </View>
             )}
 
-            {/* Expanded tray — non-partitioning dimensions plus the coach select. */}
-            {expanded && (hiddenDims.length > 0 || hasCoachFilter) && (
-                <View className="flex-row flex-wrap items-center gap-x-4 gap-y-2 pt-2 border-t" style={{ borderColor: 'var(--c-border-soft)' }}>
-                    {hiddenDims.map((d) => (
+            {/* Expanded tray — every filter dimension (Tip/Sex/Nivel/Status),
+                sort controls, the medical-alert quick filter, and the coach
+                select. Nothing lives permanently in the page anymore. */}
+            {expanded && (
+                <View className="gap-3 pt-2.5 border-t" style={{ borderColor: 'var(--c-border-soft)' }}>
+                    {/* Dimensions */}
+                    {trayDims.map((d) => (
                         <ChipGroup
                             key={d.key}
                             label={d.label}
@@ -282,6 +278,59 @@ export default function TeamFiltersBar({
                             options={d.options as any}
                         />
                     ))}
+
+                    {/* Sortare */}
+                    <View className="flex-row items-center flex-wrap gap-1.5">
+                        <View className="flex-row items-center gap-1 mr-1">
+                            <ArrowUpDown size={12} color="var(--c-faint)" />
+                            <Text className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-faint)' }}>Sortează</Text>
+                        </View>
+                        {SORT_OPTIONS.map((o) => {
+                            const active = sort.key === o.value;
+                            return (
+                                <Pressable
+                                    key={o.value}
+                                    onPress={() => setSort(active ? { key: o.value, dir: sort.dir === 'asc' ? 'desc' : 'asc' } : { key: o.value, dir: o.value === 'name' ? 'asc' : 'desc' })}
+                                    className="flex-row items-center gap-1 px-2.5 h-7 rounded-[8px] border"
+                                    style={active
+                                        ? { backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' }
+                                        : { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}
+                                >
+                                    <Text className="text-[12px] font-semibold" style={{ color: active ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)' }}>{o.label}</Text>
+                                    {active ? <Text className="text-[11px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{sort.dir === 'asc' ? '↑' : '↓'}</Text> : null}
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+
+                    {/* Alertă — teams with expired/stale medical checks. Only when
+                        the club actually has any, so it never adds empty noise. */}
+                    {counts.alert.medical > 0 && (
+                        <View className="flex-row items-center flex-wrap gap-1.5">
+                            <Text className="text-[10px] font-semibold uppercase tracking-wider mr-1" style={{ color: 'var(--c-faint)' }}>Alertă</Text>
+                            <Pressable
+                                onPress={() => setFilter('alert', 'all')}
+                                className="px-2.5 h-7 rounded-[8px] border justify-center"
+                                style={filters.alert === 'all'
+                                    ? { backgroundColor: 'var(--c-brand-surface)', borderColor: 'transparent' }
+                                    : { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}
+                            >
+                                <Text className="text-[12px] font-semibold" style={{ color: filters.alert === 'all' ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>Toate</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => setFilter('alert', filters.alert === 'medical' ? 'all' : 'medical')}
+                                className="flex-row items-center gap-1.5 px-2.5 h-7 rounded-[8px] border"
+                                style={filters.alert === 'medical'
+                                    ? { backgroundColor: 'var(--c-warning)', borderColor: 'transparent' }
+                                    : { backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-border)' }}
+                            >
+                                <AlertTriangle size={12} color={filters.alert === 'medical' ? 'var(--c-on-brand)' : 'var(--c-warning-fg)'} />
+                                <Text className="text-[12px] font-semibold" style={{ color: filters.alert === 'medical' ? 'var(--c-on-brand)' : 'var(--c-warning-fg)' }}>Vize expirate</Text>
+                                <Text className="text-[11px] font-bold" style={{ color: filters.alert === 'medical' ? 'rgba(255,255,255,0.8)' : 'var(--c-warning-fg)' }}>{counts.alert.medical}</Text>
+                            </Pressable>
+                        </View>
+                    )}
+
                     {hasCoachFilter && (
                         <View className="flex-row items-center gap-1.5">
                             <Text className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-faint)' }}>Antrenor</Text>

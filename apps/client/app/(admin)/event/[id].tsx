@@ -4,6 +4,7 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  TextInput,
   ActivityIndicator,
   Alert,
   useWindowDimensions,
@@ -22,6 +23,7 @@ import {
   Settings,
   CheckCircle2,
   Trash2,
+  MessageSquare,
 } from 'lucide-react';
 import { eventsApi, CalendarEvent } from '../../../services/eventsApi';
 import { teamsApi, Team } from '../../../services/teamsApi';
@@ -133,24 +135,22 @@ const SectionCard = ({
   <View
     style={{
       backgroundColor: 'var(--c-surface)',
-      borderRadius: 28,
-      padding: 24,
-      marginBottom: 16,
+      borderRadius: 16,
+      padding: 18,
+      marginBottom: 12,
       borderWidth: 1,
-      borderColor: 'var(--c-surface-3)',
-      shadowColor: 'var(--c-ink-strong)',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 10,
-      elevation: 2,
-    }}
+      borderColor: 'var(--c-border)',
+      boxShadow: 'var(--e-sm)',
+    } as any}
   >
     <Text
       style={{
-        fontSize: 18,
-        fontWeight: '900',
-        color: 'var(--c-brand-fg)',
-        marginBottom: 20,
+        fontSize: 12,
+        fontWeight: '700',
+        color: 'var(--c-faint)',
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
+        marginBottom: 14,
       }}
     >
       {title}
@@ -228,6 +228,75 @@ const TeamCard = ({
   </View>
 );
 
+// Editable note from the coach, shown to every player on this event
+// (post-session feedback, focus points, MVP shoutout). Saves on demand rather
+// than on every keystroke — matches the delete action's explicit-intent pattern.
+const CoachNoteCard = ({
+  value,
+  onChange,
+  onSave,
+  saving,
+  dirty,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  saving: boolean;
+  dirty: boolean;
+}) => (
+  <SectionCard title="Notă pentru jucători">
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
+      <MessageSquare size={16} color="var(--c-brand-fg)" style={{ marginTop: 2 } as any} />
+      <Text style={{ flex: 1, fontSize: 12, fontWeight: '600', color: 'var(--c-faint)', lineHeight: 17 }}>
+        Vizibilă tuturor jucătorilor de pe acest eveniment — feedback după sesiune, puncte de focus sau un shoutout.
+      </Text>
+    </View>
+    <TextInput
+      value={value}
+      onChangeText={onChange}
+      placeholder="ex. Ritm foarte bun azi, continuăm cu blocajele pick-and-roll."
+      placeholderTextColor="var(--c-faint)"
+      multiline
+      textAlignVertical="top"
+      style={{
+        minHeight: 88,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'var(--c-border)',
+        backgroundColor: 'var(--c-surface-2)',
+        color: 'var(--c-ink)',
+        padding: 12,
+        fontSize: 14,
+        fontWeight: '500',
+      } as any}
+    />
+    <TouchableOpacity
+      onPress={onSave}
+      disabled={saving || !dirty}
+      activeOpacity={0.85}
+      style={{
+        alignSelf: 'flex-end',
+        marginTop: 10,
+        paddingHorizontal: 16,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: dirty ? 'var(--c-brand-surface)' : 'var(--c-surface-3)',
+        opacity: saving ? 0.7 : 1,
+      }}
+    >
+      {saving ? (
+        <ActivityIndicator size="small" color="#fff" />
+      ) : (
+        <Text style={{ fontSize: 12, fontWeight: '800', color: dirty ? '#fff' : 'var(--c-faint)' }}>
+          {dirty ? 'Salvează' : 'Salvat'}
+        </Text>
+      )}
+    </TouchableOpacity>
+  </SectionCard>
+);
+
 // ─── Main screen ───────────────────────────────────────────────────────────────
 
 export default function EventDetailScreen() {
@@ -241,6 +310,8 @@ export default function EventDetailScreen() {
   const [teamPlayers, setTeamPlayers] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
 
   const { setSearchPlaceholder, setHeaderActions, setMobileFab } = useHeader();
 
@@ -266,6 +337,7 @@ export default function EventDetailScreen() {
         teamsApi.getTeams(),
       ]);
       setEvent(eventData);
+      setNoteDraft(eventData.coachNote ?? '');
       setTeams(allTeams);
 
       // If there is a team attached, load its player count
@@ -313,6 +385,23 @@ export default function EventDetailScreen() {
       setDeleting(false);
     }
   }, [event, deleting, navigateAfterDelete]);
+
+  const saveCoachNote = useCallback(async () => {
+    if (!event || savingNote) return;
+
+    const nextNote = noteDraft.trim() || null;
+    try {
+      setSavingNote(true);
+      const updated = await eventsApi.updateEvent(event.id, { coachNote: nextNote });
+      setEvent(updated);
+      setNoteDraft(updated.coachNote ?? '');
+    } catch (error) {
+      console.error('Save coach note error:', error);
+      Alert.alert('Eroare', 'Nota nu a putut fi salvată. Încearcă din nou.');
+    } finally {
+      setSavingNote(false);
+    }
+  }, [event, noteDraft, savingNote]);
 
   const handleDeleteEventPress = useCallback(() => {
     if (deleting) return;
@@ -542,11 +631,11 @@ export default function EventDetailScreen() {
         {/* Title */}
         <Text
           style={{
-            fontSize: isDesktop ? 38 : 30,
-            fontWeight: '900',
-            color: 'var(--c-brand-fg)',
-            lineHeight: isDesktop ? 46 : 38,
-            letterSpacing: -0.5,
+            fontSize: isDesktop ? 28 : 23,
+            fontWeight: '800',
+            color: 'var(--c-ink-strong)',
+            lineHeight: isDesktop ? 34 : 29,
+            letterSpacing: -0.4,
           }}
         >
           {event.title}
@@ -715,6 +804,14 @@ export default function EventDetailScreen() {
               </View>
             </View>
           </SectionCard>
+
+          <CoachNoteCard
+            value={noteDraft}
+            onChange={setNoteDraft}
+            onSave={() => void saveCoachNote()}
+            saving={savingNote}
+            dirty={noteDraft.trim() !== (event.coachNote ?? '').trim()}
+          />
         </View>
 
         {/* RIGHT column */}

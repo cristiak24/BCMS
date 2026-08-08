@@ -23,7 +23,11 @@ export const ADMIN_MENU_ITEMS: { label: string; icon: AdminMenuIconName; href: s
     { label: 'Users', icon: 'people', href: '/admin/users', superadminOnly: true },
 ];
 
-export default function Sidebar() {
+type SidebarProps = {
+    items?: typeof ADMIN_MENU_ITEMS;
+};
+
+export default function Sidebar({ items = ADMIN_MENU_ITEMS }: SidebarProps) {
     const { pathname } = useLocation();
     const { session } = useFirebaseAuth();
     const { width } = useResponsive();
@@ -54,7 +58,7 @@ export default function Sidebar() {
 
             {/* Navigation Links */}
             <View className="flex-1 py-1 px-2.5 gap-1 relative">
-                {ADMIN_MENU_ITEMS.map((item) => {
+                {items.map((item) => {
                     if (item.superadminOnly && !isSuperadmin(session)) {
                         return null;
                     }

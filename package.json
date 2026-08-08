@@ -20,5 +20,20 @@
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1"
-  }
+  },
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cristiak24/BCMS.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/cristiak24/BCMS/issues"
+  },
+  "homepage": "https://github.com/cristiak24/BCMS#readme"
 }

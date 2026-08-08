@@ -4,6 +4,7 @@ exports.playersController = void 0;
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
+const playerUpdate_1 = require("../lib/playerUpdate");
 const DEFAULT_PAYMENT_CURRENCY = (process.env.STRIPE_CURRENCY || 'ron').trim().toLowerCase();
 function isSuperadmin(req) {
     return req.user?.role === 'superadmin';
@@ -426,12 +427,11 @@ exports.playersController = {
                 if (!await isPlayerAllowedForRequest(req, p))
                     return res.status(403).json({ error: 'Access denied' });
             }
-            const updateData = { ...req.body };
-            if (req.body.medicalCheckExpiry) {
-                updateData.medicalCheckExpiry = new Date(String(req.body.medicalCheckExpiry)).toISOString();
+            const update = (0, playerUpdate_1.buildPlayerUpdate)(req.body);
+            if (!update.ok) {
+                return res.status(400).json({ error: update.error });
             }
-            delete updateData.id;
-            const [updated] = await db_1.db.update(schema_1.players).set(updateData).where((0, drizzle_orm_1.eq)(schema_1.players.id, playerId)).returning();
+            const [updated] = await db_1.db.update(schema_1.players).set(update.data).where((0, drizzle_orm_1.eq)(schema_1.players.id, playerId)).returning();
             res.json(updated);
         }
         catch (error) {

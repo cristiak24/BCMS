@@ -2,6 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import GlassCard from '../../components/ui/GlassCard';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
+import PageContainer from '../../components/ui/PageContainer';
+import PageHeader from '../../components/ui/PageHeader';
+import Pagination, { usePagination } from '../../components/ui/Pagination';
+import SectionHeader from '../../components/ui/SectionHeader';
 import { CalendarEvent, eventsApi } from '../../services/eventsApi';
 import {
   isPresentAttendanceStatus,
@@ -39,7 +45,7 @@ function statusTone(status?: string | null) {
   const normalized = String(status ?? '').toLowerCase();
 
   if (isPresentAttendanceStatus(normalized)) {
-    return { label: 'Present', bg: 'bg-emerald-50', fg: 'text-emerald-700', color: 'var(--c-success-fg)', icon: 'check-circle' as const };
+    return { label: 'Prezent', bg: 'bg-emerald-50', fg: 'text-emerald-700', color: 'var(--c-success-fg)', icon: 'check-circle' as const };
   }
 
   if (normalized === 'absent') {
@@ -50,7 +56,7 @@ function statusTone(status?: string | null) {
     return { label: 'Medical', bg: 'bg-amber-50', fg: 'text-amber-700', color: 'var(--c-warning-fg)', icon: 'medical-services' as const };
   }
 
-  return { label: 'Not marked', bg: 'bg-slate-100', fg: 'text-slate-500', color: 'var(--c-muted)', icon: 'radio-button-unchecked' as const };
+  return { label: 'Nemarcat', bg: 'bg-slate-100', fg: 'text-slate-500', color: 'var(--c-muted)', icon: 'radio-button-unchecked' as const };
 }
 
 function PlayerAttendanceScreen() {
@@ -65,6 +71,11 @@ function PlayerAttendanceScreen() {
     () => records.filter((record) => record.status !== null),
     [records]
   );
+
+  // The history was an unbounded stack — 40 sessions meant 40 rows and a very
+  // long scroll with no way to move through it. resetKey is the record count so
+  // a refresh that changes the set returns to page 1.
+  const pager = usePagination(visibleRecords, 8, String(visibleRecords.length));
 
   const loadData = useCallback(async (showSpinner = false) => {
     if (showSpinner) {
@@ -81,7 +92,7 @@ function PlayerAttendanceScreen() {
       setSummary(details.summary);
       setRecords(details.records);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load attendance.');
+      setError(err instanceof Error ? err.message : 'Nu s-a putut încărca prezența.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -93,101 +104,151 @@ function PlayerAttendanceScreen() {
   }, [loadData]);
 
   return (
-    <ScrollView className="flex-1 bg-[#F1F5F9]" contentContainerClassName="px-4 md:px-10 py-8 pb-16">
-      <View className="max-w-5xl w-full mx-auto gap-6">
-        <View className="flex-row items-start justify-between gap-4">
-          <View className="flex-1">
-            <Text className="text-[#0E2041] text-3xl md:text-4xl font-black tracking-tight">Attendance</Text>
-            <Text className="text-[#64748B] text-sm md:text-base font-semibold mt-2 max-w-2xl">
-              Your marked attendance from recent club sessions.
-            </Text>
-            {session ? (
-              <Text className="text-[#94A3B8] text-xs font-bold uppercase tracking-widest mt-3">
-                {session.name}
-              </Text>
-            ) : null}
-          </View>
+    <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
+      <PageContainer>
+        <PageHeader
+          title="Prezență"
+          subtitle="Prezența ta marcată la sesiunile recente ale clubului."
+          actions={
+            <Pressable
+              onPress={() => loadData(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Reîmprospătează"
+              className="w-9 h-9 rounded-[10px] border items-center justify-center"
+              style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+            >
+              {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
+            </Pressable>
+          }
+        />
 
-          <Pressable onPress={() => loadData(true)} className="px-4 py-3 rounded-2xl bg-white border border-gray-100 shadow-sm flex-row items-center gap-2">
-            {refreshing ? <ActivityIndicator size="small" color="var(--c-blue)" /> : <MaterialIcons name="refresh" size={20} color="var(--c-blue)" />}
-            <Text className="text-[#0E2041] font-bold">Refresh</Text>
-          </Pressable>
-        </View>
-
-        <View className="flex-row flex-wrap gap-4">
-          <GlassCard className="flex-1 min-w-[190px] p-5">
-            <Text className="text-[10px] font-black uppercase tracking-widest text-[#94A3B8]">Attendance rate</Text>
-            <Text className="text-[#0E2041] text-4xl font-black mt-2">
-              {summary.rate == null ? '—' : `${summary.rate}%`}
-            </Text>
-            <Text className="text-[#64748B] text-xs font-semibold mt-2">
-              {summary.total ? `${summary.present}/${summary.total} sessions present` : 'No marked sessions yet'}
-            </Text>
+        <View className="gap-4">
+        {/* Two tiles, so two columns — NOT admin's 4-up roster grid. Copying
+            `xl:grid-cols-4` here left the two cards in the leftmost 480px of a
+            972px row with 492px of dead space beside them. Column count has to
+            follow the item count, not the reference screen. */}
+        <View className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <GlassCard>
+            <Text className="text-[10px] font-semibold uppercase tracking-[0.09em] text-[var(--c-muted)]">Rată prezență</Text>
+            {loading ? (
+              <View>
+                <Skeleton className="h-10 w-24 mt-2" />
+                <Skeleton className="h-3 w-40 mt-3" />
+              </View>
+            ) : (
+              <>
+                <Text className="text-[25px] font-bold mt-1.5 text-[var(--c-ink)]">
+                  {summary.rate == null ? '—' : `${summary.rate}%`}
+                </Text>
+                <Text className="text-[12px] font-medium mt-2 text-[var(--c-muted)]">
+                  {summary.total ? `${summary.present}/${summary.total} sesiuni prezent` : 'Nicio sesiune marcată încă'}
+                </Text>
+              </>
+            )}
           </GlassCard>
 
-          <GlassCard className="flex-1 min-w-[190px] p-5">
-            <Text className="text-[10px] font-black uppercase tracking-widest text-[#94A3B8]">Marked sessions</Text>
-            <Text className="text-[#0E2041] text-4xl font-black mt-2">{summary.total}</Text>
-            <Text className="text-[#64748B] text-xs font-semibold mt-2">Recent attendance records found</Text>
+          <GlassCard>
+            <Text className="text-[10px] font-semibold uppercase tracking-[0.09em] text-[var(--c-muted)]">Sesiuni marcate</Text>
+            {loading ? (
+              <View>
+                <Skeleton className="h-10 w-16 mt-2" />
+                <Skeleton className="h-3 w-44 mt-3" />
+              </View>
+            ) : (
+              <>
+                <Text className="text-[25px] font-bold mt-1.5 text-[var(--c-ink)]">{summary.total}</Text>
+                <Text className="text-[12px] font-medium mt-2 text-[var(--c-muted)]">Înregistrări recente de prezență</Text>
+              </>
+            )}
           </GlassCard>
         </View>
 
-        <GlassCard className="p-5 md:p-6">
-          <View className="flex-row items-center justify-between mb-4">
-            <View>
-              <Text className="text-[#0E2041] text-xl font-black">Recent records</Text>
-              <Text className="text-[#64748B] text-sm font-semibold mt-1">Sessions where your attendance was marked.</Text>
-            </View>
-            <MaterialIcons name="fact-check" size={22} color="var(--c-blue)" />
-          </View>
+        {/* Flat section, not a card wrapping cards. The outer GlassCard put a
+            border around a list of bordered rows, so every record read as
+            nested boxes. */}
+        <View>
+          <SectionHeader
+            title="Înregistrări recente"
+            subtitle="Sesiuni în care prezența ta a fost marcată."
+          />
 
           {loading ? (
-            <View className="py-10 items-center justify-center">
-              <ActivityIndicator size="large" color="var(--c-blue)" />
+            // Same row geometry as a loaded record (48px tile, two text lines, badge)
+            // so the card keeps its height when the records land.
+            <View className="gap-2.5" accessibilityRole="progressbar" accessibilityLabel="Se încarcă prezența">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <Skeleton key={index} className="h-[68px] w-full rounded-[14px]" />
+              ))}
             </View>
           ) : error ? (
-            <View className="py-8 items-center">
-              <MaterialIcons name="error-outline" size={32} color="var(--c-danger)" />
-              <Text className="text-red-600 font-bold text-center mt-3">{error}</Text>
-            </View>
+            <ErrorState
+              title="Nu am putut încărca prezența"
+              message={error}
+              actionLabel="Reîncearcă"
+              onAction={() => loadData(true)}
+            />
           ) : visibleRecords.length === 0 ? (
-            <View className="py-8 items-center">
-              <MaterialIcons name="event-busy" size={32} color="var(--c-faint)" />
-              <Text className="text-[#64748B] font-semibold text-center mt-3">No marked attendance found yet.</Text>
-            </View>
+            <EmptyState
+              icon="event-busy"
+              compact
+              title="Nicio prezență marcată încă"
+              message="Sesiunile la care antrenorul îți marchează prezența apar aici."
+            />
           ) : (
-            <View className="gap-3">
-              {visibleRecords.map((record) => {
+            <View className="gap-2.5">
+              {pager.pageItems.map((record) => {
                 const tone = statusTone(record.status);
 
                 return (
-                  <View key={record.event.id} className="rounded-2xl border border-gray-100 bg-white p-4 flex-row gap-4 items-center">
-                    <View className="w-12 h-12 rounded-2xl bg-[#EBF1FF] items-center justify-center">
-                      <MaterialIcons name={eventTypeIcon(record.event.type)} size={22} color="var(--c-blue)" />
+                  <View
+                    key={record.event.id}
+                    className="rounded-[14px] border px-4 py-3 flex-row gap-3 items-center"
+                    style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any}
+                  >
+                    <View
+                      className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0"
+                      style={{ backgroundColor: 'var(--c-surface-tint)' }}
+                    >
+                      <MaterialIcons name={eventTypeIcon(record.event.type)} size={17} color="var(--c-brand-fg)" />
                     </View>
 
-                    <View className="flex-1">
-                      <Text className="text-[#0E2041] font-black text-base">{record.event.title}</Text>
-                      <Text className="text-[#64748B] text-sm font-semibold mt-1">
+                    {/* teamName dropped: it is the player's own squad on every
+                        row, so it added a third line of identical text to each
+                        record. */}
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+                        {record.event.title}
+                      </Text>
+                      <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
                         {formatDateTime(record.event.startTime)}
                         {record.event.location ? ` · ${record.event.location}` : ''}
                       </Text>
-                      {record.event.teamName ? (
-                        <Text className="text-[#94A3B8] text-xs font-semibold mt-1">{record.event.teamName}</Text>
-                      ) : null}
                     </View>
 
-                    <View className={`${tone.bg} px-3 py-2 rounded-2xl flex-row items-center gap-2`}>
-                      <MaterialIcons name={tone.icon} size={16} color={tone.color} />
-                      <Text className={`${tone.fg} text-[11px] font-black uppercase tracking-widest`}>{tone.label}</Text>
+                    <View className={`${tone.bg} px-2.5 py-1 rounded-full flex-row items-center gap-1.5 shrink-0`}>
+                      <MaterialIcons name={tone.icon} size={13} color={tone.color} />
+                      <Text className={`${tone.fg} text-[11px] font-semibold`}>{tone.label}</Text>
                     </View>
                   </View>
                 );
               })}
             </View>
           )}
-        </GlassCard>
-      </View>
+
+          {!loading && !error && visibleRecords.length ? (
+            <Pagination
+              page={pager.page}
+              totalPages={pager.totalPages}
+              onPageChange={pager.setPage}
+              rangeStart={pager.rangeStart}
+              rangeEnd={pager.rangeEnd}
+              total={pager.total}
+              itemNoun="sesiuni"
+            />
+          ) : null}
+        </View>
+        </View>
+      </PageContainer>
     </ScrollView>
   );
 }

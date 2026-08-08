@@ -53,9 +53,9 @@ export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
       setPhone(updated.phone ?? '');
       setPreferredLanguage(updated.preferredLanguage ?? '');
       setNotificationPreferences(updated.notificationPreferences ?? { email: true, push: false, sms: false });
-      setSuccess('Profile saved successfully.');
+      setSuccess('Profil salvat cu succes.');
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Failed to save profile.');
+      setError(saveError instanceof Error ? saveError.message : 'Nu s-a putut salva profilul.');
     } finally {
       setSaving(false);
     }
@@ -63,46 +63,46 @@ export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
 
   return (
     <View className="space-y-4">
-      <View className="bg-white rounded-[28px] p-6 border border-gray-100 shadow-sm">
-        <Text className="text-[#0E2041] text-[12px] font-black uppercase tracking-widest mb-5">Personal Information</Text>
+      <View className="bg-[var(--c-surface)] rounded-[28px] p-6 border border-gray-100 shadow-sm">
+        <Text className="text-[#0E2041] text-[12px] font-black uppercase tracking-widest mb-5">Informații personale</Text>
 
         <View className="gap-4">
           <AuraInput
-            label="First Name"
+            label="Prenume"
             iconName="person"
             value={firstName}
             onChangeText={setFirstName}
           />
           <AuraInput
-            label="Last Name"
+            label="Nume"
             iconName="person"
             value={lastName}
             onChangeText={setLastName}
           />
           <AuraInput
-            label="Phone Number"
+            label="Număr de telefon"
             iconName="phone"
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
-            placeholder="Optional"
+            placeholder="Opțional"
           />
           <AuraInput
-            label="Preferred Language"
+            label="Limbă preferată"
             iconName="language"
             value={preferredLanguage}
             onChangeText={setPreferredLanguage}
-            placeholder="Optional"
+            placeholder="Opțional"
           />
         </View>
 
         <View className="mt-2">
-          <Text className="text-[#64748B] text-[11px] font-bold tracking-wider uppercase mb-3">Notification Preferences</Text>
+          <Text className="text-[#64748B] text-[11px] font-bold tracking-wider uppercase mb-3">Preferințe notificări</Text>
           <View className="gap-3">
             {([
-              { key: 'email', label: 'Email updates' },
-              { key: 'push', label: 'Push notifications' },
-              { key: 'sms', label: 'SMS alerts' },
+              { key: 'email', label: 'Actualizări email' },
+              { key: 'push', label: 'Notificări push' },
+              { key: 'sms', label: 'Alerte SMS' },
             ] as const).map((item) => (
               <View key={item.key} className="flex-row items-center justify-between bg-[#F8FAFC] rounded-2xl px-4 py-3 border border-gray-100">
                 <Text className="text-[#0E2041] font-semibold">{item.label}</Text>
@@ -140,7 +140,7 @@ export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
             ) : (
               <>
                 <MaterialIcons name="save" size={18} color="var(--c-surface)" />
-                <Text className="text-white font-black text-[12px] uppercase tracking-widest ml-2">Save Changes</Text>
+                <Text className="text-white font-black text-[12px] uppercase tracking-widest ml-2">Salvează</Text>
               </>
             )}
           </Pressable>

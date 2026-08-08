@@ -11,6 +11,45 @@ function isSuperadmin(req: AuthenticatedRequest) {
     return req.user?.role === 'superadmin';
 }
 
+// Player/parent sessions must only ever see their own team's roster, and only
+// the fields that make sense for a teammate list (no payment/medical/contact
+// data belonging to someone else). Every other authenticated role keeps the
+// existing club-wide, full-detail roster behaviour.
+function isPlayerFacingRole(req: AuthenticatedRequest) {
+    const role = req.user?.role;
+    return role === 'player' || role === 'parent';
+}
+
+// Denylist (not allowlist) so the stripped row keeps the exact same shape as
+// the full row — that matters for TypeScript (buildRosterRows stays a single
+// consistent return type instead of widening to `unknown` for every caller)
+// and for any downstream code that reads a field it doesn't recognize as safe.
+const SENSITIVE_ROSTER_FIELDS = ['email', 'medicalCheckExpiry', 'attendanceRate', 'paymentStatus'] as const;
+
+function toSafeRosterRow<T extends Record<string, unknown>>(row: T): T {
+    const safe = { ...row };
+    for (const key of SENSITIVE_ROSTER_FIELDS) {
+        if (key in safe) (safe as Record<string, unknown>)[key] = null;
+    }
+    return safe;
+}
+
+async function getSelfPlayerRecord(req: AuthenticatedRequest) {
+    const email = req.user?.email;
+    if (!email) return null;
+    const rows = await db.select().from(players).where(eq(players.email, String(email).trim().toLowerCase())).limit(1);
+    return rows[0] ?? null;
+}
+
+async function getSelfTeamIds(req: AuthenticatedRequest): Promise<number[]> {
+    const self = await getSelfPlayerRecord(req);
+    if (!self) return [];
+    const membershipRows = await db.select({ teamId: playersToTeams.teamId }).from(playersToTeams).where(eq(playersToTeams.playerId, self.id));
+    const ids = new Set(membershipRows.map(m => m.teamId));
+    if (self.teamId != null) ids.add(self.teamId);
+    return Array.from(ids);
+}
+
 function getRequestClubId(req: AuthenticatedRequest) {
     return req.user?.clubId == null ? null : Number(req.user.clubId);
 }
@@ -98,8 +137,16 @@ async function buildPlayerPaymentSummary(playerId: number) {
     };
 }
 
-async function buildRosterRows(req: AuthenticatedRequest) {
-    const allowedTeamIds = await getAllowedTeamIds(req);
+async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPlayerFacing?: boolean } = {}) {
+    const { stripForPlayerFacing = true } = options;
+    const isPlayerFacing = isPlayerFacingRole(req);
+    let allowedTeamIds = await getAllowedTeamIds(req);
+
+    if (isPlayerFacing) {
+        const selfTeamIds = await getSelfTeamIds(req);
+        allowedTeamIds = allowedTeamIds === null ? selfTeamIds : allowedTeamIds.filter(id => selfTeamIds.includes(id));
+    }
+
     if (allowedTeamIds !== null && allowedTeamIds.length === 0) return [];
 
     let allPlayers = await db.select().from(players);
@@ -196,7 +243,7 @@ async function buildRosterRows(req: AuthenticatedRequest) {
         }
     }
 
-    return allPlayers.map(player => {
+    const rows = allPlayers.map(player => {
         const firstName = player.firstName || player.name?.split(' ')[0] || 'Unknown';
         const lastName = player.lastName || player.name?.split(' ').slice(1).join(' ') || 'Player';
         const playerTeams = teamsByPlayer.get(player.id) || [];
@@ -226,6 +273,31 @@ async function buildRosterRows(req: AuthenticatedRequest) {
             isUnassigned: teamNames.length === 0,
         };
     });
+
+    // A player/parent session only gets teammate-safe fields (name, number,
+    // position, team) — never another player's payment/medical/attendance/
+    // contact data. Their own data is still reachable through the dedicated
+    // "me" endpoints, not this shared roster.
+    return isPlayerFacing && stripForPlayerFacing ? rows.map(toSafeRosterRow) : rows;
+}
+
+// Shared by getPlayerById and getMe — callers must already have verified the
+// requester is allowed to see this exact player's full (unstripped) record.
+async function buildFullPlayerPayload(req: AuthenticatedRequest, player: typeof players.$inferSelect) {
+    const rosterRows = await buildRosterRows(req, { stripForPlayerFacing: false });
+    const rosterPlayer = rosterRows.find(row => row.id === player.id);
+    const paymentSummary = await buildPlayerPaymentSummary(player.id);
+
+    return {
+        ...player,
+        ...rosterPlayer,
+        ...paymentSummary,
+        clubId: rosterPlayer?.clubId ?? await getPlayerClubIdByEmail(player.email),
+        isUnassigned: rosterPlayer?.isUnassigned ?? true,
+        teamName: rosterPlayer?.teamName ?? 'Unassigned',
+        teamNames: rosterPlayer?.teamNames ?? [],
+        category: rosterPlayer?.category ?? 'Unassigned',
+    };
 }
 
 function computeAttendanceRateFromRecords(records: (typeof attendance.$inferSelect)[]) {
@@ -237,6 +309,13 @@ function computeAttendanceRateFromRecords(records: (typeof attendance.$inferSele
 export const playersController = {
     async searchPlayers(req: AuthenticatedRequest, res: Response) {
         try {
+            // Roster-management-only: returns unfiltered player rows (medical,
+            // payment, contact fields) so it's used to find a player to add to a
+            // team, not something a player/parent session should ever reach.
+            if (isPlayerFacingRole(req)) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+
             const { query } = req.query;
             if (!query || typeof query !== 'string') {
                 return res.status(400).json({ error: 'Search query is required' });
@@ -293,6 +372,12 @@ export const playersController = {
 
     async getRosterSummary(req: AuthenticatedRequest, res: Response) {
         try {
+            // Club/team-wide attendance & payment aggregates — a management
+            // view, not something player/parent sessions consume today.
+            if (isPlayerFacingRole(req)) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+
             const rosterRows = await buildRosterRows(req);
             const rosterPlayerIds = rosterRows.map(row => row.id);
 
@@ -501,28 +586,39 @@ export const playersController = {
             const player = pRows[0];
             if (!player) return res.status(404).json({ error: 'Player not found' });
 
-            const allowedTeamIds = await getAllowedTeamIds(req);
-            if (allowedTeamIds !== null) {
-                if (!await isPlayerAllowedForRequest(req, player)) return res.status(403).json({ error: 'Access denied' });
+            if (isPlayerFacingRole(req)) {
+                // A player/parent may only ever fetch their own record — never a
+                // teammate's, which would otherwise carry payment/medical data.
+                const self = await getSelfPlayerRecord(req);
+                if (!self || self.id !== playerId) {
+                    return res.status(403).json({ error: 'Access denied' });
+                }
+            } else {
+                const allowedTeamIds = await getAllowedTeamIds(req);
+                if (allowedTeamIds !== null) {
+                    if (!await isPlayerAllowedForRequest(req, player)) return res.status(403).json({ error: 'Access denied' });
+                }
             }
 
-            const rosterRows = await buildRosterRows(req);
-            const rosterPlayer = rosterRows.find(row => row.id === player.id);
-            const paymentSummary = await buildPlayerPaymentSummary(player.id);
-
-            res.json({
-                ...player,
-                ...rosterPlayer,
-                ...paymentSummary,
-                clubId: rosterPlayer?.clubId ?? await getPlayerClubIdByEmail(player.email),
-                isUnassigned: rosterPlayer?.isUnassigned ?? true,
-                teamName: rosterPlayer?.teamName ?? 'Unassigned',
-                teamNames: rosterPlayer?.teamNames ?? [],
-                category: rosterPlayer?.category ?? 'Unassigned',
-            });
+            res.json(await buildFullPlayerPayload(req, player));
         } catch (error) {
             console.error('Get player by id error:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
-    }
+    },
+
+    // Own-record lookup for player/parent sessions that don't know their
+    // `players.id` — resolves it from the authenticated user's email instead
+    // of requiring a client-supplied id, so there's nothing to guess or spoof.
+    async getMe(req: AuthenticatedRequest, res: Response) {
+        try {
+            const self = await getSelfPlayerRecord(req);
+            if (!self) return res.status(404).json({ error: 'No player record linked to this account' });
+
+            res.json(await buildFullPlayerPayload(req, self));
+        } catch (error) {
+            console.error('Get self player error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
 };

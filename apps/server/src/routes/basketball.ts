@@ -1,11 +1,27 @@
 import { Router } from 'express';
 import axios from 'axios';
+import { authenticate } from '../middleware/auth';
+import { rateLimit } from '../middleware/rateLimit';
 
 const router = Router();
 
-const API_KEY = '9c3622c013ca2f69e8c373ecbf5af38e180f6d7d';
+// Every endpoint below fans out to an upstream FRB widget service on our own API key
+// and our own egress bill. Leaving them anonymous let the whole internet spend both,
+// and gave away a working key to anyone who watched the traffic. This is federation
+// reference data that only signed-in users have any reason to read, so authentication
+// is enough — no role gate, since every role legitimately reads it.
+router.use(authenticate);
+
+// Kept as a literal fallback so local dev and the current deploy keep working until
+// FRB_API_KEY is set in every environment. Rotate the key once it is.
+const API_KEY = process.env.FRB_API_KEY || '9c3622c013ca2f69e8c373ecbf5af38e180f6d7d';
 const REFERER = 'https://www.frbaschet.ro/';
 const HEADERS = { Referer: REFERER };
+
+// Bounds how fast one caller can make us hammer the upstream widget service. It is a
+// per-instance guard against accidental render loops and casual abuse, layered on top
+// of the authentication above rather than instead of it.
+const basketballProxyRateLimit = rateLimit({ bucket: 'basketball:proxy', limit: 60, windowMs: 60_000 });
 
 // ---------- Types ----------
 
@@ -198,7 +214,7 @@ router.get('/leagues', (_req, res) => {
 });
 
 // ---------- GET /api/basketball/seasons?leagueId= ----------
-router.get('/seasons', async (req, res) => {
+router.get('/seasons', basketballProxyRateLimit, async (req, res) => {
     const { leagueId } = req.query as Record<string, string>;
     if (!leagueId) {
         res.status(400).json({ error: 'leagueId required' });
@@ -225,7 +241,7 @@ router.get('/seasons', async (req, res) => {
 });
 
 // ---------- GET /api/basketball/teams?leagueId=&seasonId= ----------
-router.get('/teams', async (req, res) => {
+router.get('/teams', basketballProxyRateLimit, async (req, res) => {
     const { leagueId, seasonId } = req.query as Record<string, string>;
     if (!leagueId || !seasonId) {
         res.status(400).json({ error: 'leagueId and seasonId required' });
@@ -262,7 +278,7 @@ router.get('/teams', async (req, res) => {
 });
 
 // ---------- GET /api/basketball/matches?teamId=&seasonId=&leagueId=&month= ----------
-router.get('/matches', async (req, res) => {
+router.get('/matches', basketballProxyRateLimit, async (req, res) => {
     const { teamId, seasonId, month, leagueId } = req.query as Record<string, string>;
     if (!teamId || !seasonId || !leagueId) {
         res.status(400).json({ error: 'teamId, seasonId and leagueId required' });
@@ -368,7 +384,7 @@ router.get('/matches', async (req, res) => {
 });
 
 // ---------- GET /api/basketball/standings?seasonId=&leagueId= ----------
-router.get('/standings', async (req, res) => {
+router.get('/standings', basketballProxyRateLimit, async (req, res) => {
     const { seasonId, leagueId } = req.query as Record<string, string>;
     if (!seasonId || !leagueId) {
         res.status(400).json({ error: 'seasonId and leagueId required' });
@@ -399,7 +415,7 @@ router.get('/standings', async (req, res) => {
 
 // ---------- GET /api/basketball/dashboard-summary ----------
 // Agregă date din finance + players pentru KPI-uri dashboard
-router.get('/dashboard-summary', async (_req, res) => {
+router.get('/dashboard-summary', basketballProxyRateLimit, async (_req, res) => {
     res.status(501).json({ message: 'Use /api/dashboard/summary instead' });
 });
 

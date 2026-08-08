@@ -12,10 +12,16 @@ const stripe_1 = __importDefault(require("stripe"));
 const firebaseAdmin_1 = require("../lib/firebaseAdmin");
 const requestContext_1 = require("../lib/requestContext");
 const requestAuth_1 = require("../lib/requestAuth");
+const auth_1 = require("../middleware/auth");
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
 const router = (0, express_1.Router)();
+// Every finance endpoint requires a verified Firebase ID token. Per-route checks
+// below narrow this further (admin/accountant vs. the player's own data). The
+// Stripe webhook is mounted separately in app.ts, before this router, because it
+// authenticates via the Stripe signature instead.
+router.use(auth_1.authenticate);
 const DEFAULT_STRIPE_PUBLISHABLE_KEY = 'pk_test_51TP7NnCFpLYWSHx5i7EAuPRWUXgoP0lxHFIqDIGvyQOpNIbu4VOg2IMg7H8LW5HgTslJVudDxe3xnGXgRIubcVbA00swDdrRS0';
 const DEFAULT_PAYMENT_CURRENCY = (process.env.STRIPE_CURRENCY || 'ron').trim().toLowerCase();
 const FINANCE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;

@@ -5,7 +5,6 @@ import financeRoutes, { stripeWebhookHandler } from './routes/finance';
 import userRoutes from './routes/users';
 import authRoutes from './routes/auth';
 import profileRoutes from './routes/profile';
-import adminRouter from './routes/admin';
 import manageAccessRoutes from './routes/manageAccess';
 import clubAdminRoutes from './routes/clubAdmin';
 import invitationsRoutes from './routes/invitations';
@@ -17,6 +16,7 @@ import teamsRoutes from './routes/teams';
 import playerRoutes from './routes/playerRoutes';
 import eventRoutes from './routes/eventRoutes';
 import documentRoutes from './routes/documents';
+import notificationRoutes from './routes/notificationRoutes';
 import { loadServerEnv } from './lib/loadEnv';
 
 loadServerEnv();
@@ -139,7 +139,6 @@ export function createServerApp() {
     app.use('/api/users', userRoutes);
     app.use('/api/auth', authRoutes);
     app.use('/api/profile', profileRoutes);
-    app.use('/api/admin', adminRouter);
     app.use('/api/manage-access', manageAccessRoutes);
     app.use('/api/club-admin', clubAdminRoutes);
     app.use('/api/invitations', invitationsRoutes);
@@ -151,6 +150,7 @@ export function createServerApp() {
     app.use('/api/players', playerRoutes);
     app.use('/api/events', eventRoutes);
     app.use('/api/documents', documentRoutes);
+    app.use('/api/notifications', notificationRoutes);
 
     app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

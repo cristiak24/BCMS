@@ -29,14 +29,13 @@ export default function AdminActionButton({
             onPress={onPress}
             disabled={disabled}
             accessibilityLabel={accessibilityLabel ?? label}
-            className={`rounded-[16px] px-4 py-3 flex-row items-center shadow-sm ${
-                isPrimary
-                    ? 'bg-[#123A97]'
-                    : 'border border-[#DDE7F5] bg-white hover:border-blue-200'
-            } ${disabled ? 'opacity-60' : ''} ${className ?? ''}`}
+            className={`rounded-[10px] h-10 px-3.5 flex-row items-center ${disabled ? 'opacity-60' : ''} ${className ?? ''}`}
+            style={isPrimary
+                ? { backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)' } as any
+                : { backgroundColor: 'var(--c-surface)', borderWidth: 1, borderColor: 'var(--c-border)' } as any}
         >
-            <MaterialIcons name={icon} size={18} color={isPrimary ? 'var(--c-surface)' : 'var(--c-ink-soft)'} />
-            <Text className={`${isPrimary ? 'text-white' : 'text-slate-700'} font-bold ml-2`}>
+            <MaterialIcons name={icon} size={16} color={isPrimary ? 'var(--c-on-brand)' : 'var(--c-ink-soft)'} />
+            <Text className="font-semibold ml-2 text-[13px]" style={{ color: isPrimary ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>
                 {label}
             </Text>
         </Pressable>

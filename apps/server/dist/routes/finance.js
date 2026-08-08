@@ -21,10 +21,72 @@ const stripe_1 = __importDefault(require("stripe"));
 const firebaseAdmin_1 = require("../lib/firebaseAdmin");
 const requestContext_1 = require("../lib/requestContext");
 const requestAuth_1 = require("../lib/requestAuth");
+const financeDefaults_1 = require("../lib/financeDefaults");
+const auth_1 = require("../middleware/auth");
+const auditService_1 = require("../services/auditService");
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
 const router = (0, express_1.Router)();
+// Every finance endpoint requires a verified Firebase ID token. Per-route checks
+// below narrow this further (admin/accountant vs. the player's own data). The
+// Stripe webhook is mounted separately in app.ts, before this router, because it
+// authenticates via the Stripe signature instead.
+router.use(auth_1.authenticate);
+/**
+ * Audit logging must never cost a user a mutation that already succeeded.
+ *
+ * `writeAuditLog` does not swallow its own failures, and the existing call sites in
+ * clubAdmin/manageAccess leave it unwrapped — so there, a failed audit insert surfaces
+ * as a 500 on a change that has already been committed. Money is the wrong surface on
+ * which to repeat that: the record is written on a best-effort basis and a failure is
+ * loud in the logs but invisible to the caller.
+ */
+function recordFinanceAudit(input) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            yield (0, auditService_1.writeAuditLog)(input);
+        }
+        catch (error) {
+            console.error(`[finance/audit] Failed to record ${input.action}:`, error);
+        }
+    });
+}
+/**
+ * Actor fields for an audit row, sourced only from the verified Bearer identity that
+ * `authenticate` attached. Never from client-supplied headers.
+ */
+/** Fee fields worth a before/after record. All are inputs to real Stripe amounts. */
+const AUDITED_SETTINGS_FIELDS = [
+    'monthlyPlayerFee',
+    'trainingLevy',
+    'facilityFee',
+    'paymentDueDay',
+    'autoAdjust',
+];
+function settingsAuditChanges(before, updates) {
+    var _a;
+    const changes = {};
+    for (const field of AUDITED_SETTINGS_FIELDS) {
+        // Only fields this request actually set — an untouched fee is not a change.
+        if (updates[field] === undefined) {
+            continue;
+        }
+        changes[field] = { before: (_a = before === null || before === void 0 ? void 0 : before[field]) !== null && _a !== void 0 ? _a : null, after: updates[field] };
+    }
+    return changes;
+}
+function financeAuditActor(req) {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
+    const authed = req;
+    return {
+        actorUserId: (_b = (_a = authed.user) === null || _a === void 0 ? void 0 : _a.id) !== null && _b !== void 0 ? _b : null,
+        actorUid: (_d = (_c = authed.firebaseUser) === null || _c === void 0 ? void 0 : _c.uid) !== null && _d !== void 0 ? _d : null,
+        actorRole: (_f = (_e = authed.user) === null || _e === void 0 ? void 0 : _e.role) !== null && _f !== void 0 ? _f : null,
+        ipAddress: (_g = req.ip) !== null && _g !== void 0 ? _g : null,
+        userAgent: (_h = req.get('user-agent')) !== null && _h !== void 0 ? _h : null,
+    };
+}
 const DEFAULT_STRIPE_PUBLISHABLE_KEY = 'pk_test_51TP7NnCFpLYWSHx5i7EAuPRWUXgoP0lxHFIqDIGvyQOpNIbu4VOg2IMg7H8LW5HgTslJVudDxe3xnGXgRIubcVbA00swDdrRS0';
 const DEFAULT_PAYMENT_CURRENCY = (process.env.STRIPE_CURRENCY || 'ron').trim().toLowerCase();
 const FINANCE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
@@ -100,6 +162,26 @@ function isFirestoreNotFound(error) {
         'code' in error &&
         Number(error.code) === 5);
 }
+/**
+ * True for Firestore failures that mean "this environment can't reach Firestore"
+ * rather than "this document doesn't exist" — missing/!broken Application
+ * Default Credentials, and the gRPC UNAVAILABLE (14) / DEADLINE_EXCEEDED (4)
+ * codes. These are recoverable here because every caller has a Postgres path.
+ */
+function isFirestoreUnavailable(error) {
+    var _a;
+    if (!error || typeof error !== 'object') {
+        return false;
+    }
+    const code = Number(error.code);
+    if (code === 14 || code === 4) {
+        return true;
+    }
+    const message = String((_a = error.message) !== null && _a !== void 0 ? _a : '').toLowerCase();
+    return message.includes('default credentials')
+        || message.includes('could not refresh access token')
+        || message.includes('unable to detect a project id');
+}
 function canUseFirestoreDocuments() {
     var _a, _b, _c, _d;
     return Boolean(((_a = process.env.FIREBASE_SERVICE_ACCOUNT_JSON) === null || _a === void 0 ? void 0 : _a.trim()) ||
@@ -158,19 +240,34 @@ function getCurrentPlayer(req) {
         if (!email) {
             throw Object.assign(new Error('You must be signed in to load player payments.'), { statusCode: 401 });
         }
-        try {
-            const snap = yield firebaseAdmin_1.firestore.collection('players').where('email', '==', email).limit(1).get();
-            const doc = snap.docs[0];
-            if (doc) {
-                return {
-                    doc,
-                    data: doc.data(),
-                };
+        // Only touch Firestore when this environment actually has credentials for
+        // it. Firebase Admin is initialised with a projectId alone when no service
+        // account is configured (see lib/firebaseAdmin.ts) — that is enough to
+        // VERIFY ID tokens (public JWKS, no ADC) but NOT to read Firestore, which
+        // needs Application Default Credentials. Without this guard the query below
+        // threw "Could not load the default credentials", which is not a not-found,
+        // so it was rethrown and surfaced as a 500/503 on GET /finance/player/summary
+        // — even though the Postgres fallback right below it had the player all
+        // along. Same guard already used at the other Firestore reads in this file.
+        if (canUseFirestoreDocuments()) {
+            try {
+                const snap = yield firebaseAdmin_1.firestore.collection('players').where('email', '==', email).limit(1).get();
+                const doc = snap.docs[0];
+                if (doc) {
+                    return {
+                        doc,
+                        data: doc.data(),
+                    };
+                }
             }
-        }
-        catch (error) {
-            if (!isFirestoreNotFound(error)) {
-                throw error;
+            catch (error) {
+                // A credential/availability failure must not take the request down
+                // when Postgres can answer it. Only genuinely unexpected errors
+                // propagate.
+                if (!isFirestoreNotFound(error) && !isFirestoreUnavailable(error)) {
+                    throw error;
+                }
+                console.warn('[finance] Firestore player lookup unavailable, falling back to Postgres:', error);
             }
         }
         const playerRows = yield db_1.db
@@ -233,6 +330,17 @@ function normalizeMoneyValue(value) {
     const amount = Number(value);
     return Number.isFinite(amount) && amount >= 0 ? amount : null;
 }
+// Day-of-month (1..31) by which the monthly fee can be paid. Returns null for
+// invalid input so callers can reject it; use resolveDueDay() to read a stored
+// value with the default fallback.
+function normalizeDueDay(value) {
+    const day = Math.trunc(Number(value));
+    return Number.isFinite(day) && day >= 1 && day <= 31 ? day : null;
+}
+function resolveDueDay(value) {
+    var _a;
+    return (_a = normalizeDueDay(value)) !== null && _a !== void 0 ? _a : financeDefaults_1.DEFAULT_PAYMENT_DUE_DAY;
+}
 function getPlayerClubId(player) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, _b;
@@ -241,7 +349,7 @@ function getPlayerClubId(player) {
             return directClubId;
         }
         const teamIds = yield getPlayerTeamIds(player);
-        for (const teamId of teamIds) {
+        for (const teamId of canUseFirestoreDocuments() ? teamIds : []) {
             try {
                 const teamSnap = yield firebaseAdmin_1.firestore.collection('teams').where('id', '==', teamId).limit(1).get();
                 const teamDoc = teamSnap.docs[0];
@@ -251,7 +359,7 @@ function getPlayerClubId(player) {
                 }
             }
             catch (error) {
-                if (!isFirestoreNotFound(error)) {
+                if (!isFirestoreNotFound(error) && !isFirestoreUnavailable(error)) {
                     throw error;
                 }
             }
@@ -271,48 +379,11 @@ function getPlayerClubId(player) {
     });
 }
 function seedSettingsData(clubId) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c, _d;
-        let legacy = null;
-        if (canUseFirestoreDocuments()) {
-            try {
-                const legacySnap = yield firebaseAdmin_1.firestore.collection('financialSettings').doc('1').get();
-                legacy = legacySnap.exists ? legacySnap.data() : null;
-            }
-            catch (error) {
-                if (!isFirestoreNotFound(error)) {
-                    console.error('[finance/settings] Legacy Firestore settings fallback:', error);
-                }
-            }
-        }
-        if (!legacy) {
-            const rows = yield db_1.db
-                .select()
-                .from(schema_1.financialSettings)
-                .where((0, drizzle_orm_1.eq)(schema_1.financialSettings.id, 1))
-                .limit(1);
-            const existing = rows[0];
-            if (existing) {
-                legacy = {
-                    id: existing.id,
-                    monthlyPlayerFee: existing.monthlyPlayerFee,
-                    trainingLevy: existing.trainingLevy,
-                    facilityFee: existing.facilityFee,
-                    autoAdjust: existing.autoAdjust,
-                    updatedAt: existing.updatedAt,
-                };
-            }
-        }
-        return {
-            id: clubId !== null && clubId !== void 0 ? clubId : 1,
-            clubId: clubId !== null && clubId !== void 0 ? clubId : null,
-            monthlyPlayerFee: (_a = normalizeMoneyValue(legacy === null || legacy === void 0 ? void 0 : legacy.monthlyPlayerFee)) !== null && _a !== void 0 ? _a : 0,
-            trainingLevy: (_b = normalizeMoneyValue(legacy === null || legacy === void 0 ? void 0 : legacy.trainingLevy)) !== null && _b !== void 0 ? _b : 0,
-            facilityFee: (_c = normalizeMoneyValue(legacy === null || legacy === void 0 ? void 0 : legacy.facilityFee)) !== null && _c !== void 0 ? _c : 0,
-            autoAdjust: Number((_d = legacy === null || legacy === void 0 ? void 0 : legacy.autoAdjust) !== null && _d !== void 0 ? _d : 1) ? 1 : 0,
-            updatedAt: new Date(),
-        };
-    });
+    // Seeded from neutral defaults only. This used to read club 1's live settings and
+    // hand them to whichever club was being onboarded, which meant a new tenant began
+    // charging another club's fees — and these numbers feed real Stripe amounts, so
+    // the blast radius was money taken from real parents, not a cosmetic default.
+    return (0, financeDefaults_1.buildDefaultSettings)(clubId);
 }
 function ensureSettings(clubId) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -324,7 +395,7 @@ function ensureSettings(clubId) {
         if (snap.exists) {
             return snap;
         }
-        yield ref.set(yield seedSettingsData(clubId));
+        yield ref.set(seedSettingsData(clubId));
         return ref.get();
     });
 }
@@ -339,10 +410,36 @@ function getSettingsData(clubId) {
                 console.error('[finance/settings] Firestore settings fallback:', error);
             }
         }
+        // TODO(schema): `financial_settings` has no `club_id` column, so both this read
+        // and the PATCH /settings write overload the primary key as the tenant key. That
+        // only holds while club ids and the settings id sequence cannot collide, which
+        // nothing enforces. The table needs a real `club_id` column plus a backfill
+        // migration; until then, read and write MUST keep using the same key or every
+        // club silently reads another club's fees.
+        // Both settings inserts pin `id` explicitly, so financial_settings_id_seq never
+        // advances and any future insert that omits the id will collide with an existing
+        // club's row — the migration adding `club_id` must also setval the sequence past
+        // the highest id in use.
+        if (clubId == null) {
+            // Never fall back to row 1 for a caller we could not scope. These values drive
+            // Stripe charges, so handing back some other club's real fees is strictly worse
+            // than handing back nothing chargeable.
+            console.warn('[finance/settings] No club id resolved for caller; returning safe defaults instead of row 1.');
+            return {
+                id: financeDefaults_1.DEFAULT_SETTINGS_ROW_ID,
+                clubId: null,
+                monthlyPlayerFee: 0,
+                trainingLevy: 0,
+                facilityFee: 0,
+                autoAdjust: 1,
+                paymentDueDay: financeDefaults_1.DEFAULT_PAYMENT_DUE_DAY,
+                updatedAt: new Date(),
+            };
+        }
         const rows = yield db_1.db
             .select()
             .from(schema_1.financialSettings)
-            .where((0, drizzle_orm_1.eq)(schema_1.financialSettings.id, 1))
+            .where((0, drizzle_orm_1.eq)(schema_1.financialSettings.id, clubId))
             .limit(1);
         const existing = rows[0];
         if (existing) {
@@ -353,12 +450,17 @@ function getSettingsData(clubId) {
                 trainingLevy: existing.trainingLevy,
                 facilityFee: existing.facilityFee,
                 autoAdjust: existing.autoAdjust,
+                paymentDueDay: resolveDueDay(existing.paymentDueDay),
                 updatedAt: existing.updatedAt,
             };
         }
+        // The id has to be pinned to the club, not left to the serial default: the read
+        // above looks the row up by club id, so an auto-assigned id would never be found
+        // again and every request would insert another orphan row.
         const inserted = yield db_1.db
             .insert(schema_1.financialSettings)
             .values({
+            id: clubId,
             monthlyPlayerFee: 0,
             trainingLevy: 0,
             facilityFee: 0,
@@ -373,6 +475,7 @@ function getSettingsData(clubId) {
             trainingLevy: inserted[0].trainingLevy,
             facilityFee: inserted[0].facilityFee,
             autoAdjust: inserted[0].autoAdjust,
+            paymentDueDay: resolveDueDay(inserted[0].paymentDueDay),
             updatedAt: inserted[0].updatedAt,
         };
     });
@@ -411,19 +514,7 @@ function getPlayerTeamIds(player) {
         if (player.teamId != null) {
             ids.add(Number(player.teamId));
         }
-        try {
-            const membershipsSnap = yield firebaseAdmin_1.firestore.collection('playersToTeams').where('playerId', '==', player.id).get();
-            membershipsSnap.docs.forEach((docSnap) => {
-                const teamId = Number(docSnap.data().teamId);
-                if (Number.isFinite(teamId)) {
-                    ids.add(teamId);
-                }
-            });
-        }
-        catch (error) {
-            if (!isFirestoreNotFound(error)) {
-                throw error;
-            }
+        const addMembershipsFromPostgres = () => __awaiter(this, void 0, void 0, function* () {
             const membershipRows = yield db_1.db
                 .select({ teamId: schema_1.playersToTeams.teamId })
                 .from(schema_1.playersToTeams)
@@ -434,22 +525,48 @@ function getPlayerTeamIds(player) {
                     ids.add(teamId);
                 }
             });
+        });
+        // No Firestore credentials in this environment — go straight to Postgres
+        // rather than paying an ADC timeout to discover the same thing.
+        if (!canUseFirestoreDocuments()) {
+            yield addMembershipsFromPostgres();
+            return ids;
+        }
+        try {
+            const membershipsSnap = yield firebaseAdmin_1.firestore.collection('playersToTeams').where('playerId', '==', player.id).get();
+            membershipsSnap.docs.forEach((docSnap) => {
+                const teamId = Number(docSnap.data().teamId);
+                if (Number.isFinite(teamId)) {
+                    ids.add(teamId);
+                }
+            });
+        }
+        catch (error) {
+            if (!isFirestoreNotFound(error) && !isFirestoreUnavailable(error)) {
+                throw error;
+            }
+            yield addMembershipsFromPostgres();
         }
         return ids;
     });
 }
 function getPlayerPaymentRows(playerId) {
     return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const snap = yield firebaseAdmin_1.firestore.collection('playerPayments').where('playerId', '==', playerId).get();
-            return snap.docs.map((docSnap) => ({
-                ref: docSnap.ref,
-                data: docSnap.data(),
-            }));
-        }
-        catch (error) {
-            if (!isFirestoreNotFound(error)) {
-                throw error;
+        // Skip Firestore outright when this environment has no credentials for it:
+        // attempting the call costs a ~30s Application-Default-Credentials timeout
+        // per read before failing, which is what made this endpoint hang.
+        if (canUseFirestoreDocuments()) {
+            try {
+                const snap = yield firebaseAdmin_1.firestore.collection('playerPayments').where('playerId', '==', playerId).get();
+                return snap.docs.map((docSnap) => ({
+                    ref: docSnap.ref,
+                    data: docSnap.data(),
+                }));
+            }
+            catch (error) {
+                if (!isFirestoreNotFound(error) && !isFirestoreUnavailable(error)) {
+                    throw error;
+                }
             }
         }
         const rows = yield db_1.db
@@ -472,16 +589,18 @@ function getPlayerPaymentRows(playerId) {
 }
 function getPlayerByNumericId(playerId) {
     return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const snap = yield firebaseAdmin_1.firestore.collection('players').where('id', '==', playerId).limit(1).get();
-            const doc = snap.docs[0];
-            if (doc) {
-                return doc.data();
+        if (canUseFirestoreDocuments()) {
+            try {
+                const snap = yield firebaseAdmin_1.firestore.collection('players').where('id', '==', playerId).limit(1).get();
+                const doc = snap.docs[0];
+                if (doc) {
+                    return doc.data();
+                }
             }
-        }
-        catch (error) {
-            if (!isFirestoreNotFound(error)) {
-                throw error;
+            catch (error) {
+                if (!isFirestoreNotFound(error) && !isFirestoreUnavailable(error)) {
+                    throw error;
+                }
             }
         }
         const rows = yield db_1.db.select().from(schema_1.players).where((0, drizzle_orm_1.eq)(schema_1.players.id, playerId)).limit(1);
@@ -521,19 +640,27 @@ function buildEventFees(player, currency, paidFeeIds) {
             return [];
         }
         const now = new Date();
-        let eventRows;
-        try {
-            const eventsSnap = yield firebaseAdmin_1.firestore.collection('events').get();
-            eventRows = eventsSnap.docs.map((docSnap) => docSnap.data());
-        }
-        catch (error) {
-            if (!isFirestoreNotFound(error)) {
-                throw error;
-            }
-            eventRows = (yield db_1.db
+        const eventRowsFromPostgres = () => __awaiter(this, void 0, void 0, function* () {
+            return yield db_1.db
                 .select()
                 .from(schema_1.events)
-                .where((0, drizzle_orm_1.inArray)(schema_1.events.teamId, Array.from(teamIds))));
+                .where((0, drizzle_orm_1.inArray)(schema_1.events.teamId, Array.from(teamIds)));
+        });
+        let eventRows;
+        if (!canUseFirestoreDocuments()) {
+            eventRows = yield eventRowsFromPostgres();
+        }
+        else {
+            try {
+                const eventsSnap = yield firebaseAdmin_1.firestore.collection('events').get();
+                eventRows = eventsSnap.docs.map((docSnap) => docSnap.data());
+            }
+            catch (error) {
+                if (!isFirestoreNotFound(error) && !isFirestoreUnavailable(error)) {
+                    throw error;
+                }
+                eventRows = yield eventRowsFromPostgres();
+            }
         }
         return eventRows
             .filter((event) => {
@@ -605,7 +732,9 @@ function buildPlayerFees(player, paymentRows, currency) {
                     amount: monthlyPlayerFee,
                     currency,
                     status: 'upcoming',
-                    dueDate: new Date(currentYear, currentMonth - 1, 28).toISOString(),
+                    // The monthly fee can be paid until the configured due day of the
+                    // following month (e.g. due day 25 → July's fee is due Aug 25).
+                    dueDate: new Date(currentYear, currentMonth, resolveDueDay(settings.paymentDueDay)).toISOString(),
                     icon: 'training',
                 });
             }
@@ -661,13 +790,16 @@ function buildTransactions(paymentRows, currency) {
     });
 }
 function buildAdminRecentPayments(clubId_1) {
-    return __awaiter(this, arguments, void 0, function* (clubId, limit = 12) {
-        const teamRows = clubId == null
+    return __awaiter(this, arguments, void 0, function* (clubId, limit = 12, teamId = null) {
+        const allTeamRows = clubId == null
             ? yield db_1.db.select({ id: schema_1.teams.id, name: schema_1.teams.name }).from(schema_1.teams)
             : yield db_1.db.select({ id: schema_1.teams.id, name: schema_1.teams.name }).from(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.clubId, clubId));
+        // When scoped to a single team, restrict every downstream lookup to it so the
+        // report only contains that team's players' payments.
+        const teamRows = teamId != null ? allTeamRows.filter((team) => team.id === teamId) : allTeamRows;
         const teamNameById = new Map(teamRows.map((team) => [team.id, team.name]));
         const teamIds = teamRows.map((team) => team.id);
-        const directPlayers = clubId == null
+        const directPlayers = clubId == null && teamId == null
             ? yield db_1.db.select().from(schema_1.players)
             : teamIds.length
                 ? yield db_1.db.select().from(schema_1.players).where((0, drizzle_orm_1.inArray)(schema_1.players.teamId, teamIds))
@@ -679,7 +811,9 @@ function buildAdminRecentPayments(clubId_1) {
                 .innerJoin(schema_1.players, (0, drizzle_orm_1.eq)(schema_1.playersToTeams.playerId, schema_1.players.id))
                 .where((0, drizzle_orm_1.inArray)(schema_1.playersToTeams.teamId, teamIds))
             : [];
-        const clubUserRows = clubId == null
+        // Club-wide fallback players (users without an explicit team) don't belong to
+        // a single team, so skip them entirely when the report is team-scoped.
+        const clubUserRows = clubId == null || teamId != null
             ? []
             : yield db_1.db
                 .select({ email: schema_1.users.email })
@@ -1238,7 +1372,7 @@ router.get('/documents', (req, res) => __awaiter(void 0, void 0, void 0, functio
     }
 }));
 router.patch('/documents/:id/status', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const clubId = yield resolveAdminFinanceClubId(req, res);
     if (clubId === null && res.headersSent) {
         return;
@@ -1265,6 +1399,7 @@ router.patch('/documents/:id/status', (req, res) => __awaiter(void 0, void 0, vo
             yield docSnap.ref.set({ status }, { merge: true });
             const updated = yield docSnap.ref.get();
             res.json(Object.assign(Object.assign({}, updated.data()), { date: (_a = (0, firebaseAdmin_1.toIso)(updated.data().date)) !== null && _a !== void 0 ? _a : null }));
+            yield recordFinanceAudit(Object.assign({ action: 'finance.document.status', entityType: 'financial_document', entityId: id, clubId, metadata: { store: 'firestore', previousStatus: (_b = existing.status) !== null && _b !== void 0 ? _b : null, nextStatus: status } }, financeAuditActor(req)));
         }
         catch (firestoreError) {
             console.error('[PATCH /api/finance/documents/:id/status] Firestore fallback:', firestoreError);
@@ -1288,7 +1423,8 @@ router.patch('/documents/:id/status', (req, res) => __awaiter(void 0, void 0, vo
                 res.status(404).json({ error: 'Document not found' });
                 return;
             }
-            res.json(Object.assign(Object.assign({}, updated), { date: (_b = (0, firebaseAdmin_1.toIso)(updated.date)) !== null && _b !== void 0 ? _b : null }));
+            res.json(Object.assign(Object.assign({}, updated), { date: (_c = (0, firebaseAdmin_1.toIso)(updated.date)) !== null && _c !== void 0 ? _c : null }));
+            yield recordFinanceAudit(Object.assign({ action: 'finance.document.status', entityType: 'financial_document', entityId: id, clubId, metadata: { store: 'postgres', previousStatus: (_d = existing.status) !== null && _d !== void 0 ? _d : null, nextStatus: status } }, financeAuditActor(req)));
         }
     }
     catch (error) {
@@ -1412,7 +1548,7 @@ router.get('/stripe/config', (req, res) => __awaiter(void 0, void 0, void 0, fun
     });
 }));
 router.get('/admin/recent-payments', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b;
     try {
         const clubId = yield resolveAdminFinanceClubId(req, res);
         if (clubId === null && res.headersSent) {
@@ -1422,10 +1558,103 @@ router.get('/admin/recent-payments', (req, res) => __awaiter(void 0, void 0, voi
         const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
             ? Math.min(Math.floor(parsedLimit), 50)
             : 12;
-        res.json(yield buildAdminRecentPayments(clubId, limit));
+        const parsedTeamId = Number((_b = req.query) === null || _b === void 0 ? void 0 : _b.teamId);
+        const teamId = Number.isFinite(parsedTeamId) && parsedTeamId > 0 ? parsedTeamId : null;
+        res.json(yield buildAdminRecentPayments(clubId, limit, teamId));
     }
     catch (error) {
         handleRouteError(res, error, '[GET /api/finance/admin/recent-payments]');
+    }
+}));
+// Record a payment made outside Stripe (e.g. a player paying cash) so it shows
+// up in the team payment report alongside online payments.
+router.post('/admin/manual-payment', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
+    try {
+        const clubId = yield resolveAdminFinanceClubId(req, res);
+        if (clubId === null && res.headersSent) {
+            return;
+        }
+        const body = req.body;
+        const playerId = Number(body.playerId);
+        const amount = Number(body.amount);
+        if (!Number.isFinite(playerId) || playerId <= 0) {
+            res.status(400).json({ error: 'Jucătorul selectat este invalid.' });
+            return;
+        }
+        if (!Number.isFinite(amount) || amount <= 0) {
+            res.status(400).json({ error: 'Suma trebuie să fie un număr mai mare ca 0.' });
+            return;
+        }
+        const player = yield getPlayerByNumericId(playerId);
+        if (!player) {
+            res.status(404).json({ error: 'Jucătorul nu a fost găsit.' });
+            return;
+        }
+        const method = (String((_a = body.method) !== null && _a !== void 0 ? _a : 'cash').trim().toLowerCase()) || 'cash';
+        const description = typeof body.description === 'string' && body.description.trim()
+            ? body.description.trim()
+            : 'Plată numerar';
+        const when = body.date ? ((_b = (0, firebaseAdmin_1.toDate)(body.date)) !== null && _b !== void 0 ? _b : new Date()) : new Date();
+        const currency = DEFAULT_PAYMENT_CURRENCY;
+        try {
+            const id = yield (0, firebaseAdmin_1.nextNumericId)('playerPayments');
+            const record = {
+                id,
+                playerId,
+                amount: Math.round(amount),
+                month: when.getMonth() + 1,
+                year: when.getFullYear(),
+                status: 'paid',
+                date: when,
+                createdAt: when,
+                description,
+                provider: method,
+                currency,
+                receiptUrl: null,
+            };
+            yield firebaseAdmin_1.firestore.collection('playerPayments').doc(String(id)).set(record);
+            res.json({ success: true, payment: record });
+            yield recordFinanceAudit(Object.assign({ action: 'finance.payment.manual', entityType: 'player_payment', entityId: id, clubId, metadata: {
+                    store: 'firestore',
+                    playerId,
+                    amount: record.amount,
+                    currency,
+                    method,
+                    month: record.month,
+                    year: record.year,
+                } }, financeAuditActor(req)));
+        }
+        catch (firestoreError) {
+            if (!isFirestoreNotFound(firestoreError)) {
+                console.error('[POST /api/finance/admin/manual-payment] Firestore fallback:', firestoreError);
+            }
+            const inserted = yield db_1.db
+                .insert(schema_1.playerPayments)
+                .values({
+                playerId,
+                amount: Math.round(amount),
+                month: when.getMonth() + 1,
+                year: when.getFullYear(),
+                status: 'paid',
+                date: when.toISOString(),
+                createdAt: when.toISOString(),
+            })
+                .returning();
+            res.json({ success: true, payment: inserted[0] });
+            yield recordFinanceAudit(Object.assign({ action: 'finance.payment.manual', entityType: 'player_payment', entityId: (_d = (_c = inserted[0]) === null || _c === void 0 ? void 0 : _c.id) !== null && _d !== void 0 ? _d : null, clubId, metadata: {
+                    store: 'postgres',
+                    playerId,
+                    amount: Math.round(amount),
+                    currency,
+                    method,
+                    month: when.getMonth() + 1,
+                    year: when.getFullYear(),
+                } }, financeAuditActor(req)));
+        }
+    }
+    catch (error) {
+        handleRouteError(res, error, '[POST /api/finance/admin/manual-payment]');
     }
 }));
 router.post('/player/checkout-session', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -1583,7 +1812,7 @@ router.get('/settings', (req, res) => __awaiter(void 0, void 0, void 0, function
         }
         const clubId = (user === null || user === void 0 ? void 0 : user.clubId) != null ? Number(user.clubId) : null;
         const data = yield getSettingsData(clubId);
-        res.json(Object.assign(Object.assign({}, data), { id: (_b = (_a = data.id) !== null && _a !== void 0 ? _a : clubId) !== null && _b !== void 0 ? _b : 1, clubId: (_c = data.clubId) !== null && _c !== void 0 ? _c : clubId, monthlyPlayerFee: (_d = normalizeMoneyValue(data.monthlyPlayerFee)) !== null && _d !== void 0 ? _d : 0, trainingLevy: (_e = normalizeMoneyValue(data.trainingLevy)) !== null && _e !== void 0 ? _e : 0, facilityFee: (_f = normalizeMoneyValue(data.facilityFee)) !== null && _f !== void 0 ? _f : 0, autoAdjust: Number((_g = data.autoAdjust) !== null && _g !== void 0 ? _g : 1) ? 1 : 0, updatedAt: (_h = (0, firebaseAdmin_1.toIso)(data.updatedAt)) !== null && _h !== void 0 ? _h : new Date().toISOString() }));
+        res.json(Object.assign(Object.assign({}, data), { id: (_b = (_a = data.id) !== null && _a !== void 0 ? _a : clubId) !== null && _b !== void 0 ? _b : 1, clubId: (_c = data.clubId) !== null && _c !== void 0 ? _c : clubId, monthlyPlayerFee: (_d = normalizeMoneyValue(data.monthlyPlayerFee)) !== null && _d !== void 0 ? _d : 0, trainingLevy: (_e = normalizeMoneyValue(data.trainingLevy)) !== null && _e !== void 0 ? _e : 0, facilityFee: (_f = normalizeMoneyValue(data.facilityFee)) !== null && _f !== void 0 ? _f : 0, autoAdjust: Number((_g = data.autoAdjust) !== null && _g !== void 0 ? _g : 1) ? 1 : 0, paymentDueDay: resolveDueDay(data.paymentDueDay), updatedAt: (_h = (0, firebaseAdmin_1.toIso)(data.updatedAt)) !== null && _h !== void 0 ? _h : new Date().toISOString() }));
     }
     catch (error) {
         console.error('[GET /api/finance/settings]', error);
@@ -1591,18 +1820,26 @@ router.get('/settings', (req, res) => __awaiter(void 0, void 0, void 0, function
     }
 }));
 router.patch('/settings', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q;
     try {
         const clubId = yield resolveAdminFinanceClubId(req, res);
         if (clubId === null && res.headersSent) {
             return;
         }
-        const { monthlyPlayerFee, trainingLevy, facilityFee, autoAdjust } = req.body;
+        const { monthlyPlayerFee, trainingLevy, facilityFee, autoAdjust, paymentDueDay } = req.body;
         const updates = {
             id: clubId !== null && clubId !== void 0 ? clubId : 1,
             clubId: clubId !== null && clubId !== void 0 ? clubId : null,
             updatedAt: new Date(),
         };
+        if (paymentDueDay !== undefined) {
+            const day = normalizeDueDay(paymentDueDay);
+            if (day == null) {
+                res.status(400).json({ error: 'paymentDueDay must be a day between 1 and 31.' });
+                return;
+            }
+            updates.paymentDueDay = day;
+        }
         if (monthlyPlayerFee !== undefined) {
             const amount = normalizeMoneyValue(monthlyPlayerFee);
             if (amount == null) {
@@ -1633,10 +1870,15 @@ router.patch('/settings', (req, res) => __awaiter(void 0, void 0, void 0, functi
         try {
             const ref = firebaseAdmin_1.firestore.collection('financialSettings').doc(getSettingsDocId(clubId));
             yield ensureSettings(clubId);
+            // Captured before the write so the audit row can carry what the fees were,
+            // which is the evidence this endpoint has never produced.
+            const beforeSnap = yield ref.get();
+            const before = beforeSnap.data();
             yield ref.set(updates, { merge: true });
             const snap = yield ref.get();
             const data = snap.data();
-            res.json(Object.assign(Object.assign({}, data), { monthlyPlayerFee: (_a = normalizeMoneyValue(data.monthlyPlayerFee)) !== null && _a !== void 0 ? _a : 0, trainingLevy: (_b = normalizeMoneyValue(data.trainingLevy)) !== null && _b !== void 0 ? _b : 0, facilityFee: (_c = normalizeMoneyValue(data.facilityFee)) !== null && _c !== void 0 ? _c : 0, autoAdjust: Number((_d = data.autoAdjust) !== null && _d !== void 0 ? _d : 1) ? 1 : 0, updatedAt: (_e = (0, firebaseAdmin_1.toIso)(data.updatedAt)) !== null && _e !== void 0 ? _e : new Date().toISOString() }));
+            res.json(Object.assign(Object.assign({}, data), { monthlyPlayerFee: (_a = normalizeMoneyValue(data.monthlyPlayerFee)) !== null && _a !== void 0 ? _a : 0, trainingLevy: (_b = normalizeMoneyValue(data.trainingLevy)) !== null && _b !== void 0 ? _b : 0, facilityFee: (_c = normalizeMoneyValue(data.facilityFee)) !== null && _c !== void 0 ? _c : 0, autoAdjust: Number((_d = data.autoAdjust) !== null && _d !== void 0 ? _d : 1) ? 1 : 0, paymentDueDay: resolveDueDay(data.paymentDueDay), updatedAt: (_e = (0, firebaseAdmin_1.toIso)(data.updatedAt)) !== null && _e !== void 0 ? _e : new Date().toISOString() }));
+            yield recordFinanceAudit(Object.assign({ action: 'finance.settings.update', entityType: 'financial_settings', entityId: clubId, clubId, metadata: { store: 'firestore', changes: settingsAuditChanges(before, updates) } }, financeAuditActor(req)));
             return;
         }
         catch (error) {
@@ -1644,18 +1886,25 @@ router.patch('/settings', (req, res) => __awaiter(void 0, void 0, void 0, functi
                 console.error('[PATCH /api/finance/settings] Firestore settings fallback:', error);
             }
         }
-        const pgUpdates = Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (updates.monthlyPlayerFee !== undefined ? { monthlyPlayerFee: Number(updates.monthlyPlayerFee) } : {})), (updates.trainingLevy !== undefined ? { trainingLevy: Number(updates.trainingLevy) } : {})), (updates.facilityFee !== undefined ? { facilityFee: Number(updates.facilityFee) } : {})), (updates.autoAdjust !== undefined ? { autoAdjust: Number(updates.autoAdjust) } : {})), { updatedAt: new Date().toISOString() });
-        const existingRows = yield db_1.db.select().from(schema_1.financialSettings).where((0, drizzle_orm_1.eq)(schema_1.financialSettings.id, 1)).limit(1);
+        const pgUpdates = Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (updates.monthlyPlayerFee !== undefined ? { monthlyPlayerFee: Number(updates.monthlyPlayerFee) } : {})), (updates.trainingLevy !== undefined ? { trainingLevy: Number(updates.trainingLevy) } : {})), (updates.facilityFee !== undefined ? { facilityFee: Number(updates.facilityFee) } : {})), (updates.autoAdjust !== undefined ? { autoAdjust: Number(updates.autoAdjust) } : {})), (updates.paymentDueDay !== undefined ? { paymentDueDay: Number(updates.paymentDueDay) } : {})), { updatedAt: new Date().toISOString() });
+        // Must use the same key as getSettingsData, which now reads by club id. Left
+        // hardcoded to 1, a club would write its fees into the legacy row and then read
+        // back its own (empty) row — silently losing every settings change.
+        const settingsRowId = clubId !== null && clubId !== void 0 ? clubId : financeDefaults_1.DEFAULT_SETTINGS_ROW_ID;
+        const existingRows = yield db_1.db.select().from(schema_1.financialSettings).where((0, drizzle_orm_1.eq)(schema_1.financialSettings.id, settingsRowId)).limit(1);
         const data = existingRows[0]
-            ? (yield db_1.db.update(schema_1.financialSettings).set(pgUpdates).where((0, drizzle_orm_1.eq)(schema_1.financialSettings.id, 1)).returning())[0]
+            ? (yield db_1.db.update(schema_1.financialSettings).set(pgUpdates).where((0, drizzle_orm_1.eq)(schema_1.financialSettings.id, settingsRowId)).returning())[0]
             : (yield db_1.db.insert(schema_1.financialSettings).values({
+                id: settingsRowId,
                 monthlyPlayerFee: Number((_f = updates.monthlyPlayerFee) !== null && _f !== void 0 ? _f : 0),
                 trainingLevy: Number((_g = updates.trainingLevy) !== null && _g !== void 0 ? _g : 0),
                 facilityFee: Number((_h = updates.facilityFee) !== null && _h !== void 0 ? _h : 0),
                 autoAdjust: Number((_j = updates.autoAdjust) !== null && _j !== void 0 ? _j : 1),
+                paymentDueDay: Number((_k = updates.paymentDueDay) !== null && _k !== void 0 ? _k : financeDefaults_1.DEFAULT_PAYMENT_DUE_DAY),
                 updatedAt: new Date().toISOString(),
             }).returning())[0];
-        res.json(Object.assign(Object.assign({}, data), { monthlyPlayerFee: (_k = normalizeMoneyValue(data.monthlyPlayerFee)) !== null && _k !== void 0 ? _k : 0, trainingLevy: (_l = normalizeMoneyValue(data.trainingLevy)) !== null && _l !== void 0 ? _l : 0, facilityFee: (_m = normalizeMoneyValue(data.facilityFee)) !== null && _m !== void 0 ? _m : 0, autoAdjust: Number((_o = data.autoAdjust) !== null && _o !== void 0 ? _o : 1) ? 1 : 0, updatedAt: (_p = (0, firebaseAdmin_1.toIso)(data.updatedAt)) !== null && _p !== void 0 ? _p : new Date().toISOString() }));
+        res.json(Object.assign(Object.assign({}, data), { monthlyPlayerFee: (_l = normalizeMoneyValue(data.monthlyPlayerFee)) !== null && _l !== void 0 ? _l : 0, trainingLevy: (_m = normalizeMoneyValue(data.trainingLevy)) !== null && _m !== void 0 ? _m : 0, facilityFee: (_o = normalizeMoneyValue(data.facilityFee)) !== null && _o !== void 0 ? _o : 0, autoAdjust: Number((_p = data.autoAdjust) !== null && _p !== void 0 ? _p : 1) ? 1 : 0, paymentDueDay: resolveDueDay(data.paymentDueDay), updatedAt: (_q = (0, firebaseAdmin_1.toIso)(data.updatedAt)) !== null && _q !== void 0 ? _q : new Date().toISOString() }));
+        yield recordFinanceAudit(Object.assign({ action: 'finance.settings.update', entityType: 'financial_settings', entityId: settingsRowId, clubId, metadata: { store: 'postgres', changes: settingsAuditChanges(existingRows[0], updates) } }, financeAuditActor(req)));
     }
     catch (error) {
         console.error('[PATCH /api/finance/settings]', error);

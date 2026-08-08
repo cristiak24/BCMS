@@ -28,15 +28,15 @@ export function DayScheduleModal({
   const isToday = day ? day.date.toDateString() === new Date().toDateString() : false;
 
   return (
-    <Modal visible={day !== null} transparent animationType="fade">
-      <Pressable className="flex-1 bg-black/45 items-center justify-center p-5" onPress={onClose}>
+    <Modal visible={day !== null} transparent animationType={isMobile ? 'slide' : 'fade'}>
+      <Pressable className={`flex-1 bg-black/45 ${isMobile ? 'justify-end' : 'items-center justify-center p-5'}`} onPress={onClose}>
         <View
-          className="bg-white rounded-[28px] w-full overflow-hidden"
-          style={{ maxWidth: 560, maxHeight: '86%', boxShadow: '0 24px 60px rgba(11,30,61,0.28)' } as any}
+          className={`bg-white w-full overflow-hidden ${isMobile ? 'rounded-t-[24px]' : 'rounded-[20px]'}`}
+          style={{ maxWidth: isMobile ? undefined : 560, maxHeight: isMobile ? '90%' : '86%', boxShadow: '0 24px 60px rgba(11,30,61,0.28)' } as any}
           onStartShouldSetResponder={() => true}
         >
           {/* Header */}
-          <View className="px-6 pt-6 pb-5 border-b border-[#EEF3F9]">
+          <View className={`${isMobile ? 'px-5 pt-4 pb-4' : 'px-6 pt-5 pb-4'} border-b border-[#EEF3F9]`}>
             <View className="flex-row items-start justify-between gap-4">
               <View className="flex-1">
                 <View className="flex-row items-center gap-2">
@@ -49,7 +49,7 @@ export function DayScheduleModal({
                     </View>
                   )}
                 </View>
-                <Text className="text-[#0E2041] text-[26px] font-black mt-1">
+                <Text className="text-[#0E2041] text-[21px] font-bold mt-0.5">
                   {day?.date.toLocaleDateString(RO_LOCALE, { month: 'long', day: 'numeric' })}
                 </Text>
                 <Text className="text-slate-400 font-bold text-[12px] mt-0.5">

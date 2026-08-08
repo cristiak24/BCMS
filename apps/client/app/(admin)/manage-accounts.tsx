@@ -527,9 +527,9 @@ export default function ManageAccountsScreen() {
                         />
                     </View>
 
-                    <GlassCard className="mb-6">
-                        <Text className="text-[#102A72] text-[18px] font-black">Filters</Text>
-                        <View className="mt-4 flex-row flex-wrap gap-2">
+                    <GlassCard className="mb-5">
+                        <Text className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-faint)' }}>Filtre</Text>
+                        <View className="mt-2.5 flex-row flex-wrap gap-1.5">
                             {FILTERS.map((item) => {
                                 const active = filter === item;
                                 return (
@@ -538,18 +538,21 @@ export default function ManageAccountsScreen() {
                                         onPress={() => setFilter(item)}
                                         accessibilityRole="button"
                                         accessibilityState={{ selected: active }}
-                                        className={`px-4 py-3 min-h-[44px] items-center justify-center rounded-full border ${active ? 'bg-[#123A97] border-[#123A97]' : 'bg-[#F7F9FF] border-[#E4EAF7] hover:border-blue-200'}`}
+                                        className="px-3 h-8 items-center justify-center rounded-[9px] border"
+                                        style={active
+                                            ? { backgroundColor: 'var(--c-brand-surface)', borderColor: 'transparent' }
+                                            : { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}
                                     >
-                                        <Text className={`font-bold text-[12px] capitalize ${active ? 'text-white' : 'text-[#56627F]'}`}>
-                                            {item === 'all' ? 'All' : item}
+                                        <Text className="font-semibold text-[12px] capitalize" style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>
+                                            {item === 'all' ? 'Toate' : item}
                                         </Text>
                                     </Pressable>
                                 );
                             })}
                         </View>
 
-                        <View className="mt-5 flex-row flex-wrap items-center gap-2">
-                            <Text className="text-[11px] font-bold uppercase tracking-wide text-[#56627F] mr-1">Sort by</Text>
+                        <View className="mt-3 pt-3 border-t flex-row flex-wrap items-center gap-1.5" style={{ borderColor: 'var(--c-border-soft)' }}>
+                            <Text className="text-[10px] font-semibold uppercase tracking-wider mr-1" style={{ color: 'var(--c-faint)' }}>Sortare</Text>
                             {SORT_OPTIONS.map((option) => {
                                 const active = sortKey === option.key;
                                 return (
@@ -565,11 +568,14 @@ export default function ManageAccountsScreen() {
                                         }}
                                         accessibilityRole="button"
                                         accessibilityState={{ selected: active }}
-                                        className={`px-4 py-2 min-h-[40px] flex-row items-center gap-1 rounded-full border ${active ? 'bg-[#EEF3FF] border-[#123A97]' : 'bg-white border-[#E4EAF7] hover:border-blue-200'}`}
+                                        className="px-3 h-8 flex-row items-center gap-1 rounded-[9px] border"
+                                        style={active
+                                            ? { backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' }
+                                            : { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}
                                     >
-                                        <Text className={`font-bold text-[12px] ${active ? 'text-[#123A97]' : 'text-[#56627F]'}`}>{option.label}</Text>
+                                        <Text className="font-semibold text-[12px]" style={{ color: active ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)' }}>{option.label}</Text>
                                         {active ? (
-                                            <MaterialIcons name={sortDesc ? 'arrow-downward' : 'arrow-upward'} size={14} color="var(--c-brand-fg)" />
+                                            <MaterialIcons name={sortDesc ? 'arrow-downward' : 'arrow-upward'} size={13} color="var(--c-brand-fg)" />
                                         ) : null}
                                     </Pressable>
                                 );
@@ -579,15 +585,16 @@ export default function ManageAccountsScreen() {
                                 <Pressable
                                     onPress={toggleSelectAll}
                                     accessibilityRole="button"
-                                    className="ml-auto px-4 py-2 min-h-[40px] flex-row items-center gap-2 rounded-full border border-[#E4EAF7] bg-white hover:border-blue-200"
+                                    className="ml-auto px-3 h-8 flex-row items-center gap-1.5 rounded-[9px] border"
+                                    style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
                                 >
                                     <MaterialIcons
                                         name={allSelectableSelected ? 'check-box' : 'check-box-outline-blank'}
-                                        size={18}
+                                        size={16}
                                         color="var(--c-brand-fg)"
                                     />
-                                    <Text className="font-bold text-[12px] text-[#56627F]">
-                                        {allSelectableSelected ? 'Clear selection' : `Select all (${selectableAccounts.length})`}
+                                    <Text className="font-semibold text-[12px]" style={{ color: 'var(--c-ink-soft)' }}>
+                                        {allSelectableSelected ? 'Deselectează' : `Toate (${selectableAccounts.length})`}
                                     </Text>
                                 </Pressable>
                             ) : null}

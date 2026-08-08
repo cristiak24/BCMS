@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from '@/src/web/reactNative';
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import { useRouter } from '@/src/web/expoRouter';
+import { Clock, MapPin, TrendingUp, Trophy } from 'lucide-react';
 import { eventsApi, CalendarEvent } from '../../services/eventsApi';
 import { AuthUser, normalizeRole } from '../../utils/authSession';
 import { useFirebaseAuth } from '../../context/AuthContext';
 import { getCoachScopedEvents } from '../../components/coach/coachUtils';
+import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../components/HeaderContext';
+import { PlayerEventDetailModal } from '../../components/schedule/player/PlayerEventDetailModal';
+import { Skeleton } from '../../components/ui/Skeleton';
+import PageContainer from '../../components/ui/PageContainer';
+import { EmptyState } from '../../components/ui/ScreenState';
+import { findNextUpcomingEvent } from '../../utils/scheduleLanding';
+import { PlayerDayScheduleModal } from '../../components/schedule/player/PlayerDayScheduleModal';
+import { PlayerScheduleWeekView } from '../../components/schedule/player/PlayerScheduleWeekView';
+import { PlayerScheduleAgendaList } from '../../components/schedule/player/PlayerScheduleAgendaList';
+import { PlayerScheduleToolbar } from '../../components/schedule/player/PlayerScheduleToolbar';
+import { PlayerCalendarGrid } from '../../components/schedule/player/PlayerCalendarGrid';
+import type { PlayerCalendarDay } from '../../components/schedule/player/PlayerCalendarGrid';
 import {
   toDateKey,
   startOfMonth,
@@ -14,37 +26,16 @@ import {
   getEventTimestamp,
   isCancelledEvent,
   getMonthGridDays,
+  getEventTypeMeta,
+  eventMatchesSearch,
+  buildICSCalendar,
+  triggerFileDownload,
 } from '../../components/schedule/scheduleShared';
 
 type EventFilter = 'all' | 'training' | 'match' | 'camp';
+type ScheduleView = 'month' | 'week' | 'agenda';
 
-type EventTone = {
-  label: string;
-  color: string;
-  pillBg: string;
-  chipBg: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
-};
-
-type CalendarDay = {
-  key: string;
-  dayNumber: number | null;
-  dateKey: string | null;
-  isToday: boolean;
-  isSelected: boolean;
-  events: CalendarEvent[];
-};
-
-const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-
-const FILTERS: { key: EventFilter; label: string }[] = [
-  { key: 'all', label: 'All Events' },
-  { key: 'training', label: 'Training' },
-  { key: 'match', label: 'Matches' },
-  { key: 'camp', label: 'Camps' },
-];
-
-const EVENTS_PAGE_SIZE = 16;
+const RO_LOCALE = 'ro-RO';
 
 function getSessionTeamIds(user: AuthUser | null) {
   return new Set(
@@ -73,50 +64,18 @@ function isUpcoming(event: CalendarEvent) {
   return !isCancelledEvent(event) && getEventTimestamp(event) >= Date.now();
 }
 
-function formatMonth(value: Date) {
-  return new Intl.DateTimeFormat('en', {
-    month: 'long',
-    year: 'numeric',
-  }).format(value);
-}
-
-function formatMonthRange(value: Date) {
-  return `${formatMonth(value)} - ${formatMonth(addMonths(value, 1))}`;
-}
-
-function formatEventDate(value: string) {
-  const date = getEventDate(value);
-  if (!date) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat('en', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  }).format(date).toUpperCase();
-}
-
-function formatShortDate(value: string) {
-  const date = getEventDate(value);
-  if (!date) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
-  }).format(date);
+function formatMonthName(value: Date) {
+  return new Intl.DateTimeFormat(RO_LOCALE, { month: 'long' }).format(value);
 }
 
 function formatDayBlock(value: string) {
   const date = getEventDate(value);
   if (!date) {
-    return { month: 'DATE', day: '--' };
+    return { month: 'DATA', day: '--' };
   }
 
   return {
-    month: new Intl.DateTimeFormat('en', { month: 'short' }).format(date).toUpperCase(),
+    month: new Intl.DateTimeFormat(RO_LOCALE, { month: 'short' }).format(date).toUpperCase().replace('.', ''),
     day: String(date.getDate()),
   };
 }
@@ -127,7 +86,7 @@ function formatEventTime(value: string) {
     return value;
   }
 
-  return new Intl.DateTimeFormat('en', {
+  return new Intl.DateTimeFormat(RO_LOCALE, {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
@@ -153,47 +112,12 @@ function eventMatchesFilter(event: CalendarEvent, filter: EventFilter) {
   return event.type === filter;
 }
 
-function toneForEvent(type: CalendarEvent['type']): EventTone {
-  if (type === 'match') {
-    return {
-      label: 'MATCH',
-      color: 'var(--c-brand-fg)',
-      pillBg: 'var(--c-surface-tint)',
-      chipBg: 'var(--c-surface-tint)',
-      icon: 'sports-basketball',
-    };
-  }
-
-  if (type === 'camp') {
-    return {
-      label: 'CAMP',
-      color: 'var(--c-sky)',
-      pillBg: 'var(--c-surface-tint)',
-      chipBg: 'var(--c-surface-tint)',
-      icon: 'terrain',
-    };
-  }
-
-  if (type === 'admin') {
-    return {
-      label: 'INFO',
-      color: 'var(--c-muted)',
-      pillBg: 'var(--c-surface-2)',
-      chipBg: 'var(--c-surface-2)',
-      icon: 'badge',
-    };
-  }
-
-  return {
-    label: 'TRAINING',
-    color: 'var(--c-brand-fg)',
-    pillBg: 'var(--c-surface-tint)',
-    chipBg: 'var(--c-surface-tint)',
-    icon: 'fitness-center',
-  };
+function parseDateKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year, month - 1, day);
 }
 
-function getCalendarDays(viewDate: Date, eventsByDay: Map<string, CalendarEvent[]>, selectedDayKey: string | null): CalendarDay[] {
+function getCalendarDays(viewDate: Date, eventsByDay: Map<string, CalendarEvent[]>, selectedDayKey: string | null): PlayerCalendarDay[] {
   // Delegates the actual month-grid math to the shared helper (used by the
   // admin schedule too) and only adds the tabs-specific "isSelected" flag.
   const minimumSlots = 35;
@@ -214,7 +138,7 @@ function getNextMatchLabel(match: CalendarEvent | null) {
 
   const diffMs = getEventTimestamp(match) - Date.now();
   if (diffMs <= 0) {
-    return 'Now';
+    return 'Acum';
   }
 
   const hours = Math.ceil(diffMs / 3600000);
@@ -222,248 +146,167 @@ function getNextMatchLabel(match: CalendarEvent | null) {
     return `${hours}h`;
   }
 
-  return `${Math.ceil(hours / 24)}d`;
+  return `${Math.ceil(hours / 24)}z`;
 }
 
-function EmptyState({ message }: { message: string }) {
-  return (
-    <View className="items-center justify-center rounded-[28px] border border-[#E3ECF6] bg-white px-6 py-10">
-      <MaterialIcons name="event-busy" size={30} color="var(--c-faint)" />
-      <Text className="mt-3 text-center text-[#64748B] font-bold">{message}</Text>
-    </View>
-  );
-}
 
-function FilterChip({
-  filter,
-  active,
-  onPress,
-}: {
-  filter: { key: EventFilter; label: string };
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.filterChip, active ? styles.filterChipActive : styles.filterChipIdle]}
-    >
-      <Text style={[styles.filterChipText, active ? styles.filterChipTextActive : styles.filterChipTextIdle]}>
-        {filter.label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function PaginationButton({
-  icon,
-  label,
-  disabled,
-  onPress,
-}: {
-  icon: keyof typeof MaterialIcons.glyphMap;
-  label: string;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      disabled={disabled}
-      onPress={onPress}
-      style={[styles.paginationButton, disabled ? styles.paginationButtonDisabled : null]}
-    >
-      <MaterialIcons name={icon} size={24} color={disabled ? '#A7B4C6' : 'var(--c-brand-fg)'} />
-    </Pressable>
-  );
-}
-
-function CalendarEventPill({ event }: { event: CalendarEvent }) {
-  const tone = toneForEvent(event.type);
-
-  return (
-    <View style={[styles.calendarEventPill, { backgroundColor: tone.chipBg, borderLeftColor: tone.color }]}>
-      <Text numberOfLines={2} style={[styles.calendarEventText, { color: tone.color }]}>
-        {tone.label}: {event.title}
-      </Text>
-    </View>
-  );
-}
-
-function CalendarCell({
-  day,
-  index,
-  isLastRow,
-  cellHeight,
-  onSelect,
-}: {
-  day: CalendarDay;
-  index: number;
-  isLastRow: boolean;
-  cellHeight: number;
-  onSelect: (dateKey: string) => void;
-}) {
-  const showOverflow = day.events.length > 2;
-
-  return (
-    <Pressable
-      disabled={!day.dateKey}
-      onPress={() => day.dateKey && onSelect(day.dateKey)}
-      style={[
-        styles.calendarCell,
-        {
-          minHeight: cellHeight,
-          borderRightWidth: index % 7 === 6 ? 0 : 1,
-          borderBottomWidth: isLastRow ? 0 : 1,
-        },
-        day.isSelected ? styles.calendarCellSelected : null,
-      ]}
-    >
-      {day.dayNumber ? (
-        <>
-          <View className="flex-row items-center justify-between">
-            <View style={[styles.dayNumber, day.isToday || day.isSelected ? styles.dayNumberActive : null]}>
-              <Text style={[styles.dayNumberText, day.isToday || day.isSelected ? styles.dayNumberTextActive : null]}>
-                {day.dayNumber}
-              </Text>
-            </View>
-            {day.events.length ? (
-              <Text className="text-[10px] font-black text-[#8EA1B8]">{day.events.length}</Text>
-            ) : null}
-          </View>
-
-          <View className="mt-2 gap-1">
-            {day.events.slice(0, 2).map((event) => (
-              <CalendarEventPill key={event.id} event={event} />
-            ))}
-            {showOverflow ? (
-              <Text className="text-[10px] font-black text-[#64748B]">+{day.events.length - 2} more</Text>
-            ) : null}
-          </View>
-        </>
-      ) : null}
-    </Pressable>
-  );
-}
-
-function UpcomingEventCard({ event, primary }: { event: CalendarEvent; primary?: boolean }) {
-  const router = useRouter();
-  const tone = toneForEvent(event.type);
-  const actionLabel = event.type === 'camp' ? 'Register' : event.type === 'training' ? 'Attending' : 'Check In';
-  const handleAction = () => {
-    if (event.type === 'match') {
-      router.replace('/attendance' as any);
-    }
-  };
-
-  return (
-    <View className="rounded-[30px] border border-[#E4EEF7] bg-white p-6 shadow-sm">
-      <View className="flex-row items-start justify-between gap-4">
-        <View className="flex-1">
-          <Text className="text-[#111827] text-[12px] font-black uppercase tracking-widest">
-            {formatEventDate(event.startTime)} - {formatEventTime(event.startTime)}
-          </Text>
-          <Text className="mt-3 text-[#050817] text-2xl font-black leading-7" numberOfLines={3}>
-            {event.title}
-          </Text>
-        </View>
-        <View style={[styles.typeBadge, { backgroundColor: tone.pillBg }]}>
-          <Text style={[styles.typeBadgeText, { color: tone.color }]}>{tone.label}</Text>
-        </View>
-      </View>
-
-      <View className="mt-7 flex-row items-center gap-3">
-        <MaterialIcons name="place" size={20} color="var(--c-muted)" />
-        <Text className="flex-1 text-[#6B7280] text-base font-semibold" numberOfLines={1}>
-          {event.location || event.teamName || 'Club court'}
-        </Text>
-      </View>
-
-      <View className="mt-8 h-px bg-[#E5EAF1]" />
-
-      <View className="mt-5 flex-row items-center justify-between gap-4">
-        <View className="flex-row items-center gap-2">
-          {event.type === 'training' ? (
-            <MaterialIcons name="check-circle-outline" size={24} color="var(--c-brand-fg)" />
-          ) : (
-            <>
-              <View className="h-9 w-9 rounded-full bg-[#0A2C93] items-center justify-center border-2 border-white">
-                <Text className="text-white text-[11px] font-black">VS</Text>
-              </View>
-              <View className="-ml-3 h-9 w-9 rounded-full bg-[#007A99] items-center justify-center border-2 border-white">
-                <MaterialIcons name={tone.icon} size={17} color="var(--c-surface)" />
-              </View>
-            </>
-          )}
-          {event.type === 'training' ? (
-            <Text className="text-[#006092] font-black">Attending</Text>
-          ) : (
-            <Text className="text-[#64748B] text-xs font-black">+8</Text>
-          )}
-        </View>
-
-        {event.type === 'training' ? (
-          <MaterialIcons name="more-horiz" size={24} color="var(--c-muted)" />
-        ) : (
-          <Pressable
-            onPress={handleAction}
-            style={[styles.cardAction, primary ? styles.cardActionPrimary : styles.cardActionSecondary]}
-          >
-            <Text style={[styles.cardActionText, primary ? styles.cardActionTextPrimary : styles.cardActionTextSecondary]}>
-              {actionLabel}
-            </Text>
-          </Pressable>
-        )}
-      </View>
-    </View>
-  );
-}
-
-function MiniMetric({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <View style={[styles.metricCard, { backgroundColor: color }]}>
-      <Text className="text-[#AFC4FF] text-[11px] font-black uppercase tracking-widest">{label}</Text>
-      <Text className="mt-4 text-white text-3xl font-black">{value}</Text>
-    </View>
-  );
-}
-
-function AllEventRow({ event }: { event: CalendarEvent }) {
-  const tone = toneForEvent(event.type);
+/**
+ * Right-rail event card — mirrors the admin ScheduleEventCard in its `compact`
+ * (stacked) form: 48px date block, radius 20, 3px type-coloured left edge.
+ * Read-only: pressing the card opens the detail sheet, nothing else.
+ */
+function UpcomingEventCard({ event, onDetails }: { event: CalendarEvent; onDetails: () => void }) {
+  const meta = getEventTypeMeta(event.type);
   const dateBlock = formatDayBlock(event.startTime);
 
   return (
-    <View className="rounded-[24px] border border-[#E4EEF7] bg-white px-4 py-4 md:px-5 flex-col md:flex-row md:items-center gap-4">
-      <View className="w-[74px] h-[74px] rounded-[22px] bg-[#F0F6FC] items-center justify-center">
-        <Text className="text-[#64748B] text-[11px] font-black uppercase tracking-widest">{dateBlock.month}</Text>
-        <Text className="text-[#0A2C93] text-3xl font-black leading-9">{dateBlock.day}</Text>
-      </View>
-
-      <View className="flex-1 min-w-0">
-        <View className="flex-row flex-wrap items-center gap-2">
-          <Text className="text-[#050817] text-lg font-black" numberOfLines={1}>{event.title}</Text>
-          <View style={[styles.typeBadgeSmall, { backgroundColor: tone.pillBg }]}>
-            <Text style={[styles.typeBadgeTextSmall, { color: tone.color }]}>{tone.label}</Text>
-          </View>
+    <Pressable
+      onPress={onDetails}
+      accessibilityRole="button"
+      className="bg-[var(--c-surface)] border border-[var(--c-border)] rounded-[20px] px-4 py-4 gap-3 hover:opacity-90"
+      style={{ borderLeftWidth: 3, borderLeftColor: meta.solid }}
+    >
+      <View className="flex-row items-center gap-3">
+        <View
+          className="w-12 h-12 rounded-[14px] items-center justify-center border"
+          style={{ backgroundColor: meta.soft, borderColor: meta.soft }}
+        >
+          <Text className="text-[9px] font-black uppercase tracking-wider" style={{ color: meta.onSoft }}>
+            {dateBlock.month}
+          </Text>
+          <Text className="text-[17px] font-black leading-tight" style={{ color: 'var(--c-ink-strong)' }}>
+            {dateBlock.day}
+          </Text>
         </View>
-        <View className="mt-3 flex-row flex-wrap gap-x-5 gap-y-2">
+
+        <View className="flex-1 min-w-0">
           <View className="flex-row items-center gap-2">
-            <MaterialIcons name="schedule" size={17} color="var(--c-muted)" />
-            <Text className="text-[#6B7280] font-semibold">{formatTimeRange(event.startTime, event.endTime)}</Text>
-          </View>
-          <View className="flex-row items-center gap-2">
-            <MaterialIcons name="place" size={17} color="var(--c-muted)" />
-            <Text className="text-[#6B7280] font-semibold" numberOfLines={1}>
-              {event.location || event.teamName || 'Club court'}
+            <Text
+              numberOfLines={1}
+              className="text-[15px] font-black flex-1"
+              style={{ color: 'var(--c-ink-strong)' }}
+            >
+              {event.title}
             </Text>
+            <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: meta.soft }}>
+              <Text className="text-[9px] font-black uppercase tracking-widest" style={{ color: meta.onSoft }}>
+                {meta.label}
+              </Text>
+            </View>
+          </View>
+
+          <View className="gap-1.5 mt-1.5">
+            <View className="flex-row items-center gap-1.5">
+              <Clock size={13} color="var(--c-faint)" />
+              <Text className="text-[12px] font-bold" style={{ color: 'var(--c-muted)' }}>
+                {formatTimeRange(event.startTime, event.endTime)}
+              </Text>
+            </View>
+            <View className="flex-row items-center gap-1.5 flex-1 min-w-0">
+              <MapPin size={13} color="var(--c-faint)" />
+              <Text numberOfLines={1} className="text-[12px] font-semibold flex-1" style={{ color: 'var(--c-muted)' }}>
+                {event.location || event.teamName || 'Teren club'}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
+    </Pressable>
+  );
+}
 
-      <View className="md:items-end">
-        <Text className="text-[#8EA1B8] text-[11px] font-black uppercase tracking-widest">{formatShortDate(event.startTime)}</Text>
-        <Text className="mt-1 text-[#0E2041] font-black">{event.teamName || 'Team event'}</Text>
+/**
+ * Flat stat tile. These were two saturated gradients (indigo + a hardcoded
+ * off-brand teal) with 32px white numerals — the loudest thing on a page whose
+ * subject is the calendar. Same surface/border/type as every other card now.
+ */
+function MiniMetric({ label, value, icon: Icon }: {
+  label: string;
+  value: string;
+  icon: typeof TrendingUp;
+}) {
+  return (
+    <View
+      className="flex-1 rounded-[14px] border p-4 justify-between"
+      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', minHeight: 88, boxShadow: 'var(--e-sm)' } as any}
+    >
+      <View className="flex-row items-center gap-2">
+        <Icon size={14} color="var(--c-faint)" />
+        <Text className="text-[11px] font-bold uppercase tracking-[0.07em]" style={{ color: 'var(--c-faint)' }}>{label}</Text>
+      </View>
+      <Text className="text-[24px] font-bold tracking-tight mt-2" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{value}</Text>
+    </View>
+  );
+}
+
+/** One event line inside a day card: type bar, title, time, place. */
+function DayEventLine({ event, onPress }: { event: CalendarEvent; onPress: () => void }) {
+  const meta = getEventTypeMeta(event.type);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${meta.label}: ${event.title}`}
+      className="flex-row items-center gap-2.5 rounded-[10px] px-2.5 py-2 hover:opacity-90"
+      style={{ backgroundColor: 'var(--c-surface-2)' }}
+    >
+      <View style={{ width: 3, alignSelf: 'stretch', minHeight: 26, borderRadius: 2, backgroundColor: meta.solid }} />
+      <View className="flex-1 min-w-0">
+        <Text className="text-[12.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{event.title}</Text>
+        <View className="flex-row items-center gap-1.5 mt-0.5">
+          <Clock size={11} color="var(--c-faint)" />
+          <Text className="text-[11px] font-medium" style={{ color: 'var(--c-muted)' }}>{formatTimeRange(event.startTime, event.endTime)}</Text>
+          <MapPin size={11} color="var(--c-faint)" />
+          <Text className="text-[11px] font-medium flex-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+            {event.location || 'Teren club'}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+/** A single day's events, as one card in the month grid. */
+function DayCard({
+  dateKey,
+  events,
+  isToday,
+  onSelectEvent,
+}: {
+  dateKey: string;
+  events: CalendarEvent[];
+  isToday: boolean;
+  onSelectEvent: (event: CalendarEvent) => void;
+}) {
+  const date = parseDateKey(dateKey);
+  const weekday = new Intl.DateTimeFormat(RO_LOCALE, { weekday: 'short' }).format(date).replace('.', '');
+
+  return (
+    <View
+      className="rounded-[14px] border p-3"
+      style={{
+        backgroundColor: 'var(--c-surface)',
+        borderColor: isToday ? 'var(--c-brand-border)' : 'var(--c-border)',
+        boxShadow: 'var(--e-sm)',
+      } as any}
+    >
+      <View className="flex-row items-center gap-2 mb-2">
+        <Text className="text-[16px] font-bold leading-none" style={{ color: isToday ? 'var(--c-brand-fg)' : 'var(--c-ink)' }}>
+          {date.getDate()}
+        </Text>
+        <Text className="text-[11px] font-bold uppercase tracking-[0.07em]" style={{ color: 'var(--c-faint)' }}>{weekday}</Text>
+        {isToday ? (
+          <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+            <Text className="text-[10px] font-bold uppercase" style={{ color: 'var(--c-brand-fg)' }}>Azi</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View className="gap-1.5">
+        {events.map((event) => (
+          <DayEventLine key={event.id} event={event} onPress={() => onSelectEvent(event)} />
+        ))}
       </View>
     </View>
   );
@@ -471,18 +314,31 @@ function AllEventRow({ event }: { event: CalendarEvent }) {
 
 export default function ScheduleScreen() {
   const { session } = useFirebaseAuth();
+  const { setSearchPlaceholder, searchValue, setSearchValue } = useHeader();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<EventFilter>('all');
-  const [eventsPage, setEventsPage] = useState(1);
+  const [scheduleView, setScheduleView] = useState<ScheduleView>('month');
   const [viewDate, setViewDate] = useState(() => startOfMonth(new Date()));
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(() => toDateKey(new Date()));
+  const [selectedDay, setSelectedDay] = useState<{ date: Date; events: CalendarEvent[] } | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const { width } = useWindowDimensions();
 
-  const calendarCellHeight = width >= 1280 ? 150 : width >= 768 ? 128 : 96;
+  const isMobile = width < 1024;
   const isCoach = normalizeRole(session?.role) === 'coach';
+
+  // Global header search box drives the schedule search, same as admin.
+  useEffect(() => {
+    setSearchPlaceholder('Caută evenimente...');
+    return () => {
+      setSearchPlaceholder(DEFAULT_SEARCH_PLACEHOLDER);
+      setSearchValue('');
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadData = useCallback(async (showSpinner = false) => {
     if (showSpinner) {
@@ -502,16 +358,24 @@ export default function ScheduleScreen() {
         .filter((event) => isCoach || belongsToSessionTeam(event, teamIds))
         .sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b));
 
-      const firstUpcoming = visibleEvents.find(isUpcoming) ?? visibleEvents[0] ?? null;
-      const firstUpcomingDate = firstUpcoming ? getEventDate(firstUpcoming.startTime) : null;
+      const landingEvent = findNextUpcomingEvent(visibleEvents);
+      const landingDate = landingEvent ? getEventDate(landingEvent.startTime) : null;
 
       setEvents(visibleEvents);
-      if (firstUpcomingDate) {
-        setViewDate(startOfMonth(firstUpcomingDate));
-        setSelectedDayKey(toDateKey(firstUpcomingDate));
+      // Only ever jump forward. The old `?? visibleEvents[0]` fallback ran against an
+      // ascending list, so a club with nothing upcoming opened on the OLDEST event it
+      // had ever recorded — the calendar landed in 2023. With nothing ahead we stay on
+      // the current month and keep today selected.
+      if (landingDate) {
+        setViewDate(startOfMonth(landingDate));
+        setSelectedDayKey(toDateKey(landingDate));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load schedule.');
+      // Never surface the raw message: transport-level failures produce strings
+      // like "signal is aborted without reason", which rendered verbatim in the
+      // error banner. Log the real error, show the user a stable one.
+      console.error('[schedule] Failed to load events:', err);
+      setError('Programul nu a putut fi încărcat. Verifică conexiunea și încearcă din nou.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -523,24 +387,11 @@ export default function ScheduleScreen() {
   }, [loadData]);
 
   const filteredEvents = useMemo(
-    () => events.filter((event) => eventMatchesFilter(event, activeFilter)),
-    [activeFilter, events]
+    () => events
+      .filter((event) => eventMatchesFilter(event, activeFilter))
+      .filter((event) => eventMatchesSearch(event, searchValue)),
+    [activeFilter, events, searchValue]
   );
-
-  const eventsPageCount = Math.max(1, Math.ceil(filteredEvents.length / EVENTS_PAGE_SIZE));
-  const safeEventsPage = Math.min(eventsPage, eventsPageCount);
-  const eventsPageStart = (safeEventsPage - 1) * EVENTS_PAGE_SIZE;
-  const paginatedEvents = filteredEvents.slice(eventsPageStart, eventsPageStart + EVENTS_PAGE_SIZE);
-  const visibleEventsStart = filteredEvents.length ? eventsPageStart + 1 : 0;
-  const visibleEventsEnd = Math.min(eventsPageStart + EVENTS_PAGE_SIZE, filteredEvents.length);
-
-  useEffect(() => {
-    setEventsPage(1);
-  }, [activeFilter]);
-
-  useEffect(() => {
-    setEventsPage((currentPage) => Math.min(currentPage, eventsPageCount));
-  }, [eventsPageCount]);
 
   const eventsByDay = useMemo(() => {
     const byDay = new Map<string, CalendarEvent[]>();
@@ -563,6 +414,14 @@ export default function ScheduleScreen() {
     [eventsByDay, selectedDayKey, viewDate]
   );
 
+  // The month grid already holds exactly the right days, in order, filtered —
+  // the day list below is just its non-empty cells, so the two can never
+  // disagree about what the month contains.
+  const monthDayGroups = useMemo(
+    () => calendarDays.filter((day) => day.dateKey !== null && day.events.length > 0),
+    [calendarDays]
+  );
+
   const upcomingEvents = useMemo(
     () => filteredEvents.filter(isUpcoming).sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b)),
     [filteredEvents]
@@ -573,339 +432,186 @@ export default function ScheduleScreen() {
     [upcomingEvents]
   );
 
+  // Per-type counts feed the toolbar chips (which double as the calendar's
+  // legend). Scoped to the month on screen — the admin toolbar's counts are
+  // month-scoped because admin fetches a month at a time, and an unscoped count
+  // here read as "677 antrenamente" next to an empty August. Computed IGNORING
+  // the active type filter, so each chip always shows its own total rather than
+  // 0 once another type is selected. Presentation only.
+  const typeCounts = useMemo(() => {
+    const monthKey = toDateKey(viewDate).slice(0, 7);
+    return events
+      .filter((event) => eventMatchesSearch(event, searchValue))
+      .filter((event) => {
+        const date = getEventDate(event.startTime);
+        return date != null && toDateKey(date).slice(0, 7) === monthKey;
+      })
+      .reduce<Record<string, number>>((acc, event) => {
+        acc[event.type] = (acc[event.type] ?? 0) + 1;
+        return acc;
+      }, {});
+  }, [events, searchValue, viewDate]);
+
   const monthEventCount = calendarDays.reduce((total, day) => total + day.events.length, 0);
   const visibleUpcomingCards = upcomingEvents.slice(0, 3);
-  const pageTitle = isCoach ? 'Coach Schedule' : 'My Schedule';
-  const pageSubtitle = isCoach ? (session?.clubName || 'Coach calendar') : (session?.teamName || session?.clubName || 'Team calendar');
+
+  const handleSelectDay = (dateKey: string) => {
+    setSelectedDayKey(dateKey);
+    setSelectedDay({ date: parseDateKey(dateKey), events: eventsByDay.get(dateKey) ?? [] });
+  };
+
+  const resetKey = `${toDateKey(viewDate).slice(0, 7)}|${activeFilter}|${searchValue}`;
+
+  const handleExport = () => {
+    const filename = `program-${toDateKey(viewDate).slice(0, 7)}.ics`;
+    const ok = triggerFileDownload(filename, buildICSCalendar(filteredEvents), 'text/calendar;charset=utf-8;');
+    if (!ok) {
+      setError('Exportul calendarului este disponibil momentan doar pe web.');
+    }
+  };
 
   return (
-    <ScrollView className="flex-1 bg-[#EEF7FF]" contentContainerClassName="px-4 md:px-10 py-7 md:py-10 pb-20">
-      <View className="w-full max-w-7xl mx-auto">
-        <View className="flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-8">
-          <View className="flex-1">
-            <Text className="text-[#0A2C93] text-4xl md:text-5xl font-black tracking-tight">{pageTitle}</Text>
-            <View className="mt-5 flex-row flex-wrap items-center gap-3">
-              <View className="h-10 w-10 rounded-xl bg-white items-center justify-center border border-[#DDE8F5]">
-                <MaterialIcons name="calendar-today" size={22} color="#1E2C43" />
-              </View>
-              <Text className="text-[#1E293B] text-lg md:text-xl font-semibold">{formatMonthRange(viewDate)}</Text>
-              <Text className="text-[#8EA1B8] text-sm font-black uppercase tracking-widest">{pageSubtitle}</Text>
-            </View>
-          </View>
-
-          <View className="flex-row flex-wrap items-center gap-3">
-            {FILTERS.map((filter) => (
-              <FilterChip
-                key={filter.key}
-                filter={filter}
-                active={activeFilter === filter.key}
-                onPress={() => setActiveFilter(filter.key)}
-              />
-            ))}
-            <Pressable onPress={() => loadData(true)} className="h-[52px] w-[52px] rounded-full bg-white border border-[#BED0E5] items-center justify-center">
-              {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={23} color="var(--c-brand-fg)" />}
-            </Pressable>
-          </View>
+    <ScrollView
+      className="flex-1 bg-[var(--c-bg)]"
+      contentContainerClassName="pb-32"
+    >
+      <PageContainer>
+        <View className="mb-4">
+          <PlayerScheduleToolbar
+            monthLabel={formatMonthName(viewDate)}
+            year={viewDate.getFullYear()}
+            eventCount={monthEventCount}
+            onNavigateMonth={(delta) => setViewDate((current) => addMonths(current, delta))}
+            onToday={() => setViewDate(startOfMonth(new Date()))}
+            view={scheduleView}
+            onViewChange={setScheduleView}
+            filter={activeFilter}
+            onFilterChange={setActiveFilter}
+            typeCounts={typeCounts}
+            onExport={handleExport}
+            onRefresh={() => loadData(true)}
+            refreshing={refreshing}
+            isMobile={isMobile}
+            searchValue={searchValue}
+            onClearSearch={() => setSearchValue('')}
+          />
         </View>
 
         {error ? (
-          <View className="mb-6 rounded-[24px] border border-red-100 bg-white px-5 py-4 flex-row items-center gap-3">
-            <MaterialIcons name="error-outline" size={22} color="var(--c-danger)" />
-            <Text className="flex-1 text-red-600 font-bold">{error}</Text>
+          <View className="mb-4 rounded-[12px] border border-[var(--c-danger-border)] bg-[var(--c-danger-bg)] px-4 py-3 flex-row items-center gap-2">
+            <MaterialIcons name="error-outline" size={18} color="var(--c-danger)" />
+            <Text className="flex-1 text-[12px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text>
           </View>
         ) : null}
 
-        <View className="flex-col xl:flex-row gap-8">
-          <View className="flex-1 min-w-0 gap-8">
-            <View className="overflow-hidden rounded-[34px] border border-[#DDE8F5] bg-white shadow-sm">
-              <View className="px-5 md:px-8 py-6 flex-row items-center justify-between">
-                <View>
-                  <Text className="text-[#050817] text-2xl md:text-3xl font-black">{formatMonth(viewDate)}</Text>
-                  <Text className="mt-1 text-[#8EA1B8] text-[11px] font-black uppercase tracking-widest">
-                    {monthEventCount} events this month
-                  </Text>
-                </View>
-                <View className="flex-row items-center gap-2">
-                  <Pressable
-                    onPress={() => setViewDate((current) => addMonths(current, -1))}
-                    className="h-11 w-11 rounded-full items-center justify-center"
-                  >
-                    <MaterialIcons name="chevron-left" size={30} color="var(--c-ink-strong)" />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setViewDate((current) => addMonths(current, 1))}
-                    className="h-11 w-11 rounded-full items-center justify-center"
-                  >
-                    <MaterialIcons name="chevron-right" size={30} color="var(--c-ink-strong)" />
-                  </Pressable>
-                </View>
+        {scheduleView === 'week' ? (
+          <PlayerScheduleWeekView events={filteredEvents} onSelectEvent={setSelectedEvent} isMobile={isMobile} />
+        ) : scheduleView === 'agenda' ? (
+          <PlayerScheduleAgendaList events={filteredEvents} resetKey={resetKey} isMobile={isMobile} onSelectEvent={setSelectedEvent} />
+        ) : (
+          <View className="gap-5 w-full">
+            <View className={`${isMobile ? 'gap-4' : 'flex-row gap-5 items-start w-full'}`}>
+              <View className="flex-1 min-w-0">
+                {/* Month header removed — the toolbar above already owns the month
+                    label, count and stepper. The grid card is now just the grid. */}
+                <PlayerCalendarGrid days={calendarDays} loading={loading} onSelectDay={handleSelectDay} />
               </View>
 
-              <View className="h-px bg-[#E5EAF1]" />
+              <View className={`${isMobile ? 'w-full' : 'shrink-0'} gap-4`} style={isMobile ? undefined : { width: width >= 1440 ? 380 : 340 }}>
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Evenimente viitoare</Text>
+                  <Pressable onPress={() => setScheduleView('agenda')}>
+                    <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Vezi tot</Text>
+                  </Pressable>
+                </View>
 
-              <View className="flex-row bg-white">
-                {WEEKDAYS.map((day) => (
-                  <View key={day} style={styles.weekdayCell}>
-                    <Text className="text-[#6B7280] text-[12px] font-black uppercase tracking-widest">{day}</Text>
+                {loading ? (
+                  <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă evenimentele viitoare">
+                    {Array.from({ length: 2 }).map((_, index) => (
+                      <Skeleton key={index} className="h-[108px] w-full rounded-[20px]" />
+                    ))}
                   </View>
-                ))}
+                ) : visibleUpcomingCards.length ? (
+                  visibleUpcomingCards.map((event) => (
+                    <UpcomingEventCard key={event.id} event={event} onDetails={() => setSelectedEvent(event)} />
+                  ))
+                ) : (
+                  <EmptyState icon="event-busy" compact title="Niciun eveniment viitor" message="Evenimentele programate apar aici." />
+                )}
+
+                <View className="flex-row gap-3">
+                  <MiniMetric label="Viitoare" value={String(upcomingEvents.length)} icon={TrendingUp} />
+                  <MiniMetric label="Următorul meci" value={getNextMatchLabel(nextMatch)} icon={Trophy} />
+                </View>
+              </View>
+            </View>
+
+            {/* Full width, month-scoped, grouped by day.
+                It used to be a 16-row flat list stacked in the ~800px left
+                column, listing EVERY event ever ("21 evenimente") right under a
+                calendar whose toolbar said "12 evenimente" — two different
+                answers to the same question, in one narrow strip, while the
+                right rail sat empty for 1400px. Now it answers the same
+                question as the calendar above it, and spends the whole page
+                width doing it. */}
+            <View>
+              <View className="mb-3 flex-row flex-wrap items-end justify-between gap-3">
+                <View>
+                  <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>
+                    Evenimentele lunii
+                  </Text>
+                  <Text className="mt-0.5 text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>
+                    {monthEventCount} {monthEventCount === 1 ? 'eveniment' : 'evenimente'} în {formatMonthName(viewDate)} {viewDate.getFullYear()}
+                  </Text>
+                </View>
+                <Pressable onPress={() => setScheduleView('agenda')} accessibilityRole="button">
+                  <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Vezi toate lunile</Text>
+                </Pressable>
               </View>
 
               {loading ? (
-                <View className="min-h-[390px] items-center justify-center">
-                  <ActivityIndicator size="large" color="var(--c-brand-fg)" />
+                <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start" accessibilityRole="progressbar" accessibilityLabel="Se încarcă evenimentele">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <Skeleton key={index} className="h-[120px] w-full rounded-[14px]" />
+                  ))}
                 </View>
-              ) : (
-                <View className="flex-row flex-wrap">
-                  {calendarDays.map((day, index) => (
-                    <CalendarCell
-                      key={day.key}
-                      day={day}
-                      index={index}
-                      isLastRow={index >= calendarDays.length - 7}
-                      cellHeight={calendarCellHeight}
-                      onSelect={setSelectedDayKey}
+              ) : monthDayGroups.length ? (
+                <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
+                  {monthDayGroups.map((day) => (
+                    <DayCard
+                      key={day.dateKey}
+                      dateKey={day.dateKey as string}
+                      events={day.events}
+                      isToday={day.isToday}
+                      onSelectEvent={setSelectedEvent}
                     />
                   ))}
                 </View>
-              )}
-            </View>
-
-            <View className="rounded-[30px] border border-[#DDE8F5] bg-white p-5 md:p-6">
-              <View className="mb-5 flex-row flex-wrap items-center justify-between gap-4">
-                <View>
-                  <Text className="text-[#050817] text-2xl md:text-3xl font-black">All events</Text>
-                  <Text className="mt-1 text-[#8EA1B8] text-[11px] font-black uppercase tracking-widest">
-                    {filteredEvents.length} total
-                  </Text>
-                </View>
-                <View className="flex-row flex-wrap items-center justify-end gap-3">
-                  <View className="h-11 rounded-full bg-[#F0F6FC] px-5 items-center justify-center">
-                    <Text className="text-[#0A2C93] font-black">{FILTERS.find((filter) => filter.key === activeFilter)?.label}</Text>
-                  </View>
-                  {filteredEvents.length > EVENTS_PAGE_SIZE ? (
-                    <View className="flex-row items-center gap-2">
-                      <PaginationButton
-                        icon="chevron-left"
-                        label="Previous events page"
-                        disabled={safeEventsPage <= 1}
-                        onPress={() => setEventsPage((page) => Math.max(1, page - 1))}
-                      />
-                      <View className="h-11 min-w-[92px] rounded-full bg-white border border-[#DDE8F5] px-4 items-center justify-center">
-                        <Text className="text-[#0E2041] font-black">{safeEventsPage} / {eventsPageCount}</Text>
-                      </View>
-                      <PaginationButton
-                        icon="chevron-right"
-                        label="Next events page"
-                        disabled={safeEventsPage >= eventsPageCount}
-                        onPress={() => setEventsPage((page) => Math.min(eventsPageCount, page + 1))}
-                      />
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-
-              {loading ? (
-                <View className="py-12 items-center justify-center">
-                  <ActivityIndicator size="large" color="var(--c-brand-fg)" />
-                </View>
-              ) : filteredEvents.length ? (
-                <View className="gap-4">
-                  <Text className="text-[#64748B] text-sm font-bold">
-                    Showing {visibleEventsStart}-{visibleEventsEnd} of {filteredEvents.length}
-                  </Text>
-                  <View className="gap-3">
-                    {paginatedEvents.map((event) => (
-                      <AllEventRow key={event.id} event={event} />
-                    ))}
-                  </View>
-                </View>
               ) : (
-                <EmptyState message="No events found for this filter." />
+                <EmptyState
+                  icon="event-busy"
+                  compact
+                  title="Nicio zi cu evenimente în această lună"
+                  message="Schimbă luna din bara de sus sau încearcă alt filtru."
+                />
               )}
             </View>
           </View>
+        )}
+      </PageContainer>
 
-          <View className="w-full xl:w-[380px] gap-7">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-[#050817] text-2xl font-black">Upcoming Events</Text>
-              <Pressable onPress={() => setActiveFilter('all')}>
-                <Text className="text-[#0A2C93] font-black">View All</Text>
-              </Pressable>
-            </View>
+      <PlayerDayScheduleModal
+        day={selectedDay}
+        isMobile={isMobile}
+        onClose={() => setSelectedDay(null)}
+        onSelectEvent={(event) => { setSelectedDay(null); setSelectedEvent(event); }}
+      />
 
-            {loading ? (
-              <View className="rounded-[30px] bg-white border border-[#DDE8F5] min-h-[220px] items-center justify-center">
-                <ActivityIndicator size="large" color="var(--c-brand-fg)" />
-              </View>
-            ) : visibleUpcomingCards.length ? (
-              visibleUpcomingCards.map((event, index) => (
-                <UpcomingEventCard key={event.id} event={event} primary={index === 0} />
-              ))
-            ) : (
-              <EmptyState message="No upcoming events found." />
-            )}
-
-            <View className="flex-row gap-4">
-              <MiniMetric label="Upcoming" value={String(upcomingEvents.length)} color="#2949B9" />
-              <MiniMetric label="Next match" value={getNextMatchLabel(nextMatch)} color="var(--c-sky)" />
-            </View>
-          </View>
-        </View>
-      </View>
+      <PlayerEventDetailModal
+        event={selectedEvent}
+        isMobile={isMobile}
+        onClose={() => setSelectedEvent(null)}
+      />
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  filterChip: {
-    minHeight: 52,
-    borderRadius: 26,
-    borderWidth: 1,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterChipActive: {
-    backgroundColor: 'var(--c-sky)',
-    borderColor: 'var(--c-sky)',
-    shadowColor: 'var(--c-brand-fg)',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-  },
-  filterChipIdle: {
-    backgroundColor: 'rgba(255,255,255,0.48)',
-    borderColor: 'var(--c-border-strong)',
-  },
-  filterChipText: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  filterChipTextActive: {
-    color: '#06385F',
-  },
-  filterChipTextIdle: {
-    color: 'var(--c-ink-strong)',
-  },
-  weekdayCell: {
-    width: `${100 / 7}%`,
-    height: 62,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: 'var(--c-border)',
-  },
-  calendarCell: {
-    width: `${100 / 7}%`,
-    padding: 12,
-    borderColor: 'var(--c-border)',
-    backgroundColor: 'var(--c-surface)',
-  },
-  calendarCellSelected: {
-    borderColor: 'var(--c-brand-fg)',
-    borderWidth: 2,
-  },
-  dayNumber: {
-    minWidth: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayNumberActive: {
-    backgroundColor: 'var(--c-brand-surface-deep)',
-  },
-  dayNumberText: {
-    color: 'var(--c-ink-strong)',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  dayNumberTextActive: {
-    color: 'var(--c-surface)',
-  },
-  calendarEventPill: {
-    borderLeftWidth: 4,
-    borderRadius: 7,
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-  },
-  calendarEventText: {
-    fontSize: 11,
-    lineHeight: 15,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  typeBadge: {
-    minHeight: 28,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  typeBadgeText: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  typeBadgeSmall: {
-    minHeight: 25,
-    borderRadius: 13,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  typeBadgeTextSmall: {
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  cardAction: {
-    minHeight: 44,
-    borderRadius: 22,
-    paddingHorizontal: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  cardActionPrimary: {
-    backgroundColor: 'var(--c-brand-surface-deep)',
-    borderColor: 'var(--c-brand-fg)',
-  },
-  cardActionSecondary: {
-    backgroundColor: 'var(--c-surface)',
-    borderColor: 'var(--c-brand-fg)',
-  },
-  cardActionText: {
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  cardActionTextPrimary: {
-    color: 'var(--c-surface)',
-  },
-  cardActionTextSecondary: {
-    color: 'var(--c-brand-fg)',
-  },
-  metricCard: {
-    flex: 1,
-    minHeight: 112,
-    borderRadius: 28,
-    padding: 20,
-    justifyContent: 'center',
-  },
-  paginationButton: {
-    height: 44,
-    width: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: 'var(--c-border-strong)',
-    backgroundColor: 'var(--c-surface)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  paginationButtonDisabled: {
-    backgroundColor: 'var(--c-surface-2)',
-    borderColor: 'var(--c-border)',
-  },
-});

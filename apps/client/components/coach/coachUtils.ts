@@ -34,10 +34,10 @@ export function getCoachScopeLabel(events: CalendarEvent[], session: AuthUser | 
   const coachId = Number(session?.id);
 
   if (!Number.isFinite(coachId)) {
-    return 'Club sessions';
+    return 'Sesiunile clubului';
   }
 
-  return events.some((event) => Number(event.coachId) === coachId) ? 'Assigned sessions' : 'Club sessions';
+  return events.some((event) => Number(event.coachId) === coachId) ? 'Sesiuni atribuite' : 'Sesiunile clubului';
 }
 
 export function formatCoachDate(value: string) {
@@ -70,8 +70,8 @@ export function formatCoachTimeRange(start: string, end: string) {
 }
 
 export function eventTypeLabel(type: CalendarEvent['type']) {
-  if (type === 'match') return 'Match';
-  if (type === 'camp') return 'Camp';
+  if (type === 'match') return 'Meci';
+  if (type === 'camp') return 'Cantonament';
   if (type === 'admin') return 'Info';
-  return 'Training';
+  return 'Antrenament';
 }

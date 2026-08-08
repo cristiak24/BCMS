@@ -29,9 +29,7 @@ function ensureClubForUser(user) {
             }
         }
         const defaultClub = yield (0, manageAccessRepository_1.ensureDefaultClub)();
-        if (!user.isHardcodedAdmin) {
-            yield (0, manageAccessRepository_1.assignUserClub)(user.id, defaultClub.id);
-        }
+        yield (0, manageAccessRepository_1.assignUserClub)(user.id, defaultClub.id);
         return defaultClub;
     });
 }
@@ -51,7 +49,7 @@ function approveManageAccessRequest(user, requestId) {
         if (request.status !== 'pending') {
             throw new Error('Only pending requests can be approved.');
         }
-        yield (0, manageAccessRepository_1.approveAccessRequest)(request.id, club.id, user.isHardcodedAdmin ? null : user.id);
+        yield (0, manageAccessRepository_1.approveAccessRequest)(request.id, club.id, user.id);
         yield (0, manageAccessRepository_1.updateUserAccess)(request.userId, {
             clubId: club.id,
             role: request.requestedRole,
@@ -75,12 +73,11 @@ function denyManageAccessRequest(user, requestId) {
         if (request.status !== 'pending') {
             throw new Error('Only pending requests can be denied.');
         }
-        yield (0, manageAccessRepository_1.denyAccessRequest)(request.id, club.id, user.isHardcodedAdmin ? null : user.id);
-        yield (0, manageAccessRepository_1.updateUserAccess)(request.userId, {
-            clubId: club.id,
-            role: request.requestedRole,
-            status: 'disabled',
-        });
+        // Denying a request only rejects that request — it must NOT disable the user's
+        // account. The user stays in their current (pending) state so the admin can
+        // still approve a later request, exactly as the UI copy promises. Disabling an
+        // account is a separate, explicit action in Manage Accounts.
+        yield (0, manageAccessRepository_1.denyAccessRequest)(request.id, club.id, user.id);
         return {
             requestId: request.id,
             clubId: club.id,
@@ -116,7 +113,7 @@ function generateClubInviteLink(user, role, refreshIntervalMinutes) {
             tokenHash: token.tokenHash,
             expiresAt: token.expiresAt,
             refreshIntervalMinutes: interval,
-            createdBy: user.isHardcodedAdmin ? null : user.id,
+            createdBy: user.id,
         });
         if (!created) {
             throw new Error('Could not persist the invite link.');

@@ -70,6 +70,30 @@ function getRequestClubId(req) {
 function isSuperadmin(req) {
     return req.user?.role === 'superadmin';
 }
+/**
+ * Read access to a single event.
+ *
+ * Club-less events (teamId === null) used to skip the check entirely, which let
+ * any authenticated user in any club read them — and their attendance rows.
+ * Those events are now superadmin-only, since there is no club to scope them to.
+ */
+async function ensureEventReadAccess(req, event) {
+    if (isSuperadmin(req)) {
+        return null;
+    }
+    const clubId = getRequestClubId(req);
+    if (clubId == null) {
+        return { status: 403, error: 'Your account is not assigned to a club.' };
+    }
+    if (event.teamId == null) {
+        return { status: 403, error: 'Access denied' };
+    }
+    const teamRows = await db_1.db.select().from(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.id, event.teamId)).limit(1);
+    if (!teamRows[0] || teamRows[0].clubId !== clubId) {
+        return { status: 403, error: 'Access denied' };
+    }
+    return null;
+}
 async function ensureTeamAccess(req, teamId) {
     const rows = await db_1.db.select().from(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.id, teamId)).limit(1);
     const team = rows[0];
@@ -148,14 +172,9 @@ exports.eventsController = {
             if (!event) {
                 return res.status(404).json({ error: 'Event not found' });
             }
-            if (!isSuperadmin(req)) {
-                const clubId = getRequestClubId(req);
-                if (event.teamId != null) {
-                    const teamRows = await db_1.db.select().from(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.id, event.teamId)).limit(1);
-                    if (teamRows[0] && teamRows[0].clubId !== clubId) {
-                        return res.status(403).json({ error: 'Access denied' });
-                    }
-                }
+            const denied = await ensureEventReadAccess(req, event);
+            if (denied) {
+                return res.status(denied.status).json({ error: denied.error });
             }
             res.json(await enrichEvent(event));
         }
@@ -215,6 +234,11 @@ exports.eventsController = {
                     return res.status(access.status).json({ error: access.error });
                 }
             }
+            else if (!isSuperadmin(req)) {
+                // No team means no club to scope the check to, so only a superadmin
+                // may touch it. Previously this branch was simply skipped.
+                return res.status(403).json({ error: 'Access denied' });
+            }
             const updates = {
                 ...(req.body.type !== undefined ? { type: req.body.type } : {}),
                 ...(req.body.title !== undefined ? { title: req.body.title } : {}),
@@ -249,6 +273,11 @@ exports.eventsController = {
                     return res.status(access.status).json({ error: access.error });
                 }
             }
+            else if (!isSuperadmin(req)) {
+                // No team means no club to scope the check to, so only a superadmin
+                // may touch it. Previously this branch was simply skipped.
+                return res.status(403).json({ error: 'Access denied' });
+            }
             await db_1.db.delete(schema_1.attendance).where((0, drizzle_orm_1.eq)(schema_1.attendance.eventId, eventId));
             await db_1.db.delete(schema_1.events).where((0, drizzle_orm_1.eq)(schema_1.events.id, eventId));
             res.json({ success: true });
@@ -266,24 +295,19 @@ exports.eventsController = {
             if (!existingEvent) {
                 return res.status(404).json({ error: 'Event not found' });
             }
-            if (!isSuperadmin(req)) {
-                const clubId = getRequestClubId(req);
-                if (existingEvent.teamId != null) {
-                    const teamRows = await db_1.db.select().from(schema_1.teams).where((0, drizzle_orm_1.eq)(schema_1.teams.id, existingEvent.teamId)).limit(1);
-                    if (teamRows[0] && teamRows[0].clubId !== clubId) {
-                        return res.status(403).json({ error: 'Access denied' });
-                    }
-                }
+            const denied = await ensureEventReadAccess(req, existingEvent);
+            if (denied) {
+                return res.status(denied.status).json({ error: denied.error });
             }
             const attendanceRows = await db_1.db.select().from(schema_1.attendance).where((0, drizzle_orm_1.eq)(schema_1.attendance.eventId, eventId));
-            const playerIds = attendanceRows.map((row) => row.playerId);
-            const playersById = new Map();
-            const playerRows = playerIds.length ? await db_1.db.select().from(schema_1.players) : [];
-            playerRows.forEach((player) => {
-                if (playerIds.includes(player.id)) {
-                    playersById.set(player.id, player);
-                }
-            });
+            // Fetch only the players on this event's sheet. This previously loaded
+            // every player row in the database and filtered in JS with an O(n·m)
+            // `playerIds.includes` lookup inside the loop.
+            const playerIds = Array.from(new Set(attendanceRows.map((row) => row.playerId)));
+            const playerRows = playerIds.length
+                ? await db_1.db.select().from(schema_1.players).where((0, drizzle_orm_1.inArray)(schema_1.players.id, playerIds))
+                : [];
+            const playersById = new Map(playerRows.map((player) => [player.id, player]));
             res.json(attendanceRows.map((row) => {
                 const player = playersById.get(row.playerId);
                 return {
@@ -315,6 +339,9 @@ exports.eventsController = {
                 if (access.status !== 200) {
                     return res.status(access.status).json({ error: access.error });
                 }
+            }
+            else if (!isSuperadmin(req)) {
+                return res.status(403).json({ error: 'Access denied' });
             }
             for (const item of playerAttendances) {
                 const playerId = Number(item.playerId);

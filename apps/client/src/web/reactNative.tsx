@@ -99,7 +99,7 @@ function translateRNStyle(style: RNStyle): CSSProperties {
   return out;
 }
 
-function flattenStyle(style: StyleInput): CSSProperties | undefined {
+export function flattenStyle(style: StyleInput): CSSProperties | undefined {
   if (!style) return undefined;
   if (Array.isArray(style)) {
     return Object.assign({}, ...style.map(flattenStyle).filter(Boolean));

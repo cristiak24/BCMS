@@ -60,6 +60,10 @@ import {
   ArrowUp,
   ArrowDown,
   Activity,
+  CalendarRange,
+  ClipboardList,
+  MessageSquare,
+  Volleyball,
   Zap,
   Wallet,
   Sparkles,
@@ -179,7 +183,14 @@ const iconMap: Record<string, typeof Circle> = {
   shield: Building2,
   sports: Trophy,
   'admin-panel-settings': UserCog,
-  'sports-basketball': Trophy,
+  // A ball, not a Trophy. This name means "player"/"match" at every call site
+  // (role pickers, "Set player", upcoming fixtures) — a trophy was wrong for
+  // all of them, and it collided with 'emoji-events', which IS the trophy.
+  'sports-basketball': Volleyball,
+  scoreboard: ClipboardList,
+  'calendar-month': CalendarRange,
+  'chat-bubble': MessageSquare,
+  'chat-bubble-outline': MessageSquare,
   'basketball-ball': Trophy,
   'credit-card': CreditCard,
   terrain: MapPin,

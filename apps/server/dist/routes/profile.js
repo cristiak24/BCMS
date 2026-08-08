@@ -18,11 +18,15 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const drizzle_orm_1 = require("drizzle-orm");
 const requestContext_1 = require("../lib/requestContext");
-const requestAuth_1 = require("../lib/requestAuth");
+const auth_1 = require("../middleware/auth");
 const firebaseAdmin_1 = require("../lib/firebaseAdmin");
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const router = (0, express_1.Router)();
+// Defence in depth: `requireRequestUser` already verifies the bearer token in
+// every handler, but rejecting unauthenticated calls at the router boundary
+// means a future handler cannot forget to do so.
+router.use(auth_1.authenticate);
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED_AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const ALLOWED_AVATAR_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
@@ -57,14 +61,14 @@ function findUserByNumericId(userId) {
         return (_a = rows[0]) !== null && _a !== void 0 ? _a : null;
     });
 }
-function resolveProfileRecord(userId, reqClubId) {
+function resolveProfileRecord(userId) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u;
         const user = yield findUserByNumericId(userId);
         if (!user) {
             return null;
         }
-        const clubId = (_a = user.clubId) !== null && _a !== void 0 ? _a : (reqClubId ? Number(reqClubId) : null);
+        const clubId = (_a = user.clubId) !== null && _a !== void 0 ? _a : null;
         const clubRows = clubId == null
             ? []
             : yield db_1.db.select({ name: schema_1.clubs.name }).from(schema_1.clubs).where((0, drizzle_orm_1.eq)(schema_1.clubs.id, clubId)).limit(1);
@@ -117,39 +121,12 @@ function resolveProfileRecord(userId, reqClubId) {
     });
 }
 router.get('/me', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
     try {
-        const requestUser = yield (0, requestContext_1.getRequestUser)(req);
+        const requestUser = yield (0, requestContext_1.requireRequestUser)(req, res);
         if (!requestUser) {
-            return res.status(401).json({ error: 'Not authenticated' });
+            return;
         }
-        if (requestUser.isHardcodedAdmin || (requestUser.id === 0 && (0, requestAuth_1.isDemoAdmin)(req))) {
-            const clubId = (_a = requestUser.clubId) !== null && _a !== void 0 ? _a : (req.header('x-user-club-id') ? Number(req.header('x-user-club-id')) : null);
-            const clubRows = clubId == null
-                ? []
-                : yield db_1.db.select({ name: schema_1.clubs.name }).from(schema_1.clubs).where((0, drizzle_orm_1.eq)(schema_1.clubs.id, clubId)).limit(1);
-            const clubName = (_c = (_b = clubRows[0]) === null || _b === void 0 ? void 0 : _b.name) !== null && _c !== void 0 ? _c : null;
-            return res.json({
-                id: 0,
-                email: 'admin@test.com',
-                name: 'Admin User',
-                firstName: 'Admin',
-                lastName: 'User',
-                fullName: 'Admin User',
-                role: 'admin',
-                status: 'processed',
-                clubId,
-                clubName,
-                teamName: null,
-                avatarUrl: null,
-                phone: null,
-                preferredLanguage: null,
-                notificationPreferences: { email: true, push: true, sms: false },
-                createdAt: null,
-                lastLoginAt: null,
-            });
-        }
-        const profile = yield resolveProfileRecord(requestUser.id, req.header('x-user-club-id'));
+        const profile = yield resolveProfileRecord(requestUser.id);
         if (!profile) {
             return res.status(404).json({ error: 'Profile not found' });
         }
@@ -163,18 +140,30 @@ router.get('/me', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 router.patch('/me', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
-        const requestUser = yield (0, requestContext_1.getRequestUser)(req);
+        const requestUser = yield (0, requestContext_1.requireRequestUser)(req, res);
         if (!requestUser) {
-            return res.status(401).json({ error: 'Not authenticated' });
+            return;
         }
-        if (requestUser.isHardcodedAdmin || (requestUser.id === 0 && (0, requestAuth_1.isDemoAdmin)(req))) {
-            return res.status(400).json({ error: 'Demo admin profile cannot be edited from the database-backed profile endpoint.' });
-        }
-        const { firstName, lastName, phone, preferredLanguage, notificationPreferences } = req.body;
+        const { firstName, lastName, phone, preferredLanguage } = req.body;
         const trimmedFirstName = typeof firstName === 'string' ? firstName.trim() : undefined;
         const trimmedLastName = typeof lastName === 'string' ? lastName.trim() : undefined;
         const trimmedPhone = typeof phone === 'string' ? phone.trim() : phone === null ? null : undefined;
         const trimmedLanguage = typeof preferredLanguage === 'string' ? preferredLanguage.trim() : preferredLanguage === null ? null : undefined;
+        // Reject junk before it reaches the database: these values are rendered
+        // back into the UI and used in emails, so unbounded strings are not ok.
+        for (const [label, value, max] of [
+            ['firstName', trimmedFirstName, 80],
+            ['lastName', trimmedLastName, 80],
+            ['phone', trimmedPhone, 32],
+            ['preferredLanguage', trimmedLanguage, 16],
+        ]) {
+            if (typeof value === 'string' && value.length > max) {
+                return res.status(400).json({ error: `${label} must be at most ${max} characters.` });
+            }
+        }
+        if (typeof trimmedPhone === 'string' && trimmedPhone && !/^[+()\d\s-]{6,32}$/.test(trimmedPhone)) {
+            return res.status(400).json({ error: 'Phone number format is invalid.' });
+        }
         const existingUser = yield findUserByNumericId(requestUser.id);
         if (!existingUser) {
             return res.status(404).json({ error: 'Profile not found' });
@@ -184,7 +173,7 @@ router.patch('/me', (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             (_b = trimmedLastName !== null && trimmedLastName !== void 0 ? trimmedLastName : existingUser.lastName) !== null && _b !== void 0 ? _b : '',
         ].filter(Boolean).join(' ').trim();
         yield db_1.db.update(schema_1.users).set(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (trimmedFirstName !== undefined ? { firstName: trimmedFirstName } : {})), (trimmedLastName !== undefined ? { lastName: trimmedLastName } : {})), (trimmedPhone !== undefined ? { phone: trimmedPhone } : {})), (trimmedLanguage !== undefined ? { preferredLanguage: trimmedLanguage } : {})), (nextName ? { name: nextName } : {})), { updatedAt: new Date().toISOString() })).where((0, drizzle_orm_1.eq)(schema_1.users.id, requestUser.id));
-        const profile = yield resolveProfileRecord(requestUser.id, req.header('x-user-club-id'));
+        const profile = yield resolveProfileRecord(requestUser.id);
         return res.json(profile);
     }
     catch (error) {
@@ -206,12 +195,12 @@ router.post('/me/avatar', (req, res, next) => {
     });
 }, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const requestUser = yield (0, requestContext_1.getRequestUser)(req);
+        const requestUser = yield (0, requestContext_1.requireRequestUser)(req, res);
         if (!requestUser) {
-            return res.status(401).json({ error: 'Not authenticated' });
-        }
-        if (requestUser.isHardcodedAdmin || (requestUser.id === 0 && (0, requestAuth_1.isDemoAdmin)(req))) {
-            return res.status(400).json({ error: 'Demo admin avatar cannot be changed from the database-backed profile endpoint.' });
+            if (req.file) {
+                fs_1.default.unlink(req.file.path, () => { });
+            }
+            return;
         }
         if (!req.file) {
             return res.status(400).json({ error: 'No image uploaded' });

@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, TextInput, ActivityIndicator, Modal } from '@/src/web/reactNative';
+import { View, Text, Pressable, TextInput, ActivityIndicator, Modal, ScrollView } from '@/src/web/reactNative';
 import { RefreshCw, Plus, X, Check, Search } from 'lucide-react';
 import { basketballApi } from '../../services/basketballApi';
 import { teamsApi, Team, Coach, TeamGender, TeamLevel, Player } from '../../services/teamsApi';
 import { LEAGUES_M, LEAGUES_F } from './frbLeagues';
+import { useResponsive } from '../../hooks/useResponsive';
 
 type Item = { id: string; name: string };
 type SourceType = 'frb' | 'manual';
@@ -21,6 +22,7 @@ export default function CreateTeamWizard({
     onClose: () => void;
     onCreated: (team: Team) => void;
 }) {
+    const { isMobile } = useResponsive();
     const [step, setStep] = useState(0);
     const [source, setSource] = useState<SourceType | null>(initialSource ?? null);
 
@@ -174,9 +176,13 @@ export default function CreateTeamWizard({
     const leagues = gender === 'M' ? LEAGUES_M : LEAGUES_F;
 
     return (
-        <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-        <Pressable className="flex-1 bg-[#0E2041]/40 items-center justify-center px-4" onPress={creating ? undefined : onClose}>
-            <Pressable className="bg-white w-full max-w-[600px] rounded-[28px] shadow-2xl overflow-hidden" onPress={(event: any) => event.stopPropagation?.()}>
+        <Modal visible transparent animationType={isMobile ? 'slide' : 'fade'} onRequestClose={onClose}>
+        <Pressable className={`flex-1 bg-[#0E2041]/40 ${isMobile ? 'justify-end' : 'items-center justify-center px-4'}`} onPress={creating ? undefined : onClose}>
+            <Pressable
+                className={`bg-white w-full shadow-2xl overflow-hidden flex-col ${isMobile ? 'rounded-t-[24px]' : 'rounded-[20px] max-w-[600px]'}`}
+                style={{ maxHeight: isMobile ? '94%' : '90%' } as any}
+                onPress={(event: any) => event.stopPropagation?.()}
+            >
                 <View className="flex-row items-center justify-between px-6 pt-6 pb-1">
                     <Text className="text-[18px] font-black text-[#0E2041]">Creează echipă</Text>
                     <Pressable onPress={onClose} disabled={creating} className="w-9 h-9 rounded-full bg-[#F8FAFC] items-center justify-center border border-gray-100">
@@ -193,7 +199,11 @@ export default function CreateTeamWizard({
                     ))}
                 </View>
 
-                <View className="px-6 py-5 min-h-[280px]">
+                <ScrollView
+                    className="flex-1"
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 20, minHeight: isMobile ? undefined : 280 }}
+                >
                     {step === 0 && (
                         <View className="flex-row gap-3">
                             <Pressable
@@ -412,7 +422,7 @@ export default function CreateTeamWizard({
                         </View>
                     )}
 
-                </View>
+                </ScrollView>
 
                 <View className="flex-row justify-between items-center px-6 py-4 border-t border-gray-100">
                     <Pressable onPress={goBack} disabled={step === 0 || creating} className={`h-10 px-3 ${step === 0 ? 'opacity-0' : ''}`}>

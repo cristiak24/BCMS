@@ -22,8 +22,11 @@ export const EVENT_TYPE_META: Record<EventType, {
   onSolid: string;
 }> = {
   match: { label: 'Meci', solid: 'var(--c-brand-fg)', border: '#0F3A8A', soft: 'var(--c-surface-tint)', onSoft: 'var(--c-brand-fg)', onSolid: 'var(--c-surface)' },
-  training: { label: 'Antrenament', solid: 'var(--c-sky)', border: '#1D9CE8', soft: '#E1F1FF', onSoft: '#0A5EA8', onSolid: 'var(--c-surface)' },
-  camp: { label: 'Cantonament', solid: 'var(--c-purple)', border: 'var(--c-purple)', soft: '#F1E8FF', onSoft: 'var(--c-purple)', onSolid: 'var(--c-surface)' },
+  // soft/onSoft must be TOKENS, not literal hexes: these land in inline styles,
+  // which palette.css's legacy-hex remap never sees, so a pale literal stayed
+  // pale in dark mode under near-white text.
+  training: { label: 'Antrenament', solid: 'var(--c-sky)', border: '#1D9CE8', soft: 'var(--c-sky-bg)', onSoft: 'var(--c-sky-fg)', onSolid: 'var(--c-surface)' },
+  camp: { label: 'Cantonament', solid: 'var(--c-purple)', border: 'var(--c-purple)', soft: 'var(--c-purple-bg)', onSoft: 'var(--c-purple-fg)', onSolid: 'var(--c-surface)' },
   medical: { label: 'Vizită medicală', solid: '#0E9F6E', border: 'var(--c-success-fg)', soft: 'var(--c-success-bg)', onSoft: 'var(--c-success-fg)', onSolid: 'var(--c-surface)' },
   admin: { label: 'Administrativ', solid: 'var(--c-ink-soft)', border: 'var(--c-muted)', soft: 'var(--c-surface-3)', onSoft: 'var(--c-ink-soft)', onSolid: 'var(--c-surface)' },
 };

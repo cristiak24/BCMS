@@ -1,4 +1,4 @@
-import React, { ReactElement } from 'react';
+import React, { ReactElement, useMemo } from 'react';
 import {
   Link as RouterLink,
   Navigate,
@@ -27,14 +27,17 @@ function normalizeHref(href: any): To {
 
 export function useRouter() {
   const navigate = useNavigate();
-  return {
-    push: (href: any) => navigate(normalizeHref(href)),
-    replace: (href: any) => navigate(normalizeHref(href), { replace: true }),
-    back: () => navigate(-1),
-    canGoBack: () => window.history.length > 1,
-    navigate: (href: any) => navigate(normalizeHref(href)),
-    dismiss: () => navigate(-1),
-  };
+  return useMemo(
+    () => ({
+      push: (href: any) => navigate(normalizeHref(href)),
+      replace: (href: any) => navigate(normalizeHref(href), { replace: true }),
+      back: () => navigate(-1),
+      canGoBack: () => window.history.length > 1,
+      navigate: (href: any) => navigate(normalizeHref(href)),
+      dismiss: () => navigate(-1),
+    }),
+    [navigate],
+  );
 }
 
 export function usePathname() {

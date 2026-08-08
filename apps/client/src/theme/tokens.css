@@ -67,6 +67,16 @@
   --c-sky: #0EA5E9;
   --c-purple: #7C6CFF;
 
+  /* Tinted fills for the sky/purple accents. These exist because event-type
+     colours (scheduleShared.ts) are applied as INLINE styles, which the
+     legacy-hex remap in palette.css cannot reach — a hardcoded #E1F1FF stayed
+     pale in dark mode and the ink-strong text on top of it turned white,
+     making training date blocks unreadable. */
+  --c-sky-bg: #E1F1FF;
+  --c-sky-fg: #0A5EA8;
+  --c-purple-bg: #F1E8FF;
+  --c-purple-fg: #6D28D9;
+
   /* ── Status ───────────────────────────────────
      -fg is the text weight (AA on -bg), plain is the dot/fill weight. */
   --c-success: #12B76A;
@@ -165,6 +175,10 @@ html[data-theme="dark"] {
   --c-blue-deep: #8F88FF;
   --c-sky: #38BDF8;
   --c-purple: #A79BFF;
+  --c-sky-bg: #10283A;
+  --c-sky-fg: #7DD3FC;
+  --c-purple-bg: #241F45;
+  --c-purple-fg: #C4B5FD;
 
   /* ── Status ───────────────────────────────── */
   --c-success: #32D583;

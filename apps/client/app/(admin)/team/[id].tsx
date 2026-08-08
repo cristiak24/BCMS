@@ -204,38 +204,46 @@ export default function TeamDetailsScreen() {
             <ScrollView className="flex-1 w-full px-4 md:px-8 xl:px-12 pt-6 md:pt-8" showsVerticalScrollIndicator={false}>
                 <View className="w-full max-w-[1180px] mx-auto">
 
-                    {/* Top bar */}
-                    <View className="flex-row items-center justify-between mb-5">
-                        <Pressable onPress={() => router.push('/admin/my-club-admin' as any)} className="flex-row items-center gap-2 h-9 pl-2 pr-3.5 rounded-full bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]">
+                    {/* Top bar. On mobile the six actions can't fit one row, so
+                        the back button sits on its own line and the actions
+                        become a horizontal scroll strip (was overflowing and
+                        truncating labels to "Progr", "Preze", …). */}
+                    <View className="flex-col lg:flex-row lg:items-center lg:justify-between gap-2.5 mb-4">
+                        <Pressable onPress={() => router.push('/admin/my-club-admin' as any)} className="flex-row items-center gap-2 h-9 pl-2 pr-3.5 rounded-[10px] self-start border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
                             <ArrowLeft size={16} color="var(--c-ink)" />
-                            <Text className="text-[#0E2041] text-[12px] font-black">My Club</Text>
+                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink)' }}>My Club</Text>
                         </Pressable>
-                        <View className="flex-row items-center gap-2">
-                            <Pressable onPress={() => router.push(`/admin/schedule?teamId=${team.id}` as any)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-full bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]">
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            className="-mx-4 lg:mx-0 lg:flex-none"
+                            contentContainerStyle={{ paddingHorizontal: 16, gap: 8, flexGrow: 0 }}
+                        >
+                            <Pressable onPress={() => router.push(`/admin/schedule?teamId=${team.id}` as any)} className="flex-row items-center gap-1.5 h-9 px-3 rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
                                 <Calendar size={14} color="var(--c-brand-fg)" />
-                                <Text className="text-[#1D3E90] text-[12px] font-black">Program</Text>
+                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Program</Text>
                             </Pressable>
-                            <Pressable onPress={() => router.push(`/admin/schedule?teamId=${team.id}&tab=attendance` as any)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-full bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]">
+                            <Pressable onPress={() => router.push(`/admin/schedule?teamId=${team.id}&tab=attendance` as any)} className="flex-row items-center gap-1.5 h-9 px-3 rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
                                 <ClipboardCheck size={14} color="var(--c-brand-fg)" />
-                                <Text className="text-[#1D3E90] text-[12px] font-black">Prezență</Text>
+                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Prezență</Text>
                             </Pressable>
-                            <Pressable onPress={() => setMedicalVisaOpen(true)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-full bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]">
+                            <Pressable onPress={() => setMedicalVisaOpen(true)} className="flex-row items-center gap-1.5 h-9 px-3 rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
                                 <ShieldCheck size={14} color="var(--c-success-fg)" />
-                                <Text className="text-[#1D3E90] text-[12px] font-black">Vize medicale</Text>
+                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Vize medicale</Text>
                             </Pressable>
-                            <Pressable onPress={() => setPaymentsReportOpen(true)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-full bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]">
+                            <Pressable onPress={() => setPaymentsReportOpen(true)} className="flex-row items-center gap-1.5 h-9 px-3 rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
                                 <Receipt size={14} color="var(--c-brand-fg)" />
-                                <Text className="text-[#1D3E90] text-[12px] font-black">Raport plăți</Text>
+                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Raport plăți</Text>
                             </Pressable>
-                            <Pressable onPress={() => setEditOpen(true)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-full bg-[#1D3E90] active:bg-[#15316f]">
-                                <Pencil size={14} color="var(--c-surface)" />
-                                <Text className="text-white text-[12px] font-black">Editează</Text>
+                            <Pressable onPress={() => setEditOpen(true)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-[10px]" style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)' } as any}>
+                                <Pencil size={14} color="var(--c-on-brand)" />
+                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-on-brand)' }}>Editează</Text>
                             </Pressable>
-                        </View>
+                        </ScrollView>
                     </View>
 
                     {/* Hero */}
-                    <View className="bg-white rounded-[22px] border border-[#E3E9F2] p-6 mb-4 flex-col lg:flex-row lg:items-center gap-5">
+                    <View className="bg-white rounded-[16px] border border-[#E3E9F2] p-5 mb-3 flex-col lg:flex-row lg:items-center gap-4">
                         <View className="flex-row items-center gap-4 flex-1 min-w-0">
                             <View className="w-16 h-16 rounded-[18px] items-center justify-center flex-none" style={{ backgroundColor: crestTint }}>
                                 <Shield size={30} color={accentColor} fill={accentColor} />

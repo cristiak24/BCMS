@@ -13,10 +13,55 @@ exports.playersController = void 0;
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
+const playerUpdate_1 = require("../lib/playerUpdate");
 const DEFAULT_PAYMENT_CURRENCY = (process.env.STRIPE_CURRENCY || 'ron').trim().toLowerCase();
 function isSuperadmin(req) {
     var _a;
     return ((_a = req.user) === null || _a === void 0 ? void 0 : _a.role) === 'superadmin';
+}
+// Player/parent sessions must only ever see their own team's roster, and only
+// the fields that make sense for a teammate list (no payment/medical/contact
+// data belonging to someone else). Every other authenticated role keeps the
+// existing club-wide, full-detail roster behaviour.
+function isPlayerFacingRole(req) {
+    var _a;
+    const role = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
+    return role === 'player' || role === 'parent';
+}
+// Denylist (not allowlist) so the stripped row keeps the exact same shape as
+// the full row — that matters for TypeScript (buildRosterRows stays a single
+// consistent return type instead of widening to `unknown` for every caller)
+// and for any downstream code that reads a field it doesn't recognize as safe.
+const SENSITIVE_ROSTER_FIELDS = ['email', 'medicalCheckExpiry', 'attendanceRate', 'paymentStatus'];
+function toSafeRosterRow(row) {
+    const safe = Object.assign({}, row);
+    for (const key of SENSITIVE_ROSTER_FIELDS) {
+        if (key in safe)
+            safe[key] = null;
+    }
+    return safe;
+}
+function getSelfPlayerRecord(req) {
+    return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b;
+        const email = (_a = req.user) === null || _a === void 0 ? void 0 : _a.email;
+        if (!email)
+            return null;
+        const rows = yield db_1.db.select().from(schema_1.players).where((0, drizzle_orm_1.eq)(schema_1.players.email, String(email).trim().toLowerCase())).limit(1);
+        return (_b = rows[0]) !== null && _b !== void 0 ? _b : null;
+    });
+}
+function getSelfTeamIds(req) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const self = yield getSelfPlayerRecord(req);
+        if (!self)
+            return [];
+        const membershipRows = yield db_1.db.select({ teamId: schema_1.playersToTeams.teamId }).from(schema_1.playersToTeams).where((0, drizzle_orm_1.eq)(schema_1.playersToTeams.playerId, self.id));
+        const ids = new Set(membershipRows.map(m => m.teamId));
+        if (self.teamId != null)
+            ids.add(self.teamId);
+        return Array.from(ids);
+    });
 }
 function getRequestClubId(req) {
     var _a;
@@ -112,10 +157,16 @@ function buildPlayerPaymentSummary(playerId) {
         };
     });
 }
-function buildRosterRows(req) {
-    return __awaiter(this, void 0, void 0, function* () {
+function buildRosterRows(req_1) {
+    return __awaiter(this, arguments, void 0, function* (req, options = {}) {
         var _a, _b;
-        const allowedTeamIds = yield getAllowedTeamIds(req);
+        const { stripForPlayerFacing = true } = options;
+        const isPlayerFacing = isPlayerFacingRole(req);
+        let allowedTeamIds = yield getAllowedTeamIds(req);
+        if (isPlayerFacing) {
+            const selfTeamIds = yield getSelfTeamIds(req);
+            allowedTeamIds = allowedTeamIds === null ? selfTeamIds : allowedTeamIds.filter(id => selfTeamIds.includes(id));
+        }
         if (allowedTeamIds !== null && allowedTeamIds.length === 0)
             return [];
         let allPlayers = yield db_1.db.select().from(schema_1.players);
@@ -199,7 +250,7 @@ function buildRosterRows(req) {
                 }
             }
         }
-        return allPlayers.map(player => {
+        const rows = allPlayers.map(player => {
             var _a, _b, _c, _d;
             const firstName = player.firstName || ((_a = player.name) === null || _a === void 0 ? void 0 : _a.split(' ')[0]) || 'Unknown';
             const lastName = player.lastName || ((_b = player.name) === null || _b === void 0 ? void 0 : _b.split(' ').slice(1).join(' ')) || 'Player';
@@ -221,6 +272,22 @@ function buildRosterRows(req) {
                 paymentStatus, teamName: teamNames[0] || 'Unassigned', teamNames,
                 clubId, isUnassigned: teamNames.length === 0 });
         });
+        // A player/parent session only gets teammate-safe fields (name, number,
+        // position, team) — never another player's payment/medical/attendance/
+        // contact data. Their own data is still reachable through the dedicated
+        // "me" endpoints, not this shared roster.
+        return isPlayerFacing && stripForPlayerFacing ? rows.map(toSafeRosterRow) : rows;
+    });
+}
+// Shared by getPlayerById and getMe — callers must already have verified the
+// requester is allowed to see this exact player's full (unstripped) record.
+function buildFullPlayerPayload(req, player) {
+    return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b, _c, _d, _e;
+        const rosterRows = yield buildRosterRows(req, { stripForPlayerFacing: false });
+        const rosterPlayer = rosterRows.find(row => row.id === player.id);
+        const paymentSummary = yield buildPlayerPaymentSummary(player.id);
+        return Object.assign(Object.assign(Object.assign(Object.assign({}, player), rosterPlayer), paymentSummary), { clubId: (_a = rosterPlayer === null || rosterPlayer === void 0 ? void 0 : rosterPlayer.clubId) !== null && _a !== void 0 ? _a : yield getPlayerClubIdByEmail(player.email), isUnassigned: (_b = rosterPlayer === null || rosterPlayer === void 0 ? void 0 : rosterPlayer.isUnassigned) !== null && _b !== void 0 ? _b : true, teamName: (_c = rosterPlayer === null || rosterPlayer === void 0 ? void 0 : rosterPlayer.teamName) !== null && _c !== void 0 ? _c : 'Unassigned', teamNames: (_d = rosterPlayer === null || rosterPlayer === void 0 ? void 0 : rosterPlayer.teamNames) !== null && _d !== void 0 ? _d : [], category: (_e = rosterPlayer === null || rosterPlayer === void 0 ? void 0 : rosterPlayer.category) !== null && _e !== void 0 ? _e : 'Unassigned' });
     });
 }
 function computeAttendanceRateFromRecords(records) {
@@ -233,6 +300,12 @@ exports.playersController = {
     searchPlayers(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
+                // Roster-management-only: returns unfiltered player rows (medical,
+                // payment, contact fields) so it's used to find a player to add to a
+                // team, not something a player/parent session should ever reach.
+                if (isPlayerFacingRole(req)) {
+                    return res.status(403).json({ error: 'Forbidden' });
+                }
                 const { query } = req.query;
                 if (!query || typeof query !== 'string') {
                     return res.status(400).json({ error: 'Search query is required' });
@@ -288,6 +361,11 @@ exports.playersController = {
         return __awaiter(this, void 0, void 0, function* () {
             var _a, _b;
             try {
+                // Club/team-wide attendance & payment aggregates — a management
+                // view, not something player/parent sessions consume today.
+                if (isPlayerFacingRole(req)) {
+                    return res.status(403).json({ error: 'Forbidden' });
+                }
                 const rosterRows = yield buildRosterRows(req);
                 const rosterPlayerIds = rosterRows.map(row => row.id);
                 const averageAttendance = rosterRows.length > 0
@@ -467,12 +545,11 @@ exports.playersController = {
                     if (!(yield isPlayerAllowedForRequest(req, p)))
                         return res.status(403).json({ error: 'Access denied' });
                 }
-                const updateData = Object.assign({}, req.body);
-                if (req.body.medicalCheckExpiry) {
-                    updateData.medicalCheckExpiry = new Date(String(req.body.medicalCheckExpiry)).toISOString();
+                const update = (0, playerUpdate_1.buildPlayerUpdate)(req.body);
+                if (!update.ok) {
+                    return res.status(400).json({ error: update.error });
                 }
-                delete updateData.id;
-                const [updated] = yield db_1.db.update(schema_1.players).set(updateData).where((0, drizzle_orm_1.eq)(schema_1.players.id, playerId)).returning();
+                const [updated] = yield db_1.db.update(schema_1.players).set(update.data).where((0, drizzle_orm_1.eq)(schema_1.players.id, playerId)).returning();
                 res.json(updated);
             }
             catch (error) {
@@ -483,7 +560,6 @@ exports.playersController = {
     },
     getPlayerById(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b, _c, _d, _e;
             try {
                 const playerId = parseInt(req.params.id, 10);
                 if (Number.isNaN(playerId))
@@ -492,20 +568,44 @@ exports.playersController = {
                 const player = pRows[0];
                 if (!player)
                     return res.status(404).json({ error: 'Player not found' });
-                const allowedTeamIds = yield getAllowedTeamIds(req);
-                if (allowedTeamIds !== null) {
-                    if (!(yield isPlayerAllowedForRequest(req, player)))
+                if (isPlayerFacingRole(req)) {
+                    // A player/parent may only ever fetch their own record — never a
+                    // teammate's, which would otherwise carry payment/medical data.
+                    const self = yield getSelfPlayerRecord(req);
+                    if (!self || self.id !== playerId) {
                         return res.status(403).json({ error: 'Access denied' });
+                    }
                 }
-                const rosterRows = yield buildRosterRows(req);
-                const rosterPlayer = rosterRows.find(row => row.id === player.id);
-                const paymentSummary = yield buildPlayerPaymentSummary(player.id);
-                res.json(Object.assign(Object.assign(Object.assign(Object.assign({}, player), rosterPlayer), paymentSummary), { clubId: (_a = rosterPlayer === null || rosterPlayer === void 0 ? void 0 : rosterPlayer.clubId) !== null && _a !== void 0 ? _a : yield getPlayerClubIdByEmail(player.email), isUnassigned: (_b = rosterPlayer === null || rosterPlayer === void 0 ? void 0 : rosterPlayer.isUnassigned) !== null && _b !== void 0 ? _b : true, teamName: (_c = rosterPlayer === null || rosterPlayer === void 0 ? void 0 : rosterPlayer.teamName) !== null && _c !== void 0 ? _c : 'Unassigned', teamNames: (_d = rosterPlayer === null || rosterPlayer === void 0 ? void 0 : rosterPlayer.teamNames) !== null && _d !== void 0 ? _d : [], category: (_e = rosterPlayer === null || rosterPlayer === void 0 ? void 0 : rosterPlayer.category) !== null && _e !== void 0 ? _e : 'Unassigned' }));
+                else {
+                    const allowedTeamIds = yield getAllowedTeamIds(req);
+                    if (allowedTeamIds !== null) {
+                        if (!(yield isPlayerAllowedForRequest(req, player)))
+                            return res.status(403).json({ error: 'Access denied' });
+                    }
+                }
+                res.json(yield buildFullPlayerPayload(req, player));
             }
             catch (error) {
                 console.error('Get player by id error:', error);
                 res.status(500).json({ error: 'Internal server error' });
             }
         });
-    }
+    },
+    // Own-record lookup for player/parent sessions that don't know their
+    // `players.id` — resolves it from the authenticated user's email instead
+    // of requiring a client-supplied id, so there's nothing to guess or spoof.
+    getMe(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const self = yield getSelfPlayerRecord(req);
+                if (!self)
+                    return res.status(404).json({ error: 'No player record linked to this account' });
+                res.json(yield buildFullPlayerPayload(req, self));
+            }
+            catch (error) {
+                console.error('Get self player error:', error);
+                res.status(500).json({ error: 'Internal server error' });
+            }
+        });
+    },
 };

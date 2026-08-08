@@ -37,7 +37,12 @@ body {
 .rn-pressable {
   appearance: none;
   background: transparent;
-  border: 0;
+  /* Longhand, not the `border` shorthand: the shorthand also resets
+     border-style to `none`, which permanently wins over Tailwind's
+     `border-*`/`border-[hex]` utilities (they only set width/color and
+     rely on Preflight's `border-style: solid` default) — any bordered
+     Pressable/TouchableOpacity rendered a border-less button. */
+  border-width: 0;
   color: inherit;
   cursor: pointer;
   display: flex;

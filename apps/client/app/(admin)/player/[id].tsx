@@ -249,7 +249,7 @@ export default function PlayerProfile() {
           <View className="flex-row flex-wrap border-t border-[#E8EEF7] bg-white">
             <View className="min-w-[170px] flex-1 border-r border-[#EEF3F8] px-5 py-4">
               <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email</Text>
-              <Text className="mt-1 text-sm font-black text-[#0E2041]" numberOfLines={1}>{email || 'No email'}</Text>
+              <Text className="mt-1 text-sm font-black text-[#0E2041] break-anywhere">{email || 'No email'}</Text>
             </View>
             <View className="min-w-[140px] flex-1 border-r border-[#EEF3F8] px-5 py-4">
               <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">Jersey</Text>

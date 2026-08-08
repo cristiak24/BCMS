@@ -14,6 +14,7 @@ export interface CalendarEvent {
     status: string;
     teamName?: string;
     coachName?: string;
+    coachNote?: string | null;
 }
 
 export interface EventAttendance {

@@ -14,10 +14,24 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const axios_1 = __importDefault(require("axios"));
+const auth_1 = require("../middleware/auth");
+const rateLimit_1 = require("../middleware/rateLimit");
 const router = (0, express_1.Router)();
-const API_KEY = '9c3622c013ca2f69e8c373ecbf5af38e180f6d7d';
+// Every endpoint below fans out to an upstream FRB widget service on our own API key
+// and our own egress bill. Leaving them anonymous let the whole internet spend both,
+// and gave away a working key to anyone who watched the traffic. This is federation
+// reference data that only signed-in users have any reason to read, so authentication
+// is enough — no role gate, since every role legitimately reads it.
+router.use(auth_1.authenticate);
+// Kept as a literal fallback so local dev and the current deploy keep working until
+// FRB_API_KEY is set in every environment. Rotate the key once it is.
+const API_KEY = process.env.FRB_API_KEY || '9c3622c013ca2f69e8c373ecbf5af38e180f6d7d';
 const REFERER = 'https://www.frbaschet.ro/';
 const HEADERS = { Referer: REFERER };
+// Bounds how fast one caller can make us hammer the upstream widget service. It is a
+// per-instance guard against accidental render loops and casual abuse, layered on top
+// of the authentication above rather than instead of it.
+const basketballProxyRateLimit = (0, rateLimit_1.rateLimit)({ bucket: 'basketball:proxy', limit: 60, windowMs: 60000 });
 // ---------- Helpers ----------
 /**
  * Parsează scorul din formatul "75 - 60", "75-60", "75 : 60" sau "?" în { home, away }.
@@ -170,7 +184,7 @@ router.get('/leagues', (_req, res) => {
     ]);
 });
 // ---------- GET /api/basketball/seasons?leagueId= ----------
-router.get('/seasons', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get('/seasons', basketballProxyRateLimit, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { leagueId } = req.query;
     if (!leagueId) {
         res.status(400).json({ error: 'leagueId required' });
@@ -194,7 +208,7 @@ router.get('/seasons', (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
 }));
 // ---------- GET /api/basketball/teams?leagueId=&seasonId= ----------
-router.get('/teams', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get('/teams', basketballProxyRateLimit, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { leagueId, seasonId } = req.query;
     if (!leagueId || !seasonId) {
         res.status(400).json({ error: 'leagueId and seasonId required' });
@@ -226,7 +240,7 @@ router.get('/teams', (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
 }));
 // ---------- GET /api/basketball/matches?teamId=&seasonId=&leagueId=&month= ----------
-router.get('/matches', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get('/matches', basketballProxyRateLimit, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { teamId, seasonId, month, leagueId } = req.query;
     if (!teamId || !seasonId || !leagueId) {
         res.status(400).json({ error: 'teamId, seasonId and leagueId required' });
@@ -317,7 +331,7 @@ router.get('/matches', (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
 }));
 // ---------- GET /api/basketball/standings?seasonId=&leagueId= ----------
-router.get('/standings', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get('/standings', basketballProxyRateLimit, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const { seasonId, leagueId } = req.query;
     if (!seasonId || !leagueId) {
@@ -346,7 +360,7 @@ router.get('/standings', (req, res) => __awaiter(void 0, void 0, void 0, functio
 }));
 // ---------- GET /api/basketball/dashboard-summary ----------
 // Agregă date din finance + players pentru KPI-uri dashboard
-router.get('/dashboard-summary', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get('/dashboard-summary', basketballProxyRateLimit, (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     res.status(501).json({ message: 'Use /api/dashboard/summary instead' });
 }));
 exports.default = router;

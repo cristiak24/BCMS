@@ -4,6 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { CalendarEvent, EventAttendance, eventsApi } from '../../services/eventsApi';
 import { teamsApi, type Player } from '../../services/teamsApi';
 import { useFirebaseAuth } from '../../context/AuthContext';
+import PageHeader from '../ui/PageHeader';
 import {
   eventTypeLabel,
   formatCoachDate,
@@ -24,7 +25,7 @@ type AttendancePlayer = {
 };
 
 const STATUS_OPTIONS: { status: AttendanceStatus; label: string; icon: keyof typeof MaterialIcons.glyphMap; color: string }[] = [
-  { status: 'present', label: 'Present', icon: 'check-circle', color: 'var(--c-success-fg)' },
+  { status: 'present', label: 'Prezent', icon: 'check-circle', color: 'var(--c-success-fg)' },
   { status: 'absent', label: 'Absent', icon: 'cancel', color: 'var(--c-danger)' },
   { status: 'medical', label: 'Medical', icon: 'medical-services', color: 'var(--c-warning-fg)' },
 ];
@@ -62,17 +63,17 @@ function mergeAttendance(teamPlayers: Player[], attendanceRows: EventAttendance[
 
 function statusTone(status?: string | null) {
   const normalized = String(status ?? '').toLowerCase();
-  if (normalized === 'present' || normalized === 'prezent') return { label: 'Present', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' };
+  if (normalized === 'present' || normalized === 'prezent') return { label: 'Prezent', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' };
   if (normalized === 'absent') return { label: 'Absent', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger)' };
   if (normalized === 'medical' || normalized === 'excused') return { label: 'Medical', bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' };
-  return { label: 'Pending', bg: 'var(--c-border)', fg: 'var(--c-muted)' };
+  return { label: 'În așteptare', bg: 'var(--c-border)', fg: 'var(--c-muted)' };
 }
 
 function EventSelectorCard({ event, active, onPress }: { event: CalendarEvent; active: boolean; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} className={`rounded-[24px] border p-4 ${active ? 'bg-[#EBF4FF] border-[#0A2C93]' : 'bg-white border-[#E3ECF6]'}`}>
+    <Pressable onPress={onPress} className={`rounded-[24px] border p-4 ${active ? 'bg-[#EBF4FF] border-[#0A2C93]' : 'bg-[var(--c-surface)] border-[#E3ECF6]'}`}>
       <View className="flex-row items-start gap-3">
-        <View className="h-11 w-11 rounded-2xl bg-white items-center justify-center border border-[#E3ECF6]">
+        <View className="h-11 w-11 rounded-2xl bg-[var(--c-surface)] items-center justify-center border border-[#E3ECF6]">
           <MaterialIcons name={event.type === 'match' ? 'sports-basketball' : 'fitness-center'} size={21} color="var(--c-brand-fg)" />
         </View>
         <View className="flex-1 min-w-0">
@@ -112,7 +113,7 @@ export default function CoachAttendance() {
       setEvents(scopedEvents);
       setSelectedEventId((current) => current ?? scopedEvents[0]?.id ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load sessions.');
+      setError(err instanceof Error ? err.message : 'Nu s-au putut încărca sesiunile.');
     } finally {
       setLoadingEvents(false);
     }
@@ -143,7 +144,7 @@ export default function CoachAttendance() {
       ]);
       setPlayers(mergeAttendance(teamPlayers, attendanceRows));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load attendance.');
+      setError(err instanceof Error ? err.message : 'Nu s-a putut încărca prezența.');
     } finally {
       setLoadingAttendance(false);
     }
@@ -162,7 +163,7 @@ export default function CoachAttendance() {
       await eventsApi.updateEventAttendance(selectedEvent.id, [{ playerId, status }]);
       setPlayers((current) => current.map((player) => player.playerId === playerId ? { ...player, status } : player));
     } catch (err) {
-      Alert.alert('Attendance', err instanceof Error ? err.message : 'Could not update attendance.');
+      Alert.alert('Prezență', err instanceof Error ? err.message : 'Nu s-a putut actualiza prezența.');
     } finally {
       setSavingPlayerId(null);
     }
@@ -172,29 +173,35 @@ export default function CoachAttendance() {
   const presentCount = players.filter((player) => String(player.status ?? '').toLowerCase() === 'present' || String(player.status ?? '').toLowerCase() === 'prezent').length;
 
   return (
-    <ScrollView className="flex-1 bg-[#F1F5F9]" contentContainerClassName="px-5 md:px-10 py-8 pb-20">
+    <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="px-5 md:px-10 py-8 pb-20">
       <View className="w-full max-w-7xl mx-auto">
-        <View className="flex-row items-start justify-between gap-4 mb-8">
-          <View className="flex-1">
-            <Text className="text-[#0E2041] text-4xl md:text-5xl font-black tracking-tight">Attendance</Text>
-            <Text className="text-[#64748B] text-base md:text-lg font-semibold mt-3">Mark player availability for your sessions.</Text>
-          </View>
-          <Pressable onPress={() => loadEvents()} className="h-12 w-12 rounded-full bg-white border border-[#E3ECF6] items-center justify-center">
-            {loadingEvents ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={22} color="var(--c-brand-fg)" />}
-          </Pressable>
-        </View>
+        <PageHeader
+          title="Prezență"
+          subtitle="Marchează disponibilitatea jucătorilor pentru sesiunile tale."
+          actions={
+            <Pressable
+              onPress={() => loadEvents()}
+              className="w-9 h-9 rounded-[10px] border items-center justify-center"
+              style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+              accessibilityRole="button"
+              accessibilityLabel="Reîmprospătează"
+            >
+              {loadingEvents ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
+            </Pressable>
+          }
+        />
 
         {error ? (
-          <View className="mb-6 rounded-[24px] border border-red-100 bg-white px-5 py-4 flex-row items-center gap-3">
+          <View className="mb-6 rounded-[24px] border border-red-100 bg-[var(--c-surface)] px-5 py-4 flex-row items-center gap-3">
             <MaterialIcons name="error-outline" size={22} color="var(--c-danger)" />
             <Text className="flex-1 text-red-600 font-bold">{error}</Text>
           </View>
         ) : null}
 
         <View className="flex-col xl:flex-row gap-8">
-          <View className="w-full xl:w-[380px] rounded-[30px] border border-[#E3ECF6] bg-white p-5">
-            <Text className="text-[#0E2041] text-2xl font-black">Sessions</Text>
-            <Text className="text-[#64748B] text-sm font-semibold mt-1 mb-5">Choose a session to mark.</Text>
+          <View className="w-full xl:w-[380px] rounded-[30px] border border-[#E3ECF6] bg-[var(--c-surface)] p-5">
+            <Text className="text-[#0E2041] text-[17px] font-bold">Sesiuni</Text>
+            <Text className="text-[#64748B] text-sm font-semibold mt-1 mb-5">Alege o sesiune de marcat.</Text>
 
             {loadingEvents ? (
               <View className="py-10 items-center">
@@ -213,27 +220,27 @@ export default function CoachAttendance() {
               </View>
             ) : (
               <View className="rounded-[24px] bg-[#F8FBFF] px-5 py-10 items-center">
-                <Text className="text-[#64748B] font-bold text-center">No coach sessions found.</Text>
+                <Text className="text-[#64748B] font-bold text-center">Nicio sesiune de antrenor găsită.</Text>
               </View>
             )}
           </View>
 
-          <View className="flex-1 rounded-[30px] border border-[#E3ECF6] bg-white p-5 md:p-7">
+          <View className="flex-1 rounded-[30px] border border-[#E3ECF6] bg-[var(--c-surface)] p-5 md:p-7">
             <View className="flex-row flex-wrap items-start justify-between gap-4 mb-6">
               <View className="flex-1 min-w-[240px]">
-                <Text className="text-[#0E2041] text-2xl md:text-3xl font-black">{selectedEvent?.title ?? 'Select a session'}</Text>
+                <Text className="text-[#0E2041] text-[17px] font-bold">{selectedEvent?.title ?? 'Selectează o sesiune'}</Text>
                 <Text className="text-[#64748B] font-semibold mt-2">
-                  {selectedEvent ? `${selectedEvent.teamName ?? 'Team'} · ${formatCoachDate(selectedEvent.startTime)} · ${formatCoachTimeRange(selectedEvent.startTime, selectedEvent.endTime)}` : 'Attendance roster will appear here.'}
+                  {selectedEvent ? `${selectedEvent.teamName ?? 'Echipă'} · ${formatCoachDate(selectedEvent.startTime)} · ${formatCoachTimeRange(selectedEvent.startTime, selectedEvent.endTime)}` : 'Lista de prezență va apărea aici.'}
                 </Text>
               </View>
               <View className="flex-row gap-3">
                 <View className="rounded-2xl bg-[#F0F6FC] px-4 py-3">
-                  <Text className="text-[#64748B] text-[10px] font-black uppercase tracking-widest">Marked</Text>
-                  <Text className="text-[#0E2041] text-xl font-black">{markedCount}/{players.length}</Text>
+                  <Text className="text-[#64748B] text-[10px] font-black uppercase tracking-widest">Marcați</Text>
+                  <Text className="text-[#0E2041] text-[21px] font-black">{markedCount}/{players.length}</Text>
                 </View>
                 <View className="rounded-2xl bg-[#DCFCE7] px-4 py-3">
-                  <Text className="text-[#047857] text-[10px] font-black uppercase tracking-widest">Present</Text>
-                  <Text className="text-[#047857] text-xl font-black">{presentCount}</Text>
+                  <Text className="text-[#047857] text-[10px] font-black uppercase tracking-widest">Prezenți</Text>
+                  <Text className="text-[#047857] text-[21px] font-black">{presentCount}</Text>
                 </View>
               </View>
             </View>
@@ -249,7 +256,7 @@ export default function CoachAttendance() {
                   const busy = savingPlayerId === player.playerId;
 
                   return (
-                    <View key={player.playerId} className="rounded-[22px] border border-[#EDF2F7] bg-white px-4 py-4 flex-col md:flex-row md:items-center gap-4">
+                    <View key={player.playerId} className="rounded-[22px] border border-[#EDF2F7] bg-[var(--c-surface)] px-4 py-4 flex-col md:flex-row md:items-center gap-4">
                       <View className="flex-row items-center gap-4 flex-1 min-w-0">
                         <View className="h-12 w-12 rounded-2xl bg-[#EEF4FB] items-center justify-center">
                           <Text className="text-[#0A2C93] font-black">{player.number ?? `${player.firstName?.[0] ?? 'P'}${player.lastName?.[0] ?? ''}`}</Text>
@@ -268,7 +275,7 @@ export default function CoachAttendance() {
                             key={option.status}
                             disabled={busy}
                             onPress={() => markPlayer(player.playerId, option.status)}
-                            className="h-10 rounded-full border border-[#DDE8F5] bg-[#F8FBFF] px-3 flex-row items-center gap-2"
+                            className="h-11 rounded-full border border-[#DDE8F5] bg-[#F8FBFF] px-3 flex-row items-center gap-2"
                           >
                             {busy ? <ActivityIndicator size="small" color={option.color} /> : <MaterialIcons name={option.icon} size={16} color={option.color} />}
                             <Text style={{ color: option.color }} className="text-xs font-black">{option.label}</Text>
@@ -282,7 +289,7 @@ export default function CoachAttendance() {
             ) : (
               <View className="py-16 items-center">
                 <MaterialIcons name="groups" size={34} color="var(--c-faint)" />
-                <Text className="text-[#64748B] font-bold text-center mt-3">No players found for this session team.</Text>
+                <Text className="text-[#64748B] font-bold text-center mt-3">Niciun jucător găsit pentru echipa acestei sesiuni.</Text>
               </View>
             )}
           </View>

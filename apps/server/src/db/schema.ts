@@ -159,6 +159,9 @@ export const events = pgTable("events", {
 	amount: integer(),
 	status: varchar({ length: 50 }).default('scheduled'),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	// Shared note from the coach on this event, visible to every player on it
+	// (post-session feedback, focus points, MVP shoutout).
+	coachNote: text("coach_note"),
 }, (table) => [
 	foreignKey({
 			columns: [table.teamId],
@@ -196,6 +199,34 @@ export const attendance = pgTable("attendance", {
 			columns: [table.eventId],
 			foreignColumns: [events.id],
 			name: "attendance_event_id_events_id_fk"
+		}),
+]);
+
+export const notifications = pgTable("notifications", {
+	id: serial().primaryKey().notNull(),
+	userId: integer("user_id").notNull(),
+	type: varchar({ length: 50 }).notNull(),
+	title: varchar({ length: 255 }).notNull(),
+	message: text().notNull(),
+	eventId: integer("event_id"),
+	playerId: integer("player_id"),
+	isRead: boolean("is_read").default(false).notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "notifications_user_id_users_id_fk"
+		}),
+	foreignKey({
+			columns: [table.eventId],
+			foreignColumns: [events.id],
+			name: "notifications_event_id_events_id_fk"
+		}),
+	foreignKey({
+			columns: [table.playerId],
+			foreignColumns: [players.id],
+			name: "notifications_player_id_players_id_fk"
 		}),
 ]);
 

@@ -45,7 +45,6 @@ const finance_1 = __importStar(require("./routes/finance"));
 const users_1 = __importDefault(require("./routes/users"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const profile_1 = __importDefault(require("./routes/profile"));
-const admin_1 = __importDefault(require("./routes/admin"));
 const manageAccess_1 = __importDefault(require("./routes/manageAccess"));
 const clubAdmin_1 = __importDefault(require("./routes/clubAdmin"));
 const invitations_1 = __importDefault(require("./routes/invitations"));
@@ -148,7 +147,10 @@ function createServerApp() {
             callback(new Error(`CORS blocked origin: ${origin}`));
         },
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-User-Id', 'X-User-Uid', 'X-User-Role', 'X-User-Club-Id'],
+        // Identity is proven by the Firebase ID token in `Authorization` only.
+        // The old `X-User-*` headers are no longer read by the server and are
+        // deliberately not allowed through CORS either.
+        allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
         exposedHeaders: ['Content-Length', 'Content-Type'],
     }));
     app.post('/api/finance/stripe/webhook', express_1.default.raw({ type: 'application/json' }), finance_1.stripeWebhookHandler);
@@ -163,7 +165,6 @@ function createServerApp() {
     app.use('/api/users', users_1.default);
     app.use('/api/auth', auth_1.default);
     app.use('/api/profile', profile_1.default);
-    app.use('/api/admin', admin_1.default);
     app.use('/api/manage-access', manageAccess_1.default);
     app.use('/api/club-admin', clubAdmin_1.default);
     app.use('/api/invitations', invitations_1.default);

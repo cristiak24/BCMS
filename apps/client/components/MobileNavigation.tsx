@@ -21,9 +21,9 @@ type MobileBottomNavigationProps = {
   items: BottomItem[];
   pathname: string;
   isDashboard: boolean;
-  moreIsActive: boolean;
+  moreIsActive?: boolean;
   bottomInset: number;
-  onOpenMore: () => void;
+  onOpenMore?: () => void;
 };
 
 type MobileNavigationSheetProps = {
@@ -43,9 +43,11 @@ export function MobileBottomNavigation({
   onOpenMore,
 }: MobileBottomNavigationProps) {
   return (
+    // Structural surfaces use tokens, matching Sidebar, so the bar players see on
+    // every screen tracks light/dark instead of staying white on a dark shell.
     <View
-      className="flex lg:hidden flex-row items-center bg-white border-t border-[#E6EEF8] fixed bottom-0 left-0 right-0 w-full z-20 px-2"
-      style={{ paddingTop: 10, paddingBottom: Math.max(bottomInset, 12), ...theme.shadow.lift }}
+      className="flex lg:hidden flex-row items-center border-t fixed bottom-0 left-0 right-0 w-full z-20 px-2"
+      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', paddingTop: 10, paddingBottom: Math.max(bottomInset, 12), ...theme.shadow.lift } as any}
     >
       {items.map((item) => {
         const isActive = item.match === 'dashboard' ? isDashboard : pathname.includes(item.match);
@@ -63,19 +65,21 @@ export function MobileBottomNavigation({
           </RouterLink>
         );
       })}
-      <Pressable
-        onPress={onOpenMore}
-        className="flex-1 items-center justify-center py-1 px-1"
-        accessibilityRole="button"
-        accessibilityLabel="Open all admin pages"
-      >
-        <View className="items-center justify-center rounded-[18px] px-2 py-2 min-h-[52px] w-full" style={{ backgroundColor: moreIsActive ? 'var(--c-surface-tint)' : 'transparent' }}>
-          <MaterialIcons name="apps" size={20} color={moreIsActive ? theme.colors.royal : theme.colors.faint} />
-          <Text className="text-[10px] mt-1 font-black" style={{ color: moreIsActive ? theme.colors.royal : theme.colors.faint }} numberOfLines={1}>
-            More
-          </Text>
-        </View>
-      </Pressable>
+      {onOpenMore ? (
+        <Pressable
+          onPress={onOpenMore}
+          className="flex-1 items-center justify-center py-1 px-1"
+          accessibilityRole="button"
+          accessibilityLabel="Open all admin pages"
+        >
+          <View className="items-center justify-center rounded-[18px] px-2 py-2 min-h-[52px] w-full" style={{ backgroundColor: moreIsActive ? 'var(--c-surface-tint)' : 'transparent' }}>
+            <MaterialIcons name="apps" size={20} color={moreIsActive ? theme.colors.royal : theme.colors.faint} />
+            <Text className="text-[10px] mt-1 font-black" style={{ color: moreIsActive ? theme.colors.royal : theme.colors.faint }} numberOfLines={1}>
+              More
+            </Text>
+          </View>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

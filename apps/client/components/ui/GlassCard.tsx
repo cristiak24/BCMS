@@ -9,7 +9,8 @@ interface GlassCardProps extends ViewProps {
 export default function GlassCard({ children, className, ...props }: GlassCardProps) {
     return (
         <View
-            className={`bg-white border border-[#DDE7F5] rounded-lg shadow-lg p-6 overflow-hidden ${className ?? ''}`}
+            className={`relative rounded-[16px] border p-5 overflow-hidden ${className ?? ''}`}
+            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
             {...props}
         >
             {children}

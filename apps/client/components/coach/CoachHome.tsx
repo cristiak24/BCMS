@@ -5,6 +5,7 @@ import { useRouter } from '@/src/web/expoRouter';
 import { CalendarEvent, eventsApi } from '../../services/eventsApi';
 import { teamsApi, type Player, type Team } from '../../services/teamsApi';
 import { useFirebaseAuth } from '../../context/AuthContext';
+import PageHeader from '../ui/PageHeader';
 import {
   eventTypeLabel,
   formatCoachDate,
@@ -17,11 +18,11 @@ import {
 
 function CoachMetric({ label, value, icon, color }: { label: string; value: string | number; icon: keyof typeof MaterialIcons.glyphMap; color: string }) {
   return (
-    <View className="flex-1 min-w-[170px] rounded-[26px] border border-[#E2EAF4] bg-white p-5">
+    <View className="flex-1 min-w-[170px] rounded-[26px] border border-[#E2EAF4] bg-[var(--c-surface)] p-5">
       <View className="h-12 w-12 rounded-2xl items-center justify-center" style={{ backgroundColor: `${color}18` }}>
         <MaterialIcons name={icon} size={23} color={color} />
       </View>
-      <Text className="mt-5 text-[#0E2041] text-4xl font-black">{value}</Text>
+      <Text className="mt-5 text-[#0E2041] text-[21px] font-black">{value}</Text>
       <Text className="mt-1 text-[#64748B] text-xs font-black uppercase tracking-widest">{label}</Text>
     </View>
   );
@@ -29,7 +30,7 @@ function CoachMetric({ label, value, icon, color }: { label: string; value: stri
 
 function CoachEventCard({ event }: { event: CalendarEvent }) {
   return (
-    <View className="min-w-[260px] flex-1 rounded-[28px] border border-[#E3ECF6] bg-white p-5">
+    <View className="min-w-[260px] flex-1 rounded-[28px] border border-[#E3ECF6] bg-[var(--c-surface)] p-5">
       <View className="flex-row items-start justify-between gap-4">
         <View className="flex-1">
           <Text className="text-[#006092] text-[10px] font-black uppercase tracking-widest">{eventTypeLabel(event.type)}</Text>
@@ -51,7 +52,7 @@ function CoachEventCard({ event }: { event: CalendarEvent }) {
         </View>
         <View className="flex-row items-center gap-3">
           <MaterialIcons name="groups" size={18} color="var(--c-muted)" />
-          <Text className="text-[#1E293B] font-bold flex-1" numberOfLines={1}>{event.teamName || 'Club team'}</Text>
+          <Text className="text-[#1E293B] font-bold flex-1" numberOfLines={1}>{event.teamName || 'Echipa clubului'}</Text>
         </View>
       </View>
     </View>
@@ -63,13 +64,13 @@ function PlayerFocusRow({ player }: { player: Player }) {
   const tone = rate == null ? 'var(--c-muted)' : rate >= 80 ? 'var(--c-success-fg)' : 'var(--c-warning-fg)';
 
   return (
-    <View className="flex-row items-center gap-4 rounded-2xl border border-[#EDF2F7] bg-white px-4 py-3">
+    <View className="flex-row items-center gap-4 rounded-2xl border border-[#EDF2F7] bg-[var(--c-surface)] px-4 py-3">
       <View className="h-11 w-11 rounded-2xl bg-[#EEF4FB] items-center justify-center">
         <Text className="text-[#0A2C93] font-black">{player.firstName?.[0] ?? 'P'}{player.lastName?.[0] ?? ''}</Text>
       </View>
       <View className="flex-1 min-w-0">
         <Text className="text-[#0E2041] font-black" numberOfLines={1}>{player.firstName} {player.lastName}</Text>
-        <Text className="text-[#64748B] text-xs font-semibold mt-1" numberOfLines={1}>{player.teamName || player.teamNames?.[0] || player.position || 'Player'}</Text>
+        <Text className="text-[#64748B] text-xs font-semibold mt-1" numberOfLines={1}>{player.teamName || player.teamNames?.[0] || player.position || 'Jucător'}</Text>
       </View>
       <Text style={{ color: tone }} className="font-black">{rate == null ? '—' : `${rate}%`}</Text>
     </View>
@@ -105,7 +106,7 @@ export default function CoachHome() {
       setTeams(teamRows);
       setPlayers(rosterRows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load coach dashboard.');
+      setError(err instanceof Error ? err.message : 'Nu s-a putut încărca panoul antrenorului.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -133,36 +134,39 @@ export default function CoachHome() {
   );
 
   return (
-    <ScrollView className="flex-1 bg-[#F4F8FF]" contentContainerClassName="px-5 md:px-10 py-7 md:py-10 pb-20">
+    <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="px-5 md:px-10 py-7 md:py-10 pb-20">
       <View className="w-full max-w-7xl mx-auto">
-        <View className="flex-row items-start justify-between gap-4 mb-8">
-          <View className="flex-1">
-            <Text className="text-[#0A2C93] text-4xl md:text-5xl font-black tracking-tight">Coach Hub</Text>
-            <Text className="text-[#1E293B] text-base md:text-xl mt-3">
-              {session?.clubName ?? 'Club'} training control center.
-            </Text>
-            <Text className="text-[#8EA1B8] text-[11px] font-black uppercase tracking-widest mt-4">
-              {getCoachScopeLabel(events, session)}
-            </Text>
-          </View>
-
-          <Pressable onPress={() => loadData(true)} className="h-12 w-12 rounded-full bg-white border border-[#EAF1FA] items-center justify-center">
-            {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={22} color="var(--c-brand-fg)" />}
-          </Pressable>
-        </View>
+        <PageHeader
+          title="Panou antrenor"
+          subtitle={`Centrul de control al antrenamentelor · ${session?.clubName ?? 'Club'}.`}
+          actions={
+            <Pressable
+              onPress={() => loadData(true)}
+              className="w-9 h-9 rounded-[10px] border items-center justify-center"
+              style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+              accessibilityRole="button"
+              accessibilityLabel="Reîmprospătează"
+            >
+              {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
+            </Pressable>
+          }
+        />
+        <Text className="text-[11px] font-black uppercase tracking-widest mb-8" style={{ color: 'var(--c-faint)' }}>
+          {getCoachScopeLabel(events, session)}
+        </Text>
 
         {error ? (
-          <View className="mb-6 rounded-[24px] border border-red-100 bg-white px-5 py-4 flex-row items-center gap-3">
+          <View className="mb-6 rounded-[24px] border border-red-100 bg-[var(--c-surface)] px-5 py-4 flex-row items-center gap-3">
             <MaterialIcons name="error-outline" size={22} color="var(--c-danger)" />
             <Text className="flex-1 text-red-600 font-bold">{error}</Text>
           </View>
         ) : null}
 
         <View className="flex-row flex-wrap gap-4 mb-8">
-          <CoachMetric label="Upcoming sessions" value={upcomingEvents.length} icon="event-available" color="var(--c-brand-fg)" />
-          <CoachMetric label="Active teams" value={visibleTeamsCount} icon="groups" color="var(--c-sky)" />
-          <CoachMetric label="Roster players" value={players.length} icon="sports-basketball" color="var(--c-purple)" />
-          <CoachMetric label="This week" value={upcomingEvents.filter((event) => getEventTimestamp(event) - Date.now() <= 7 * 24 * 3600000).length} icon="date-range" color="var(--c-success-fg)" />
+          <CoachMetric label="Sesiuni viitoare" value={upcomingEvents.length} icon="event-available" color="var(--c-brand-fg)" />
+          <CoachMetric label="Echipe active" value={visibleTeamsCount} icon="groups" color="var(--c-sky)" />
+          <CoachMetric label="Jucători în lot" value={players.length} icon="sports-basketball" color="var(--c-purple)" />
+          <CoachMetric label="Săptămâna aceasta" value={upcomingEvents.filter((event) => getEventTimestamp(event) - Date.now() <= 7 * 24 * 3600000).length} icon="date-range" color="var(--c-success-fg)" />
         </View>
 
         {loading ? (
@@ -172,14 +176,14 @@ export default function CoachHome() {
         ) : (
           <View className="flex-col xl:flex-row gap-8">
             <View className="flex-1 gap-8">
-              <View className="rounded-[34px] border border-[#EAF1FA] bg-white p-6 md:p-8">
+              <View className="rounded-[34px] border border-[#EAF1FA] bg-[var(--c-surface)] p-6 md:p-8">
                 <View className="flex-row items-center justify-between gap-4 mb-6">
                   <View>
-                    <Text className="text-[#050817] text-3xl font-black">Next sessions</Text>
-                    <Text className="text-[#64748B] font-semibold mt-1">Training, matches and camps that need your attention.</Text>
+                    <Text className="text-[#050817] text-[17px] font-bold">Sesiuni următoare</Text>
+                    <Text className="text-[#64748B] font-semibold mt-1">Antrenamente, meciuri și cantonamente care necesită atenția ta.</Text>
                   </View>
                   <Pressable onPress={() => router.replace('/schedule' as any)}>
-                    <Text className="text-[#006092] font-black">Open schedule</Text>
+                    <Text className="text-[#006092] font-black">Deschide programul</Text>
                   </Pressable>
                 </View>
 
@@ -190,17 +194,17 @@ export default function CoachHome() {
                 ) : (
                   <View className="rounded-[28px] border border-[#E3ECF6] bg-[#F8FBFF] px-6 py-10 items-center">
                     <MaterialIcons name="event-busy" size={32} color="var(--c-faint)" />
-                    <Text className="text-[#64748B] font-bold text-center mt-3">No upcoming sessions found.</Text>
+                    <Text className="text-[#64748B] font-bold text-center mt-3">Nicio sesiune viitoare.</Text>
                   </View>
                 )}
               </View>
             </View>
 
-            <View className="w-full xl:w-[380px] rounded-[34px] border border-[#EAF1FA] bg-white p-6 md:p-7">
+            <View className="w-full xl:w-[380px] rounded-[34px] border border-[#EAF1FA] bg-[var(--c-surface)] p-6 md:p-7">
               <View className="flex-row items-center justify-between gap-4">
                 <View>
-                  <Text className="text-[#050817] text-2xl font-black">Roster focus</Text>
-                  <Text className="text-[#64748B] text-sm font-semibold mt-1">Lowest recent attendance</Text>
+                  <Text className="text-[#050817] text-[17px] font-bold">Focus lot</Text>
+                  <Text className="text-[#64748B] text-sm font-semibold mt-1">Cea mai scăzută prezență recentă</Text>
                 </View>
                 <MaterialIcons name="monitor-heart" size={25} color="var(--c-brand-fg)" />
               </View>
@@ -210,13 +214,13 @@ export default function CoachHome() {
                   lowAttendancePlayers.map((player) => <PlayerFocusRow key={player.id} player={player} />)
                 ) : (
                   <View className="rounded-[24px] bg-[#F8FBFF] px-5 py-8 items-center">
-                    <Text className="text-[#64748B] font-bold text-center">Attendance focus appears after records are marked.</Text>
+                    <Text className="text-[#64748B] font-bold text-center">Focusul pe prezență apare după marcarea înregistrărilor.</Text>
                   </View>
                 )}
               </View>
 
               <Pressable onPress={() => router.replace('/attendance' as any)} className="mt-6 h-[52px] rounded-full bg-[#0A2C93] px-5 items-center justify-center">
-                <Text className="text-white font-black">Manage attendance</Text>
+                <Text className="text-white font-black">Gestionează prezența</Text>
               </Pressable>
             </View>
           </View>

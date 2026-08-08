@@ -1,4 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { signOut as firebaseSignOut } from 'firebase/auth';
+import { firebaseAuth } from '../../config/firebase';
+import { clearAuthSession, setCachedAuthSession } from '../../utils/authSession';
 
 type ErrorBoundaryProps = {
   children: ReactNode;
@@ -16,7 +19,14 @@ type ErrorBoundaryState = {
  * Without this, a single bad field on an API response (a `null` where the UI
  * expects an object) unmounts the whole React tree and leaves the user staring
  * at a blank white page with no way forward. Now they get an explanation and
- * two ways out: retry the subtree, or go back to the dashboard.
+ * a few ways out: retry the subtree, go back to the dashboard, or log out.
+ *
+ * This boundary wraps the app ABOVE FirebaseAuthProvider (see App.tsx), so it
+ * can't use useFirebaseAuth()/signOut() — and it must not need to. If the
+ * crash happens on a logged-in user's home route, "go to dashboard" just
+ * re-triggers the same crash (Landing redirects straight back there), trapping
+ * the user with no escape. Log out is handled here directly against Firebase
+ * + local session storage so it always works, independent of whatever broke.
  */
 export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null };
@@ -32,6 +42,18 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
   }
 
   reset = () => this.setState({ error: null });
+
+  logout = async () => {
+    try {
+      await firebaseSignOut(firebaseAuth);
+    } catch (error) {
+      console.error('[ErrorBoundary] Sign-out failed:', error);
+    } finally {
+      setCachedAuthSession(null);
+      await clearAuthSession();
+      window.location.href = '/login';
+    }
+  };
 
   render() {
     const { error } = this.state;
@@ -103,6 +125,18 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
               }}
             >
               Pagina principală
+            </button>
+            <button
+              type="button"
+              onClick={this.logout}
+              className="min-h-[44px] rounded-2xl border px-5 text-sm font-black"
+              style={{
+                borderColor: 'var(--c-danger-bg)',
+                color: 'var(--c-danger-fg)',
+                backgroundColor: 'var(--c-surface)',
+              }}
+            >
+              Deconectare
             </button>
           </div>
 

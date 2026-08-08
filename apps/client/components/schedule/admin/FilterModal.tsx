@@ -3,6 +3,7 @@ import { View, Text, Modal, Pressable, TouchableOpacity, ScrollView, TextInput }
 import { X, Check, Users, UserCog, Eye, Search } from 'lucide-react';
 import { Team } from '../../../services/teamsApi';
 import { EVENT_TYPE_META, EventType } from '../scheduleShared';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 const EVENT_TYPES: EventType[] = ['training', 'match', 'camp', 'medical', 'admin'];
 
@@ -52,9 +53,10 @@ function Chip({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.8}
-      className={`flex-row items-center gap-1.5 rounded-full px-3 py-1.5 border ${
-        active ? 'bg-[#1D3E90] border-[#1D3E90]' : 'bg-[#F4F7FC] border-[#E3EAF5] hover:bg-[#EAF1FB]'
-      }`}
+      className="flex-row items-center gap-1.5 rounded-[9px] px-2.5 h-8 border"
+      style={active
+        ? { backgroundColor: 'var(--c-brand-surface)', borderColor: 'transparent' }
+        : { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}
     >
       {dotColor ? (
         <View
@@ -62,14 +64,14 @@ function Chip({
             width: 6,
             height: 6,
             borderRadius: 3,
-            backgroundColor: active ? 'var(--c-surface)' : dotColor,
+            backgroundColor: active ? 'var(--c-on-brand)' : dotColor,
           }}
         />
       ) : null}
-      <Text className={`text-[11.5px] font-bold ${active ? 'text-white' : 'text-[#334155]'}`} numberOfLines={1}>
+      <Text className="text-[12px] font-semibold" style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }} numberOfLines={1}>
         {label}
       </Text>
-      {active ? <Check size={11} color="var(--c-surface)" /> : null}
+      {active ? <Check size={12} color="var(--c-on-brand)" /> : null}
     </TouchableOpacity>
   );
 }
@@ -101,6 +103,7 @@ export function FilterModal({
   coaches: { id: number; name: string }[];
   teams: Team[];
 }) {
+  const { isMobile } = useResponsive();
   const [coachQuery, setCoachQuery] = useState('');
   const [teamQuery, setTeamQuery] = useState('');
 
@@ -121,24 +124,24 @@ export function FilterModal({
   }, [teams, teamQuery, filterTeamId]);
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <Pressable className="flex-1 bg-black/45 items-center justify-center p-5" onPress={onClose}>
+    <Modal visible={visible} transparent animationType={isMobile ? 'slide' : 'fade'}>
+      <Pressable className={`flex-1 bg-black/45 ${isMobile ? 'justify-end' : 'items-center justify-center p-5'}`} onPress={onClose}>
         <View
-          className="bg-white rounded-[28px] w-full overflow-hidden"
-          style={{ maxWidth: 640, maxHeight: '88%', boxShadow: '0 24px 60px rgba(11,30,61,0.28)' } as any}
+          className={`bg-white w-full overflow-hidden ${isMobile ? 'rounded-t-[24px]' : 'rounded-[20px]'}`}
+          style={{ maxWidth: isMobile ? undefined : 640, maxHeight: isMobile ? '92%' : '88%', boxShadow: '0 24px 60px rgba(11,30,61,0.28)' } as any}
           onStartShouldSetResponder={() => true}
         >
           {/* Header */}
-          <View className="px-7 pt-6 pb-5 border-b border-[#EEF3F9] flex-row items-start justify-between gap-4">
+          <View className={`${isMobile ? 'px-5 pt-4 pb-4' : 'px-6 pt-5 pb-4'} border-b border-[#EEF3F9] flex-row items-start justify-between gap-4`}>
             <View className="flex-1">
-              <Text className="text-[26px] font-black text-[#0E2041]">Filtre</Text>
-              <Text className="text-slate-400 text-[12px] font-bold mt-1">
+              <Text className="text-[20px] font-bold text-[#0E2041]">Filtre</Text>
+              <Text className="text-slate-400 text-[12px] font-medium mt-0.5">
                 {activeCount === 0 ? 'Niciun filtru aplicat' : `${activeCount} ${activeCount === 1 ? 'filtru aplicat' : 'filtre aplicate'}`}
               </Text>
             </View>
             <TouchableOpacity
               onPress={onClose}
-              className="w-10 h-10 rounded-full bg-[#F4F7FC] border border-[#E3EAF5] items-center justify-center"
+              className="w-9 h-9 rounded-[10px] bg-[#F4F7FC] border border-[#E3EAF5] items-center justify-center"
               accessibilityLabel="Închide filtrele"
             >
               <X color="var(--c-ink-soft)" size={18} />
@@ -146,7 +149,7 @@ export function FilterModal({
           </View>
 
           {/* Body */}
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 28, paddingTop: 22, paddingBottom: 24 }}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: isMobile ? 18 : 24, paddingTop: 18, paddingBottom: 24 }}>
             <View className="mb-6">
               <SectionLabel>Categorie eveniment</SectionLabel>
               <View className="flex-row flex-wrap gap-1.5">
@@ -174,16 +177,24 @@ export function FilterModal({
                   {filteredCoaches.length === 0 ? (
                     <Text className="text-slate-400 text-[13px] font-semibold">Niciun antrenor găsit.</Text>
                   ) : (
-                    <View className="flex-row flex-wrap gap-1.5">
-                      {filteredCoaches.map((coach) => (
-                        <Chip
-                          key={coach.id}
-                          label={coach.name}
-                          active={filterCoachId === coach.id}
-                          onPress={() => setFilterCoachId(filterCoachId === coach.id ? null : coach.id)}
-                        />
-                      ))}
-                    </View>
+                    // Capped + nested-scroll: with 20+ coaches a plain wrap grew
+                    // to ~10 rows and buried the Club/Team section below it.
+                    <ScrollView
+                      style={{ maxHeight: 148 }}
+                      nestedScrollEnabled
+                      showsVerticalScrollIndicator={false}
+                    >
+                      <View className="flex-row flex-wrap gap-1.5">
+                        {filteredCoaches.map((coach) => (
+                          <Chip
+                            key={coach.id}
+                            label={coach.name}
+                            active={filterCoachId === coach.id}
+                            onPress={() => setFilterCoachId(filterCoachId === coach.id ? null : coach.id)}
+                          />
+                        ))}
+                      </View>
+                    </ScrollView>
                   )}
                 </>
               )}
@@ -201,16 +212,22 @@ export function FilterModal({
                   {filteredTeams.length === 0 ? (
                     <Text className="text-slate-400 text-[13px] font-semibold">Nicio echipă găsită.</Text>
                   ) : (
-                    <View className="flex-row flex-wrap gap-1.5">
-                      {filteredTeams.map((team) => (
-                        <Chip
-                          key={team.id}
-                          label={team.name}
-                          active={filterTeamId === team.id}
-                          onPress={() => setFilterTeamId(filterTeamId === team.id ? null : team.id)}
-                        />
-                      ))}
-                    </View>
+                    <ScrollView
+                      style={{ maxHeight: 148 }}
+                      nestedScrollEnabled
+                      showsVerticalScrollIndicator={false}
+                    >
+                      <View className="flex-row flex-wrap gap-1.5">
+                        {filteredTeams.map((team) => (
+                          <Chip
+                            key={team.id}
+                            label={team.name}
+                            active={filterTeamId === team.id}
+                            onPress={() => setFilterTeamId(filterTeamId === team.id ? null : team.id)}
+                          />
+                        ))}
+                      </View>
+                    </ScrollView>
                   )}
                 </>
               )}
@@ -241,7 +258,7 @@ export function FilterModal({
           </ScrollView>
 
           {/* Footer */}
-          <View className="px-7 py-5 border-t border-[#EEF3F9] bg-[#FBFCFE] flex-row items-center justify-between gap-4">
+          <View className={`${isMobile ? 'px-5 py-4' : 'px-6 py-4'} border-t border-[#EEF3F9] bg-[#FBFCFE] flex-row items-center justify-between gap-4`}>
             <TouchableOpacity
               onPress={() => {
                 setFilterType(null);
@@ -258,10 +275,10 @@ export function FilterModal({
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onClose}
-              className="bg-[#1D3E90] rounded-full px-9 h-12 items-center justify-center"
-              style={{ boxShadow: '0 10px 22px rgba(29,62,144,0.28)' } as any}
+              className="rounded-[10px] px-6 h-11 items-center justify-center"
+              style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)' } as any}
             >
-              <Text className="text-white font-black uppercase tracking-widest text-[12px]">Aplică filtrele</Text>
+              <Text className="text-white font-semibold uppercase tracking-wide text-[12px]">Aplică</Text>
             </TouchableOpacity>
           </View>
         </View>

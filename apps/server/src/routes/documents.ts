@@ -3,10 +3,11 @@ import { admin, firestore, nextNumericId, toIso } from '../lib/firebaseAdmin';
 import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
-import { authenticate, requireRoles } from '../middleware/auth';
+import { authenticate, requireRoles, type AuthenticatedRequest } from '../middleware/auth';
 import { db } from '../db';
-import { l12Documents } from '../db/schema';
-import { desc } from 'drizzle-orm';
+import { l12Documents, players as playersTable, playersToTeams, teams } from '../db/schema';
+import { desc, eq, inArray } from 'drizzle-orm';
+import { assertTeamInClub, filterIdsToClub, isSuperadmin, resolveRequestClubId } from '../lib/tenantScope';
 
 const router = Router();
 const MAX_L12_PLAYERS = 24;
@@ -31,7 +32,7 @@ function safeFileSegment(value: unknown) {
         .slice(0, 80) || 'Necunoscut';
 }
 
-router.post('/generate-l12', async (req, res) => {
+router.post('/generate-l12', async (req: AuthenticatedRequest, res) => {
     try {
         const { teamId, matchDetails, players } = req.body;
 
@@ -45,7 +46,59 @@ router.post('/generate-l12', async (req, res) => {
             return;
         }
 
-        let team = { id: Number(teamId), name: 'Echipă Necunoscută' };
+        const numericTeamId = Number(teamId);
+        if (!Number.isFinite(numericTeamId)) {
+            res.status(400).json({ error: 'Invalid team id.' });
+            return;
+        }
+
+        // An L12 is an official FRB match sheet filed on behalf of a team, so the
+        // caller has to actually own that team — the role gate on this router only
+        // proves they are an admin or coach somewhere, not here. Wrong-club and
+        // wrong-role both answer 'Forbidden.' so that team ids belonging to other
+        // clubs cannot be probed by diffing the two responses.
+        const teamRows = await db.select().from(teams).where(eq(teams.id, numericTeamId)).limit(1);
+        const teamScope = assertTeamInClub(teamRows[0], resolveRequestClubId(req.user), isSuperadmin(req.user));
+
+        if (teamScope === 'not-found') {
+            res.status(404).json({ error: 'Team not found.' });
+            return;
+        }
+
+        if (teamScope !== 'ok') {
+            res.status(403).json({ error: 'Forbidden.' });
+            return;
+        }
+
+        // A stranger's name on a federation document is a real-world problem, not just
+        // a data-integrity one. An unrecognised player therefore fails the whole
+        // request instead of being quietly dropped from the sheet.
+        const submittedPlayerIds: number[] = players.map((player: { id?: unknown }) => Number(player?.id));
+        if (submittedPlayerIds.some((id) => !Number.isFinite(id))) {
+            res.status(400).json({ error: 'Every selected player must have a valid id.' });
+            return;
+        }
+
+        const [rosterLinks, directPlayers] = await Promise.all([
+            db.select({ playerId: playersToTeams.playerId })
+                .from(playersToTeams)
+                .where(eq(playersToTeams.teamId, numericTeamId)),
+            db.select({ id: playersTable.id })
+                .from(playersTable)
+                .where(eq(playersTable.teamId, numericTeamId)),
+        ]);
+
+        const roster = new Set<number>([
+            ...rosterLinks.map((row) => row.playerId),
+            ...directPlayers.map((row) => row.id),
+        ]);
+
+        if (submittedPlayerIds.some((id) => !roster.has(id))) {
+            res.status(400).json({ error: 'One or more selected players are not on this team roster.' });
+            return;
+        }
+
+        let team = { id: numericTeamId, name: 'Echipă Necunoscută' };
         try {
             const teamSnap = await firestore.collection('teams').doc(String(teamId)).get();
             if (teamSnap.exists) {
@@ -183,8 +236,35 @@ router.post('/generate-l12', async (req, res) => {
     }
 });
 
-router.get('/l12', async (_req, res) => {
+router.get('/l12', async (req: AuthenticatedRequest, res) => {
     try {
+        // l12_documents carries no club_id of its own — tenancy is derived through
+        // teams.club_id. Without this filter the archive returned every club's match
+        // sheets, including their rosters, to any admin or coach in any club.
+        const superadmin = isSuperadmin(req.user);
+        let allowedTeamIds: number[] = [];
+
+        if (!superadmin) {
+            const clubId = resolveRequestClubId(req.user);
+
+            // No club means nothing to scope to, so the caller sees nothing rather
+            // than everything.
+            if (clubId == null) {
+                res.json([]);
+                return;
+            }
+
+            const clubTeams = await db.select({ id: teams.id }).from(teams).where(eq(teams.clubId, clubId));
+            allowedTeamIds = clubTeams.map((clubTeam) => clubTeam.id);
+
+            // A club with no teams owns no documents. Returning early also keeps an
+            // empty array away from inArray, which would emit invalid `IN ()` SQL.
+            if (allowedTeamIds.length === 0) {
+                res.json([]);
+                return;
+            }
+        }
+
         try {
             const snap = await firestore.collection('l12Documents').orderBy('createdAt', 'desc').limit(50).get();
             const docs = snap.docs.map((docSnap) => {
@@ -202,10 +282,18 @@ router.get('/l12', async (_req, res) => {
                 };
             });
 
-            res.json(docs);
+            const visibleTeamIds = new Set(
+                filterIdsToClub(docs.map((doc) => doc.teamId), allowedTeamIds, superadmin),
+            );
+
+            res.json(docs.filter((doc) => visibleTeamIds.has(Number(doc.teamId))));
         } catch (firestoreError) {
             console.error('[GET /api/documents/l12] Firestore fallback:', firestoreError);
-            const docs = await db.select().from(l12Documents).orderBy(desc(l12Documents.createdAt)).limit(50);
+            const baseQuery = db.select().from(l12Documents);
+            const docs = await (superadmin
+                ? baseQuery
+                : baseQuery.where(inArray(l12Documents.teamId, allowedTeamIds))
+            ).orderBy(desc(l12Documents.createdAt)).limit(50);
             res.json(docs.map((doc) => ({
                 ...doc,
                 createdAt: toIso(doc.createdAt) ?? new Date().toISOString(),

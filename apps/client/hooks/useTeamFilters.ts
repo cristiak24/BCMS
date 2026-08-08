@@ -6,6 +6,8 @@ export type SourceFilter = 'all' | 'frb' | 'manual';
 export type GenderFilter = 'all' | 'M' | 'F';
 export type LevelFilter = 'all' | TeamLevel;
 export type StatusFilter = 'all' | 'active' | 'inactive';
+// Quick "teams in alert" filter: only those with expired/stale medical checks.
+export type AlertFilter = 'all' | 'medical';
 
 export type SortKey = 'name' | 'players' | 'updated' | 'medical';
 export type SortDir = 'asc' | 'desc';
@@ -16,6 +18,7 @@ export interface TeamFiltersState {
     gender: GenderFilter;
     level: LevelFilter;
     status: StatusFilter;
+    alert: AlertFilter;
     coachId: number | 'all';
 }
 
@@ -30,6 +33,7 @@ export interface FilterCounts {
     gender: Record<GenderFilter, number>;
     level: Record<string, number>;
     status: Record<StatusFilter, number>;
+    alert: Record<AlertFilter, number>;
 }
 
 const DEFAULT_FILTERS: TeamFiltersState = {
@@ -38,14 +42,19 @@ const DEFAULT_FILTERS: TeamFiltersState = {
     gender: 'all',
     level: 'all',
     status: 'all',
+    alert: 'all',
     coachId: 'all',
 };
 
-const DEFAULT_SORT: SortState = { key: 'updated', dir: 'desc' };
+// Alphabetical by default — the previous "most recently updated" order was
+// arbitrary from the user's point of view and made the list feel unstable.
+const DEFAULT_SORT: SortState = { key: 'name', dir: 'asc' };
 
 const LEVEL_ORDER: TeamLevel[] = ['national', 'municipal', 'initiere'];
 
-const STORAGE_KEY = 'myclub.filters.v1';
+// Bumped to v2 so the new alphabetical default + alert filter take effect
+// instead of being shadowed by a persisted "updated" sort from v1.
+const STORAGE_KEY = 'myclub.filters.v2';
 
 interface PersistedState {
     filters?: Partial<TeamFiltersState>;
@@ -92,12 +101,14 @@ export function useTeamFilters(teams: Team[]) {
             gender: { all: teams.length, M: 0, F: 0 },
             level: { all: teams.length },
             status: { all: teams.length, active: 0, inactive: 0 },
+            alert: { all: teams.length, medical: 0 },
         };
         teams.forEach((t) => {
             if (isFrbTeam(t)) c.source.frb += 1; else c.source.manual += 1;
             if (t.gender === 'M') c.gender.M += 1; else if (t.gender === 'F') c.gender.F += 1;
             if (t.level) c.level[t.level] = (c.level[t.level] ?? 0) + 1;
             if (t.isActive) c.status.active += 1; else c.status.inactive += 1;
+            if (t.staleMedicalChecks > 0) c.alert.medical += 1;
         });
         return c;
     }, [teams]);
@@ -113,6 +124,7 @@ export function useTeamFilters(teams: Team[]) {
             if (filters.level !== 'all' && team.level !== filters.level) return false;
             if (filters.status === 'active' && !team.isActive) return false;
             if (filters.status === 'inactive' && team.isActive) return false;
+            if (filters.alert === 'medical' && team.staleMedicalChecks <= 0) return false;
             if (filters.coachId !== 'all' && team.coachId !== filters.coachId) return false;
 
             if (query) {
@@ -159,6 +171,7 @@ export function useTeamFilters(teams: Team[]) {
         (filters.gender !== 'all' ? 1 : 0) +
         (filters.level !== 'all' ? 1 : 0) +
         (filters.status !== 'all' ? 1 : 0) +
+        (filters.alert !== 'all' ? 1 : 0) +
         (filters.coachId !== 'all' ? 1 : 0);
 
     const hasActiveFilters = activeFilterCount > 0;

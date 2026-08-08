@@ -119,12 +119,38 @@
 .break-anywhere { overflow-wrap: anywhere; word-break: break-word; }
 
 /* ── Focus ────────────────────────────────────────────────────────────────
- * Brand-tinted rather than the old flat blue, and offset so it never sits
- * under an adjacent control. */
+ * Two different treatments. Buttons/links keep a tight keyboard-focus outline
+ * for a11y. TEXT FIELDS get a soft border tint instead — the old style stacked
+ * an offset 2px outline AND a 3px glow (from global.css) on every input, which
+ * is the heavy blue double "contur" the search box showed the moment it was
+ * tapped. That reads as loud and broken on touch, where the input is always
+ * focus-visible; a quiet border shift is enough. */
 
-:where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"]), [role="button"]):focus-visible {
+:where(a, button, summary, [tabindex]:not([tabindex="-1"]), [role="button"]):focus-visible {
   outline: 2px solid var(--c-brand-surface);
-  outline-offset: 2px;
+  outline-offset: 1px;
+  border-radius: 8px;
+}
+
+/* Wins over global.css (loads later): no outline, no glow — just a border. */
+:where(input, select, textarea):focus,
+:where(input, select, textarea):focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: var(--c-brand-border);
+}
+
+/* ── iOS focus-zoom guard ───────────────────────────────────────────────────
+ * Mobile Safari zooms the whole page when you focus a field whose font-size is
+ * under 16px — which is why tapping the search yanked the viewport. Forcing
+ * every text control to 16px on phones/tablets stops that at the source, and
+ * (unlike a maximum-scale viewport lock) it keeps pinch-zoom working for
+ * accessibility. Desktop keeps its denser sizes. 16px also reads better on a
+ * phone, so this is a UX win, not a compromise. */
+@media (max-width: 1023px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
 }
 
 /* ── Scrollbars ───────────────────────────────────────────────────────────

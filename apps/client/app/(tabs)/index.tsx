@@ -1,54 +1,52 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from '@/src/web/reactNative';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import { LinearGradient } from '@/src/web/linearGradient';
 import { useRouter } from '@/src/web/expoRouter';
 import { eventsApi, CalendarEvent } from '../../services/eventsApi';
 import { basketballApi, Match } from '../../services/basketballApi';
 import { teamsApi, Player, Team } from '../../services/teamsApi';
 import { AuthUser, normalizeRole } from '../../utils/authSession';
-import { loadPlayerAttendanceSummary, PlayerAttendanceSummary } from '../../utils/playerAttendance';
+import {
+  loadPlayerAttendanceDetails,
+  isPresentAttendanceStatus,
+  isCountedAttendanceStatus,
+  PlayerAttendanceRecord,
+  PlayerAttendanceSummary,
+} from '../../utils/playerAttendance';
 import { useFirebaseAuth } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
+import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../components/HeaderContext';
 import CoachHome from '../../components/coach/CoachHome';
+import GlassCard from '../../components/ui/GlassCard';
+import { Skeleton } from '../../components/ui/Skeleton';
+import PageContainer from '../../components/ui/PageContainer';
+import PageHeader from '../../components/ui/PageHeader';
+import SectionHeader from '../../components/ui/SectionHeader';
+import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
+import { PlayerEventDetailModal } from '../../components/schedule/player/PlayerEventDetailModal';
 
 type HubEvent = CalendarEvent & {
   source?: 'internal' | 'frb';
   frbMatch?: Match;
-  teamFilterKey?: string;
   teamDisplayName?: string;
   categoryName?: string;
   seasonName?: string;
   venueName?: string | null;
 };
 
-type FilterOption = {
-  key: string;
-  label: string;
-};
+/**
+ * Home is a digest, not an archive: each section shows at most this many rows
+ * and links to /schedule for the full list. The old screen carried a 4-field
+ * filter bar and 12-item lists, which made the landing page longer than the
+ * dedicated schedule screen it was supposed to summarise.
+ */
+const SECTION_LIMIT = 4;
+const RO_LOCALE = 'ro-RO';
 
-type GameFilters = {
-  team: string;
-  category: string;
-  month: string;
-  season: string;
-};
-
-const ALL_FILTER_KEY = 'all';
 const palette = {
-  navy: 'var(--c-ink-strong)',
   royal: 'var(--c-brand-fg)',
-  blue: 'var(--c-blue)',
-  sky: 'var(--c-sky)',
   orange: 'var(--c-warning)',
-  amber: 'var(--c-warning)',
   green: 'var(--c-success-fg)',
-  slate: 'var(--c-muted)',
-  muted: 'var(--c-faint)',
-  line: 'var(--c-border)',
-  soft: 'var(--c-surface-2)',
-  page: 'var(--c-surface-2)',
-  card: 'var(--c-surface)',
 };
 
 function getSessionTeamIds(user: AuthUser | null) {
@@ -57,14 +55,6 @@ function getSessionTeamIds(user: AuthUser | null) {
       .map((teamId) => Number(teamId))
       .filter((teamId) => Number.isFinite(teamId))
   );
-}
-
-function belongsToSessionTeam(event: CalendarEvent, teamIds: Set<number>) {
-  if (teamIds.size === 0) {
-    return true;
-  }
-
-  return event.teamId != null && teamIds.has(Number(event.teamId));
 }
 
 function getEventTime(value: string) {
@@ -78,7 +68,7 @@ function formatDate(value: string) {
     return value;
   }
 
-  return new Intl.DateTimeFormat('en', {
+  return new Intl.DateTimeFormat(RO_LOCALE, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -88,11 +78,11 @@ function formatDate(value: string) {
 function getDateBlock(value: string) {
   const date = getEventTime(value);
   if (!date) {
-    return { month: 'DATE', day: '--' };
+    return { month: 'DATA', day: '--' };
   }
 
   return {
-    month: new Intl.DateTimeFormat('en', { month: 'short' }).format(date).toUpperCase(),
+    month: new Intl.DateTimeFormat(RO_LOCALE, { month: 'short' }).format(date).toUpperCase().replace('.', ''),
     day: String(date.getDate()),
   };
 }
@@ -105,9 +95,10 @@ function formatTimeRange(start: string, end: string) {
     return start;
   }
 
-  const formatter = new Intl.DateTimeFormat('en', {
-    hour: 'numeric',
+  const formatter = new Intl.DateTimeFormat(RO_LOCALE, {
+    hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   });
 
   if (!endDate) {
@@ -128,32 +119,81 @@ function normalizeTeamName(value?: string | null) {
     .replace(/\s+/g, ' ');
 }
 
-function getPlayerTeamNamesFromRoster(roster: Player[], session: AuthUser | null) {
-  const sessionEmail = normalizeTeamName(session?.email);
-  const sessionId = Number(session?.id);
-  const player = roster.find((item) => {
-    const sameEmail = sessionEmail && normalizeTeamName(item.email) === sessionEmail;
-    const sameId = Number.isFinite(sessionId) && Number(item.id) === sessionId;
-    return sameEmail || sameId;
-  });
+/**
+ * The player's own team names, from every source that is scoped to *them*
+ * rather than to their club:
+ *   • their own player record (GET /players/me), and
+ *   • the roster (GET /players/roster), which the server already narrows to
+ *     the requesting player's team(s).
+ * `teamsApi.getTeams()` is deliberately NOT a source — it returns every team
+ * in the club, which is what used to leak other squads' fixtures onto this
+ * page.
+ */
+function getPlayerTeamNames(myRecord: Player | null, roster: Player[]) {
+  const names = [
+    ...(myRecord ? [myRecord.teamName, ...(myRecord.teamNames ?? [])] : []),
+    ...roster.flatMap((item) => [item.teamName, ...(item.teamNames ?? [])]),
+  ];
 
-  if (!player) {
-    return new Set<string>();
-  }
-
-  return new Set(
-    [player.teamName, ...(player.teamNames ?? [])]
-      .map(normalizeTeamName)
-      .filter(Boolean)
-  );
+  return new Set(names.map(normalizeTeamName).filter(Boolean));
 }
 
-function isScopedTeam(team: Team, teamIds: Set<number>, teamNames: Set<string>) {
-  if (teamIds.size === 0 && teamNames.size === 0) {
+/**
+ * Team-name comparison that tolerates the drift between how a squad is named
+ * in our DB and how the federation spells it in a fixture ("CSM 2007 Focsani"
+ * vs "CSM 2007 Focsani U16"), by accepting either as a substring of the other.
+ */
+function namesOverlap(candidate: string | null | undefined, names: Set<string>) {
+  const normalized = normalizeTeamName(candidate);
+  if (!normalized) {
+    return false;
+  }
+
+  if (names.has(normalized)) {
     return true;
   }
 
-  return teamIds.has(Number(team.id)) || teamNames.has(normalizeTeamName(team.name));
+  for (const name of names) {
+    if (name.length >= 4 && (normalized.includes(name) || name.includes(normalized))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Whether an event belongs to a team the player is actually on.
+ *
+ * The previous rule returned `true` for everything whenever the session
+ * carried no team ids, so a player whose squad was "CSM 2007 Focsani" saw the
+ * club's other squads' results (Oradea fixtures on a Focsani player's home
+ * page). Identity now also comes from the player's own record and roster, and
+ * when at least one signal exists it is enforced instead of ignored.
+ */
+function belongsToPlayerTeams(event: CalendarEvent, teamIds: Set<number>, teamNames: Set<string>) {
+  if (teamIds.size === 0 && teamNames.size === 0) {
+    // No signal at all: fall back to the server's club scoping rather than
+    // showing the player a blank page.
+    return true;
+  }
+
+  if (event.teamId != null && teamIds.has(Number(event.teamId))) {
+    return true;
+  }
+
+  return namesOverlap(event.teamName, teamNames);
+}
+
+function isPlayerTeam(team: Team, teamIds: Set<number>, teamNames: Set<string>) {
+  if (teamIds.size === 0 && teamNames.size === 0) {
+    // Unlike internal events, federation fixtures are fetched per-team from an
+    // external API — with no identity signal there is nothing to scope them
+    // to, and pulling every club team's fixtures is exactly the leak above.
+    return false;
+  }
+
+  return teamIds.has(Number(team.id)) || namesOverlap(team.name, teamNames);
 }
 
 function hashToNegativeId(value: string) {
@@ -222,28 +262,11 @@ function frbMatchToHubEvent(match: Match, team: Team, index: number): HubEvent |
     coachName: 'FRB',
     source: 'frb',
     frbMatch: match,
-    teamFilterKey: String(team.id),
     teamDisplayName: team.name,
     categoryName: team.leagueName || match.league || 'FRB',
     seasonName: team.seasonName || '',
     venueName: match.league || null,
   };
-}
-
-function getEventTeamKey(event: HubEvent) {
-  if (event.teamFilterKey) {
-    return event.teamFilterKey;
-  }
-
-  if (event.teamId != null) {
-    return String(event.teamId);
-  }
-
-  return normalizeTeamName(event.teamName || event.teamDisplayName || 'team');
-}
-
-function getEventTeamLabel(event: HubEvent) {
-  return event.teamDisplayName || event.teamName || 'Team event';
 }
 
 function getEventCategory(event: HubEvent) {
@@ -252,23 +275,14 @@ function getEventCategory(event: HubEvent) {
   }
 
   if (event.type === 'match') {
-    return 'Internal match';
+    return 'Meci';
   }
 
   if (event.type === 'camp') {
-    return 'Camp';
+    return 'Cantonament';
   }
 
-  return 'Training';
-}
-
-function getEventSeason(event: HubEvent) {
-  if (event.seasonName) {
-    return event.seasonName;
-  }
-
-  const date = getEventTime(event.startTime);
-  return date ? `${date.getFullYear()}` : 'Season';
+  return 'Antrenament';
 }
 
 function getMonthKey(value: string) {
@@ -280,41 +294,12 @@ function getMonthKey(value: string) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function getMonthLabel(value: string) {
-  const date = getEventTime(value);
-  if (!date) {
-    return 'Unknown month';
-  }
-
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
-}
-
-function buildFilterOptions<T>(
-  items: T[],
-  getKey: (item: T) => string,
-  getLabel: (item: T) => string
-): FilterOption[] {
-  const map = new Map<string, string>();
-  items.forEach((item) => {
-    const key = getKey(item);
-    const label = getLabel(item);
-    if (key && label && !map.has(key)) {
-      map.set(key, label);
-    }
-  });
-
-  return Array.from(map, ([key, label]) => ({ key, label }));
-}
-
 function getEventIdentity(event: CalendarEvent) {
   const eventDate = getEventTime(event.startTime);
   const dateKey = eventDate
     ? `${eventDate.getFullYear()}-${eventDate.getMonth() + 1}-${eventDate.getDate()}`
     : event.startTime;
-  return `${event.type}:${dateKey}:${event.title.trim().toLowerCase()}`;
+  return `${event.type}:${dateKey}:${(event.title ?? '').trim().toLowerCase()}`;
 }
 
 function dedupeHubEvents(events: HubEvent[]) {
@@ -376,7 +361,7 @@ function isFinishedGame(event: CalendarEvent) {
 function getStatusCopy(event: CalendarEvent) {
   const status = String(event.status ?? '').trim();
   if (!status) {
-    return 'Scheduled';
+    return 'Programat';
   }
 
   return status.charAt(0).toUpperCase() + status.slice(1);
@@ -406,8 +391,10 @@ function sessionMatchesSearch(event: CalendarEvent, query: string) {
   ].some((value) => String(value ?? '').toLowerCase().includes(normalized));
 }
 
-function getInitial(session: AuthUser | null) {
-  return session?.name?.trim()?.[0]?.toUpperCase() ?? 'P';
+function getFirstName(session: AuthUser | null) {
+  const name = session?.name?.trim();
+  if (!name) return 'Panoul meu';
+  return name.split(/\s+/)[0];
 }
 
 function splitMatchTitle(title: string) {
@@ -415,157 +402,111 @@ function splitMatchTitle(title: string) {
   return parts.length === 2 ? { home: parts[0], away: parts[1] } : { home: title, away: '' };
 }
 
+type MatchOutcome = 'win' | 'loss' | 'draw';
+
+/** Win/loss/draw from the player's own side, resolved against their team names. */
+function getMatchOutcome(event: HubEvent, teamNames: Set<string>): MatchOutcome | null {
+  const score = getScoreFromText(event);
+  if (!score) {
+    return null;
+  }
+
+  const home = Number(score.home);
+  const away = Number(score.away);
+  if (Number.isNaN(home) || Number.isNaN(away)) {
+    return null;
+  }
+
+  if (home === away) {
+    return 'draw';
+  }
+
+  // Prefer the player's own team names; fall back to the event's team when the
+  // session could not resolve any (so a solitary event still reads correctly).
+  const ourNames = teamNames.size > 0
+    ? teamNames
+    : new Set([normalizeTeamName(event.teamName || event.teamDisplayName)].filter(Boolean));
+
+  const teams = splitMatchTitle(event.title);
+  const isHome = namesOverlap(teams.home, ourNames);
+  const isAway = namesOverlap(teams.away, ourNames);
+  if (isHome === isAway) {
+    // Neither side (or ambiguously both) is us — not a result we can score.
+    return null;
+  }
+
+  const weWon = isHome ? home > away : away > home;
+  return weWon ? 'win' : 'loss';
+}
+
+/** Consecutive "present" records from the most recent one, stopping at the first counted-but-absent record. Unmarked records are skipped, not counted as a break. */
+function getAttendanceStreak(recordsDescending: PlayerAttendanceRecord[]) {
+  let streak = 0;
+  for (const record of recordsDescending) {
+    if (!isCountedAttendanceStatus(record.status)) {
+      continue;
+    }
+    if (isPresentAttendanceStatus(record.status)) {
+      streak += 1;
+      continue;
+    }
+    break;
+  }
+  return streak;
+}
+
+/** Rate delta between the most recent chunk and the one before it, or null when there isn't enough counted history to compare. */
+function getAttendanceTrend(countedDescending: PlayerAttendanceRecord[], chunkSize = 5) {
+  if (countedDescending.length < chunkSize + 2) {
+    return null;
+  }
+
+  const recent = countedDescending.slice(0, chunkSize);
+  const previous = countedDescending.slice(chunkSize, chunkSize * 2);
+  if (previous.length === 0) {
+    return null;
+  }
+
+  const rate = (chunk: PlayerAttendanceRecord[]) => chunk.filter((r) => isPresentAttendanceStatus(r.status)).length / chunk.length;
+  return Math.round((rate(recent) - rate(previous)) * 100);
+}
+
 function getAttendanceTone(rate: number | null) {
   if (rate == null) {
-    return { label: 'Pending', color: 'var(--c-muted)', bg: 'var(--c-surface-3)' };
+    return { label: 'În așteptare', color: 'var(--c-muted)' };
   }
 
   if (rate >= 90) {
-    return { label: 'Elite rhythm', color: palette.green, bg: 'var(--c-success-bg)' };
+    return { label: 'Ritm de elită', color: palette.green };
   }
 
   if (rate >= 80) {
-    return { label: 'On track', color: 'var(--c-sky)', bg: 'var(--c-surface-tint)' };
+    return { label: 'Pe drumul bun', color: 'var(--c-brand-fg)' };
   }
 
-  return { label: 'Needs focus', color: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)' };
-}
-
-function PremiumCard({ children, className = '', style }: { children: ReactNode; className?: string; style?: StyleProp<ViewStyle> }) {
-  return (
-    <View className={`bg-white border border-[#DDE8F5] ${className}`} style={[styles.cardShadow, style]}>
-      {children}
-    </View>
-  );
-}
-
-function IconBadge({
-  icon,
-  color,
-  bg,
-  size = 42,
-}: {
-  icon: keyof typeof MaterialIcons.glyphMap;
-  color: string;
-  bg: string;
-  size?: number;
-}) {
-  return (
-    <View
-      className="items-center justify-center"
-      style={{ width: size, height: size, borderRadius: Math.max(14, size / 3), backgroundColor: bg }}
-    >
-      <MaterialIcons name={icon} size={Math.round(size * 0.48)} color={color} />
-    </View>
-  );
+  return { label: 'Necesită atenție', color: 'var(--c-warning-fg)' };
 }
 
 function MetaRow({ icon, text }: { icon: keyof typeof MaterialIcons.glyphMap; text: string }) {
   return (
     <View className="flex-row items-center min-w-0">
-      <MaterialIcons name={icon} size={16} color={palette.slate} />
-      <Text className="text-[#64748B] text-[13px] font-bold ml-1.5 flex-1" numberOfLines={1}>
+      <MaterialIcons name={icon} size={14} color="var(--c-faint)" />
+      <Text className="text-[12px] font-medium ml-1.5 flex-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
         {text}
       </Text>
     </View>
   );
 }
 
-function PlayerHubHeader({
-  query,
-  onQueryChange,
-  refreshing,
-  onRefresh,
-  onAccount,
-  session,
-  isMobile,
-  isSmallPhone,
-}: {
-  query: string;
-  onQueryChange: (value: string) => void;
-  refreshing: boolean;
-  onRefresh: () => void;
-  onAccount: () => void;
-  session: AuthUser | null;
-  isMobile: boolean;
-  isSmallPhone: boolean;
-}) {
+/** Uppercase micro-label + icon, the one card-header treatment used everywhere on this page. */
+function CardLabel({ icon, children }: { icon: keyof typeof MaterialIcons.glyphMap; children: ReactNode }) {
   return (
-    <LinearGradient
-      colors={['#06132C', 'var(--c-brand-fg)', 'var(--c-sky)']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.hero, isMobile ? styles.heroMobile : null]}
-    >
-      <View className="absolute right-[-44px] top-[-70px] w-[210px] h-[210px] rounded-full border border-white/15" />
-      <View className="absolute right-[42px] bottom-[-84px] w-[170px] h-[170px] rounded-full border border-white/10" />
-      <View className="absolute left-[-26px] bottom-[-52px] w-[120px] h-[120px] rounded-full border border-[#FDBA2D]/30" />
-
-      <View className={`${isMobile ? 'gap-5' : 'flex-row items-start justify-between gap-6'}`}>
-        <View className="flex-1 min-w-0">
-          <View className="self-start flex-row items-center rounded-full bg-white/12 border border-white/15 px-3 py-2 mb-4">
-            <MaterialIcons name="sports-basketball" size={16} color={palette.amber} />
-            <Text className="text-white/90 text-[10px] font-black uppercase tracking-widest ml-2">
-              Player workspace
-            </Text>
-          </View>
-          <Text
-            className={`text-white font-black leading-tight ${isSmallPhone ? 'text-[34px]' : isMobile ? 'text-[40px]' : 'text-[54px]'}`}
-          >
-            Player Hub
-          </Text>
-          <Text className="text-[#CFE2FF] text-[15px] md:text-[17px] font-semibold mt-3 max-w-[680px] leading-6">
-            Training rhythm, next fixtures, attendance, and recent results in one sharp game-day view.
-          </Text>
-        </View>
-
-        <View className={`${isMobile ? 'w-full gap-3' : 'w-[460px] gap-3'}`}>
-          <View className={`${isSmallPhone ? 'flex-col' : 'flex-row'} gap-3`}>
-            <View className="flex-1 h-[54px] rounded-[20px] bg-white flex-row items-center px-4 border border-white/70">
-              <MaterialIcons name="search" size={20} color={palette.slate} />
-              <TextInput
-                value={query}
-                onChangeText={onQueryChange}
-                placeholder="Search sessions, teams, venues..."
-                placeholderTextColor="var(--c-faint)"
-                className="flex-1 ml-3 text-[#07152F] text-[15px] font-semibold outline-none"
-              />
-            </View>
-            <View className={`${isSmallPhone ? 'flex-row' : 'flex-row'} gap-3`}>
-              <Pressable
-                onPress={onRefresh}
-                className="h-[54px] rounded-[20px] bg-white/95 items-center justify-center border border-white/70 active:scale-95"
-                style={{ flex: isSmallPhone ? 1 : undefined, width: isSmallPhone ? undefined : 54 }}
-                accessibilityRole="button"
-              >
-                {refreshing ? <ActivityIndicator size="small" color={palette.royal} /> : <MaterialIcons name="refresh" size={23} color={palette.royal} />}
-              </Pressable>
-              <Pressable
-                onPress={onAccount}
-                className="h-[54px] rounded-[20px] bg-[#FDBA2D] items-center justify-center active:scale-95"
-                style={{ flex: isSmallPhone ? 1 : undefined, width: isSmallPhone ? undefined : 54 }}
-                accessibilityRole="button"
-              >
-                <Text className="text-[#07152F] font-black text-lg">{getInitial(session)}</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          <View className="flex-row flex-wrap gap-2">
-            <View className="rounded-full bg-white/12 border border-white/15 px-3 py-2">
-              <Text className="text-white text-[10px] font-black uppercase tracking-widest" numberOfLines={1}>
-                {session?.clubName ?? 'Club workspace'}
-              </Text>
-            </View>
-            <View className="rounded-full bg-[#FDBA2D]/20 border border-[#FDBA2D]/30 px-3 py-2">
-              <Text className="text-[#FFE8A3] text-[10px] font-black uppercase tracking-widest">
-                Game ready
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-    </LinearGradient>
+    <View className="flex-row items-center gap-2">
+      <MaterialIcons name={icon} size={14} color="var(--c-faint)" />
+      <Text className="text-[11px] font-bold uppercase tracking-[0.07em]" style={{ color: 'var(--c-faint)' }}>
+        {children}
+      </Text>
+    </View>
   );
 }
 
@@ -573,463 +514,355 @@ function AttendanceCard({
   playerAttendance,
   attendanceRate,
   attendancePercent,
-  isMobile,
 }: {
   playerAttendance: PlayerAttendanceSummary | null;
   attendanceRate: number | null;
   attendancePercent: number;
-  isMobile: boolean;
 }) {
   const tone = getAttendanceTone(attendanceRate);
 
   return (
-    <PremiumCard className="rounded-[28px] p-6 md:p-7 justify-between overflow-hidden" style={{ minHeight: isMobile ? 260 : 330 }}>
-      <View className="absolute right-[-36px] top-[-42px] w-[150px] h-[150px] rounded-full bg-[#EAF2FF]" />
-      <View className="flex-row items-start justify-between gap-4">
-        <IconBadge icon="insert-chart-outlined" color={palette.royal} bg="var(--c-surface-tint)" size={58} />
-        <View className="rounded-full px-3.5 py-2" style={{ backgroundColor: tone.bg }}>
-          <Text className="text-[10px] font-black uppercase tracking-widest" style={{ color: tone.color }}>
-            {tone.label}
-          </Text>
-        </View>
-      </View>
+    <GlassCard className="min-h-[132px] h-full justify-between">
+      <CardLabel icon="insert-chart-outlined">Rată prezență</CardLabel>
 
-      <View className="mt-8">
-        <Text className="text-[#07152F] text-[13px] font-black uppercase tracking-widest">Attendance rate</Text>
-        <View className="flex-row items-end mt-2">
-          <Text className="text-[#123A97] text-[56px] md:text-[68px] font-black tracking-tight leading-none">
+      <View className="mt-3">
+        <View className="flex-row items-end">
+          <Text className="text-[26px] font-bold tracking-tight leading-none" style={{ color: 'var(--c-ink)' }}>
             {attendanceRate == null ? '--' : `${attendanceRate}`}
           </Text>
-          <Text className="text-[#123A97] text-[25px] md:text-[30px] font-black mb-1">%</Text>
+          <Text className="text-[13px] font-bold mb-0.5" style={{ color: 'var(--c-muted)' }}>%</Text>
         </View>
-        <Text className="text-[#64748B] text-[14px] font-semibold mt-3 leading-5">
+        <Text className="text-[12px] font-semibold mt-1.5" style={{ color: tone.color }}>{tone.label}</Text>
+        <View className="h-1.5 rounded-full overflow-hidden mt-2.5" style={{ backgroundColor: 'var(--c-border-soft)' }}>
+          <View style={{ width: `${attendancePercent}%`, height: '100%', borderRadius: 999, backgroundColor: 'var(--c-brand-fg)' }} />
+        </View>
+        <Text className="text-[11px] font-medium mt-2" style={{ color: 'var(--c-faint)' }}>
           {playerAttendance?.total
-            ? `${playerAttendance.present}/${playerAttendance.total} recent sessions marked present`
-            : 'No marked attendance yet'}
+            ? `${playerAttendance.present}/${playerAttendance.total} sesiuni recente`
+            : 'Nicio prezență marcată încă'}
         </Text>
       </View>
-
-      <View className="mt-7">
-        <View className="h-3.5 rounded-full bg-[#E8EEF7] overflow-hidden">
-          <LinearGradient
-            colors={[palette.sky, palette.royal]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{ width: `${attendancePercent}%`, height: '100%', borderRadius: 999 }}
-          />
-        </View>
-        <View className="flex-row justify-between mt-3">
-          <Text className="text-[#8EA1B8] text-[11px] font-black uppercase tracking-widest">Recent form</Text>
-          <Text className="text-[#F97316] text-[11px] font-black uppercase tracking-widest">Target 90%</Text>
-        </View>
-      </View>
-    </PremiumCard>
+    </GlassCard>
   );
 }
 
 function NextEventCard({
   event,
-  label,
   accent,
+  label,
   icon,
-  compact,
+  onPress,
 }: {
   event: HubEvent | null;
   label: string;
   accent: string;
   icon: keyof typeof MaterialIcons.glyphMap;
-  compact: boolean;
+  onPress?: () => void;
 }) {
   const score = event ? getScoreFromText(event) : null;
 
-  return (
-    <PremiumCard className="rounded-[26px] p-5 overflow-hidden" style={{ flexBasis: compact ? '100%' : 230, flexGrow: 1, minHeight: 220 }}>
-      <View className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: accent }} />
-      <View className="flex-row items-center justify-between gap-3">
-        <Text className="text-[#64748B] text-[10px] font-black uppercase tracking-widest">{label}</Text>
-        <IconBadge icon={icon} color={accent} bg="var(--c-surface-2)" size={38} />
-      </View>
+  const body = (
+    <>
+      <CardLabel icon={icon}>{label}</CardLabel>
       {event ? (
-        <>
-          <Text className="text-[#07152F] text-[18px] font-black mt-5 leading-6" numberOfLines={2}>
+        <View className="mt-3 flex-1">
+          <Text className="text-[15px] font-bold leading-5" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
             {event.title}
           </Text>
-          <View className="mt-4 gap-2.5">
-            {score ? (
-              <View className="self-start rounded-2xl bg-[#EEF5FF] px-4 py-2 border border-[#D7E5FF]">
-                <Text className="text-[#123A97] text-lg font-black">{score.label}</Text>
-              </View>
-            ) : null}
+          {score ? (
+            <Text className="text-[18px] font-bold mt-1.5" style={{ color: accent }}>{score.label}</Text>
+          ) : null}
+          <View className="mt-2 gap-1">
             <MetaRow icon="calendar-today" text={formatDate(event.startTime)} />
             <MetaRow icon="schedule" text={formatTimeRange(event.startTime, event.endTime)} />
-            <MetaRow icon="place" text={event.venueName || event.location || event.teamName || 'Club court'} />
           </View>
-        </>
+        </View>
       ) : (
-        <View className="flex-1 justify-center mt-5">
-          <Text className="text-[#64748B] text-sm font-bold">No scheduled item found.</Text>
+        <View className="flex-1 justify-center mt-3">
+          <Text className="text-[13px] font-medium" style={{ color: 'var(--c-faint)' }}>Nimic programat.</Text>
         </View>
       )}
-    </PremiumCard>
+    </>
   );
+
+  // h-full on both wrapper and card: as a grid child the Pressable is stretched
+  // to the row height, but without it the GlassCard inside kept its own
+  // min-height and rendered visibly shorter than the unwrapped AttendanceCard
+  // sitting beside it.
+  if (event && onPress) {
+    return (
+      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${label}: ${event.title}`} className="h-full">
+        <GlassCard className="min-h-[132px] h-full">{body}</GlassCard>
+      </Pressable>
+    );
+  }
+
+  return <GlassCard className="min-h-[132px] h-full">{body}</GlassCard>;
 }
 
-function NextUpSection({
-  nextTraining,
-  nextGame,
-  latestResult,
-  isMobile,
-}: {
-  nextTraining: HubEvent | null;
-  nextGame: HubEvent | null;
-  latestResult: HubEvent | null;
-  isMobile: boolean;
-}) {
-  return (
-    <PremiumCard className="rounded-[32px] p-6 md:p-7 flex-1">
-      <View className={`${isMobile ? 'gap-2' : 'flex-row items-end justify-between gap-6'}`}>
-        <View>
-          <Text className="text-[#F97316] text-[11px] font-black uppercase tracking-widest">Live overview</Text>
-          <Text className="text-[#07152F] text-[30px] md:text-[38px] font-black mt-2 leading-tight">Next up</Text>
-        </View>
-        <Text className="text-[#64748B] text-[13px] font-semibold max-w-[300px] leading-5">
-          Your closest court moments, prioritized for quick scanning.
-        </Text>
-      </View>
-      <View className="flex-row flex-wrap gap-4 mt-7">
-        <NextEventCard event={nextTraining} accent={palette.royal} icon="fitness-center" label="Next training" compact={isMobile} />
-        <NextEventCard event={nextGame} accent={palette.orange} icon="sports-basketball" label="Next game" compact={isMobile} />
-        <NextEventCard event={latestResult} accent={palette.green} icon="emoji-events" label="Latest result" compact={isMobile} />
-      </View>
-    </PremiumCard>
-  );
-}
-
-function SectionHeader({
-  eyebrow,
-  title,
-  subtitle,
-  actionLabel,
-  onAction,
-  trailing,
-  isMobile,
-}: {
-  eyebrow?: string;
-  title: string;
-  subtitle?: string;
-  actionLabel?: string;
-  onAction?: () => void;
-  trailing?: ReactNode;
-  isMobile: boolean;
-}) {
-  return (
-    <View className={`${isMobile ? 'gap-4' : 'flex-row items-end justify-between gap-5'} mb-5`}>
-      <View className="flex-1 min-w-0">
-        {eyebrow ? <Text className="text-[#F97316] text-[10px] font-black uppercase tracking-widest mb-2">{eyebrow}</Text> : null}
-        <Text className="text-[#07152F] text-[26px] md:text-[32px] font-black leading-tight">{title}</Text>
-        {subtitle ? <Text className="text-[#64748B] text-[14px] font-semibold mt-2 leading-5">{subtitle}</Text> : null}
-      </View>
-      {trailing ?? (actionLabel && onAction ? (
-        <Pressable
-          onPress={onAction}
-          className="self-start rounded-full bg-[#EAF2FF] border border-[#D7E5FF] px-4 py-3 flex-row items-center active:scale-95"
-          accessibilityRole="button"
-        >
-          <Text className="text-[#123A97] text-[12px] font-black uppercase tracking-widest">{actionLabel}</Text>
-          <MaterialIcons name="arrow-forward" size={17} color={palette.royal} style={{ marginLeft: 6 }} />
-        </Pressable>
-      ) : null)}
-    </View>
-  );
-}
-
-function EventCard({
+function EventRow({
   event,
   accent,
   label,
-  variant,
   isMobile,
+  onDetails,
 }: {
   event: HubEvent;
   accent: string;
   label: string;
-  variant: 'training' | 'game';
   isMobile: boolean;
+  onDetails: () => void;
 }) {
   const dateBlock = getDateBlock(event.startTime);
   const isMatch = event.type === 'match';
 
   return (
-    <Pressable accessibilityRole="button" className="active:scale-[0.99]">
-      <PremiumCard className={`rounded-[26px] overflow-hidden ${isMobile ? 'p-4' : 'p-5'}`}>
-        <View className={`${isMobile ? 'gap-4' : 'flex-row items-center gap-5'}`}>
-          <View className={`${isMobile ? 'flex-row items-center gap-3' : 'items-center'}`}>
-            <View className="w-[66px] h-[74px] rounded-[22px] bg-[#F4F8FD] border border-[#DDE8F5] items-center justify-center">
-              <Text className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: accent }}>
-                {dateBlock.month}
-              </Text>
-              <Text className="text-[#07152F] text-[24px] font-black leading-none">{dateBlock.day}</Text>
-            </View>
-            {isMobile ? (
-              <View className="rounded-full px-3 py-1.5" style={{ backgroundColor: variant === 'game' ? 'var(--c-warning-bg)' : 'var(--c-surface-tint)' }}>
-                <Text className="text-[10px] font-black uppercase tracking-widest" style={{ color: accent }}>
-                  {label}
-                </Text>
-              </View>
-            ) : null}
-          </View>
+    <Pressable
+      onPress={onDetails}
+      accessibilityRole="button"
+      accessibilityLabel={`${isMatch ? 'Fișă meci' : 'Detalii'}: ${event.title}`}
+      className="rounded-[14px] border px-4 py-3.5 flex-row items-center gap-4"
+      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
+    >
+      <View
+        className="w-12 h-12 rounded-[12px] items-center justify-center border shrink-0"
+        style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
+      >
+        <Text className="text-[10px] font-bold uppercase tracking-widest" style={{ color: accent }}>
+          {dateBlock.month}
+        </Text>
+        <Text className="text-[16px] font-bold leading-none mt-0.5" style={{ color: 'var(--c-ink)' }}>{dateBlock.day}</Text>
+      </View>
 
-          <View className="flex-1 min-w-0">
-            <View className="flex-row flex-wrap gap-2 mb-2">
-              {!isMobile ? (
-                <View className="rounded-full px-3 py-1.5" style={{ backgroundColor: variant === 'game' ? 'var(--c-warning-bg)' : 'var(--c-surface-tint)' }}>
-                  <Text className="text-[10px] font-black uppercase tracking-widest" style={{ color: accent }}>
-                    {label}
-                  </Text>
-                </View>
-              ) : null}
-              <View className="rounded-full bg-[#F8FAFC] border border-[#E8EEF7] px-3 py-1.5">
-                <Text className="text-[#64748B] text-[10px] font-black uppercase tracking-widest">
-                  {event.source === 'frb' ? 'FRB' : 'Club'}
-                </Text>
-              </View>
+      <View className="flex-1 min-w-0">
+        <View className="flex-row items-center flex-wrap gap-x-2 gap-y-1">
+          <Text className="text-[11px] font-bold uppercase tracking-[0.06em]" style={{ color: accent }}>
+            {label}
+          </Text>
+          {event.coachNote ? (
+            <View className="flex-row items-center gap-1">
+              <MaterialIcons name="chat-bubble-outline" size={11} color="var(--c-brand-fg)" />
+              <Text className="text-[11px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Notă antrenor</Text>
             </View>
-            <Text className="text-[#07152F] text-[18px] md:text-[20px] font-black leading-6" numberOfLines={isMobile ? 3 : 2}>
-              {event.title}
-            </Text>
-            <View className={`${isMobile ? 'gap-2.5' : 'flex-row flex-wrap gap-x-5 gap-y-2'} mt-3`}>
-              <MetaRow icon="calendar-today" text={formatDate(event.startTime)} />
-              <MetaRow icon="schedule" text={formatTimeRange(event.startTime, event.endTime)} />
-              <MetaRow icon="place" text={event.venueName || event.location || event.teamName || 'Club court'} />
-            </View>
-          </View>
-
-          <View className={`${isMobile ? 'w-full' : 'items-end min-w-[150px]'}`}>
-            {!isMobile ? (
-              <>
-                <Text className="text-[#8EA1B8] text-[9px] font-black uppercase tracking-widest">Category</Text>
-                <Text className="text-[13px] font-black mt-1 uppercase text-right" style={{ color: accent }} numberOfLines={1}>
-                  {label}
-                </Text>
-              </>
-            ) : null}
-            <Pressable
-              onPress={() => isMatch ? null : undefined}
-              className={`${isMobile ? 'w-full mt-1' : 'mt-4'} h-12 rounded-[18px] bg-[#07152F] px-5 items-center justify-center flex-row active:scale-95`}
-            >
-              <Text className="text-white text-[12px] font-black uppercase tracking-widest">{isMatch ? 'Fișă Meci' : 'Details'}</Text>
-              <MaterialIcons name="chevron-right" size={18} color="var(--c-surface)" />
-            </Pressable>
-          </View>
+          ) : null}
         </View>
-      </PremiumCard>
+        <Text className="text-[15px] font-bold leading-5 mt-0.5" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
+          {event.title}
+        </Text>
+        <View className={`${isMobile ? 'gap-1' : 'flex-row flex-wrap gap-x-5 gap-y-1'} mt-1.5`}>
+          <MetaRow icon="schedule" text={formatTimeRange(event.startTime, event.endTime)} />
+          <MetaRow icon="place" text={event.venueName || event.location || event.teamName || 'Teren club'} />
+        </View>
+      </View>
+
+      {/* Shown on every breakpoint — the whole row is tappable, and hiding the
+          chevron on mobile left that with no affordance at all. */}
+      <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
     </Pressable>
   );
 }
 
-function ResultCard({ event, isMobile }: { event: HubEvent; isMobile: boolean }) {
+const OUTCOME_META: Record<MatchOutcome, { label: string; full: string; color: string; bg: string }> = {
+  win: { label: 'V', full: 'Victorie', color: 'var(--c-success-fg)', bg: 'var(--c-success-bg)' },
+  loss: { label: 'Î', full: 'Înfrângere', color: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)' },
+  draw: { label: 'E', full: 'Egal', color: 'var(--c-muted)', bg: 'var(--c-surface-3)' },
+};
+
+function ResultCard({ event, outcome }: { event: HubEvent; outcome: MatchOutcome | null }) {
   const score = getScoreFromText(event);
   const dateBlock = getDateBlock(event.startTime);
   const teams = splitMatchTitle(event.title);
+  const meta = outcome ? OUTCOME_META[outcome] : null;
+  const ownTeam = normalizeTeamName(event.teamName);
+  const context = [event.categoryName, event.venueName, event.location]
+    .map((value) => (value ?? '').trim())
+    .find((value) => value && normalizeTeamName(value) !== ownTeam) ?? '';
 
   return (
-    <PremiumCard
-      className="rounded-[26px] p-5 overflow-hidden"
-      style={{ flexBasis: isMobile ? '100%' : 250, flexGrow: isMobile ? 0 : 1, minHeight: 210 }}
-    >
-      <View className="absolute right-[-28px] top-[-30px] w-[96px] h-[96px] rounded-full bg-[#FFF7ED]" />
-      <View className="flex-row items-center justify-between">
-        <View className="rounded-full bg-[#F4F8FD] border border-[#E8EEF7] px-3 py-1.5">
-          <Text className="text-[#64748B] text-[10px] font-black uppercase tracking-widest">
-            {dateBlock.month} {dateBlock.day}
-          </Text>
-        </View>
-        <IconBadge icon="emoji-events" color={palette.green} bg="var(--c-success-bg)" size={36} />
+    <GlassCard className="min-h-[132px] h-full justify-between">
+      <View className="flex-row items-center justify-between gap-2">
+        <CardLabel icon="emoji-events">{`${dateBlock.month} ${dateBlock.day}`}</CardLabel>
+        {meta ? (
+          <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: meta.bg }}>
+            <Text className="text-[10px] font-bold uppercase tracking-widest" style={{ color: meta.color }}>{meta.full}</Text>
+          </View>
+        ) : null}
       </View>
-      <Text className="text-[#64748B] text-[10px] font-black uppercase tracking-widest mt-5" numberOfLines={1}>
-        {event.teamName || event.location || 'Match'}
-      </Text>
-      <View className="mt-3 gap-2">
-        <Text className="text-[#07152F] text-[15px] font-black leading-5" numberOfLines={1}>
+
+      <View className="mt-3 gap-1">
+        <Text className="text-[13px] font-bold leading-5" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
           {teams.home}
         </Text>
-        <View className="flex-row items-center justify-between gap-3">
-          <Text className="text-[#8EA1B8] text-[10px] font-black uppercase tracking-widest">Final</Text>
-          <Text className="text-[#123A97] text-[30px] font-black tracking-tight leading-none">
-            {score?.label ?? getStatusCopy(event)}
-          </Text>
-        </View>
+        <Text className="text-[20px] font-bold tracking-tight leading-none" style={{ color: 'var(--c-brand-fg)' }}>
+          {score?.label ?? getStatusCopy(event)}
+        </Text>
         {teams.away ? (
-          <Text className="text-[#07152F] text-[15px] font-black leading-5" numberOfLines={1}>
+          <Text className="text-[13px] font-bold leading-5" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
             {teams.away}
           </Text>
         ) : null}
       </View>
-    </PremiumCard>
-  );
-}
 
-function EmptySection({ message }: { message: string }) {
-  return (
-    <View className="bg-white rounded-[28px] border border-dashed border-[#BFD0EA] px-6 py-9 items-center justify-center min-h-[160px]">
-      <View className="w-14 h-14 rounded-[20px] bg-[#F4F8FD] items-center justify-center border border-[#E8EEF7]">
-        <MaterialIcons name="event-busy" size={28} color="var(--c-faint)" />
-      </View>
-      <Text className="text-[#64748B] font-bold text-center mt-4 leading-5">{message}</Text>
-    </View>
-  );
-}
-
-function DropdownFilter({
-  label,
-  value,
-  options,
-  onChange,
-  isMobile,
-}: {
-  label: string;
-  value: string;
-  options: FilterOption[];
-  onChange: (value: string) => void;
-  isMobile: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const allOptions = [{ key: ALL_FILTER_KEY, label: 'All' }, ...options];
-  const selectedLabel = allOptions.find((option) => option.key === value)?.label ?? 'All';
-
-  return (
-    <View className="relative flex-1" style={{ zIndex: open ? 40 : 1, minWidth: isMobile ? '100%' : 180 }}>
-      <Text className="text-[#64748B] text-[10px] font-black uppercase tracking-widest mb-2">{label}</Text>
-      <Pressable
-        onPress={() => setOpen((current) => !current)}
-        className={`h-[54px] rounded-[18px] border px-4 flex-row items-center justify-between active:scale-[0.99] ${open ? 'bg-[#07152F] border-[#07152F]' : 'bg-[#F8FBFF] border-[#DDE8F5]'}`}
-      >
-        <Text className={`${open ? 'text-white' : 'text-[#0E2041]'} flex-1 text-[13px] font-black`} numberOfLines={1}>
-          {selectedLabel}
+      {/* Competition/venue, NOT event.teamName — the player's own squad is
+          already one of the two lines above, so printing it again just
+          repeated "CSM 2007 Focsani" twice inside the same card. */}
+      {context ? (
+        <Text className="text-[11px] font-medium mt-2" style={{ color: 'var(--c-faint)' }} numberOfLines={1}>
+          {context}
         </Text>
-        <MaterialIcons name={open ? 'expand-less' : 'expand-more'} size={20} color={open ? 'var(--c-surface)' : palette.orange} />
-      </Pressable>
-
-      {open ? (
-        <View
-          className="absolute left-0 right-0 top-[78px] rounded-[20px] bg-white border border-[#DDE8F5] overflow-hidden"
-          style={[styles.cardShadow, { elevation: 20 }]}
-        >
-          <ScrollView style={{ maxHeight: 240 }} showsVerticalScrollIndicator>
-            {allOptions.map((option) => {
-              const active = value === option.key;
-              return (
-                <Pressable
-                  key={option.key}
-                  onPress={() => {
-                    onChange(option.key);
-                    setOpen(false);
-                  }}
-                  className={`min-h-[50px] px-4 flex-row items-center justify-between border-b border-[#EEF3FA] ${active ? 'bg-[#EEF5FF]' : 'bg-white'}`}
-                >
-                  <Text className={`${active ? 'text-[#0A2C93]' : 'text-[#334155]'} flex-1 text-[13px] font-black`} numberOfLines={1}>
-                    {option.label}
-                  </Text>
-                  {active ? <MaterialIcons name="check-circle" size={18} color={palette.royal} /> : null}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
       ) : null}
+    </GlassCard>
+  );
+}
+
+function attendanceMarkColor(status: string | null) {
+  if (isPresentAttendanceStatus(status)) return 'var(--c-success)';
+  const normalized = String(status ?? '').toLowerCase();
+  if (normalized === 'medical' || normalized === 'excused') return 'var(--c-warning)';
+  if (normalized === 'absent') return 'var(--c-danger)';
+  return 'var(--c-border-strong)';
+}
+
+function FormColumn({ icon, label, children }: { icon: keyof typeof MaterialIcons.glyphMap; label: string; children: ReactNode }) {
+  return (
+    <View className="flex-1 min-w-[180px]">
+      <View className="mb-3">
+        <CardLabel icon={icon}>{label}</CardLabel>
+      </View>
+      {children}
     </View>
   );
 }
 
-function FilterBar({
-  gameFilters,
-  teamFilterOptions,
-  categoryFilterOptions,
-  monthFilterOptions,
-  seasonFilterOptions,
-  onChange,
-  onReset,
+/**
+ * "Formă" — a supporting stats block, not a dashboard: attendance consistency
+ * (streak + a status strip of the last 10 marked sessions), the recent match
+ * record, and session volume this month vs last. All three are derived from
+ * data the page already loads — no extra network calls.
+ */
+function PlayerFormStats({
+  streak,
+  strip,
+  trendDelta,
+  wins,
+  losses,
+  draws,
+  recentOutcomes,
+  monthCount,
+  lastMonthCount,
   isMobile,
 }: {
-  gameFilters: GameFilters;
-  teamFilterOptions: FilterOption[];
-  categoryFilterOptions: FilterOption[];
-  monthFilterOptions: FilterOption[];
-  seasonFilterOptions: FilterOption[];
-  onChange: (filters: GameFilters) => void;
-  onReset: () => void;
+  streak: number;
+  strip: PlayerAttendanceRecord[];
+  trendDelta: number | null;
+  wins: number;
+  losses: number;
+  draws: number;
+  recentOutcomes: MatchOutcome[];
+  monthCount: number;
+  lastMonthCount: number;
   isMobile: boolean;
 }) {
-  return (
-    <PremiumCard className="rounded-[28px] p-4 md:p-5 mb-5" style={{ zIndex: 30 }}>
-      <View className={`${isMobile ? 'gap-4' : 'flex-row items-center justify-between gap-4'} mb-5`}>
-        <View className="flex-1 min-w-0">
-          <Text className="text-[#07152F] text-[18px] font-black">Match filters</Text>
-          <Text className="text-[#64748B] text-[13px] font-semibold mt-1 leading-5">
-            Filter by team, category, month, or season without leaving the hub.
-          </Text>
-        </View>
-        <Pressable
-          onPress={onReset}
-          className="self-start h-11 rounded-full bg-[#FFF7ED] border border-[#FED7AA] px-4 items-center justify-center flex-row active:scale-95"
-          accessibilityRole="button"
-        >
-          <MaterialIcons name="restart-alt" size={17} color={palette.orange} />
-          <Text className="text-[#C2410C] text-[11px] font-black uppercase tracking-widest ml-1.5">Reset</Text>
-        </Pressable>
-      </View>
+  const hasAttendanceData = strip.length > 0;
+  const hasMatchData = wins + losses + draws > 0;
+  const monthDelta = monthCount - lastMonthCount;
 
-      <View className={`${isMobile ? 'flex-col' : 'flex-row flex-wrap'} gap-3`}>
-        <DropdownFilter
-          label="Team"
-          value={gameFilters.team}
-          options={teamFilterOptions}
-          isMobile={isMobile}
-          onChange={(team) => onChange({ ...gameFilters, team })}
-        />
-        <DropdownFilter
-          label="Category"
-          value={gameFilters.category}
-          options={categoryFilterOptions}
-          isMobile={isMobile}
-          onChange={(category) => onChange({ ...gameFilters, category })}
-        />
-        <DropdownFilter
-          label="Month"
-          value={gameFilters.month}
-          options={monthFilterOptions}
-          isMobile={isMobile}
-          onChange={(month) => onChange({ ...gameFilters, month })}
-        />
-        <DropdownFilter
-          label="Season"
-          value={gameFilters.season}
-          options={seasonFilterOptions}
-          isMobile={isMobile}
-          onChange={(season) => onChange({ ...gameFilters, season })}
-        />
+  if (!hasAttendanceData && !hasMatchData && monthCount === 0 && lastMonthCount === 0) {
+    return null;
+  }
+
+  return (
+    <GlassCard>
+      <Text className="text-[15px] font-bold mb-4" style={{ color: 'var(--c-ink)' }}>Formă</Text>
+      <View className={`${isMobile ? 'gap-5' : 'flex-row gap-8'}`}>
+        <FormColumn icon="event-available" label="Consistență">
+          {hasAttendanceData ? (
+            <>
+              <View className="flex-row items-end gap-1.5 mb-2" accessibilityLabel={`Ultimele ${strip.length} sesiuni marcate`}>
+                {strip.slice().reverse().map((record) => (
+                  <View
+                    key={record.event.id}
+                    style={{ width: 10, height: 24, borderRadius: 4, backgroundColor: attendanceMarkColor(record.status) }}
+                  />
+                ))}
+              </View>
+              <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>
+                {streak > 0 ? `${streak} sesiuni consecutive prezent` : 'Fără sesiuni consecutive momentan'}
+              </Text>
+              {trendDelta != null ? (
+                <Text className="text-[11px] font-medium mt-1" style={{ color: trendDelta >= 0 ? 'var(--c-success-fg)' : 'var(--c-danger-fg)' }}>
+                  {trendDelta === 0 ? 'Ritm constant' : `${trendDelta > 0 ? '▲' : '▼'} ${Math.abs(trendDelta)}% față de perioada anterioară`}
+                </Text>
+              ) : null}
+            </>
+          ) : (
+            <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>Nicio prezență marcată încă.</Text>
+          )}
+        </FormColumn>
+
+        <FormColumn icon="scoreboard" label="Bilanț meciuri">
+          {hasMatchData ? (
+            <>
+              <View className="flex-row items-center gap-1.5 mb-2">
+                {recentOutcomes.slice().reverse().map((outcome, index) => (
+                  <View
+                    key={index}
+                    className="w-6 h-6 rounded-full items-center justify-center"
+                    style={{ backgroundColor: OUTCOME_META[outcome].bg }}
+                  >
+                    <Text className="text-[10px] font-bold" style={{ color: OUTCOME_META[outcome].color }}>{OUTCOME_META[outcome].label}</Text>
+                  </View>
+                ))}
+              </View>
+              <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>
+                {wins}V · {losses}Î{draws ? ` · ${draws}E` : ''} în ultimele {wins + losses + draws} meciuri
+              </Text>
+            </>
+          ) : (
+            <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>Niciun rezultat cu scor încă.</Text>
+          )}
+        </FormColumn>
+
+        <FormColumn icon="calendar-month" label="Volum lunar">
+          <Text className="text-[24px] font-bold leading-none" style={{ color: 'var(--c-ink)' }}>{monthCount}</Text>
+          <Text className="text-[12px] font-semibold mt-1.5" style={{ color: 'var(--c-ink-soft)' }}>sesiuni luna aceasta</Text>
+          {lastMonthCount > 0 ? (
+            <Text className="text-[11px] font-medium mt-1" style={{ color: monthDelta >= 0 ? 'var(--c-success-fg)' : 'var(--c-muted)' }}>
+              {monthDelta === 0 ? 'La fel ca luna trecută' : `${monthDelta > 0 ? '▲' : '▼'} ${Math.abs(monthDelta)} față de luna trecută (${lastMonthCount})`}
+            </Text>
+          ) : null}
+        </FormColumn>
       </View>
-    </PremiumCard>
+    </GlassCard>
   );
 }
 
 function PlayerHomeScreen() {
   const router = useRouter();
   const { session } = useFirebaseAuth();
-  const { isMobile, isTablet, isDesktop, isSmallPhone } = useResponsive();
+  const { isMobile } = useResponsive();
+  // Search lives in the global app header (components/AppHeader.tsx, wired via
+  // HeaderContext) — same as the schedule screen. Home used to render its own
+  // search box and its own avatar button, duplicating both of the header's.
+  const { setSearchPlaceholder, searchValue, setSearchValue } = useHeader();
   const [playerAttendance, setPlayerAttendance] = useState<PlayerAttendanceSummary | null>(null);
+  const [attendanceRecords, setAttendanceRecords] = useState<PlayerAttendanceRecord[]>([]);
   const [events, setEvents] = useState<HubEvent[]>([]);
-  const [query, setQuery] = useState('');
+  const [playerTeamNames, setPlayerTeamNames] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attendanceWarning, setAttendanceWarning] = useState<string | null>(null);
-  const [gameFilters, setGameFilters] = useState<GameFilters>({
-    team: ALL_FILTER_KEY,
-    category: ALL_FILTER_KEY,
-    month: ALL_FILTER_KEY,
-    season: ALL_FILTER_KEY,
-  });
+  const [selectedEvent, setSelectedEvent] = useState<HubEvent | null>(null);
+
+  useEffect(() => {
+    setSearchPlaceholder('Caută sesiuni, echipe, locații...');
+    return () => {
+      setSearchPlaceholder(DEFAULT_SEARCH_PLACEHOLDER);
+      setSearchValue('');
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadData = useCallback(async (showSpinner = false) => {
     if (showSpinner) {
@@ -1042,20 +875,25 @@ function PlayerHomeScreen() {
     setAttendanceWarning(null);
 
     try {
-      const [allEvents, savedTeams, roster] = await Promise.all([
+      const [allEvents, savedTeams, roster, myRecord] = await Promise.all([
         eventsApi.getEvents(),
         teamsApi.getTeams().catch(() => [] as Team[]),
         teamsApi.getRoster().catch(() => [] as Player[]),
+        teamsApi.getMyPlayerRecord().catch(() => null),
       ]);
+
       const teamIds = getSessionTeamIds(session);
-      const rosterTeamNames = getPlayerTeamNamesFromRoster(roster, session);
+      const teamNames = getPlayerTeamNames(myRecord, roster);
+      setPlayerTeamNames(teamNames);
+
       const sessionEvents = allEvents
-        .filter((event) => belongsToSessionTeam(event, teamIds))
+        .filter((event) => belongsToPlayerTeams(event, teamIds, teamNames))
         .map((event) => ({ ...event, source: 'internal' as const }));
 
+      // Only the player's OWN teams' fixtures — see isPlayerTeam.
       const scopedTeams = savedTeams
         .filter(hasFrbIds)
-        .filter((team) => isScopedTeam(team, teamIds, rosterTeamNames));
+        .filter((team) => isPlayerTeam(team, teamIds, teamNames));
 
       const frbEventGroups = await Promise.all(
         scopedTeams.map(async (team) => {
@@ -1069,13 +907,16 @@ function PlayerHomeScreen() {
       setEvents(dedupeHubEvents([...sessionEvents, ...frbEventGroups.flat()]));
 
       try {
-        setPlayerAttendance(await loadPlayerAttendanceSummary(session, sessionEvents));
+        const details = await loadPlayerAttendanceDetails(session, sessionEvents, 20);
+        setPlayerAttendance(details.summary);
+        setAttendanceRecords(details.records);
       } catch (attendanceError) {
         setPlayerAttendance(null);
-        setAttendanceWarning(attendanceError instanceof Error ? attendanceError.message : 'Could not load attendance.');
+        setAttendanceRecords([]);
+        setAttendanceWarning(attendanceError instanceof Error ? attendanceError.message : 'Nu s-a putut încărca prezența.');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load your player hub.');
+      setError(err instanceof Error ? err.message : 'Nu s-a putut încărca panoul.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -1087,18 +928,17 @@ function PlayerHomeScreen() {
   }, [loadData]);
 
   const filteredEvents = useMemo(
-    () => {
-      return events
-        .filter((event) => sessionMatchesSearch(event, query));
-    },
-    [events, query]
+    () => events.filter((event) => sessionMatchesSearch(event, searchValue)),
+    [events, searchValue]
   );
 
-  const upcomingTraining = useMemo(
+  // Strictly trainings — the section is titled "Antrenamente viitoare", and
+  // admin/medical entries listed under it would be mislabelled. Everything
+  // else is one tap away in /schedule.
+  const allUpcomingTraining = useMemo(
     () => filteredEvents
       .filter((event) => event.type === 'training' && isUpcoming(event))
-      .sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b))
-      .slice(0, 3),
+      .sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b)),
     [filteredEvents]
   );
 
@@ -1109,227 +949,262 @@ function PlayerHomeScreen() {
     [filteredEvents]
   );
 
-  const teamFilterOptions = useMemo(
-    () => buildFilterOptions(allUpcomingGames, getEventTeamKey, getEventTeamLabel),
-    [allUpcomingGames]
-  );
-
-  const categoryFilterOptions = useMemo(
-    () => buildFilterOptions(allUpcomingGames, getEventCategory, getEventCategory),
-    [allUpcomingGames]
-  );
-
-  const monthFilterOptions = useMemo(
-    () => buildFilterOptions(allUpcomingGames, (event) => getMonthKey(event.startTime), (event) => getMonthLabel(event.startTime)),
-    [allUpcomingGames]
-  );
-
-  const seasonFilterOptions = useMemo(
-    () => buildFilterOptions(allUpcomingGames, getEventSeason, getEventSeason),
-    [allUpcomingGames]
-  );
-
-  const upcomingGames = useMemo(
-    () => allUpcomingGames.filter((event) => {
-      const matchesTeam = gameFilters.team === ALL_FILTER_KEY || getEventTeamKey(event) === gameFilters.team;
-      const matchesCategory = gameFilters.category === ALL_FILTER_KEY || getEventCategory(event) === gameFilters.category;
-      const matchesMonth = gameFilters.month === ALL_FILTER_KEY || getMonthKey(event.startTime) === gameFilters.month;
-      const matchesSeason = gameFilters.season === ALL_FILTER_KEY || getEventSeason(event) === gameFilters.season;
-      return matchesTeam && matchesCategory && matchesMonth && matchesSeason;
-    }).slice(0, 12),
-    [allUpcomingGames, gameFilters]
-  );
-
-  useEffect(() => {
-    setGameFilters((current) => ({
-      team: current.team === ALL_FILTER_KEY || teamFilterOptions.some((option) => option.key === current.team) ? current.team : ALL_FILTER_KEY,
-      category: current.category === ALL_FILTER_KEY || categoryFilterOptions.some((option) => option.key === current.category) ? current.category : ALL_FILTER_KEY,
-      month: current.month === ALL_FILTER_KEY || monthFilterOptions.some((option) => option.key === current.month) ? current.month : ALL_FILTER_KEY,
-      season: current.season === ALL_FILTER_KEY || seasonFilterOptions.some((option) => option.key === current.season) ? current.season : ALL_FILTER_KEY,
-    }));
-  }, [categoryFilterOptions, monthFilterOptions, seasonFilterOptions, teamFilterOptions]);
-
-  const gameResults = useMemo(
+  const allGameResults = useMemo(
     () => filteredEvents
       .filter(isFinishedGame)
-      .sort((a, b) => getEventTimestamp(b) - getEventTimestamp(a))
-      .slice(0, 12),
+      .sort((a, b) => getEventTimestamp(b) - getEventTimestamp(a)),
     [filteredEvents]
   );
 
+  const upcomingTraining = allUpcomingTraining.slice(0, SECTION_LIMIT);
+  const upcomingGames = allUpcomingGames.slice(0, SECTION_LIMIT);
+  const gameResults = allGameResults.slice(0, SECTION_LIMIT);
+
   const attendanceRate = playerAttendance?.rate ?? null;
   const attendancePercent = attendanceRate == null ? 0 : Math.max(0, Math.min(100, attendanceRate));
-  const nextTraining = upcomingTraining[0] ?? null;
-  const nextGame = upcomingGames[0] ?? null;
-  const latestResult = gameResults[0] ?? null;
-  const contentPaddingClass = isSmallPhone ? 'px-3 py-3' : isMobile ? 'px-4 py-4' : 'px-6 lg:px-10 py-6 lg:py-8';
+  const nextTraining = allUpcomingTraining[0] ?? null;
+  const nextGame = allUpcomingGames[0] ?? null;
+  const latestResult = allGameResults[0] ?? null;
+
+  // ── "Formă" derived stats — all computed from data already on the page. ──
+  const countedAttendance = useMemo(
+    () => attendanceRecords.filter((record) => isCountedAttendanceStatus(record.status)),
+    [attendanceRecords]
+  );
+  const attendanceStreak = useMemo(() => getAttendanceStreak(attendanceRecords), [attendanceRecords]);
+  const attendanceTrend = useMemo(() => getAttendanceTrend(countedAttendance), [countedAttendance]);
+  const attendanceStrip = useMemo(() => countedAttendance.slice(0, 10), [countedAttendance]);
+
+  // Formă is a season summary, so it reads the UNFILTERED event set. Deriving
+  // it from `filteredEvents` meant typing in the global search rewrote the
+  // player's win/loss record and monthly volume, while the attendance half of
+  // the same card (sourced from attendanceRecords) stayed put — one card
+  // showing two different realities.
+  const matchOutcomes = useMemo(
+    () => events
+      .filter(isFinishedGame)
+      .sort((a, b) => getEventTimestamp(b) - getEventTimestamp(a))
+      .map((event) => getMatchOutcome(event, playerTeamNames))
+      .filter((outcome): outcome is MatchOutcome => outcome !== null),
+    [events, playerTeamNames]
+  );
+  const winCount = useMemo(() => matchOutcomes.filter((o) => o === 'win').length, [matchOutcomes]);
+  const lossCount = useMemo(() => matchOutcomes.filter((o) => o === 'loss').length, [matchOutcomes]);
+  const drawCount = useMemo(() => matchOutcomes.filter((o) => o === 'draw').length, [matchOutcomes]);
+  const recentOutcomes = useMemo(() => matchOutcomes.slice(0, 8), [matchOutcomes]);
+
+  const sessionMonthCounts = useMemo(() => {
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+    let current = 0;
+    let previous = 0;
+    events.forEach((event) => {
+      if (isCancelled(event) || (event.type !== 'training' && event.type !== 'match')) {
+        return;
+      }
+      const monthKey = getMonthKey(event.startTime);
+      if (monthKey === currentKey) current += 1;
+      else if (monthKey === prevKey) previous += 1;
+    });
+    return { current, previous };
+  }, [events]);
+
+  const goToSchedule = () => router.push('/schedule' as any);
+
+  /**
+   * One consistent affordance per section. Showing "Vezi toate (5)" on a
+   * truncated section but "Program" on an untruncated one made three adjacent
+   * sections look like they did three different things.
+   */
+  const seeAllLabel = (total: number) => (total > SECTION_LIMIT ? `Vezi toate (${total})` : 'Vezi în program');
 
   return (
     <ScrollView
-      className="flex-1 bg-[#EDF4FB]"
-      contentContainerClassName={`${contentPaddingClass} pb-24`}
+      className="flex-1 bg-[var(--c-bg)]"
+      contentContainerClassName="pb-24"
       showsVerticalScrollIndicator={false}
     >
-      <View className="w-full max-w-[1440px] self-center">
-        <PlayerHubHeader
-          query={query}
-          onQueryChange={setQuery}
-          refreshing={refreshing}
-          onRefresh={() => loadData(true)}
-          onAccount={() => router.replace('/account' as any)}
-          session={session}
-          isMobile={isMobile}
-          isSmallPhone={isSmallPhone}
+      <PageContainer>
+        <PageHeader
+          title={getFirstName(session)}
+          subtitle={session?.clubName ?? 'Spațiul tău de jucător'}
+          actions={
+            <Pressable
+              onPress={() => loadData(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Reîmprospătează"
+              className="w-9 h-9 rounded-[10px] border items-center justify-center"
+              style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+            >
+              {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
+            </Pressable>
+          }
         />
 
-        <View className={`${isDesktop ? 'flex-row' : 'flex-col'} gap-5 md:gap-6 mt-5 md:mt-6 mb-8 md:mb-10`}>
-          <View style={{ width: isDesktop ? 370 : '100%' }}>
-            <AttendanceCard
-              playerAttendance={playerAttendance}
-              attendanceRate={attendanceRate}
-              attendancePercent={attendancePercent}
-              isMobile={isMobile}
-            />
-          </View>
-          <NextUpSection
-            nextTraining={nextTraining}
-            nextGame={nextGame}
-            latestResult={latestResult}
-            isMobile={isMobile || isTablet}
+        {/* Real grid, not flex-wrap: with `basis-[220px] grow` a 4-card row broke
+            into a ragged 3+1 / 4+2 at intermediate widths. Fixed column counts
+            keep every row full. */}
+        <View className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
+          <AttendanceCard
+            playerAttendance={playerAttendance}
+            attendanceRate={attendanceRate}
+            attendancePercent={attendancePercent}
+          />
+          <NextEventCard
+            event={nextTraining}
+            accent={palette.royal}
+            icon="fitness-center"
+            label="Următorul antrenament"
+            onPress={nextTraining ? () => setSelectedEvent(nextTraining) : undefined}
+          />
+          <NextEventCard
+            event={nextGame}
+            accent={palette.orange}
+            icon="sports-basketball"
+            label="Următorul meci"
+            onPress={nextGame ? () => setSelectedEvent(nextGame) : undefined}
+          />
+          <NextEventCard
+            event={latestResult}
+            accent={palette.green}
+            icon="emoji-events"
+            label="Ultimul rezultat"
+            onPress={latestResult ? () => setSelectedEvent(latestResult) : undefined}
           />
         </View>
 
         {loading ? (
-          <View className="py-16 items-center justify-center">
-            <ActivityIndicator size="large" color={palette.royal} />
-            <Text className="text-[#64748B] text-sm font-bold mt-3">Loading your player hub...</Text>
+          <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă panoul">
+            <Skeleton className="h-[150px] w-full rounded-[16px]" />
+            {Array.from({ length: 2 }).map((_, sectionIndex) => (
+              <View key={sectionIndex}>
+                <View className="mb-4">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-5 w-52 mt-2" />
+                </View>
+                <View className="gap-2.5">
+                  {Array.from({ length: 3 }).map((_, cardIndex) => (
+                    <Skeleton key={cardIndex} className="h-[84px] w-full rounded-[14px]" />
+                  ))}
+                </View>
+              </View>
+            ))}
           </View>
         ) : error ? (
-          <View className="bg-white rounded-[28px] p-8 items-center border border-red-100" style={styles.cardShadow}>
-            <MaterialIcons name="error-outline" size={34} color="var(--c-danger)" />
-            <Text className="text-red-600 font-bold text-center mt-3">{error}</Text>
-          </View>
+          <ErrorState
+            title="Nu am putut încărca panoul"
+            message={error}
+            actionLabel="Reîncearcă"
+            onAction={() => loadData(true)}
+          />
         ) : (
-          <View className="gap-10 md:gap-12">
+          <View className="gap-6">
             {attendanceWarning ? (
-              <View className="bg-[#FFFBEB] rounded-[24px] border border-amber-200 px-5 py-4 flex-row items-center gap-3">
-                <MaterialIcons name="info-outline" size={22} color="var(--c-warning)" />
-                <Text className="text-[#92400E] font-bold flex-1">{attendanceWarning}</Text>
+              <View className="rounded-[14px] border px-4 py-3 flex-row items-center gap-3" style={{ backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-border)' } as any}>
+                <MaterialIcons name="info-outline" size={18} color="var(--c-warning)" />
+                <Text className="text-[12px] font-semibold flex-1" style={{ color: 'var(--c-warning-fg)' }}>{attendanceWarning}</Text>
               </View>
             ) : null}
 
+            <PlayerFormStats
+              streak={attendanceStreak}
+              strip={attendanceStrip}
+              trendDelta={attendanceTrend}
+              wins={winCount}
+              losses={lossCount}
+              draws={drawCount}
+              recentOutcomes={recentOutcomes}
+              monthCount={sessionMonthCounts.current}
+              lastMonthCount={sessionMonthCounts.previous}
+              isMobile={isMobile}
+            />
+
             <View>
               <SectionHeader
-                eyebrow="Court work"
-                title="Upcoming Training"
-                subtitle="Your next scheduled team sessions, ordered by time."
-                actionLabel="Schedule"
-                onAction={() => router.replace('/schedule' as any)}
+                eyebrow="Pe teren"
+                title="Antrenamente viitoare"
+                subtitle="Următoarele sesiuni programate ale echipei."
+                actionLabel={seeAllLabel(allUpcomingTraining.length)}
+                onAction={goToSchedule}
                 isMobile={isMobile}
               />
 
               {upcomingTraining.length ? (
-                <View className="gap-4">
+                <View className="gap-2.5">
                   {upcomingTraining.map((event) => (
-                    <EventCard key={event.id} event={event} accent={palette.royal} label="Team training" variant="training" isMobile={isMobile} />
+                    <EventRow
+                      key={event.id}
+                      event={event}
+                      accent={palette.royal}
+                      label={getEventCategory(event)}
+                      isMobile={isMobile}
+                      onDetails={() => setSelectedEvent(event)}
+                    />
                   ))}
                 </View>
               ) : (
-                <EmptySection message="No upcoming training sessions found." />
+                <EmptyState icon="event-busy" compact title="Niciun antrenament viitor" message="Antrenamentele programate de club apar aici." />
               )}
             </View>
 
             <View>
               <SectionHeader
-                eyebrow="Game day"
-                title="Upcoming Games"
-                subtitle={`Showing ${upcomingGames.length} of ${allUpcomingGames.length} scheduled games`}
-                actionLabel="Schedule"
-                onAction={() => router.replace('/schedule' as any)}
+                eyebrow="Zi de meci"
+                title="Meciuri viitoare"
+                subtitle="Următoarele meciuri ale echipei tale."
+                actionLabel={seeAllLabel(allUpcomingGames.length)}
+                onAction={goToSchedule}
                 isMobile={isMobile}
-              />
-
-              <FilterBar
-                gameFilters={gameFilters}
-                teamFilterOptions={teamFilterOptions}
-                categoryFilterOptions={categoryFilterOptions}
-                monthFilterOptions={monthFilterOptions}
-                seasonFilterOptions={seasonFilterOptions}
-                isMobile={isMobile}
-                onChange={setGameFilters}
-                onReset={() => setGameFilters({ team: ALL_FILTER_KEY, category: ALL_FILTER_KEY, month: ALL_FILTER_KEY, season: ALL_FILTER_KEY })}
               />
 
               {upcomingGames.length ? (
-                <View className="gap-4">
+                <View className="gap-2.5">
                   {upcomingGames.map((event) => (
-                    <EventCard key={event.id} event={event} accent={palette.orange} label={getEventCategory(event)} variant="game" isMobile={isMobile} />
+                    <EventRow
+                      key={event.id}
+                      event={event}
+                      accent={palette.orange}
+                      label={getEventCategory(event)}
+                      isMobile={isMobile}
+                      onDetails={() => setSelectedEvent(event)}
+                    />
                   ))}
                 </View>
               ) : (
-                <EmptySection message="No upcoming games found." />
+                <EmptyState icon="sports-basketball" compact title="Niciun meci viitor" message="Meciurile programate ale echipei tale apar aici." />
               )}
             </View>
 
             <View>
               <SectionHeader
-                eyebrow="Scoreboard"
-                title="Game Results"
-                subtitle="Recent finals and completed match records."
-                trailing={
-                  <View className="rounded-full bg-white border border-[#DDE8F5] px-4 py-3" style={styles.microShadow}>
-                    <Text className="text-[#64748B] text-[12px] font-black uppercase tracking-widest">{gameResults.length} recent</Text>
-                  </View>
-                }
+                eyebrow="Tabelă"
+                title="Rezultate meciuri"
+                subtitle="Ultimele meciuri încheiate ale echipei tale."
+                actionLabel={seeAllLabel(allGameResults.length)}
+                onAction={goToSchedule}
                 isMobile={isMobile}
               />
 
               {gameResults.length ? (
-                <View className={`${isMobile ? 'flex-col' : 'flex-row flex-wrap'} gap-4`}>
-                  {gameResults.map((event) => <ResultCard key={event.id} event={event} isMobile={isMobile} />)}
+                <View className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                  {gameResults.map((event) => (
+                    <ResultCard key={event.id} event={event} outcome={getMatchOutcome(event, playerTeamNames)} />
+                  ))}
                 </View>
               ) : (
-                <EmptySection message="No game results available yet." />
+                <EmptyState icon="scoreboard" compact title="Niciun rezultat disponibil încă" message="Rezultatele meciurilor jucate apar aici." />
               )}
             </View>
           </View>
         )}
-      </View>
+      </PageContainer>
+
+      <PlayerEventDetailModal event={selectedEvent} isMobile={isMobile} onClose={() => setSelectedEvent(null)} />
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  hero: {
-    position: 'relative',
-    overflow: 'hidden',
-    borderRadius: 36,
-    padding: 30,
-    shadowColor: 'var(--c-brand-fg)',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.2,
-    shadowRadius: 30,
-    elevation: 10,
-  },
-  heroMobile: {
-    borderRadius: 28,
-    padding: 20,
-  },
-  cardShadow: {
-    shadowColor: 'var(--c-ink-strong)',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.08,
-    shadowRadius: 22,
-    elevation: 4,
-  },
-  microShadow: {
-    shadowColor: 'var(--c-ink-strong)',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-});
 
 export default function HomeScreen() {
   const { session } = useFirebaseAuth();

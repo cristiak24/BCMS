@@ -40,6 +40,13 @@ const authenticate = async (req, res, next) => {
             }
         }
         if (userRows.length > 0) {
+            // A deactivated account must not be able to act anywhere, not just on
+            // the role-gated routes. Rejecting here means an admin who deactivates
+            // a user revokes their access on the very next request, rather than
+            // leaving them with a working session until the token expires.
+            if (userRows[0].status === 'disabled') {
+                return res.status(403).json({ error: 'This account has been disabled.' });
+            }
             req.user = userRows[0];
         }
         next();

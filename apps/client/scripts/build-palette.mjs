@@ -111,6 +111,11 @@ const EXPLICIT = {
   '#D97706': { bg: 'warning', text: 'warning-fg', border: 'warning' },
   '#B45309': { bg: 'warning-fg', text: 'warning-fg', border: 'warning-fg' },
   '#F97316': { bg: 'warning', text: 'warning-fg', border: 'warning' },
+  // Pale tint used as text on a translucent warning badge over a non-warning
+  // (brand gradient) surface, not a solid warning fill — the "pale text on
+  // dark fill of the same family" heuristic below would map it to `warning`
+  // itself, which is the badge's own background and made the label unreadable.
+  '#FFE8A3': { text: 'warning-fg' },
 
   // Sky / cyan accents.
   '#0EA5E9': { bg: 'sky', text: 'sky', border: 'sky' },

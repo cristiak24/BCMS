@@ -3,8 +3,10 @@ import axios from 'axios';
 import { toDate, toIso } from '../lib/firebaseAdmin';
 import { db } from '../db';
 import { attendance, events, players, teams, users } from '../db/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, lte, or } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { buildEventQueryPlan, type EventQueryParams } from '../lib/eventQuery';
+import { createFeedbackNotification } from '../lib/notifications';
 
 const API_KEY = '9c3622c013ca2f69e8c373ecbf5af38e180f6d7d';
 const REFERER = 'https://www.frbaschet.ro/';
@@ -23,6 +25,7 @@ type EventDoc = {
     amount?: number | null;
     status?: string;
     createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
+    coachNote?: string | null;
 };
 
 type PlayerDoc = { id: number; firstName?: string | null; lastName?: string | null; number?: number | null; };
@@ -73,15 +76,7 @@ function determineStatus(homeScore: string, awayScore: string) {
     return !homeScore || !awayScore ? 'scheduled' : 'finished';
 }
 
-async function enrichEvent(event: EventDoc) {
-    const [teamRows, coachRows] = await Promise.all([
-        event.teamId != null ? db.select({ name: teams.name }).from(teams).where(eq(teams.id, event.teamId)).limit(1) : Promise.resolve([]),
-        event.coachId != null ? db.select({ name: users.name }).from(users).where(eq(users.id, event.coachId)).limit(1) : Promise.resolve([]),
-    ]);
-
-    const teamName = teamRows[0]?.name ?? null;
-    const coachName = coachRows[0]?.name ?? null;
-
+function toEventPayload(event: EventDoc, teamName: string | null, coachName: string | null) {
     return {
         ...event,
         startTime: toIso(event.startTime) ?? new Date().toISOString(),
@@ -90,6 +85,50 @@ async function enrichEvent(event: EventDoc) {
         teamName,
         coachName,
     };
+}
+
+/**
+ * Attach team and coach names to a batch of events.
+ *
+ * This used to be two queries *per event*, so a 30-event month cost 61 round trips.
+ * Names are now resolved with one lookup per table over the distinct ids. An empty
+ * batch short-circuits, which also keeps an empty array away from inArray.
+ */
+async function enrichEvents(eventRows: EventDoc[]) {
+    if (eventRows.length === 0) {
+        return [];
+    }
+
+    const teamIds = Array.from(new Set(
+        eventRows.map((event) => event.teamId).filter((id): id is number => id != null)
+    ));
+    const coachIds = Array.from(new Set(
+        eventRows.map((event) => event.coachId).filter((id): id is number => id != null)
+    ));
+
+    const [teamRows, coachRows] = await Promise.all([
+        teamIds.length
+            ? db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, teamIds))
+            : Promise.resolve([] as { id: number; name: string }[]),
+        coachIds.length
+            ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, coachIds))
+            : Promise.resolve([] as { id: number; name: string }[]),
+    ]);
+
+    const teamNameById = new Map(teamRows.map((row) => [row.id, row.name]));
+    const coachNameById = new Map(coachRows.map((row) => [row.id, row.name]));
+
+    return eventRows.map((event) => toEventPayload(
+        event,
+        event.teamId != null ? teamNameById.get(event.teamId) ?? null : null,
+        event.coachId != null ? coachNameById.get(event.coachId) ?? null : null,
+    ));
+}
+
+/** Single-event path (getEventById) — same shape, via the same code. */
+async function enrichEvent(event: EventDoc) {
+    const [enriched] = await enrichEvents([event]);
+    return enriched;
 }
 
 function getRequestClubId(req: AuthenticatedRequest) {
@@ -160,49 +199,63 @@ async function ensureTeamAccess(req: AuthenticatedRequest, teamId: number) {
 export const eventsController = {
     async getEvents(req: AuthenticatedRequest, res: Response) {
         try {
-            const { start, end, type, coachId, teamId } = req.query as Record<string, string>;
-            const eventRows = await db.select().from(events);
-            
+            // Resolve the caller's club teams first — the plan below needs them to
+            // intersect any requested team ids against what the club actually owns.
             let allowedTeamIds: number[] | null = null;
             if (!isSuperadmin(req)) {
                 const clubId = getRequestClubId(req);
-                if (clubId == null) {
-                    return res.json([]);
+                if (clubId != null) {
+                    const clubTeams = await db.select({ id: teams.id }).from(teams).where(eq(teams.clubId, clubId));
+                    allowedTeamIds = clubTeams.map(t => t.id);
                 }
-                const clubTeams = await db.select({ id: teams.id }).from(teams).where(eq(teams.clubId, clubId));
-                allowedTeamIds = clubTeams.map(t => t.id);
             }
 
-            const filteredEvents = eventRows
-                .map((event) => event as EventDoc)
-                .filter((event) => {
-                    if (allowedTeamIds !== null && event.teamId != null && !allowedTeamIds.includes(event.teamId)) {
-                        return false;
-                    }
+            const plan = buildEventQueryPlan(req.query as EventQueryParams, {
+                isSuperadmin: isSuperadmin(req),
+                allowedTeamIds,
+            });
 
-                    if (type && event.type !== type) {
-                        return false;
-                    }
+            // No club, an out-of-club team request, or an unmatchable filter: answer
+            // without touching the database.
+            if (plan.empty) {
+                return res.json([]);
+            }
 
-                    if (coachId && event.coachId !== Number(coachId)) {
-                        return false;
-                    }
+            const conditions = [];
 
-                    if (teamId && event.teamId !== Number(teamId)) {
-                        return false;
-                    }
+            if (plan.type) {
+                conditions.push(eq(events.type, plan.type));
+            }
+            if (plan.coachId != null) {
+                conditions.push(eq(events.coachId, plan.coachId));
+            }
+            // Inclusive at both ends, matching the old `<` / `>` rejection tests.
+            if (plan.start) {
+                conditions.push(gte(events.startTime, plan.start));
+            }
+            if (plan.end) {
+                conditions.push(lte(events.startTime, plan.end));
+            }
 
-                    const startDate = start ? new Date(start) : null;
-                    const endDate = end ? new Date(end) : null;
-                    const eventDate = toDate(event.startTime);
-                    if (!eventDate) return true;
-                    if (startDate && eventDate < startDate) return false;
-                    if (endDate && eventDate > endDate) return false;
-                    return true;
-                });
+            if (plan.teamIds) {
+                // An explicit team filter excludes club-less events, exactly as
+                // `event.teamId !== Number(teamId)` did.
+                conditions.push(inArray(events.teamId, plan.teamIds));
+            } else if (plan.clubTeamIds) {
+                // The tenancy restriction, by contrast, always let `team_id IS NULL`
+                // events through — the old check was `event.teamId != null && ...`.
+                // A bare inArray here would silently drop every club-less event.
+                conditions.push(plan.clubTeamIds.length
+                    ? or(isNull(events.teamId), inArray(events.teamId, plan.clubTeamIds))
+                    : isNull(events.teamId));
+            }
 
-            const enriched = await Promise.all(filteredEvents.map(enrichEvent));
-            res.json(enriched);
+            // `and()` of zero conditions is undefined, which Drizzle treats as "no
+            // WHERE" — the only caller that reaches it is a superadmin who supplied no
+            // filters, for whom "every event" is the correct answer.
+            const eventRows = await db.select().from(events).where(and(...conditions));
+
+            res.json(await enrichEvents(eventRows as EventDoc[]));
         } catch (error) {
             console.error('[GET /api/events] error:', error);
             res.status(500).json({ error: 'Failed to fetch events' });
@@ -261,6 +314,7 @@ export const eventsController = {
                 amount: req.body.amount != null ? Number(req.body.amount) : null,
                 status: req.body.status || 'scheduled',
                 createdAt: new Date().toISOString(),
+                coachNote: req.body.coachNote ?? null,
             }).returning();
 
             res.json(await enrichEvent(event as EventDoc));
@@ -303,6 +357,7 @@ export const eventsController = {
                 ...(req.body.coachId !== undefined ? { coachId: req.body.coachId == null ? null : Number(req.body.coachId) } : {}),
                 ...(req.body.amount !== undefined ? { amount: req.body.amount == null ? null : Number(req.body.amount) } : {}),
                 ...(req.body.status !== undefined ? { status: req.body.status } : {}),
+                ...(req.body.coachNote !== undefined ? { coachNote: req.body.coachNote } : {}),
             };
 
             const [updated] = await db.update(events).set(updates).where(eq(events.id, eventId)).returning();
@@ -430,6 +485,23 @@ export const eventsController = {
                         date: new Date().toISOString(),
                         note: note ?? null,
                     });
+                }
+
+                // Notify the player only when a new/changed non-empty note was
+                // actually sent — a status-only re-save or an unchanged note
+                // must not spam a duplicate notification. A notification
+                // failure must not fail the attendance save itself.
+                if (hasNote && note && note !== existing?.note) {
+                    try {
+                        await createFeedbackNotification({
+                            playerId,
+                            eventId,
+                            eventTitle: event.title,
+                            note,
+                        });
+                    } catch (notificationError) {
+                        console.error('Create feedback notification error:', notificationError);
+                    }
                 }
             }
 

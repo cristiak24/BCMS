@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, Pressable, ScrollView, ActivityIndicator } from '@/src/web/reactNative';
+import { useResponsive } from '../../../hooks/useResponsive';
 import { X, Calendar as CalendarIcon, CheckSquare, ShieldCheck } from 'lucide-react';
 import { teamsApi, Player } from '../../../services/teamsApi';
 
@@ -31,6 +32,7 @@ function formatDMY(date: Date) {
  * UpdateFileModal, but pre-scoped to a single team's roster.
  */
 export default function TeamMedicalVisaModal({ visible, teamId, teamName, onClose, onSuccess }: TeamMedicalVisaModalProps) {
+  const { isMobile } = useResponsive();
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<number[]>([]);
   const [expiryDate, setExpiryDate] = useState(''); // DD-MM-YYYY
@@ -107,8 +109,8 @@ export default function TeamMedicalVisaModal({ visible, teamId, teamName, onClos
 
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View className="flex-1 bg-[#0E2041]/60 justify-center items-center p-4">
-        <View className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden">
+      <View className={`flex-1 bg-[#0E2041]/60 ${isMobile ? 'justify-end' : 'justify-center items-center p-4'}`}>
+        <View className={`bg-white shadow-2xl overflow-hidden w-full ${isMobile ? 'rounded-t-[24px] max-h-[92%]' : 'rounded-[20px] max-w-lg'}`}>
 
           <View className="p-6 border-b border-gray-100 flex-row justify-between items-center bg-gray-50/50">
             <View className="flex-row items-center gap-3">

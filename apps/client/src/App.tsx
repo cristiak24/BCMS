@@ -1,11 +1,12 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { FirebaseAuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import PublicRoute from '../components/auth/PublicRoute';
+import { PLAYER_FEATURE_FLAGS } from '../config/playerFeatureFlags';
 
 // Entry screens stay in the main chunk: they are what an unauthenticated visitor
 // hits first, so lazy-loading them would only add a round trip.
@@ -20,11 +21,13 @@ const Profile = lazy(() => import('../app/profile'));
 const NotFound = lazy(() => import('../app/not-found'));
 const InviteRegistration = lazy(() => import('../app/invite/[token]'));
 
+const PlayerLayout = lazy(() => import('../app/(tabs)/_layout'));
 const PlayerHome = lazy(() => import('../app/(tabs)/index'));
 const PlayerAccount = lazy(() => import('../app/(tabs)/account'));
 const PlayerAttendance = lazy(() => import('../app/(tabs)/attendance'));
 const PlayerPayments = lazy(() => import('../app/(tabs)/payments'));
 const PlayerSchedule = lazy(() => import('../app/(tabs)/schedule'));
+const PlayerTeam = lazy(() => import('../app/(tabs)/team'));
 
 const AdminLayout = lazy(() => import('../app/(admin)/_layout'));
 const AdminDashboard = lazy(() => import('../app/(admin)/dashboard'));
@@ -57,10 +60,6 @@ const SuperAdminAuditLogs = lazy(() => import('../app/super-admin/audit-logs'));
 const SuperAdminSettings = lazy(() => import('../app/super-admin/settings'));
 const SuperAdminInviteRedirect = lazy(() => import('../app/super-admin/invite/[token]'));
 
-function PlayerLayout() {
-  return <Outlet />;
-}
-
 export default function App() {
   return (
     <ErrorBoundary>
@@ -81,6 +80,9 @@ export default function App() {
                   <Route path="/attendance" element={<PlayerAttendance />} />
                   <Route path="/payments" element={<PlayerPayments />} />
                   <Route path="/schedule" element={<PlayerSchedule />} />
+                  {PLAYER_FEATURE_FLAGS.teammatesView ? (
+                    <Route path="/team" element={<PlayerTeam />} />
+                  ) : null}
                 </Route>
 
                 <Route path="/admin" element={<ProtectedRoute roles={['admin', 'superadmin', 'accountant', 'staff']}><AdminLayout /></ProtectedRoute>}>

@@ -134,6 +134,7 @@ exports.financialSettings = (0, pg_core_1.pgTable)("financial_settings", {
     trainingLevy: (0, pg_core_1.integer)("training_levy").default(0).notNull(),
     facilityFee: (0, pg_core_1.integer)("facility_fee").default(0).notNull(),
     autoAdjust: (0, pg_core_1.integer)("auto_adjust").default(1).notNull(),
+    paymentDueDay: (0, pg_core_1.integer)("payment_due_day").default(25).notNull(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at", { mode: 'string' }).defaultNow().notNull(),
 });
 exports.events = (0, pg_core_1.pgTable)("events", {
@@ -149,6 +150,9 @@ exports.events = (0, pg_core_1.pgTable)("events", {
     amount: (0, pg_core_1.integer)(),
     status: (0, pg_core_1.varchar)({ length: 50 }).default('scheduled'),
     createdAt: (0, pg_core_1.timestamp)("created_at", { mode: 'string' }).defaultNow().notNull(),
+    // Shared note from the coach on this event, visible to every player on it
+    // (post-session feedback, focus points, MVP shoutout).
+    coachNote: (0, pg_core_1.text)("coach_note"),
 }, (table) => [
     (0, pg_core_1.foreignKey)({
         columns: [table.teamId],

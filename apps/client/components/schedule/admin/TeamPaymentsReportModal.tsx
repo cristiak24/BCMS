@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, ActivityIndicator, TextInput } from '@/src/web/reactNative';
+import { useResponsive } from '../../../hooks/useResponsive';
 import { X, Receipt, TrendingUp, Clock, Plus, Banknote, Check } from 'lucide-react';
 import { financeApi, AdminRecentPayment } from '../../../services/financeApi';
 import { teamsApi, Player } from '../../../services/teamsApi';
@@ -55,6 +56,7 @@ function statusMeta(status: string) {
  * paying in person) via `financeApi.createManualPayment`.
  */
 export default function TeamPaymentsReportModal({ visible, teamId, teamName, onClose }: TeamPaymentsReportModalProps) {
+  const { isMobile } = useResponsive();
   const [payments, setPayments] = useState<AdminRecentPayment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -144,8 +146,8 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
 
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View className="flex-1 bg-[#0E2041]/60 justify-center items-center p-4">
-        <View className="bg-white rounded-[32px] w-full max-w-xl shadow-2xl overflow-hidden">
+      <View className={`flex-1 bg-[#0E2041]/60 ${isMobile ? 'justify-end' : 'justify-center items-center p-4'}`}>
+        <View className={`bg-white shadow-2xl overflow-hidden w-full ${isMobile ? 'rounded-t-[24px] max-h-[92%]' : 'rounded-[20px] max-w-xl'}`}>
 
           <View className="p-6 border-b border-gray-100 flex-row justify-between items-center bg-gray-50/50">
             <View className="flex-row items-center gap-3">
