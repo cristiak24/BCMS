@@ -3,23 +3,14 @@ import { db } from '../db';
 import { users, clubs, players, playersToTeams } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { ensureDefaultClub } from '../lib/manageAccessRepository';
-import { splitDisplayName, verifyPassword } from '../lib/password';
+import { splitDisplayName } from '../lib/password';
 import { authenticate, requireSuperadmin, AuthenticatedRequest } from '../middleware/auth';
-import { rateLimit } from '../middleware/rateLimit';
 import { acceptInvitation, createSuperAdminInvitation, validateInvitationToken } from '../services/invitationsService';
 import { createPendingAccessRequestForSignup, validateInviteToken } from '../lib/manageAccessService';
 import { loadServerEnv } from '../lib/loadEnv';
-import { firebaseAuth } from '../lib/firebaseAdmin';
-import { resolvePublicAppUrl } from '../lib/publicUrl';
-import { Resend } from 'resend';
-import crypto from 'crypto';
 
 const router = Router();
 loadServerEnv();
-
-const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim() || '';
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || 'BCMS <no-reply@bcms.ro>';
-const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 async function findClubName(clubId?: number | null) {
     if (clubId == null) {
@@ -54,10 +45,6 @@ async function findPlayerTeamIdsByEmail(email?: string | null) {
     return Array.from(ids).map(String);
 }
 
-function normalizeEmail(value: string) {
-    return value.trim().toLowerCase();
-}
-
 function buildAuthUser(user: typeof users.$inferSelect, clubName: string | null, teamIds: string[]) {
     return {
         id: user.id,
@@ -80,130 +67,6 @@ function buildAuthUser(user: typeof users.$inferSelect, clubName: string | null,
     };
 }
 
-async function ensureFirebaseUserForLogin(user: typeof users.$inferSelect) {
-    const email = normalizeEmail(user.email);
-    let firebaseUserRecord;
-
-    try {
-        firebaseUserRecord = user.firebaseUid
-            ? await firebaseAuth.getUser(user.firebaseUid)
-            : await firebaseAuth.getUserByEmail(email);
-    } catch (error: any) {
-        if (error?.code !== 'auth/user-not-found') {
-            throw error;
-        }
-
-        try {
-            firebaseUserRecord = await firebaseAuth.getUserByEmail(email);
-        } catch (emailLookupError: any) {
-            if (emailLookupError?.code !== 'auth/user-not-found') {
-                throw emailLookupError;
-            }
-
-            firebaseUserRecord = await firebaseAuth.createUser({
-                email,
-                displayName: user.name ?? email,
-                password: crypto.randomBytes(24).toString('base64url'),
-                disabled: false,
-            });
-        }
-    }
-
-    if (firebaseUserRecord.uid && user.firebaseUid !== firebaseUserRecord.uid) {
-        const [updatedUser] = await db.update(users).set({
-            firebaseUid: firebaseUserRecord.uid,
-            updatedAt: new Date().toISOString(),
-        }).where(eq(users.id, user.id)).returning();
-
-        return { firebaseUserRecord, user: updatedUser ?? { ...user, firebaseUid: firebaseUserRecord.uid } };
-    }
-
-    return { firebaseUserRecord, user };
-}
-
-async function sendForgotPasswordEmail(email: string, resetLink: string, name?: string | null) {
-    if (!resend) {
-        throw new Error('RESEND_API_KEY is missing.');
-    }
-
-    const displayName = name?.trim() || email.split('@')[0] || 'there';
-
-    await resend.emails.send({
-        from: RESEND_FROM_EMAIL,
-        to: email,
-        subject: 'Reset your BCMS password',
-        html: `
-          <div style="margin:0;padding:0;background:#eef3ff;font-family:Inter,Arial,sans-serif">
-            <div style="max-width:640px;margin:0 auto;padding:32px 18px">
-              <div style="background:#fff;border:1px solid #dbe4ff;border-radius:28px;padding:32px;box-shadow:0 24px 70px rgba(23,58,168,.08)">
-                <div style="display:inline-block;padding:8px 12px;border-radius:999px;background:#e7eeff;color:#173aa8;font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase">BCMS security</div>
-                <h1 style="margin:20px 0 12px;font-size:30px;line-height:1.1;color:#102a72">Reset your password</h1>
-                <p style="font-size:16px;line-height:1.7;color:#334155;margin:0 0 10px">Hi ${displayName},</p>
-                <p style="font-size:16px;line-height:1.7;color:#334155;margin:0 0 22px">We received a request to reset the password for your BCMS account.</p>
-                <p style="margin:0 0 18px">
-                  <a href="${resetLink}" style="display:inline-block;background:#173aa8;color:#fff;text-decoration:none;padding:14px 24px;border-radius:999px;font-weight:800">Reset password</a>
-                </p>
-                <p style="font-size:13px;color:#64748b;line-height:1.6;margin:0 0 12px">If the button does not work, open this link:</p>
-                <p style="font-size:13px;color:#64748b;word-break:break-all;line-height:1.5;margin:0">${resetLink}</p>
-              </div>
-            </div>
-          </div>
-        `,
-        text: `Hi ${displayName}, reset your BCMS password here: ${resetLink}`,
-    });
-}
-
-// POST /api/auth/legacy-login
-// Bridges existing DB-password accounts into Firebase Auth without forcing
-// users through a manual password reset first.
-router.post('/legacy-login', rateLimit({ bucket: 'auth:legacy-login', limit: 10, windowMs: 5 * 60_000 }), async (req: AuthenticatedRequest, res: any) => {
-    try {
-        const email = normalizeEmail(String(req.body?.email ?? ''));
-        const password = String(req.body?.password ?? '');
-
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email si parola sunt obligatorii.' });
-        }
-
-        const [existingUser] = await db
-            .select()
-            .from(users)
-            .where(eq(users.email, email))
-            .limit(1);
-
-        if (!existingUser || !existingUser.passwordHash || !verifyPassword(password, existingUser.passwordHash)) {
-            return res.status(401).json({ error: 'Email sau parola incorecte.' });
-        }
-
-        if (existingUser.status === 'disabled') {
-            return res.status(403).json({ error: 'Contul este dezactivat. Contacteaza administratorul clubului.' });
-        }
-
-        const { firebaseUserRecord, user } = await ensureFirebaseUserForLogin(existingUser);
-        const now = new Date().toISOString();
-        const [updatedUser] = await db.update(users).set({
-            lastLoginAt: now,
-            updatedAt: now,
-        }).where(eq(users.id, user.id)).returning();
-
-        const activeUser = updatedUser ?? user;
-        const [clubName, teamIds] = await Promise.all([
-            findClubName(activeUser.clubId),
-            findPlayerTeamIdsByEmail(activeUser.email),
-        ]);
-        const customToken = await firebaseAuth.createCustomToken(firebaseUserRecord.uid);
-
-        return res.json({
-            success: true,
-            customToken,
-            user: buildAuthUser(activeUser, clubName, teamIds),
-        });
-    } catch (error) {
-        console.error('Legacy login error:', error);
-        return res.status(500).json({ error: 'Nu am putut autentifica utilizatorul.' });
-    }
-});
-
 // GET /api/auth/me
 router.get('/me', authenticate, async (req: AuthenticatedRequest, res: any) => {
     try {
@@ -222,81 +85,6 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res: any) => {
     } catch (error) {
         console.error('Error fetching /me:', error);
         res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// The response here is deliberately identical whether or not an account exists.
-// Returning "no account with this email" turned this endpoint into a free user
-// enumeration oracle for anyone who wanted to harvest valid club addresses.
-const FORGOT_PASSWORD_ACK = {
-    success: true,
-    message: 'Daca exista un cont cu acest email, vei primi un link de resetare.',
-};
-
-router.post('/forgot-password', rateLimit({ bucket: 'auth:forgot-password', limit: 5, windowMs: 15 * 60_000 }), async (req: AuthenticatedRequest, res: any) => {
-    try {
-        const email = normalizeEmail(String(req.body?.email ?? ''));
-        if (!email) {
-            return res.status(400).json({ error: 'Email is required.' });
-        }
-
-        const existingUsers = await db
-            .select()
-            .from(users)
-            .where(eq(users.email, email))
-            .limit(1);
-
-        const existingUser = existingUsers[0];
-
-        // Unknown or deactivated account: acknowledge without sending anything and
-        // without telling the caller which of the two it was.
-        if (!existingUser || existingUser.status === 'disabled') {
-            return res.json(FORGOT_PASSWORD_ACK);
-        }
-
-        let firebaseUserRecord;
-        try {
-            firebaseUserRecord = existingUser.firebaseUid
-                ? await firebaseAuth.getUser(existingUser.firebaseUid)
-                : await firebaseAuth.getUserByEmail(email);
-        } catch (error: any) {
-            if (error?.code === 'auth/user-not-found') {
-                try {
-                    firebaseUserRecord = await firebaseAuth.getUserByEmail(email);
-                } catch (emailLookupError: any) {
-                    if (emailLookupError?.code !== 'auth/user-not-found') {
-                        throw emailLookupError;
-                    }
-
-                    firebaseUserRecord = await firebaseAuth.createUser({
-                        email,
-                        displayName: existingUser.name ?? email,
-                        password: crypto.randomBytes(24).toString('base64url'),
-                        disabled: false,
-                    });
-                }
-            } else {
-                throw error;
-            }
-        }
-
-        if (firebaseUserRecord.uid && existingUser.firebaseUid !== firebaseUserRecord.uid) {
-            await db.update(users).set({
-                firebaseUid: firebaseUserRecord.uid,
-                updatedAt: new Date().toISOString(),
-            }).where(eq(users.id, existingUser.id));
-        }
-
-        const resetLink = await firebaseAuth.generatePasswordResetLink(email, {
-            url: `${resolvePublicAppUrl()}/login?reset=1`,
-        });
-
-        await sendForgotPasswordEmail(email, resetLink, existingUser.firstName ?? existingUser.name ?? null);
-
-        res.json(FORGOT_PASSWORD_ACK);
-    } catch (error) {
-        console.error('Forgot password error:', error);
-        res.status(500).json({ error: 'Nu am putut trimite emailul de resetare a parolei.' });
     }
 });
 

@@ -18,7 +18,6 @@ import AuraButton from '../components/ui/AuraButton';
 import { authApi, type InviteDetails } from '../services/authApi';
 import { getHomeRouteForRole } from '../utils/authSession';
 import { useFirebaseAuth } from '../context/AuthContext';
-import { firebaseAuth } from '../config/firebase';
 import { LoadingScreen } from '../components/ui/ScreenState';
 
 type SignupRole = 'player' | 'coach';
@@ -116,7 +115,6 @@ export default function Signup() {
         return;
       }
 
-      await firebaseAuth.currentUser?.getIdToken(true);
       await reloadSession();
     } catch (signupError) {
       setError(signupError instanceof Error ? signupError.message : 'Signup failed.');

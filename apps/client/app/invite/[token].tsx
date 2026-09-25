@@ -13,9 +13,8 @@ import {
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { LinearGradient } from '@/src/web/linearGradient';
-import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { useFirebaseAuth } from '../../context/AuthContext';
-import { firebaseAuth } from '../../config/firebase';
+import { getClerk } from '../../config/clerk';
 import { invitationsApi } from '../../services/invitationsApi';
 import { getHomeRouteForRole, type UserRole } from '../../utils/authSession';
 
@@ -85,12 +84,24 @@ export default function InviteRegistrationScreen() {
     setSubmitting(true);
     setError(null);
 
+    const clerk = await getClerk();
     let createdAccount = false;
     let inviteAccepted = false;
 
     try {
-      await createUserWithEmailAndPassword(firebaseAuth, invite.email, password);
-      createdAccount = true;
+      const signUp = await clerk.client.signUp.create({
+        emailAddress: invite.email,
+        password,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+      });
+      createdAccount = Boolean(signUp.createdUserId);
+
+      if (signUp.status !== 'complete' || !signUp.createdSessionId) {
+        throw new Error('Contul necesită un pas suplimentar de verificare. Contactează administratorul clubului.');
+      }
+
+      await clerk.setActive({ session: signUp.createdSessionId });
 
       const inviteResult = await invitationsApi.accept(token, {
         email: invite.email,
@@ -100,7 +111,6 @@ export default function InviteRegistrationScreen() {
       });
       inviteAccepted = true;
 
-      await firebaseAuth.currentUser?.getIdToken(true);
       try {
         await reloadSession();
       } catch (sessionError) {
@@ -110,9 +120,14 @@ export default function InviteRegistrationScreen() {
       const nextRoute = getHomeRouteForRole(inviteResult.role as UserRole);
       router.replace(nextRoute);
     } catch (inviteError) {
-      if (createdAccount && !inviteAccepted && firebaseAuth.currentUser) {
+      if (createdAccount && !inviteAccepted) {
         try {
-          await deleteUser(firebaseAuth.currentUser);
+          await clerk.user?.delete();
+        } catch {
+          // Best effort rollback only.
+        }
+        try {
+          await clerk.signOut();
         } catch {
           // Best effort rollback only.
         }

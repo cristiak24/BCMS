@@ -8,8 +8,8 @@ import {
   useRef,
   useState,
 } from 'react';
-import { onAuthStateChanged, signOut as firebaseSignOut, type User } from 'firebase/auth';
-import { firebaseAuth } from '../config/firebase';
+import { ClerkProvider, useAuth, useClerk, useUser } from '@clerk/react';
+import { CLERK_PUBLISHABLE_KEY, setClerkInstance } from '../config/clerk';
 import {
   clearAuthSession,
   getCachedAuthSession,
@@ -19,7 +19,7 @@ import {
   type AuthUser,
   type UserRole,
 } from '../utils/authSession';
-import { apiFetch, setUnauthorizedHandler } from '../services/apiClient';
+import { apiFetch, setSessionTokenGetter, setUnauthorizedHandler } from '../services/apiClient';
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Types
@@ -46,8 +46,10 @@ type MeResponse = {
   };
 };
 
+type CurrentUser = { uid: string; email: string | null } | null;
+
 type FirebaseAuthContextValue = {
-  user: User | null;
+  user: CurrentUser;
   session: AuthUser | null;
   initializing: boolean;
   reloadSession: () => Promise<AuthUser | null>;
@@ -64,12 +66,12 @@ const FirebaseAuthContext = createContext<FirebaseAuthContextValue | null>(null)
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────────
 
-function mapMeToAuthUser(firebaseUser: User, me: MeResponse['user']): AuthUser {
+function mapMeToAuthUser(currentUser: NonNullable<CurrentUser>, me: MeResponse['user']): AuthUser {
   return {
     id: me.id,
-    uid: firebaseUser.uid,
-    email: me.email || firebaseUser.email || '',
-    name: me.name || `${me.firstName ?? ''} ${me.lastName ?? ''}`.trim() || firebaseUser.email || 'User',
+    uid: currentUser.uid,
+    email: me.email || currentUser.email || '',
+    name: me.name || `${me.firstName ?? ''} ${me.lastName ?? ''}`.trim() || currentUser.email || 'User',
     firstName: me.firstName ?? null,
     lastName: me.lastName ?? null,
     role: me.role,
@@ -83,7 +85,7 @@ function mapMeToAuthUser(firebaseUser: User, me: MeResponse['user']): AuthUser {
     phone: me.phone ?? null,
     preferredLanguage: me.preferredLanguage ?? null,
     createdAt: me.createdAt ?? null,
-    lastLoginAt: me.lastLoginAt ?? firebaseUser.metadata.lastSignInTime ?? null,
+    lastLoginAt: me.lastLoginAt ?? null,
   };
 }
 
@@ -100,15 +102,15 @@ function isProfileProvisioningError(error: unknown) {
 
 /**
  * Fetch the Postgres user profile from the backend.
- * The apiClient automatically attaches the Firebase ID token.
+ * The apiClient automatically attaches the current session token.
  */
-async function fetchMeFromBackend(firebaseUser: User): Promise<AuthUser> {
-  // Retry a bit longer — the profile may be created shortly after Firebase auth
+async function fetchMeFromBackend(currentUser: NonNullable<CurrentUser>): Promise<AuthUser> {
+  // Retry a bit longer — the profile may be created shortly after sign-in
   for (let attempt = 0; attempt < 10; attempt++) {
     try {
       const data = await apiFetch<MeResponse>('/auth/me');
       if (data?.success && data.user) {
-        return mapMeToAuthUser(firebaseUser, data.user);
+        return mapMeToAuthUser(currentUser, data.user);
       }
     } catch (err: any) {
       if (isProfileProvisioningError(err)) {
@@ -132,22 +134,47 @@ async function fetchMeFromBackend(firebaseUser: User): Promise<AuthUser> {
 // Provider
 // ────────────────────────────────────────────────────────────────────────────────
 
-export function FirebaseAuthProvider({ children }: PropsWithChildren) {
-  const [user, setUser] = useState<User | null>(null);
+function AuthBridge({ children }: PropsWithChildren) {
+  const clerk = useClerk();
+  const { isLoaded, isSignedIn, userId, getToken } = useAuth();
+  const { user: clerkUser } = useUser();
   const [session, setSession] = useState<AuthUser | null>(getCachedAuthSession());
   const [initializing, setInitializing] = useState(true);
   const authRequestId = useRef(0);
 
+  const currentUser: CurrentUser = useMemo(() => {
+    if (!isSignedIn || !userId) {
+      return null;
+    }
+    return {
+      uid: userId,
+      email: clerkUser?.primaryEmailAddress?.emailAddress ?? null,
+    };
+  }, [isSignedIn, userId, clerkUser]);
+
   useEffect(() => {
+    if (isLoaded) {
+      setClerkInstance(clerk);
+    }
+    return () => setClerkInstance(null);
+  }, [clerk, isLoaded]);
+
+  useEffect(() => {
+    setSessionTokenGetter(() => getToken());
+    return () => setSessionTokenGetter(null);
+  }, [getToken]);
+
+  useEffect(() => {
+    if (!isLoaded) {
+      return;
+    }
+
     let mounted = true;
+    const requestId = authRequestId.current + 1;
+    authRequestId.current = requestId;
 
-    const unsubscribe = onAuthStateChanged(firebaseAuth, async (nextUser) => {
-      const requestId = authRequestId.current + 1;
-      authRequestId.current = requestId;
-
-      setUser(nextUser);
-
-      if (!nextUser) {
+    (async () => {
+      if (!currentUser) {
         setCachedAuthSession(null);
         await clearAuthSession();
         if (mounted && requestId === authRequestId.current) {
@@ -158,7 +185,7 @@ export function FirebaseAuthProvider({ children }: PropsWithChildren) {
       }
 
       try {
-        const nextSession = await fetchMeFromBackend(nextUser);
+        const nextSession = await fetchMeFromBackend(currentUser);
         setCachedAuthSession(nextSession);
         await saveAuthSession(nextSession);
         if (mounted && requestId === authRequestId.current) {
@@ -166,12 +193,13 @@ export function FirebaseAuthProvider({ children }: PropsWithChildren) {
         }
       } catch (error) {
         console.error('[AuthContext] Failed to load session from backend:', error);
-        // The Firebase user is still authenticated — the backend was just unreachable or
-        // slow (fetchMeFromBackend already retried). Fall back to the persisted session for
-        // this same account so a transient hiccup (e.g. a page refresh while /auth/me is
-        // briefly slow) doesn't log the user out. Only clear when there's no usable session.
+        // The account is still signed in — the backend was just unreachable or
+        // slow (fetchMeFromBackend already retried). Fall back to the persisted
+        // session for this same account so a transient hiccup (e.g. a page
+        // refresh while /auth/me is briefly slow) doesn't log the user out.
+        // Only clear when there's no usable session.
         const persisted = await readAuthSession();
-        const fallback = persisted && persisted.uid === nextUser.uid ? persisted : null;
+        const fallback = persisted && persisted.uid === currentUser.uid ? persisted : null;
         if (fallback) {
           setCachedAuthSession(fallback);
         } else {
@@ -186,33 +214,32 @@ export function FirebaseAuthProvider({ children }: PropsWithChildren) {
           setInitializing(false);
         }
       }
-    });
+    })();
 
     return () => {
       mounted = false;
-      unsubscribe();
     };
-  }, []);
+  }, [isLoaded, currentUser]);
 
   const reloadSession = useCallback(async () => {
-    if (!firebaseAuth.currentUser) {
+    if (!currentUser) {
       setSession(null);
       return null;
     }
 
-    const nextSession = await fetchMeFromBackend(firebaseAuth.currentUser);
+    const nextSession = await fetchMeFromBackend(currentUser);
     setCachedAuthSession(nextSession);
     setSession(nextSession);
     await saveAuthSession(nextSession);
     return nextSession;
-  }, []);
+  }, [currentUser]);
 
   const signOut = useCallback(async () => {
-    await firebaseSignOut(firebaseAuth);
+    await clerk.signOut();
     setCachedAuthSession(null);
     setSession(null);
     await clearAuthSession();
-  }, []);
+  }, [clerk]);
 
   // Tear the session down as soon as the backend says the credentials are no
   // longer good (token revoked, account deactivated), instead of leaving the
@@ -225,14 +252,22 @@ export function FirebaseAuthProvider({ children }: PropsWithChildren) {
   }, [signOut]);
 
   const value = useMemo<FirebaseAuthContextValue>(
-    () => ({ user, session, initializing, reloadSession, signOut }),
-    [initializing, session, user, reloadSession, signOut],
+    () => ({ user: currentUser, session, initializing, reloadSession, signOut }),
+    [currentUser, initializing, session, reloadSession, signOut],
   );
 
   return (
     <FirebaseAuthContext.Provider value={value}>
       {children}
     </FirebaseAuthContext.Provider>
+  );
+}
+
+export function FirebaseAuthProvider({ children }: PropsWithChildren) {
+  return (
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+      <AuthBridge>{children}</AuthBridge>
+    </ClerkProvider>
   );
 }
 

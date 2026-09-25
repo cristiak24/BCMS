@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import type { AppUserContext } from '../types/manageAccess';
 import { normalizeRole } from './requestAuth';
-import { firebaseAuth } from './firebaseAdmin';
+import { verifyBearerToken } from './clerkAuth';
 import { db } from '../db';
 import { users } from '../db/schema';
 import { eq, or, sql } from 'drizzle-orm';
@@ -9,7 +9,7 @@ import { eq, or, sql } from 'drizzle-orm';
 type ErrorPayload = { error: string };
 
 /**
- * Resolve the caller from their Firebase ID token.
+ * Resolve the caller from their Clerk session token.
  *
  * This is the ONLY accepted proof of identity. An earlier revision also trusted
  * `x-user-id` / `x-user-role` / `x-user-club-id` request headers as a fallback,
@@ -31,7 +31,7 @@ async function getBearerAuthenticatedUser(req: Request): Promise<AppUserContext 
     }
 
     try {
-        const decodedToken = await firebaseAuth.verifyIdToken(token);
+        const decodedToken = await verifyBearerToken(token);
         let userRows = await db
             .select()
             .from(users)

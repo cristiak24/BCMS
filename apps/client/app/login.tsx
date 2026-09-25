@@ -234,8 +234,15 @@ export default function Login() {
         forgotPasswordLoading,
         errorMsg,
         forgotPasswordMsg,
+        resetStage,
+        resetCode,
+        setResetCode,
+        newPassword,
+        setNewPassword,
         login,
         forgotPassword,
+        submitPasswordReset,
+        cancelPasswordReset,
     } = useLogin();
     const { session, initializing } = useFirebaseAuth();
     const [showPassword, setShowPassword] = useState(false);
@@ -376,6 +383,48 @@ export default function Login() {
                                     <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
                                         <CheckCircle2 className="mt-0.5 shrink-0" size={18} />
                                         <p className="m-0 text-sm font-bold leading-5">{forgotPasswordMsg}</p>
+                                    </div>
+                                ) : null}
+
+                                {resetStage === 'code-sent' ? (
+                                    <div className="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                                        <p className="m-0 text-sm font-bold text-blue-900">
+                                            Introdu codul primit pe email si o parola noua.
+                                        </p>
+                                        <input
+                                            className="min-h-[48px] rounded-lg border border-slate-200 bg-white px-3 text-base font-bold text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-600"
+                                            placeholder="Cod de resetare"
+                                            value={resetCode}
+                                            onChange={(e) => setResetCode(e.target.value)}
+                                            disabled={forgotPasswordLoading}
+                                        />
+                                        <input
+                                            className="min-h-[48px] rounded-lg border border-slate-200 bg-white px-3 text-base font-bold text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-600"
+                                            placeholder="Parola noua"
+                                            type="password"
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            autoComplete="new-password"
+                                            disabled={forgotPasswordLoading}
+                                        />
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={submitPasswordReset}
+                                                disabled={forgotPasswordLoading}
+                                                className="min-h-[44px] flex-1 rounded-lg border-0 bg-[#2563EB] px-4 text-sm font-black text-white transition-colors hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-70"
+                                            >
+                                                {forgotPasswordLoading ? 'Se salveaza...' : 'Salveaza parola noua'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={cancelPasswordReset}
+                                                disabled={forgotPasswordLoading}
+                                                className="min-h-[44px] rounded-lg border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 hover:bg-slate-50"
+                                            >
+                                                Renunta
+                                            </button>
+                                        </div>
                                     </div>
                                 ) : null}
 

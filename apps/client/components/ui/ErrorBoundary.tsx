@@ -1,6 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { signOut as firebaseSignOut } from 'firebase/auth';
-import { firebaseAuth } from '../../config/firebase';
+import { getClerk } from '../../config/clerk';
 import { clearAuthSession, setCachedAuthSession } from '../../utils/authSession';
 
 type ErrorBoundaryProps = {
@@ -25,7 +24,7 @@ type ErrorBoundaryState = {
  * can't use useFirebaseAuth()/signOut() — and it must not need to. If the
  * crash happens on a logged-in user's home route, "go to dashboard" just
  * re-triggers the same crash (Landing redirects straight back there), trapping
- * the user with no escape. Log out is handled here directly against Firebase
+ * the user with no escape. Log out is handled here directly against Clerk
  * + local session storage so it always works, independent of whatever broke.
  */
 export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -45,7 +44,8 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
 
   logout = async () => {
     try {
-      await firebaseSignOut(firebaseAuth);
+      const clerk = await getClerk();
+      await clerk.signOut();
     } catch (error) {
       console.error('[ErrorBoundary] Sign-out failed:', error);
     } finally {

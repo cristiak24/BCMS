@@ -1,11 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
-import { firebaseAuth } from '../lib/firebaseAdmin';
+import { verifyBearerToken } from '../lib/clerkAuth';
 import { db } from '../db';
 import { users } from '../db/schema';
 import { eq, or } from 'drizzle-orm';
 
 export interface AuthenticatedRequest extends Request {
     user?: any; // You can type this properly based on your User model
+    // Despite the name (kept to avoid touching every call site), this now holds
+    // the Clerk identity: { uid: <clerk user id>, email }.
     firebaseUser?: any;
 }
 
@@ -17,7 +19,7 @@ export const authenticate = async (req: AuthenticatedRequest, res: Response, nex
         }
 
         const token = authHeader.split('Bearer ')[1];
-        const decodedToken = await firebaseAuth.verifyIdToken(token);
+        const decodedToken = await verifyBearerToken(token);
 
         req.firebaseUser = decodedToken;
 

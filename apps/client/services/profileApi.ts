@@ -1,5 +1,4 @@
-import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
-import { firebaseAuth } from '../config/firebase';
+import { getClerk } from '../config/clerk';
 import { apiFetch } from './apiClient';
 import type { AuthUser, NotificationPreferences } from '../utils/authSession';
 
@@ -45,14 +44,15 @@ export const profileApi = {
 
   changePassword(payload: ChangePasswordPayload) {
     return (async () => {
-      const currentUser = firebaseAuth.currentUser;
-      if (!currentUser || !currentUser.email) {
+      const clerk = await getClerk();
+      if (!clerk.user) {
         throw new Error('No authenticated user found.');
       }
 
-      const credential = EmailAuthProvider.credential(currentUser.email, payload.currentPassword);
-      await reauthenticateWithCredential(currentUser, credential);
-      await updatePassword(currentUser, payload.newPassword);
+      await clerk.user.updatePassword({
+        currentPassword: payload.currentPassword,
+        newPassword: payload.newPassword,
+      });
       return { success: true, message: 'Password updated successfully' };
     })();
   },

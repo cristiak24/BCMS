@@ -1,5 +1,4 @@
 import { buildApiUrl } from '../config/serverUrl';
-import { firebaseAuth } from '../config/firebase';
 
 type ApiResponseType = 'json' | 'text' | 'blob' | 'void';
 type QueryParamValue = string | number | boolean | null | undefined;
@@ -86,12 +85,20 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
   onUnauthorized = handler;
 }
 
-/** Get the current Firebase ID token, or null if not logged in */
-async function getFirebaseIdToken(): Promise<string | null> {
+type SessionTokenGetter = () => Promise<string | null>;
+
+let sessionTokenGetter: SessionTokenGetter | null = null;
+
+/** Registered once by AuthContext with Clerk's session.getToken(). */
+export function setSessionTokenGetter(getter: SessionTokenGetter | null) {
+  sessionTokenGetter = getter;
+}
+
+/** Get the current session token, or null if not logged in */
+async function getSessionToken(): Promise<string | null> {
+  if (!sessionTokenGetter) return null;
   try {
-    const currentUser = firebaseAuth.currentUser;
-    if (!currentUser) return null;
-    return await currentUser.getIdToken();
+    return await sessionTokenGetter();
   } catch {
     return null;
   }
@@ -163,8 +170,8 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const headers = new Headers(init?.headers);
 
-  // Always try to attach Firebase ID token
-  const token = await getFirebaseIdToken();
+  // Always try to attach the current session token
+  const token = await getSessionToken();
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }

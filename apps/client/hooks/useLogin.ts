@@ -3,8 +3,10 @@ import { authApi } from '../services/authApi';
 import { useFirebaseAuth } from '../context/AuthContext';
 
 /**
- * Login hook — signs in via Firebase Auth, then waits for AuthContext
- * to load the Postgres profile via /api/auth/me before navigating.
+ * Login hook — signs in via Clerk, then waits for AuthContext to load the
+ * Postgres profile via /api/auth/me before navigating. Also drives the
+ * forgot-password flow, which with Clerk is two steps: send a code, then
+ * submit that code with a new password.
  */
 export function useLogin() {
     const { reloadSession } = useFirebaseAuth();
@@ -14,6 +16,9 @@ export function useLogin() {
     const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [forgotPasswordMsg, setForgotPasswordMsg] = useState<string | null>(null);
+    const [resetStage, setResetStage] = useState<'idle' | 'code-sent'>('idle');
+    const [resetCode, setResetCode] = useState('');
+    const [newPassword, setNewPassword] = useState('');
 
     const login = async () => {
         setErrorMsg(null);
@@ -38,7 +43,7 @@ export function useLogin() {
             // instead of waiting for the AuthContext effect to fail silently.
             await reloadSession();
 
-            // AuthContext onAuthStateChanged fires → loads /api/auth/me
+            // AuthContext picks up the newly active Clerk session → loads /api/auth/me
             // The login.tsx useEffect watches `session` and redirects when it arrives
         } catch (error) {
             setErrorMsg(error instanceof Error ? error.message : 'Nu ne-am putut conecta la server.');
@@ -62,17 +67,51 @@ export function useLogin() {
 
         try {
             const result = await authApi.forgotPassword(normalizedEmail);
-            if (!result.success) {
-                setErrorMsg(result.message ?? 'Nu am putut trimite emailul de resetare.');
-                return;
-            }
-
             setForgotPasswordMsg(result.message ?? 'Emailul de resetare a fost trimis.');
+            setResetStage('code-sent');
         } catch (error) {
             setErrorMsg(error instanceof Error ? error.message : 'Nu am putut trimite emailul de resetare.');
         } finally {
             setForgotPasswordLoading(false);
         }
+    };
+
+    const submitPasswordReset = async () => {
+        setErrorMsg(null);
+
+        if (!resetCode.trim() || !newPassword) {
+            setErrorMsg('Introdu codul primit pe email si o parola noua.');
+            return;
+        }
+
+        setForgotPasswordLoading(true);
+
+        try {
+            const result = await authApi.resetPassword(resetCode.trim(), newPassword);
+
+            if (!result.success) {
+                setErrorMsg(result.error ?? 'Nu am putut reseta parola.');
+                return;
+            }
+
+            setForgotPasswordMsg('Parola a fost schimbata. Te conectam...');
+            setResetStage('idle');
+            setResetCode('');
+            setNewPassword('');
+            await reloadSession();
+        } catch (error) {
+            setErrorMsg(error instanceof Error ? error.message : 'Nu am putut reseta parola.');
+        } finally {
+            setForgotPasswordLoading(false);
+        }
+    };
+
+    const cancelPasswordReset = () => {
+        setResetStage('idle');
+        setResetCode('');
+        setNewPassword('');
+        setForgotPasswordMsg(null);
+        setErrorMsg(null);
     };
 
     return {
@@ -84,7 +123,14 @@ export function useLogin() {
         forgotPasswordLoading,
         errorMsg,
         forgotPasswordMsg,
+        resetStage,
+        resetCode,
+        setResetCode,
+        newPassword,
+        setNewPassword,
         login,
         forgotPassword,
+        submitPasswordReset,
+        cancelPasswordReset,
     };
 }

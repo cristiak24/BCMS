@@ -1,11 +1,4 @@
-import {
-  createUserWithEmailAndPassword,
-  deleteUser,
-  signInWithCustomToken,
-  signInWithEmailAndPassword,
-  type User,
-} from 'firebase/auth';
-import { firebaseAuth } from '../config/firebase';
+import { getClerk } from '../config/clerk';
 import { apiFetch } from './apiClient';
 import type { AuthUser } from '../utils/authSession';
 
@@ -15,13 +8,6 @@ import type { AuthUser } from '../utils/authSession';
 
 export type LoginResponse = {
   success: boolean;
-  user?: AuthUser;
-  error?: string;
-};
-
-type LegacyLoginResponse = {
-  success: boolean;
-  customToken?: string;
   user?: AuthUser;
   error?: string;
 };
@@ -48,65 +34,66 @@ export type ForgotPasswordResponse = {
   message?: string;
 };
 
+export type ResetPasswordResponse = {
+  success: boolean;
+  error?: string;
+};
+
 // ────────────────────────────────────────────────────────────────────────────────
 // authApi
 // ────────────────────────────────────────────────────────────────────────────────
 
 export const authApi = {
   /**
-   * Sign in with Firebase, then the AuthContext automatically calls /me to
-   * load the Postgres profile. This just triggers the Firebase auth state change.
+   * Sign in with Clerk, then the AuthContext automatically calls /me to load
+   * the Postgres profile once the session becomes active.
    */
   async login(email: string, password: string): Promise<LoginResponse> {
     try {
-      await signInWithEmailAndPassword(firebaseAuth, email, password);
-      // AuthContext onAuthStateChanged will pick this up and call /api/auth/me
-      return { success: true };
-    } catch (error: any) {
-      if (shouldTryLegacyLogin(error?.code)) {
-        try {
-          const legacy = await apiFetch<LegacyLoginResponse>('/auth/legacy-login', {
-            method: 'POST',
-            body: JSON.stringify({ email, password }),
-          });
+      const clerk = await getClerk();
+      const result = await clerk.client.signIn.create({
+        strategy: 'password',
+        identifier: email,
+        password,
+      });
 
-          if (legacy.success && legacy.customToken) {
-            await signInWithCustomToken(firebaseAuth, legacy.customToken);
-            return { success: true, user: legacy.user };
-          }
-
-          return {
-            success: false,
-            error: legacy.error || 'Email sau parola incorecte.',
-          };
-        } catch (legacyError) {
-          return {
-            success: false,
-            error: legacyError instanceof Error ? legacyError.message : 'Email sau parola incorecte.',
-          };
-        }
+      if (result.status === 'complete' && result.createdSessionId) {
+        await clerk.setActive({ session: result.createdSessionId });
+        return { success: true };
       }
 
-      const msg = mapFirebaseAuthError(error.code) ?? (error instanceof Error ? error.message : 'Invalid credentials.');
-      return { success: false, error: msg };
+      return { success: false, error: 'Contul necesită un pas suplimentar de verificare.' };
+    } catch (error: any) {
+      return { success: false, error: mapClerkError(error) ?? 'Email sau parola incorecte.' };
     }
   },
 
   /**
-   * 1. Create Firebase Auth account
-   * 2. Call /api/auth/complete-signup to create the Postgres profile
-   * 3. Call /api/auth/complete-invite-signup if an inviteToken is present
+   * 1. Create the Clerk account
+   * 2. Call /api/auth/complete-signup (or complete-invite-signup) to create the
+   *    Postgres profile
    */
   async signup(payload: SignupPayload): Promise<{ success: boolean; error?: string }> {
-    let createdUser: User | null = null;
+    const clerk = await getClerk();
+    let createdAccount = false;
 
     try {
-      const credential = await createUserWithEmailAndPassword(
-        firebaseAuth,
-        payload.email,
-        payload.password,
-      );
-      createdUser = credential.user as any;
+      const signUp = await clerk.client.signUp.create({
+        emailAddress: payload.email,
+        password: payload.password,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+      });
+      createdAccount = Boolean(signUp.createdUserId);
+
+      if (signUp.status !== 'complete' || !signUp.createdSessionId) {
+        return {
+          success: false,
+          error: 'Contul necesită un pas suplimentar de verificare. Contactează administratorul clubului.',
+        };
+      }
+
+      await clerk.setActive({ session: signUp.createdSessionId });
 
       const name = `${payload.firstName.trim()} ${payload.lastName.trim()}`.trim();
 
@@ -122,25 +109,31 @@ export const authApi = {
         });
       }
 
-      // AuthContext onAuthStateChanged will now pick up the user and load session
       return { success: true };
     } catch (error: any) {
-      // Roll back Firebase user if backend fails
-      if (createdUser) {
+      // Roll back the Clerk account if the backend profile step fails.
+      if (createdAccount) {
         try {
-          await deleteUser(createdUser as any);
+          await clerk.user?.delete();
+        } catch {
+          // ignore cleanup errors
+        }
+        try {
+          await clerk.signOut();
         } catch {
           // ignore cleanup errors
         }
       }
 
-      const msg = mapFirebaseAuthError(error.code) ?? (error instanceof Error ? error.message : 'Signup failed.');
-      return { success: false, error: msg };
+      return {
+        success: false,
+        error: mapClerkError(error) ?? (error instanceof Error ? error.message : 'Signup failed.'),
+      };
     }
   },
 
   /**
-   * Validate an invite token via the backend (no Firebase call needed).
+   * Validate an invite token via the backend (no Clerk call needed).
    */
   async getInviteDetails(token: string): Promise<InviteDetails> {
     const data = await apiFetch<{ success: boolean } & InviteDetails>(
@@ -155,49 +148,64 @@ export const authApi = {
     };
   },
 
+  /** Starts Clerk's reset-by-email-code flow; finish it with resetPassword(). */
   async forgotPassword(email: string): Promise<ForgotPasswordResponse> {
-    const normalizedEmail = email.trim().toLowerCase();
+    const ack = { success: true, message: 'Daca exista un cont cu acest email, vei primi un cod de resetare.' };
 
-    const response = await apiFetch<{ success: boolean; message?: string }>('/auth/forgot-password', {
-      method: 'POST',
-      body: JSON.stringify({ email: normalizedEmail }),
-    });
+    try {
+      const clerk = await getClerk();
+      await clerk.client.signIn.create({
+        strategy: 'reset_password_email_code',
+        identifier: email.trim().toLowerCase(),
+      });
+      return ack;
+    } catch {
+      // Same ack regardless of outcome — don't leak whether the email is registered.
+      return ack;
+    }
+  },
 
-    return {
-      success: true,
-      message: response.message || 'Emailul de resetare a parolei a fost trimis.',
-    };
+  /** Completes the flow started by forgotPassword() with the emailed code. */
+  async resetPassword(code: string, newPassword: string): Promise<ResetPasswordResponse> {
+    try {
+      const clerk = await getClerk();
+      const signIn = clerk.client.signIn;
+      const attempted = await signIn.attemptFirstFactor({ strategy: 'reset_password_email_code', code });
+
+      if (attempted.status !== 'complete' || !attempted.createdSessionId) {
+        return { success: false, error: 'Codul introdus este incorect sau a expirat.' };
+      }
+
+      await signIn.resetPassword({ password: newPassword });
+      await clerk.setActive({ session: attempted.createdSessionId });
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: mapClerkError(error) ?? 'Nu am putut reseta parola.' };
+    }
   },
 };
 
-function shouldTryLegacyLogin(code?: string) {
-  return [
-    'auth/invalid-credential',
-    'auth/user-not-found',
-    'auth/wrong-password',
-  ].includes(String(code ?? ''));
-}
-
 // ────────────────────────────────────────────────────────────────────────────────
-// Firebase error → human-readable message
+// Clerk error → human-readable message
 // ────────────────────────────────────────────────────────────────────────────────
 
-function mapFirebaseAuthError(code?: string): string | null {
+function mapClerkError(error: unknown): string | null {
+  const code = (error as { errors?: Array<{ code?: string }> } | undefined)?.errors?.[0]?.code;
+
   switch (code) {
-    case 'auth/user-not-found':
-    case 'auth/wrong-password':
-    case 'auth/invalid-credential':
+    case 'form_password_incorrect':
+    case 'form_identifier_not_found':
       return 'Email sau parola incorecte.';
-    case 'auth/email-already-in-use':
+    case 'form_identifier_exists':
       return 'This email is already registered.';
-    case 'auth/weak-password':
-      return 'Password must be at least 6 characters.';
-    case 'auth/invalid-email':
+    case 'form_password_pwned':
+    case 'form_password_length_too_short':
+    case 'form_password_size_in_bytes_exceeded':
+      return 'Password must be at least 8 characters and not previously leaked.';
+    case 'form_param_format_invalid':
       return 'Introdu o adresa de email valida.';
-    case 'auth/too-many-requests':
+    case 'too_many_requests':
       return 'Prea multe incercari. Incearca din nou mai tarziu.';
-    case 'auth/network-request-failed':
-      return 'Eroare de retea. Verifica conexiunea.';
     default:
       return null;
   }

@@ -3,7 +3,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import Stripe from 'stripe';
-import { admin, firestore, nextNumericId, toDate, toIso } from '../lib/firebaseAdmin';
+import { firestore, nextNumericId, toDate, toIso } from '../lib/firebaseAdmin';
+import { verifyBearerToken } from '../lib/clerkAuth';
 import { requireRequestUser } from '../lib/requestContext';
 import { normalizeRole } from '../lib/requestAuth';
 import { buildDefaultSettings, DEFAULT_PAYMENT_DUE_DAY, DEFAULT_SETTINGS_ROW_ID } from '../lib/financeDefaults';
@@ -339,7 +340,7 @@ async function getRequesterEmail(req: Request) {
         return null;
     }
 
-    const decoded = await admin.auth().verifyIdToken(token);
+    const decoded = await verifyBearerToken(token);
     return decoded.email ?? null;
 }
 
