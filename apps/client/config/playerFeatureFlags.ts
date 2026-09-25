@@ -5,6 +5,6 @@
  * keeping its code in the tree.
  */
 export const PLAYER_FEATURE_FLAGS = {
-  /** "Echipa mea" — read-only teammate list (name/number/position only). */
+  /** "Echipa mea" — the player's own teams: picker + per-team squad/coach/schedule/attendance. */
   teammatesView: true,
 };

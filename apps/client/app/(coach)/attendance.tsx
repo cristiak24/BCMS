@@ -4,15 +4,27 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { CalendarEvent, EventAttendance, eventsApi } from '../../services/eventsApi';
 import { teamsApi, type Player } from '../../services/teamsApi';
 import { useFirebaseAuth } from '../../context/AuthContext';
-import PageHeader from '../ui/PageHeader';
+import GlassCard from '../../components/ui/GlassCard';
+import PageContainer from '../../components/ui/PageContainer';
+import PageHeader from '../../components/ui/PageHeader';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
+import { CoachPlayerRow, SessionRow, StatTile } from '../../components/coach/CoachPrimitives';
+import { attendanceStatusTone, getPlayerBadge, isPresentStatus } from '../../components/coach/coachDisplay';
 import {
-  eventTypeLabel,
   formatCoachDate,
   formatCoachTimeRange,
   getCoachScopedEvents,
   getEventTimestamp,
   isUpcoming,
-} from './coachUtils';
+} from '../../components/coach/coachUtils';
+
+/**
+ * "Prezență" — pick a session on the left, mark the squad on the right.
+ *
+ * The status buttons write through one at a time (PATCH per player) so a coach
+ * marking a roster courtside never loses a whole form to one failed request.
+ */
 
 type AttendanceStatus = 'present' | 'absent' | 'medical';
 
@@ -24,10 +36,13 @@ type AttendancePlayer = {
   status: string | null;
 };
 
-const STATUS_OPTIONS: { status: AttendanceStatus; label: string; icon: keyof typeof MaterialIcons.glyphMap; color: string }[] = [
-  { status: 'present', label: 'Prezent', icon: 'check-circle', color: 'var(--c-success-fg)' },
-  { status: 'absent', label: 'Absent', icon: 'cancel', color: 'var(--c-danger)' },
-  { status: 'medical', label: 'Medical', icon: 'medical-services', color: 'var(--c-warning-fg)' },
+/** Sessions offered in the picker — anything older lives on /schedule. */
+const SESSION_LIMIT = 12;
+
+const STATUS_OPTIONS: { status: AttendanceStatus; label: string; icon: string; color: string; bg: string }[] = [
+  { status: 'present', label: 'Prezent', icon: 'check-circle', color: 'var(--c-success-fg)', bg: 'var(--c-success-bg)' },
+  { status: 'absent', label: 'Absent', icon: 'cancel', color: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)' },
+  { status: 'medical', label: 'Motivat', icon: 'medical-services', color: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)' },
 ];
 
 function toAttendancePlayer(player: Player): AttendancePlayer {
@@ -61,32 +76,82 @@ function mergeAttendance(teamPlayers: Player[], attendanceRows: EventAttendance[
   });
 }
 
-function statusTone(status?: string | null) {
-  const normalized = String(status ?? '').toLowerCase();
-  if (normalized === 'present' || normalized === 'prezent') return { label: 'Prezent', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' };
-  if (normalized === 'absent') return { label: 'Absent', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger)' };
-  if (normalized === 'medical' || normalized === 'excused') return { label: 'Medical', bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' };
-  return { label: 'În așteptare', bg: 'var(--c-border)', fg: 'var(--c-muted)' };
-}
+/**
+ * Marking row. The three options are a segmented control rather than three
+ * loose buttons: the selected one is filled, so a coach can see at a glance
+ * which players are still unmarked.
+ *
+ * That filled segment is the *only* status indicator on the row — an earlier
+ * pass also carried a "Prezent" pill beside the buttons, which put the same
+ * word twice in the same 200px.
+ */
+function AttendanceRow({
+  player,
+  busy,
+  onMark,
+}: {
+  player: AttendancePlayer;
+  busy: boolean;
+  onMark: (status: AttendanceStatus) => void;
+}) {
+  const current = String(player.status ?? '').toLowerCase();
+  const unmarked = !player.status;
 
-function EventSelectorCard({ event, active, onPress }: { event: CalendarEvent; active: boolean; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} className={`rounded-[24px] border p-4 ${active ? 'bg-[#EBF4FF] border-[#0A2C93]' : 'bg-[var(--c-surface)] border-[#E3ECF6]'}`}>
-      <View className="flex-row items-start gap-3">
-        <View className="h-11 w-11 rounded-2xl bg-[var(--c-surface)] items-center justify-center border border-[#E3ECF6]">
-          <MaterialIcons name={event.type === 'match' ? 'sports-basketball' : 'fitness-center'} size={21} color="var(--c-brand-fg)" />
-        </View>
-        <View className="flex-1 min-w-0">
-          <Text className="text-[#006092] text-[10px] font-black uppercase tracking-widest">{eventTypeLabel(event.type)}</Text>
-          <Text className="text-[#0E2041] font-black mt-1" numberOfLines={2}>{event.title}</Text>
-          <Text className="text-[#64748B] text-xs font-semibold mt-2">{formatCoachDate(event.startTime)} · {formatCoachTimeRange(event.startTime, event.endTime)}</Text>
-        </View>
+    <View
+      className="rounded-[14px] border px-3.5 py-3 gap-3 flex-col md:flex-row md:items-center md:gap-4"
+      style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any}
+    >
+      <View className="flex-1 min-w-0">
+        <CoachPlayerRow
+          bare
+          firstName={player.firstName}
+          lastName={player.lastName}
+          badge={getPlayerBadge(player)}
+          // Only the unmarked state needs saying — a marked one is already
+          // spelled out by the filled segment on the right.
+          meta={unmarked ? attendanceStatusTone(null).label : null}
+        />
       </View>
-    </Pressable>
+
+      {/* Full-width thirds on mobile, intrinsic width from md up — three
+          fixed-width pills wrapped to two rows at 375px. */}
+      <View className="flex-row gap-1.5 shrink-0">
+        {STATUS_OPTIONS.map((option) => {
+          const active = current === option.status || (option.status === 'medical' && current === 'excused');
+
+          return (
+            <Pressable
+              key={option.status}
+              disabled={busy}
+              onPress={() => onMark(option.status)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active, disabled: busy }}
+              accessibilityLabel={`${option.label}: ${player.firstName} ${player.lastName}`}
+              className="flex-1 md:flex-none h-10 rounded-[11px] border px-2.5 flex-row items-center justify-center gap-1.5"
+              style={{
+                borderColor: active ? option.color : 'var(--c-border)',
+                backgroundColor: active ? option.bg : 'var(--c-surface-2)',
+                opacity: busy ? 0.6 : 1,
+              } as any}
+            >
+              {busy ? (
+                <ActivityIndicator size="small" color={option.color} />
+              ) : (
+                <MaterialIcons name={option.icon} size={15} color={active ? option.color : 'var(--c-muted)'} />
+              )}
+              <Text className="text-[11.5px] font-bold" style={{ color: active ? option.color : 'var(--c-muted)' }} numberOfLines={1}>
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
-export default function CoachAttendance() {
+export default function CoachAttendanceScreen() {
   const { session } = useFirebaseAuth();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
@@ -170,11 +235,12 @@ export default function CoachAttendance() {
   };
 
   const markedCount = players.filter((player) => player.status).length;
-  const presentCount = players.filter((player) => String(player.status ?? '').toLowerCase() === 'present' || String(player.status ?? '').toLowerCase() === 'prezent').length;
+  const presentCount = players.filter((player) => isPresentStatus(player.status)).length;
+  const presentRate = markedCount ? Math.round((presentCount / markedCount) * 100) : null;
 
   return (
-    <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="px-5 md:px-10 py-8 pb-20">
-      <View className="w-full max-w-7xl mx-auto">
+    <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
+      <PageContainer>
         <PageHeader
           title="Prezență"
           subtitle="Marchează disponibilitatea jucătorilor pentru sesiunile tale."
@@ -192,109 +258,110 @@ export default function CoachAttendance() {
         />
 
         {error ? (
-          <View className="mb-6 rounded-[24px] border border-red-100 bg-[var(--c-surface)] px-5 py-4 flex-row items-center gap-3">
-            <MaterialIcons name="error-outline" size={22} color="var(--c-danger)" />
-            <Text className="flex-1 text-red-600 font-bold">{error}</Text>
+          <View className="mb-4">
+            <ErrorState
+              title="Ceva nu a mers"
+              message={error}
+              actionLabel="Reîncearcă"
+              onAction={() => loadEvents()}
+            />
           </View>
         ) : null}
 
-        <View className="flex-col xl:flex-row gap-8">
-          <View className="w-full xl:w-[380px] rounded-[30px] border border-[#E3ECF6] bg-[var(--c-surface)] p-5">
-            <Text className="text-[#0E2041] text-[17px] font-bold">Sesiuni</Text>
-            <Text className="text-[#64748B] text-sm font-semibold mt-1 mb-5">Alege o sesiune de marcat.</Text>
-
-            {loadingEvents ? (
-              <View className="py-10 items-center">
-                <ActivityIndicator size="large" color="var(--c-brand-fg)" />
+        <View className="flex-col xl:flex-row gap-4">
+          {/* Picker first on mobile — a coach chooses the session before they
+              can mark anyone, so it must not sit below a full roster. */}
+          <View className="w-full xl:w-[340px] shrink-0">
+            <GlassCard className="gap-3">
+              <View>
+                <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Sesiuni</Text>
+                <Text className="text-[12.5px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }}>
+                  Alege sesiunea de marcat.
+                </Text>
               </View>
-            ) : events.length ? (
-              <View className="gap-3">
-                {events.slice(0, 12).map((event) => (
-                  <EventSelectorCard
-                    key={event.id}
-                    event={event}
-                    active={event.id === selectedEventId}
-                    onPress={() => setSelectedEventId(event.id)}
+
+              {loadingEvents ? (
+                <View className="gap-2.5" accessibilityRole="progressbar" accessibilityLabel="Se încarcă sesiunile">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <Skeleton key={index} className="h-[68px] w-full rounded-[14px]" />
+                  ))}
+                </View>
+              ) : events.length ? (
+                <View className="gap-2.5">
+                  {events.slice(0, SESSION_LIMIT).map((event) => (
+                    <SessionRow
+                      key={event.id}
+                      event={event}
+                      active={event.id === selectedEventId}
+                      onPress={() => setSelectedEventId(event.id)}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <EmptyState
+                  icon="event-busy"
+                  compact
+                  title="Nicio sesiune"
+                  message="Sesiunile la care ești antrenor apar aici."
+                />
+              )}
+            </GlassCard>
+          </View>
+
+          <View className="flex-1 min-w-0 gap-4">
+            <GlassCard className="gap-4">
+              <View>
+                <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
+                  {selectedEvent?.title ?? 'Selectează o sesiune'}
+                </Text>
+                <Text className="text-[12.5px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
+                  {selectedEvent
+                    ? `${selectedEvent.teamName ?? 'Echipă'} · ${formatCoachDate(selectedEvent.startTime)} · ${formatCoachTimeRange(selectedEvent.startTime, selectedEvent.endTime)}`
+                    : 'Lista de prezență apare aici.'}
+                </Text>
+              </View>
+
+              <View className="flex-row gap-2 sm:gap-2.5">
+                <StatTile label="Marcați" value={`${markedCount}/${players.length}`} hint="din lot" />
+                <StatTile label="Prezenți" value={presentCount} hint="jucători" color="var(--c-success-fg)" />
+                <StatTile
+                  label="Rată"
+                  value={presentRate == null ? '—' : `${presentRate}%`}
+                  hint={markedCount ? 'din marcați' : 'nemarcată'}
+                  color={presentRate == null ? undefined : 'var(--c-ink)'}
+                />
+              </View>
+            </GlassCard>
+
+            {loadingAttendance ? (
+              <View className="gap-2.5" accessibilityRole="progressbar" accessibilityLabel="Se încarcă prezența">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <Skeleton key={index} className="h-[110px] md:h-[76px] w-full rounded-[14px]" />
+                ))}
+              </View>
+            ) : players.length ? (
+              <View className="gap-2.5">
+                {players.map((player) => (
+                  <AttendanceRow
+                    key={player.playerId}
+                    player={player}
+                    busy={savingPlayerId === player.playerId}
+                    onMark={(status) => markPlayer(player.playerId, status)}
                   />
                 ))}
               </View>
             ) : (
-              <View className="rounded-[24px] bg-[#F8FBFF] px-5 py-10 items-center">
-                <Text className="text-[#64748B] font-bold text-center">Nicio sesiune de antrenor găsită.</Text>
-              </View>
-            )}
-          </View>
-
-          <View className="flex-1 rounded-[30px] border border-[#E3ECF6] bg-[var(--c-surface)] p-5 md:p-7">
-            <View className="flex-row flex-wrap items-start justify-between gap-4 mb-6">
-              <View className="flex-1 min-w-[240px]">
-                <Text className="text-[#0E2041] text-[17px] font-bold">{selectedEvent?.title ?? 'Selectează o sesiune'}</Text>
-                <Text className="text-[#64748B] font-semibold mt-2">
-                  {selectedEvent ? `${selectedEvent.teamName ?? 'Echipă'} · ${formatCoachDate(selectedEvent.startTime)} · ${formatCoachTimeRange(selectedEvent.startTime, selectedEvent.endTime)}` : 'Lista de prezență va apărea aici.'}
-                </Text>
-              </View>
-              <View className="flex-row gap-3">
-                <View className="rounded-2xl bg-[#F0F6FC] px-4 py-3">
-                  <Text className="text-[#64748B] text-[10px] font-black uppercase tracking-widest">Marcați</Text>
-                  <Text className="text-[#0E2041] text-[21px] font-black">{markedCount}/{players.length}</Text>
-                </View>
-                <View className="rounded-2xl bg-[#DCFCE7] px-4 py-3">
-                  <Text className="text-[#047857] text-[10px] font-black uppercase tracking-widest">Prezenți</Text>
-                  <Text className="text-[#047857] text-[21px] font-black">{presentCount}</Text>
-                </View>
-              </View>
-            </View>
-
-            {loadingAttendance ? (
-              <View className="py-16 items-center">
-                <ActivityIndicator size="large" color="var(--c-brand-fg)" />
-              </View>
-            ) : players.length ? (
-              <View className="gap-3">
-                {players.map((player) => {
-                  const tone = statusTone(player.status);
-                  const busy = savingPlayerId === player.playerId;
-
-                  return (
-                    <View key={player.playerId} className="rounded-[22px] border border-[#EDF2F7] bg-[var(--c-surface)] px-4 py-4 flex-col md:flex-row md:items-center gap-4">
-                      <View className="flex-row items-center gap-4 flex-1 min-w-0">
-                        <View className="h-12 w-12 rounded-2xl bg-[#EEF4FB] items-center justify-center">
-                          <Text className="text-[#0A2C93] font-black">{player.number ?? `${player.firstName?.[0] ?? 'P'}${player.lastName?.[0] ?? ''}`}</Text>
-                        </View>
-                        <View className="flex-1 min-w-0">
-                          <Text className="text-[#0E2041] text-base font-black" numberOfLines={1}>{player.firstName} {player.lastName}</Text>
-                          <View className="mt-2 self-start rounded-full px-3 py-1" style={{ backgroundColor: tone.bg }}>
-                            <Text style={{ color: tone.fg }} className="text-[10px] font-black uppercase tracking-widest">{tone.label}</Text>
-                          </View>
-                        </View>
-                      </View>
-
-                      <View className="flex-row flex-wrap gap-2">
-                        {STATUS_OPTIONS.map((option) => (
-                          <Pressable
-                            key={option.status}
-                            disabled={busy}
-                            onPress={() => markPlayer(player.playerId, option.status)}
-                            className="h-11 rounded-full border border-[#DDE8F5] bg-[#F8FBFF] px-3 flex-row items-center gap-2"
-                          >
-                            {busy ? <ActivityIndicator size="small" color={option.color} /> : <MaterialIcons name={option.icon} size={16} color={option.color} />}
-                            <Text style={{ color: option.color }} className="text-xs font-black">{option.label}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            ) : (
-              <View className="py-16 items-center">
-                <MaterialIcons name="groups" size={34} color="var(--c-faint)" />
-                <Text className="text-[#64748B] font-bold text-center mt-3">Niciun jucător găsit pentru echipa acestei sesiuni.</Text>
-              </View>
+              <EmptyState
+                icon="groups"
+                title={selectedEvent ? 'Niciun jucător în lot' : 'Nicio sesiune selectată'}
+                message={selectedEvent
+                  ? 'Echipa acestei sesiuni nu are jucători alocați.'
+                  : 'Alege o sesiune din listă pentru a marca prezența.'}
+              />
             )}
           </View>
         </View>
-      </View>
+      </PageContainer>
     </ScrollView>
   );
 }

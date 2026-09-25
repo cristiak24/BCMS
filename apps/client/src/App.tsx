@@ -27,7 +27,15 @@ const PlayerAccount = lazy(() => import('../app/(tabs)/account'));
 const PlayerAttendance = lazy(() => import('../app/(tabs)/attendance'));
 const PlayerPayments = lazy(() => import('../app/(tabs)/payments'));
 const PlayerSchedule = lazy(() => import('../app/(tabs)/schedule'));
-const PlayerTeam = lazy(() => import('../app/(tabs)/team'));
+const PlayerTeam = lazy(() => import('../app/(tabs)/team/index'));
+const PlayerTeamDetail = lazy(() => import('../app/(tabs)/team/[id]'));
+
+// Coach screens share the player shell (same sidebar, same header) but get
+// their own `/coach/*` paths — they used to be rendered *inside* the player
+// routes, so a coach's roster lived at `/payments`.
+const CoachDashboard = lazy(() => import('../app/(coach)/dashboard'));
+const CoachTeams = lazy(() => import('../app/(coach)/teams'));
+const CoachAttendance = lazy(() => import('../app/(coach)/attendance'));
 
 const AdminLayout = lazy(() => import('../app/(admin)/_layout'));
 const AdminDashboard = lazy(() => import('../app/(admin)/dashboard'));
@@ -83,6 +91,20 @@ export default function App() {
                   {PLAYER_FEATURE_FLAGS.teammatesView ? (
                     <Route path="/team" element={<PlayerTeam />} />
                   ) : null}
+                  {PLAYER_FEATURE_FLAGS.teammatesView ? (
+                    <Route path="/team/:id" element={<PlayerTeamDetail />} />
+                  ) : null}
+                </Route>
+
+                {/* Coach-only, and enforced by the router rather than by a role
+                    check inside each screen — a player following a `/coach/*`
+                    link is bounced by ProtectedRoute, not served a blank page. */}
+                <Route path="/coach" element={<ProtectedRoute roles={['coach']}><PlayerLayout /></ProtectedRoute>}>
+                  <Route index element={<Navigate to="/coach/dashboard" replace />} />
+                  <Route path="dashboard" element={<CoachDashboard />} />
+                  <Route path="teams" element={<CoachTeams />} />
+                  <Route path="attendance" element={<CoachAttendance />} />
+                  <Route path="*" element={<NotFound />} />
                 </Route>
 
                 <Route path="/admin" element={<ProtectedRoute roles={['admin', 'superadmin', 'accountant', 'staff']}><AdminLayout /></ProtectedRoute>}>

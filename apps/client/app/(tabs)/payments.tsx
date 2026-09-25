@@ -4,7 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import * as Linking from '@/src/web/linking';
 import * as WebBrowser from '@/src/web/webBrowser';
-import CoachTeams from '../../components/coach/CoachTeams';
+import { Navigate } from 'react-router-dom';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
 import PageContainer from '../../components/ui/PageContainer';
@@ -632,8 +632,10 @@ function PlayerPaymentsScreen() {
 export default function PaymentsScreen() {
   const { session } = useFirebaseAuth();
 
+  // A coach's squads are at /coach/teams — this route rendered them inline for
+  // years, so keep the old path pointing at the new one.
   if (normalizeRole(session?.role) === 'coach') {
-    return <CoachTeams />;
+    return <Navigate to="/coach/teams" replace />;
   }
 
   return <PlayerPaymentsScreen />;

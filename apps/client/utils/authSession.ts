@@ -87,6 +87,10 @@ export function getHomeRouteForRole(role?: UserRole | string | null) {
     return '/admin/dashboard';
   }
 
+  if (normalized === 'coach') {
+    return '/coach/dashboard';
+  }
+
   return '/myclub';
 }
 

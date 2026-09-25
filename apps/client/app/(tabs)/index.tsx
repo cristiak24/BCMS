@@ -16,7 +16,7 @@ import {
 import { useFirebaseAuth } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../components/HeaderContext';
-import CoachHome from '../../components/coach/CoachHome';
+import { Navigate } from 'react-router-dom';
 import GlassCard from '../../components/ui/GlassCard';
 import { Skeleton } from '../../components/ui/Skeleton';
 import PageContainer from '../../components/ui/PageContainer';
@@ -1209,8 +1209,10 @@ function PlayerHomeScreen() {
 export default function HomeScreen() {
   const { session } = useFirebaseAuth();
 
+  // Coaches have their own panel at /coach/dashboard. This route used to render
+  // it inline; the redirect keeps old links and bookmarks working.
   if (normalizeRole(session?.role) === 'coach') {
-    return <CoachHome />;
+    return <Navigate to="/coach/dashboard" replace />;
   }
 
   return <PlayerHomeScreen />;

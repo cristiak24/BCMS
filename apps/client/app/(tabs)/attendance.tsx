@@ -16,7 +16,7 @@ import {
   PlayerAttendanceSummary,
 } from '../../utils/playerAttendance';
 import { useFirebaseAuth } from '../../context/AuthContext';
-import CoachAttendance from '../../components/coach/CoachAttendance';
+import { Navigate } from 'react-router-dom';
 import { normalizeRole } from '../../utils/authSession';
 
 function formatDateTime(value: string) {
@@ -256,8 +256,10 @@ function PlayerAttendanceScreen() {
 export default function AttendanceScreen() {
   const { session } = useFirebaseAuth();
 
+  // The coach marking screen is /coach/attendance; this one is the player's own
+  // attendance history.
   if (normalizeRole(session?.role) === 'coach') {
-    return <CoachAttendance />;
+    return <Navigate to="/coach/attendance" replace />;
   }
 
   return <PlayerAttendanceScreen />;

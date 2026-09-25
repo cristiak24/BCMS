@@ -108,6 +108,69 @@ export interface Player {
     }[];
 }
 
+/** Session/event as a player sees it on their own team page. */
+export interface MyTeamEvent {
+    id: number;
+    type: 'training' | 'match' | 'camp' | 'admin' | 'medical' | string;
+    title: string;
+    location: string | null;
+    startTime: string;
+    endTime: string;
+    status: string;
+    coachNote: string | null;
+}
+
+export interface MyTeamPastEvent extends MyTeamEvent {
+    /** The caller's own attendance for this session — never a teammate's. */
+    myStatus: string | null;
+    myNote: string | null;
+}
+
+export interface MyAttendanceSummary {
+    rate: number | null;
+    present: number;
+    total: number;
+}
+
+/** One card on "Echipa mea" — team identity only, no squad names. */
+export interface MyTeamSummary {
+    id: number;
+    name: string;
+    leagueName: string;
+    seasonName: string;
+    gender: TeamGender | null;
+    level: TeamLevel | null;
+    isActive: boolean;
+    coachName: string | null;
+    playerCount: number;
+    upcomingCount: number;
+    nextEvent: MyTeamEvent | null;
+    attendance: MyAttendanceSummary;
+}
+
+export interface MyTeamDetail {
+    id: number;
+    name: string;
+    leagueName: string;
+    seasonName: string;
+    gender: TeamGender | null;
+    level: TeamLevel | null;
+    isActive: boolean;
+    coach: { id: number; name: string } | null;
+    playerCount: number;
+    roster: {
+        id: number;
+        firstName: string;
+        lastName: string;
+        number: number | null;
+        avatarUrl: string | null;
+        isMe: boolean;
+    }[];
+    attendance: MyAttendanceSummary;
+    upcomingEvents: MyTeamEvent[];
+    recentEvents: MyTeamPastEvent[];
+}
+
 export interface RosterSummary {
     athleteCount: number;
     averageAttendance: number;
@@ -201,6 +264,18 @@ export const teamsApi = {
             if (error instanceof ApiError && error.status === 404) return null;
             throw error;
         }
+    },
+
+    /** Teams the signed-in player belongs to — player/parent sessions. */
+    async getMyTeams(): Promise<MyTeamSummary[]> {
+        const { data } = await apiClient.get<MyTeamSummary[]>('/players/me/teams');
+        return data;
+    },
+
+    /** One of the signed-in player's own teams: squad, coach, schedule, own attendance. */
+    async getMyTeamDetail(teamId: number): Promise<MyTeamDetail> {
+        const { data } = await apiClient.get<MyTeamDetail>(`/players/me/teams/${teamId}`);
+        return data;
     },
 
     async addPlayerToTeam(playerId: number, teamId: number): Promise<void> {
