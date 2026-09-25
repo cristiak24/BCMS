@@ -3,7 +3,7 @@ services:
     name: bcms-server
     runtime: node
     rootDir: apps/server
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
