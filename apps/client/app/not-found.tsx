@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useFirebaseAuth } from '../context/AuthContext';
+import { useSession } from '../context/AuthContext';
 import { getHomeRouteForRole } from '../utils/authSession';
 
 /**
@@ -11,7 +11,7 @@ import { getHomeRouteForRole } from '../utils/authSession';
  */
 export default function NotFound() {
   const location = useLocation();
-  const { session } = useFirebaseAuth();
+  const { session } = useSession();
   const homeRoute = session ? getHomeRouteForRole(session.role) : '/';
 
   return (

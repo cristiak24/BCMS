@@ -4,7 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { theme } from '../constants/designSystem';
-import { useFirebaseAuth } from '../context/AuthContext';
+import { useSession } from '../context/AuthContext';
 import { useNotifications } from '../hooks/useNotifications';
 import { formatRelativeDate } from './myclub/teamDisplay';
 import type { AppNotification } from '../services/notificationsApi';
@@ -41,7 +41,7 @@ export default function AppHeader({
   onOpenMenu,
 }: AppHeaderProps) {
   const router = useRouter();
-  const { signOut } = useFirebaseAuth();
+  const { signOut } = useSession();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   // Mobile search is collapsed to an icon by default and expands to a full

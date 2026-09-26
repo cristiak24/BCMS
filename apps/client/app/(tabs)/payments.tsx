@@ -11,7 +11,7 @@ import PageContainer from '../../components/ui/PageContainer';
 import PageHeader from '../../components/ui/PageHeader';
 import SectionHeader from '../../components/ui/SectionHeader';
 import { useResponsive } from '../../hooks/useResponsive';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import { normalizeRole } from '../../utils/authSession';
 import {
   financeApi,
@@ -630,7 +630,7 @@ function PlayerPaymentsScreen() {
 }
 
 export default function PaymentsScreen() {
-  const { session } = useFirebaseAuth();
+  const { session } = useSession();
 
   // A coach's squads are at /coach/teams — this route rendered them inline for
   // years, so keep the old path pointing at the new one.

@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { CalendarEvent, eventsApi } from '../../services/eventsApi';
 import { teamsApi, type Player, type Team } from '../../services/teamsApi';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import PageContainer from '../../components/ui/PageContainer';
 import PageHeader from '../../components/ui/PageHeader';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -115,7 +115,7 @@ function TeamsSkeleton() {
 }
 
 export default function CoachTeamsScreen() {
-  const { session } = useFirebaseAuth();
+  const { session } = useSession();
   const [teams, setTeams] = useState<Team[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [playersByTeam, setPlayersByTeam] = useState<Record<number, Player[]>>({});

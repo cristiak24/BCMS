@@ -15,7 +15,7 @@ import {
   PlayerAttendanceRecord,
   PlayerAttendanceSummary,
 } from '../../utils/playerAttendance';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { normalizeRole } from '../../utils/authSession';
 
@@ -60,7 +60,7 @@ function statusTone(status?: string | null) {
 }
 
 function PlayerAttendanceScreen() {
-  const { session } = useFirebaseAuth();
+  const { session } = useSession();
   const [summary, setSummary] = useState<PlayerAttendanceSummary>({ rate: null, present: 0, total: 0 });
   const [records, setRecords] = useState<PlayerAttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -254,7 +254,7 @@ function PlayerAttendanceScreen() {
 }
 
 export default function AttendanceScreen() {
-  const { session } = useFirebaseAuth();
+  const { session } = useSession();
 
   // The coach marking screen is /coach/attendance; this one is the player's own
   // attendance history.

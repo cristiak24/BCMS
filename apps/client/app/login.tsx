@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { getHomeRouteForRole } from '../utils/authSession';
 import { useLogin } from '../hooks/useLogin';
-import { useFirebaseAuth } from '../context/AuthContext';
+import { useSession } from '../context/AuthContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
 
 type GlyphProps = {
@@ -244,7 +244,7 @@ export default function Login() {
         submitPasswordReset,
         cancelPasswordReset,
     } = useLogin();
-    const { session, initializing } = useFirebaseAuth();
+    const { session, initializing } = useSession();
     const [showPassword, setShowPassword] = useState(false);
 
     const emailIsFilled = useMemo(() => email.trim().length > 0, [email]);

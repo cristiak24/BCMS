@@ -4,7 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { Clock, MapPin, TrendingUp, Trophy } from 'lucide-react';
 import { eventsApi, CalendarEvent } from '../../services/eventsApi';
 import { AuthUser, normalizeRole } from '../../utils/authSession';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import { getCoachScopedEvents } from '../../components/coach/coachUtils';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../components/HeaderContext';
 import { PlayerEventDetailModal } from '../../components/schedule/player/PlayerEventDetailModal';
@@ -313,7 +313,7 @@ function DayCard({
 }
 
 export default function ScheduleScreen() {
-  const { session } = useFirebaseAuth();
+  const { session } = useSession();
   const { setSearchPlaceholder, searchValue, setSearchValue } = useHeader();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { notificationsApi, type AppNotification } from '../services/notificationsApi';
-import { useFirebaseAuth } from '../context/AuthContext';
+import { useSession } from '../context/AuthContext';
 
 const POLL_INTERVAL_MS = 45000;
 
 export function useNotifications() {
-    const { session } = useFirebaseAuth();
+    const { session } = useSession();
     const isLoggedIn = Boolean(session);
     const [unreadCount, setUnreadCount] = useState(0);
     const [notifications, setNotifications] = useState<AppNotification[]>([]);

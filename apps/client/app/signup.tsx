@@ -17,7 +17,7 @@ import GlassCard from '../components/ui/GlassCard';
 import AuraButton from '../components/ui/AuraButton';
 import { authApi, type InviteDetails } from '../services/authApi';
 import { getHomeRouteForRole } from '../utils/authSession';
-import { useFirebaseAuth } from '../context/AuthContext';
+import { useSession } from '../context/AuthContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
 
 type SignupRole = 'player' | 'coach';
@@ -34,7 +34,7 @@ const PUBLIC_ROLE_OPTIONS: {
 
 export default function Signup() {
   const router = useRouter();
-  const { session, initializing, reloadSession } = useFirebaseAuth();
+  const { session, initializing, reloadSession } = useSession();
   const params = useLocalSearchParams<{ inviteToken?: string }>();
   const inviteToken = typeof params.inviteToken === 'string' ? params.inviteToken : '';
 

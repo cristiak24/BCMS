@@ -22,9 +22,6 @@ export default defineConfig({
           if (!id.includes('node_modules')) {
             return undefined;
           }
-          if (id.includes('/firebase/') || id.includes('/@firebase/')) {
-            return 'firebase';
-          }
           if (id.includes('/react-dom/')) {
             return 'react-dom';
           }

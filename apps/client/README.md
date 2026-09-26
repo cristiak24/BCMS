@@ -1,6 +1,6 @@
 # BCMS Web Client
 
-BCMS is now a web-first React application. The production client is built with Vite and React Router into the static `dist` folder used by Firebase Hosting.
+BCMS is now a web-first React application. The production client is built with Vite and React Router into the static `dist` folder deployed to Cloudflare Workers (see `wrangler.toml`).
 
 ## Local development
 

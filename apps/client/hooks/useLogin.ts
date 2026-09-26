@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { authApi } from '../services/authApi';
-import { useFirebaseAuth } from '../context/AuthContext';
+import { useSession } from '../context/AuthContext';
 
 /**
  * Login hook — signs in via Clerk, then waits for AuthContext to load the
@@ -9,7 +9,7 @@ import { useFirebaseAuth } from '../context/AuthContext';
  * submit that code with a new password.
  */
 export function useLogin() {
-    const { reloadSession } = useFirebaseAuth();
+    const { reloadSession } = useSession();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);

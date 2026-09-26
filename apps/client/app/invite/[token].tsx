@@ -13,7 +13,7 @@ import {
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { LinearGradient } from '@/src/web/linearGradient';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import { getClerk } from '../../config/clerk';
 import { invitationsApi } from '../../services/invitationsApi';
 import { getHomeRouteForRole, type UserRole } from '../../utils/authSession';
@@ -24,7 +24,7 @@ export default function InviteRegistrationScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ token?: string }>();
   const token = useMemo(() => String(params.token ?? '').trim(), [params.token]);
-  const { reloadSession } = useFirebaseAuth();
+  const { reloadSession } = useSession();
 
   const [loading, setLoading] = useState(true);
   const [invite, setInvite] = useState<InvitationDetails | null>(null);

@@ -3,7 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar, { ADMIN_MENU_ITEMS } from '../../components/Sidebar';
 import { HeaderProvider, useHeader } from '../../components/HeaderContext';
 import { normalizeRole, isSuperadmin } from '../../utils/authSession';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import AppHeader from '../../components/AppHeader';
 import { MobileBottomNavigation, MobileNavigationSheet } from '../../components/MobileNavigation';
@@ -71,7 +71,7 @@ function AdminLayoutContent() {
     const location = useLocation();
     const pathname = location.pathname;
     const { searchPlaceholder, searchValue, setSearchValue, headerActions, mobileFab } = useHeader();
-    const { session } = useFirebaseAuth();
+    const { session } = useSession();
     const { isMobile } = useResponsive();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     

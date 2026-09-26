@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from '@/s
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { CalendarEvent, EventAttendance, eventsApi } from '../../services/eventsApi';
 import { teamsApi, type Player } from '../../services/teamsApi';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import GlassCard from '../../components/ui/GlassCard';
 import PageContainer from '../../components/ui/PageContainer';
 import PageHeader from '../../components/ui/PageHeader';
@@ -152,7 +152,7 @@ function AttendanceRow({
 }
 
 export default function CoachAttendanceScreen() {
-  const { session } = useFirebaseAuth();
+  const { session } = useSession();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [players, setPlayers] = useState<AttendancePlayer[]>([]);

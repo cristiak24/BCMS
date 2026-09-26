@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isClubAdmin } from '../utils/authSession';
-import { useFirebaseAuth } from '../context/AuthContext';
+import { useSession } from '../context/AuthContext';
 import { manageAccessApi } from '../services/manageAccessApi';
 import type { AccessRequestItem, InviteLinkItem, InviteRole } from '../types/manageAccess';
 import { DEFAULT_REFRESH_INTERVAL_MINUTES, isInviteExpired } from '../utils/manageAccess';
@@ -8,7 +8,7 @@ import { DEFAULT_REFRESH_INTERVAL_MINUTES, isInviteExpired } from '../utils/mana
 type RequestAction = 'approve' | 'deny' | null;
 
 export function useManageAccess() {
-    const { session, initializing } = useFirebaseAuth();
+    const { session, initializing } = useSession();
     const sessionCanAdmin = useMemo(() => Boolean(session && isClubAdmin(session, session.clubId)), [session]);
     const [verifiedIsAdmin, setVerifiedIsAdmin] = useState<boolean | null>(null);
     const isAdmin = verifiedIsAdmin ?? sessionCanAdmin;

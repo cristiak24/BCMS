@@ -9,7 +9,7 @@ import { useResponsive } from '../../hooks/useResponsive';
 import ProfileImagePicker from './ProfileImagePicker';
 import ProfileForm from './ProfileForm';
 import PasswordChangeForm from './PasswordChangeForm';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import { useTheme, type ThemeMode } from '../../context/ThemeContext';
 import PageContainer from '../ui/PageContainer';
 import PageHeader from '../ui/PageHeader';
@@ -109,7 +109,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
   const router = useRouter();
   const { isMobile, isDesktop } = useResponsive();
   const insets = useSafeAreaInsets();
-  const { initializing, session: authSession, signOut } = useFirebaseAuth();
+  const { initializing, session: authSession, signOut } = useSession();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileRecord | null>(null);

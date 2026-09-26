@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { players, teams, playersToTeams, attendance, playerPayments, users } from '../db/schema';
+import { players, teams, playersToTeams, attendance, playerPayments, users, events } from '../db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { buildPlayerUpdate } from '../lib/playerUpdate';
@@ -41,13 +41,19 @@ async function getSelfPlayerRecord(req: AuthenticatedRequest) {
     return rows[0] ?? null;
 }
 
+// A player belongs to a team either through the join table or through the
+// legacy players.team_id column, so both have to be unioned everywhere.
+async function getTeamIdsForPlayer(playerId: number, directTeamId: number | null): Promise<number[]> {
+    const membershipRows = await db.select({ teamId: playersToTeams.teamId }).from(playersToTeams).where(eq(playersToTeams.playerId, playerId));
+    const ids = new Set(membershipRows.map(m => m.teamId));
+    if (directTeamId != null) ids.add(directTeamId);
+    return Array.from(ids);
+}
+
 async function getSelfTeamIds(req: AuthenticatedRequest): Promise<number[]> {
     const self = await getSelfPlayerRecord(req);
     if (!self) return [];
-    const membershipRows = await db.select({ teamId: playersToTeams.teamId }).from(playersToTeams).where(eq(playersToTeams.playerId, self.id));
-    const ids = new Set(membershipRows.map(m => m.teamId));
-    if (self.teamId != null) ids.add(self.teamId);
-    return Array.from(ids);
+    return getTeamIdsForPlayer(self.id, self.teamId ?? null);
 }
 
 function getRequestClubId(req: AuthenticatedRequest) {
@@ -304,6 +310,86 @@ function computeAttendanceRateFromRecords(records: (typeof attendance.$inferSele
     if (records.length === 0) return null;
     const present = records.filter(record => isAttendancePresent(record.status)).length;
     return Math.round((present / records.length) * 1000) / 10;
+}
+
+// "Echipa mea" counts a session the same way the player's own Prezență screen
+// does — medical/excused are counted as sessions but not as attended — so the
+// two screens can never disagree about the same player's rate. (The club-side
+// `isAttendancePresent` above is deliberately more generous; that number is a
+// staffing metric, not the player's own record.)
+const COUNTED_ATTENDANCE_STATUSES = ['present', 'prezent', 'absent', 'medical', 'excused'];
+const ATTENDED_STATUSES = ['present', 'prezent'];
+
+function summarizeOwnAttendance(rows: { status: string | null }[]) {
+    const counted = rows.filter(row => COUNTED_ATTENDANCE_STATUSES.includes(String(row.status ?? '').trim().toLowerCase()));
+    const present = counted.filter(row => ATTENDED_STATUSES.includes(String(row.status ?? '').trim().toLowerCase())).length;
+    return {
+        rate: counted.length ? Math.round((present / counted.length) * 100) : null,
+        present,
+        total: counted.length,
+    };
+}
+
+function mapTeamEvent(event: typeof events.$inferSelect) {
+    return {
+        id: event.id,
+        type: event.type,
+        title: event.title,
+        location: event.location ?? null,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        status: event.status ?? 'scheduled',
+        coachNote: event.coachNote ?? null,
+    };
+}
+
+/**
+ * Teams the authenticated player belongs to, scoped to their own club.
+ * A membership row is not enough on its own: a stale row pointing at another
+ * club's team would otherwise expose that team's name, coach and squad.
+ */
+async function getScopedTeamsForSelf(req: AuthenticatedRequest, self: typeof players.$inferSelect) {
+    const teamIds = await getTeamIdsForPlayer(self.id, self.teamId ?? null);
+    if (!teamIds.length) return [];
+
+    const teamRows = await db.select().from(teams).where(inArray(teams.id, teamIds));
+    if (isSuperadmin(req)) return teamRows;
+
+    const clubId = getRequestClubId(req);
+    if (clubId == null) return [];
+    return teamRows.filter(team => team.clubId === clubId);
+}
+
+// Squad list a teammate is allowed to see: identity and shirt number only.
+// No email, medical, payment or attendance data belonging to someone else.
+async function getTeammatesForTeam(teamId: number, selfId: number) {
+    const [directRows, relationRows] = await Promise.all([
+        db.select().from(players).where(eq(players.teamId, teamId)),
+        db
+            .select({ player: players })
+            .from(playersToTeams)
+            .innerJoin(players, eq(playersToTeams.playerId, players.id))
+            .where(eq(playersToTeams.teamId, teamId)),
+    ]);
+
+    const unique = new Map<number, typeof players.$inferSelect>();
+    directRows.forEach(player => unique.set(player.id, player));
+    relationRows.forEach(row => unique.set(row.player.id, row.player));
+
+    return Array.from(unique.values())
+        .map(player => ({
+            id: player.id,
+            firstName: player.firstName || player.name?.split(' ')[0] || 'Unknown',
+            lastName: player.lastName || player.name?.split(' ').slice(1).join(' ') || 'Player',
+            number: player.number ?? null,
+            avatarUrl: player.avatarUrl ?? null,
+            isMe: player.id === selfId,
+        }))
+        .sort((a, b) => {
+            if (a.number != null && b.number != null && a.number !== b.number) return a.number - b.number;
+            if ((a.number == null) !== (b.number == null)) return a.number == null ? 1 : -1;
+            return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+        });
 }
 
 export const playersController = {
@@ -618,6 +704,144 @@ export const playersController = {
             res.json(await buildFullPlayerPayload(req, self));
         } catch (error) {
             console.error('Get self player error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    // Teams the caller plays for — one card per team on "Echipa mea", with just
+    // enough per-team context (coach, squad size, next session, own attendance)
+    // to choose which one to open. No squad names here.
+    async getMyTeams(req: AuthenticatedRequest, res: Response) {
+        try {
+            const self = await getSelfPlayerRecord(req);
+            if (!self) return res.json([]);
+
+            const teamRows = await getScopedTeamsForSelf(req, self);
+            if (!teamRows.length) return res.json([]);
+
+            const teamIds = teamRows.map(team => team.id);
+            const coachIds = Array.from(new Set(teamRows.map(team => team.coachId).filter((id): id is number => id != null)));
+
+            const [directPlayers, membershipRows, coachRows, eventRows, attendanceRows] = await Promise.all([
+                db.select({ id: players.id, teamId: players.teamId }).from(players).where(inArray(players.teamId, teamIds)),
+                db.select().from(playersToTeams).where(inArray(playersToTeams.teamId, teamIds)),
+                coachIds.length
+                    ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, coachIds))
+                    : Promise.resolve([] as { id: number; name: string }[]),
+                db.select().from(events).where(inArray(events.teamId, teamIds)),
+                db.select().from(attendance).where(eq(attendance.playerId, self.id)),
+            ]);
+
+            const coachNameById = new Map(coachRows.map(coach => [coach.id, coach.name]));
+            const squadByTeam = new Map<number, Set<number>>();
+            const addToSquad = (teamId: number, playerId: number) => {
+                const bucket = squadByTeam.get(teamId) ?? new Set<number>();
+                bucket.add(playerId);
+                squadByTeam.set(teamId, bucket);
+            };
+            directPlayers.forEach(player => { if (player.teamId != null) addToSquad(player.teamId, player.id); });
+            membershipRows.forEach(row => addToSquad(row.teamId, row.playerId));
+
+            const now = Date.now();
+
+            res.json(teamRows.map(team => {
+                const teamEvents = eventRows.filter(event => event.teamId === team.id && event.status !== 'cancelled');
+                const upcoming = teamEvents
+                    .filter(event => new Date(event.startTime).getTime() >= now)
+                    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+                const ownAttendance = attendanceRows.filter(row => row.teamId === team.id);
+
+                return {
+                    id: team.id,
+                    name: team.name,
+                    leagueName: team.leagueName,
+                    seasonName: team.seasonName,
+                    gender: team.gender,
+                    level: team.level,
+                    isActive: team.isActive,
+                    coachName: team.coachId != null ? coachNameById.get(team.coachId) ?? null : null,
+                    playerCount: squadByTeam.get(team.id)?.size ?? 0,
+                    upcomingCount: upcoming.length,
+                    nextEvent: upcoming[0] ? mapTeamEvent(upcoming[0]) : null,
+                    attendance: summarizeOwnAttendance(ownAttendance),
+                };
+            }).sort((a, b) => a.name.localeCompare(b.name)));
+        } catch (error) {
+            console.error('Get my teams error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    // One of the caller's own teams, expanded: squad, coach, schedule and their
+    // own attendance record for that team. Membership is re-checked here — the
+    // team id comes from the URL, so it is never trusted on its own.
+    async getMyTeamDetail(req: AuthenticatedRequest, res: Response) {
+        try {
+            const teamId = Number(req.params.teamId);
+            if (!Number.isFinite(teamId)) {
+                return res.status(400).json({ error: 'Invalid team id' });
+            }
+
+            const self = await getSelfPlayerRecord(req);
+            if (!self) return res.status(404).json({ error: 'No player record linked to this account' });
+
+            const teamRows = await getScopedTeamsForSelf(req, self);
+            const team = teamRows.find(row => row.id === teamId);
+            if (!team) return res.status(403).json({ error: 'You are not a member of this team.' });
+
+            const [roster, coachRows, eventRows, attendanceRows] = await Promise.all([
+                getTeammatesForTeam(team.id, self.id),
+                team.coachId != null
+                    ? db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, team.coachId)).limit(1)
+                    : Promise.resolve([] as { id: number; name: string }[]),
+                db.select().from(events).where(eq(events.teamId, team.id)),
+                db.select().from(attendance).where(eq(attendance.playerId, self.id)),
+            ]);
+
+            const ownAttendance = attendanceRows.filter(row => row.teamId === team.id);
+            const attendanceByEvent = new Map(ownAttendance.filter(row => row.eventId != null).map(row => [row.eventId as number, row]));
+
+            const now = Date.now();
+            const liveEvents = eventRows.filter(event => event.status !== 'cancelled');
+            const upcomingEvents = liveEvents
+                .filter(event => new Date(event.startTime).getTime() >= now)
+                .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+                .slice(0, 10)
+                .map(mapTeamEvent);
+            const recentEvents = liveEvents
+                .filter(event => new Date(event.startTime).getTime() < now)
+                .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+                .slice(0, 10)
+                .map(event => {
+                    const record = attendanceByEvent.get(event.id);
+                    return {
+                        ...mapTeamEvent(event),
+                        myStatus: record?.status ?? null,
+                        // The coach's private note on *this player* for that
+                        // session — never another teammate's.
+                        myNote: record?.note ?? null,
+                    };
+                });
+
+            res.json({
+                id: team.id,
+                name: team.name,
+                leagueName: team.leagueName,
+                seasonName: team.seasonName,
+                gender: team.gender,
+                level: team.level,
+                isActive: team.isActive,
+                // inviteCode is deliberately omitted: it is a join credential,
+                // not team info a player needs.
+                coach: coachRows[0] ? { id: coachRows[0].id, name: coachRows[0].name } : null,
+                playerCount: roster.length,
+                roster,
+                attendance: summarizeOwnAttendance(ownAttendance),
+                upcomingEvents,
+                recentEvents,
+            });
+        } catch (error) {
+            console.error('Get my team detail error:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     },

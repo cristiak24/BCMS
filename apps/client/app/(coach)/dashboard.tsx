@@ -4,7 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
 import { CalendarEvent, eventsApi } from '../../services/eventsApi';
 import { teamsApi, type Player, type Team } from '../../services/teamsApi';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import GlassCard from '../../components/ui/GlassCard';
 import PageContainer from '../../components/ui/PageContainer';
 import PageHeader from '../../components/ui/PageHeader';
@@ -50,7 +50,7 @@ function HomeSkeleton() {
 
 export default function CoachDashboardScreen() {
   const router = useRouter();
-  const { session } = useFirebaseAuth();
+  const { session } = useSession();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);

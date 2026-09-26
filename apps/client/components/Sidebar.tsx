@@ -2,7 +2,7 @@ import { View, Text } from '@/src/web/reactNative';
 import { NavLink, useLocation } from 'react-router-dom';
 import { MaterialIcons, FontAwesome5 } from '@/src/web/expoVectorIcons';
 import { isSuperadmin } from '../utils/authSession';
-import { useFirebaseAuth } from '../context/AuthContext';
+import { useSession } from '../context/AuthContext';
 import { theme } from '../constants/designSystem';
 import { useResponsive } from '../hooks/useResponsive';
 
@@ -29,7 +29,7 @@ type SidebarProps = {
 
 export default function Sidebar({ items = ADMIN_MENU_ITEMS }: SidebarProps) {
     const { pathname } = useLocation();
-    const { session } = useFirebaseAuth();
+    const { session } = useSession();
     const { width } = useResponsive();
     const normalizedPathname = pathname || '/admin/dashboard';
 

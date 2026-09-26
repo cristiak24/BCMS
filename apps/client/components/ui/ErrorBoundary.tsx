@@ -20,8 +20,8 @@ type ErrorBoundaryState = {
  * at a blank white page with no way forward. Now they get an explanation and
  * a few ways out: retry the subtree, go back to the dashboard, or log out.
  *
- * This boundary wraps the app ABOVE FirebaseAuthProvider (see App.tsx), so it
- * can't use useFirebaseAuth()/signOut() — and it must not need to. If the
+ * This boundary wraps the app ABOVE AuthProvider (see App.tsx), so it
+ * can't use useSession()/signOut() — and it must not need to. If the
  * crash happens on a logged-in user's home route, "go to dashboard" just
  * re-triggers the same crash (Landing redirects straight back there), trapping
  * the user with no escape. Log out is handled here directly against Clerk

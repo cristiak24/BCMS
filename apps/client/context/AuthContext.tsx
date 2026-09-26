@@ -48,7 +48,7 @@ type MeResponse = {
 
 type CurrentUser = { uid: string; email: string | null } | null;
 
-type FirebaseAuthContextValue = {
+type AuthContextValue = {
   user: CurrentUser;
   session: AuthUser | null;
   initializing: boolean;
@@ -60,7 +60,7 @@ type FirebaseAuthContextValue = {
 // Context
 // ────────────────────────────────────────────────────────────────────────────────
 
-const FirebaseAuthContext = createContext<FirebaseAuthContextValue | null>(null);
+const AuthContext = createContext<AuthContextValue | null>(null);
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -251,19 +251,19 @@ function AuthBridge({ children }: PropsWithChildren) {
     return () => setUnauthorizedHandler(null);
   }, [signOut]);
 
-  const value = useMemo<FirebaseAuthContextValue>(
+  const value = useMemo<AuthContextValue>(
     () => ({ user: currentUser, session, initializing, reloadSession, signOut }),
     [currentUser, initializing, session, reloadSession, signOut],
   );
 
   return (
-    <FirebaseAuthContext.Provider value={value}>
+    <AuthContext.Provider value={value}>
       {children}
-    </FirebaseAuthContext.Provider>
+    </AuthContext.Provider>
   );
 }
 
-export function FirebaseAuthProvider({ children }: PropsWithChildren) {
+export function AuthProvider({ children }: PropsWithChildren) {
   return (
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
       <AuthBridge>{children}</AuthBridge>
@@ -275,10 +275,10 @@ export function FirebaseAuthProvider({ children }: PropsWithChildren) {
 // Hooks & Helpers
 // ────────────────────────────────────────────────────────────────────────────────
 
-export function useFirebaseAuth() {
-  const context = useContext(FirebaseAuthContext);
+export function useSession() {
+  const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useFirebaseAuth must be used within FirebaseAuthProvider');
+    throw new Error('useSession must be used within AuthProvider');
   }
   return context;
 }

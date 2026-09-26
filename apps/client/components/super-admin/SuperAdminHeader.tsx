@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Modal, Pressable, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { usePathname, useRouter } from '@/src/web/expoRouter';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 
 type Props = {
   initials: string;
@@ -27,7 +27,7 @@ function segmentLabel(pathname: string) {
 export default function SuperAdminHeader({ initials, displayName, title = 'Aura Admin', onMenuPress }: Props) {
   const pathname = usePathname();
   const router = useRouter();
-  const { signOut } = useFirebaseAuth();
+  const { signOut } = useSession();
   const [search, setSearch] = useState('');
   const [accountMenuVisible, setAccountMenuVisible] = useState(false);
   const breadcrumb = useMemo(() => segmentLabel(pathname), [pathname]);

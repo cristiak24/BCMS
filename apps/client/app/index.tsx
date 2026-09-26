@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { useRouter } from '@/src/web/expoRouter';
 import { getHomeRouteForRole, normalizeRole } from '../utils/authSession';
-import { useFirebaseAuth } from '../context/AuthContext';
+import { useSession } from '../context/AuthContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
 
 export default function Landing() {
   const router = useRouter();
-  const { session, initializing } = useFirebaseAuth();
+  const { session, initializing } = useSession();
 
   useEffect(() => {
     if (initializing) {

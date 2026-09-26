@@ -2,16 +2,13 @@
   "name": "bcms-monorepo",
   "private": true,
   "workspaces": [
-    "apps/*",
-    "firebase/functions"
+    "apps/*"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=apps/server\" \"npm run start --workspace=apps/client\"",
     "build:web": "npm run build:web --workspace=apps/client",
-    "deploy": "npm run build:web && firebase deploy --only hosting,functions",
+    "deploy:firestore": "firebase deploy --only firestore",
     "seed:superadmin": "tsx scripts/seedSuperadmin.ts",
-    "functions:build": "npm run build --workspace=firebase/functions",
-    "functions:deploy": "npm run build --workspace=firebase/functions && firebase deploy --only functions",
     "test": "npm run test --workspace=apps/server && npm run test --workspace=apps/client"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { FirebaseAuthProvider } from '../context/AuthContext';
+import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
@@ -73,7 +73,7 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <ThemeProvider>
-          <FirebaseAuthProvider>
+          <AuthProvider>
             <Suspense fallback={<LoadingScreen message="Se încarcă..." />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
@@ -147,7 +147,7 @@ export default function App() {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
-          </FirebaseAuthProvider>
+          </AuthProvider>
         </ThemeProvider>
       </BrowserRouter>
     </ErrorBoundary>

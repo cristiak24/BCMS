@@ -5,14 +5,14 @@ import { useSafeAreaInsets } from '@/src/web/safeArea';
 import SuperAdminHeader from '../../components/super-admin/SuperAdminHeader';
 import SuperAdminSidebar from '../../components/super-admin/SuperAdminSidebar';
 import { getHomeRouteForRole, isSuperadmin } from '../../utils/authSession';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import { LoadingScreen } from '../../components/ui/ScreenState';
 
 export default function SuperAdminLayout() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { session, initializing } = useFirebaseAuth();
+  const { session, initializing } = useSession();
   const isDesktop = width >= 768;
   const [sidebarVisible, setSidebarVisible] = useState(false);
 

@@ -1,6 +1,6 @@
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import type { ReactElement } from 'react';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import { LoadingScreen } from '../ui/ScreenState';
 import { getHomeRouteForRole, normalizeRole, type UserRole } from '../../utils/authSession';
 import PendingApproval from './PendingApproval';
@@ -12,7 +12,7 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
   const location = useLocation();
-  const { initializing, session, signOut } = useFirebaseAuth();
+  const { initializing, session, signOut } = useSession();
 
   if (initializing) {
     return <LoadingScreen message="Preparing your workspace..." color="var(--c-brand-fg)" />;

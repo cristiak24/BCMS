@@ -13,7 +13,7 @@ import {
   PlayerAttendanceRecord,
   PlayerAttendanceSummary,
 } from '../../utils/playerAttendance';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../components/HeaderContext';
 import { Navigate } from 'react-router-dom';
@@ -839,7 +839,7 @@ function PlayerFormStats({
 
 function PlayerHomeScreen() {
   const router = useRouter();
-  const { session } = useFirebaseAuth();
+  const { session } = useSession();
   const { isMobile } = useResponsive();
   // Search lives in the global app header (components/AppHeader.tsx, wired via
   // HeaderContext) — same as the schedule screen. Home used to render its own
@@ -1207,7 +1207,7 @@ function PlayerHomeScreen() {
 }
 
 export default function HomeScreen() {
-  const { session } = useFirebaseAuth();
+  const { session } = useSession();
 
   // Coaches have their own panel at /coach/dashboard. This route used to render
   // it inline; the redirect keeps old links and bookmarks working.

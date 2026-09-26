@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
 import { HeaderProvider, useHeader } from '../../components/HeaderContext';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import { normalizeRole } from '../../utils/authSession';
 import AppHeader from '../../components/AppHeader';
 import { MobileBottomNavigation, MobileNavigationSheet } from '../../components/MobileNavigation';
@@ -64,7 +64,7 @@ function PlayerTabsLayoutContent() {
     const location = useLocation();
     const pathname = location.pathname;
     const { searchPlaceholder, searchValue, setSearchValue, headerActions } = useHeader();
-    const { session } = useFirebaseAuth();
+    const { session } = useSession();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const isCoach = normalizeRole(session?.role) === 'coach';

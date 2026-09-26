@@ -5,11 +5,11 @@ import { useRouter } from '@/src/web/expoRouter';
 import GlassCard from '../../components/ui/GlassCard';
 import InviteForm from '../../components/user-access/InviteForm';
 import { getHomeRouteForRole, isSuperadmin } from '../../utils/authSession';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 
 export default function CreateClubAdminScreen() {
   const router = useRouter();
-  const { session, initializing, reloadSession, signOut } = useFirebaseAuth();
+  const { session, initializing, reloadSession, signOut } = useSession();
 
   useEffect(() => {
     if (initializing) {

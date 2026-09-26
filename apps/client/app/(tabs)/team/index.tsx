@@ -9,7 +9,7 @@ import PageContainer from '../../../components/ui/PageContainer';
 import PageHeader from '../../../components/ui/PageHeader';
 import { teamsApi, MyTeamSummary, Player } from '../../../services/teamsApi';
 import { GENDER_LABELS, LEVEL_LABELS } from '../../../components/myclub/teamDisplay';
-import { useFirebaseAuth } from '../../../context/AuthContext';
+import { useSession } from '../../../context/AuthContext';
 import { attendanceRateColor, eventTypeMeta, formatEventDateTime } from '../../../components/team/playerTeamDisplay';
 
 /**
@@ -158,7 +158,7 @@ function TeamListSkeleton() {
 }
 
 export default function TeamScreen() {
-  const { session } = useFirebaseAuth();
+  const { session } = useSession();
   const router = useRouter();
   const [teams, setTeams] = useState<MyTeamSummary[]>([]);
   const [myRecord, setMyRecord] = useState<Player | null>(null);

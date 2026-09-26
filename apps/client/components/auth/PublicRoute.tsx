@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import type { ReactElement } from 'react';
-import { useFirebaseAuth } from '../../context/AuthContext';
+import { useSession } from '../../context/AuthContext';
 import { LoadingScreen } from '../ui/ScreenState';
 import { getHomeRouteForRole } from '../../utils/authSession';
 
@@ -9,7 +9,7 @@ interface PublicRouteProps {
 }
 
 export default function PublicRoute({ children }: PublicRouteProps) {
-  const { initializing, session } = useFirebaseAuth();
+  const { initializing, session } = useSession();
 
   if (initializing) {
     return <LoadingScreen message="Checking your session..." backgroundColor="var(--c-surface)" color="var(--c-blue)" />;
