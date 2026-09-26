@@ -175,6 +175,20 @@ html[data-theme="dark"] .bg-teal-50{background-color:var(--c-success-bg)}
 html[data-theme="dark"] .bg-violet-100{background-color:var(--c-surface-tint)}
 html[data-theme="dark"] .bg-violet-50{background-color:var(--c-surface-tint)}
 html[data-theme="dark"] .bg-white{background-color:var(--c-surface)}
+/* Tailwind bakes the alpha into a separate utility per fraction (bg-white/55,
+   bg-white/82, …), so the bare .bg-white override above can't reach them.
+   color-mix() reapplies the same fraction against the dark surface token
+   instead of hardcoding a fixed rgba per class. */
+html[data-theme="dark"] .bg-white\/10{background-color:color-mix(in srgb, var(--c-surface) 10%, transparent)}
+html[data-theme="dark"] .bg-white\/15{background-color:color-mix(in srgb, var(--c-surface) 15%, transparent)}
+html[data-theme="dark"] .bg-white\/20{background-color:color-mix(in srgb, var(--c-surface) 20%, transparent)}
+html[data-theme="dark"] .bg-white\/34{background-color:color-mix(in srgb, var(--c-surface) 34%, transparent)}
+html[data-theme="dark"] .bg-white\/55{background-color:color-mix(in srgb, var(--c-surface) 55%, transparent)}
+html[data-theme="dark"] .bg-white\/60{background-color:color-mix(in srgb, var(--c-surface) 60%, transparent)}
+html[data-theme="dark"] .bg-white\/70{background-color:color-mix(in srgb, var(--c-surface) 70%, transparent)}
+html[data-theme="dark"] .bg-white\/82{background-color:color-mix(in srgb, var(--c-surface) 82%, transparent)}
+html[data-theme="dark"] .bg-white\/85{background-color:color-mix(in srgb, var(--c-surface) 85%, transparent)}
+html[data-theme="dark"] .bg-white\/95{background-color:color-mix(in srgb, var(--c-surface) 95%, transparent)}
 html[data-theme="dark"] .bg-yellow-100{background-color:var(--c-warning-bg)}
 html[data-theme="dark"] .bg-yellow-50{background-color:var(--c-warning-bg)}
 html[data-theme="dark"] .bg-zinc-100{background-color:var(--c-surface-3)}
