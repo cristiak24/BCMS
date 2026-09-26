@@ -15,7 +15,7 @@ import {
 } from './manageAccessRepository';
 import { generateInviteToken, hashInviteToken, isInviteExpired, normalizeRefreshIntervalMinutes } from './manageAccessTokens';
 import type { AppUserContext, InviteLinkRecord, InviteRole } from '../types/manageAccess';
-import { toIso } from './firebaseAdmin';
+import { toIso } from './dateUtils';
 
 export async function ensureClubForUser(user: AppUserContext) {
     if (user.clubId != null) {

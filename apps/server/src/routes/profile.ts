@@ -5,7 +5,7 @@ import fs from 'fs';
 import { eq } from 'drizzle-orm';
 import { requireRequestUser } from '../lib/requestContext';
 import { authenticate } from '../middleware/auth';
-import { toIso } from '../lib/firebaseAdmin';
+import { toIso } from '../lib/dateUtils';
 import { db } from '../db';
 import { clubs, players, playersToTeams, teams, users } from '../db/schema';
 

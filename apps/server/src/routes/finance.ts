@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import Stripe from 'stripe';
-import { firestore, nextNumericId, toDate, toIso } from '../lib/firebaseAdmin';
+import { toDate, toIso } from '../lib/dateUtils';
 import { verifyBearerToken } from '../lib/clerkAuth';
 import { requireRequestUser } from '../lib/requestContext';
 import { normalizeRole } from '../lib/requestAuth';
@@ -122,7 +122,7 @@ type FinancialSettingsDoc = {
     facilityFee?: number;
     autoAdjust?: number;
     paymentDueDay?: number;
-    updatedAt?: FirebaseFirestore.Timestamp | Date | string | null;
+    updatedAt?: Date | string | null;
 };
 
 // Both constants and the neutral seed live in lib/financeDefaults so the seed can be
@@ -137,8 +137,8 @@ type PlayerPaymentDoc = {
     status?: string | null;
     description?: string | null;
     currency?: string | null;
-    date?: FirebaseFirestore.Timestamp | Date | string | null;
-    createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
+    date?: Date | string | null;
+    createdAt?: Date | string | null;
     stripeCheckoutSessionId?: string | null;
     stripePaymentIntentId?: string | null;
     receiptUrl?: string | null;
@@ -153,7 +153,7 @@ type EventFeeDoc = {
     amount?: number | string | null;
     status?: string | null;
     type?: string | null;
-    startTime?: FirebaseFirestore.Timestamp | Date | string | null;
+    startTime?: Date | string | null;
 };
 
 type PlayerPaymentFee = {
@@ -169,7 +169,6 @@ type PlayerPaymentFee = {
 };
 
 type CurrentPlayer = {
-    doc?: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>;
     data: PlayerDoc;
 };
 
@@ -189,14 +188,6 @@ type AdminRecentPayment = {
 };
 
 let stripeClient: InstanceType<typeof Stripe> | null = null;
-
-function chunkArray<T>(items: T[], size: number) {
-    const chunks: T[][] = [];
-    for (let index = 0; index < items.length; index += size) {
-        chunks.push(items.slice(index, index + size));
-    }
-    return chunks;
-}
 
 function getStripePublishableKey() {
     return process.env.STRIPE_PUBLISHABLE_KEY?.trim() || DEFAULT_STRIPE_PUBLISHABLE_KEY;
@@ -253,47 +244,6 @@ function fromMinorUnits(amount: number | null | undefined, currency: string) {
     return ZERO_DECIMAL_CURRENCIES.has(currency.toLowerCase()) ? value : value / 100;
 }
 
-function isFirestoreNotFound(error: unknown) {
-    return Boolean(
-        error &&
-        typeof error === 'object' &&
-        'code' in error &&
-        Number((error as { code?: unknown }).code) === 5
-    );
-}
-
-/**
- * True for Firestore failures that mean "this environment can't reach Firestore"
- * rather than "this document doesn't exist" — missing/!broken Application
- * Default Credentials, and the gRPC UNAVAILABLE (14) / DEADLINE_EXCEEDED (4)
- * codes. These are recoverable here because every caller has a Postgres path.
- */
-function isFirestoreUnavailable(error: unknown) {
-    if (!error || typeof error !== 'object') {
-        return false;
-    }
-
-    const code = Number((error as { code?: unknown }).code);
-    if (code === 14 || code === 4) {
-        return true;
-    }
-
-    const message = String((error as { message?: unknown }).message ?? '').toLowerCase();
-    return message.includes('default credentials')
-        || message.includes('could not refresh access token')
-        || message.includes('unable to detect a project id');
-}
-
-function canUseFirestoreDocuments() {
-    return Boolean(
-        process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim() ||
-        (process.env.FIREBASE_CLIENT_EMAIL?.trim() && process.env.FIREBASE_PRIVATE_KEY?.trim()) ||
-        process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim() ||
-        process.env.K_SERVICE ||
-        process.env.FUNCTION_TARGET
-    );
-}
-
 function getPlayerName(player: PlayerDoc) {
     const fromParts = `${player.firstName ?? ''} ${player.lastName ?? ''}`.trim();
     return player.name || fromParts || player.email || 'Player';
@@ -348,36 +298,6 @@ async function getCurrentPlayer(req: Request): Promise<CurrentPlayer> {
     const email = await getRequesterEmail(req);
     if (!email) {
         throw Object.assign(new Error('You must be signed in to load player payments.'), { statusCode: 401 });
-    }
-
-    // Only touch Firestore when this environment actually has credentials for
-    // it. Firebase Admin is initialised with a projectId alone when no service
-    // account is configured (see lib/firebaseAdmin.ts) — that is enough to
-    // VERIFY ID tokens (public JWKS, no ADC) but NOT to read Firestore, which
-    // needs Application Default Credentials. Without this guard the query below
-    // threw "Could not load the default credentials", which is not a not-found,
-    // so it was rethrown and surfaced as a 500/503 on GET /finance/player/summary
-    // — even though the Postgres fallback right below it had the player all
-    // along. Same guard already used at the other Firestore reads in this file.
-    if (canUseFirestoreDocuments()) {
-        try {
-            const snap = await firestore.collection('players').where('email', '==', email).limit(1).get();
-            const doc = snap.docs[0];
-            if (doc) {
-                return {
-                    doc,
-                    data: doc.data() as PlayerDoc,
-                };
-            }
-        } catch (error) {
-            // A credential/availability failure must not take the request down
-            // when Postgres can answer it. Only genuinely unexpected errors
-            // propagate.
-            if (!isFirestoreNotFound(error) && !isFirestoreUnavailable(error)) {
-                throw error;
-            }
-            console.warn('[finance] Firestore player lookup unavailable, falling back to Postgres:', error);
-        }
     }
 
     const playerRows = await db
@@ -465,21 +385,6 @@ async function getPlayerClubId(player: PlayerDoc) {
     }
 
     const teamIds = await getPlayerTeamIds(player);
-    for (const teamId of canUseFirestoreDocuments() ? teamIds : []) {
-        try {
-            const teamSnap = await firestore.collection('teams').where('id', '==', teamId).limit(1).get();
-            const teamDoc = teamSnap.docs[0];
-            const clubId = Number((teamDoc?.data() as { clubId?: number } | undefined)?.clubId);
-            if (Number.isFinite(clubId) && clubId > 0) {
-                return clubId;
-            }
-        } catch (error) {
-            if (!isFirestoreNotFound(error) && !isFirestoreUnavailable(error)) {
-                throw error;
-            }
-        }
-    }
-
     if (teamIds.size) {
         const teamRows = await db
             .select({ clubId: pgTeams.clubId })
@@ -503,32 +408,7 @@ function seedSettingsData(clubId?: number | null): FinancialSettingsDoc {
     return buildDefaultSettings(clubId);
 }
 
-async function ensureSettings(clubId?: number | null) {
-    if (!canUseFirestoreDocuments()) {
-        throw Object.assign(new Error('Firestore settings are not available in this environment.'), { code: 5 });
-    }
-
-    const ref = firestore.collection('financialSettings').doc(getSettingsDocId(clubId));
-    const snap = await ref.get();
-
-    if (snap.exists) {
-        return snap;
-    }
-
-    await ref.set(seedSettingsData(clubId));
-    return ref.get();
-}
-
 async function getSettingsData(clubId?: number | null) {
-    try {
-        const snap = await ensureSettings(clubId);
-        return snap.data() as FinancialSettingsDoc;
-    } catch (error) {
-        if (!isFirestoreNotFound(error)) {
-            console.error('[finance/settings] Firestore settings fallback:', error);
-        }
-    }
-
     // TODO(schema): `financial_settings` has no `club_id` column, so both this read
     // and the PATCH /settings write overload the primary key as the tenant key. That
     // only holds while club ids and the settings id sequence cannot collide, which
@@ -650,50 +530,11 @@ async function getPlayerTeamIds(player: PlayerDoc) {
         });
     };
 
-    // No Firestore credentials in this environment — go straight to Postgres
-    // rather than paying an ADC timeout to discover the same thing.
-    if (!canUseFirestoreDocuments()) {
-        await addMembershipsFromPostgres();
-        return ids;
-    }
-
-    try {
-        const membershipsSnap = await firestore.collection('playersToTeams').where('playerId', '==', player.id).get();
-        membershipsSnap.docs.forEach((docSnap) => {
-            const teamId = Number((docSnap.data() as { teamId?: number }).teamId);
-            if (Number.isFinite(teamId)) {
-                ids.add(teamId);
-            }
-        });
-    } catch (error) {
-        if (!isFirestoreNotFound(error) && !isFirestoreUnavailable(error)) {
-            throw error;
-        }
-
-        await addMembershipsFromPostgres();
-    }
-
+    await addMembershipsFromPostgres();
     return ids;
 }
 
 async function getPlayerPaymentRows(playerId: number) {
-    // Skip Firestore outright when this environment has no credentials for it:
-    // attempting the call costs a ~30s Application-Default-Credentials timeout
-    // per read before failing, which is what made this endpoint hang.
-    if (canUseFirestoreDocuments()) {
-        try {
-            const snap = await firestore.collection('playerPayments').where('playerId', '==', playerId).get();
-            return snap.docs.map((docSnap) => ({
-                ref: docSnap.ref,
-                data: docSnap.data() as PlayerPaymentDoc,
-            }));
-        } catch (error) {
-            if (!isFirestoreNotFound(error) && !isFirestoreUnavailable(error)) {
-                throw error;
-            }
-        }
-    }
-
     const rows = await db
         .select()
         .from(pgPlayerPayments)
@@ -714,20 +555,6 @@ async function getPlayerPaymentRows(playerId: number) {
 }
 
 async function getPlayerByNumericId(playerId: number) {
-    if (canUseFirestoreDocuments()) {
-        try {
-            const snap = await firestore.collection('players').where('id', '==', playerId).limit(1).get();
-            const doc = snap.docs[0];
-            if (doc) {
-                return doc.data() as PlayerDoc;
-            }
-        } catch (error) {
-            if (!isFirestoreNotFound(error) && !isFirestoreUnavailable(error)) {
-                throw error;
-            }
-        }
-    }
-
     const rows = await db.select().from(pgPlayers).where(eq(pgPlayers.id, playerId)).limit(1);
     const player = rows[0];
     return player
@@ -768,26 +595,10 @@ async function buildEventFees(player: PlayerDoc, currency: string, paidFeeIds: S
     }
 
     const now = new Date();
-    const eventRowsFromPostgres = async () => await db
+    const eventRows = await db
         .select()
         .from(pgEvents)
         .where(inArray(pgEvents.teamId, Array.from(teamIds))) as EventFeeDoc[];
-
-    let eventRows: EventFeeDoc[];
-    if (!canUseFirestoreDocuments()) {
-        eventRows = await eventRowsFromPostgres();
-    } else {
-        try {
-            const eventsSnap = await firestore.collection('events').get();
-            eventRows = eventsSnap.docs.map((docSnap) => docSnap.data() as EventFeeDoc);
-        } catch (error) {
-            if (!isFirestoreNotFound(error) && !isFirestoreUnavailable(error)) {
-                throw error;
-            }
-
-            eventRows = await eventRowsFromPostgres();
-        }
-    }
 
     return eventRows
         .filter((event) => {
@@ -1007,52 +818,6 @@ async function buildAdminRecentPayments(clubId: number | null, limit = 12, teamI
             } satisfies AdminRecentPayment;
         });
 
-    if (canUseFirestoreDocuments()) {
-        try {
-            const firestorePayments: PlayerPaymentDoc[] = [];
-            for (const playerIdChunk of chunkArray(playerIds, 30)) {
-                const snap = await firestore
-                    .collection('playerPayments')
-                    .where('playerId', 'in', playerIdChunk)
-                    .get();
-                snap.docs.forEach((docSnap) => {
-                    firestorePayments.push({
-                        ...(docSnap.data() as PlayerPaymentDoc),
-                        id: (docSnap.data() as PlayerPaymentDoc).id ?? docSnap.id,
-                    });
-                });
-            }
-
-            firestorePayments.forEach((payment) => {
-                const playerId = Number(payment.playerId);
-                const player = playersById.get(playerId);
-                if (!player) {
-                    return;
-                }
-
-                const paymentDate = toIso(payment.date) ?? toIso(payment.createdAt) ?? new Date().toISOString();
-                payments.push({
-                    id: String(payment.id ?? payment.stripeCheckoutSessionId ?? `${payment.playerId}-${paymentDate}`),
-                    playerId,
-                    playerName: getPlayerName(player),
-                    playerEmail: player.email ?? null,
-                    teamName: playerTeamNameById.get(playerId) ?? null,
-                    amount: asPositiveAmount(payment.amount),
-                    currency: payment.currency || DEFAULT_PAYMENT_CURRENCY,
-                    status: payment.status || 'paid',
-                    date: paymentDate,
-                    description: payment.description || monthName(payment.month, payment.year),
-                    provider: payment.stripeCheckoutSessionId ? 'stripe' : null,
-                    receiptUrl: payment.receiptUrl ?? null,
-                });
-            });
-        } catch (error) {
-            if (!isFirestoreNotFound(error)) {
-                console.error('[GET /api/finance/admin/recent-payments] Firestore payments fallback:', error);
-            }
-        }
-    }
-
     const seenPayments = new Set<string>();
     return payments
         .filter((payment) => {
@@ -1136,9 +901,6 @@ async function ensureStripeCustomer(player: CurrentPlayer) {
         },
     });
 
-    if (player.doc) {
-        await player.doc.ref.set({ stripeCustomerId: customer.id }, { merge: true });
-    }
     player.data.stripeCustomerId = customer.id;
     return customer.id;
 }
@@ -1166,98 +928,20 @@ async function markPaymentRowsPaid(params: {
     paymentIntentId: string | null;
     receiptUrl: string | null;
 }) {
-    let usePostgresPayments = false;
-    try {
-        const existingSessionSnap = await firestore
-            .collection('playerPayments')
-            .where('stripeCheckoutSessionId', '==', params.checkoutSessionId)
-            .limit(1)
-            .get();
-
-        if (!existingSessionSnap.empty) {
-            return existingSessionSnap.docs[0].data();
-        }
-    } catch (error) {
-        if (!isFirestoreNotFound(error)) {
-            throw error;
-        }
-        usePostgresPayments = true;
-    }
-
-    let updatedExistingRows = 0;
-    if (!usePostgresPayments) {
-        for (const fee of params.fees) {
-            if (!String(fee.id).startsWith('payment:') || fee.paymentId == null) {
-                continue;
-            }
-
-            const paymentId = Number(fee.paymentId);
-            if (!Number.isFinite(paymentId)) {
-                continue;
-            }
-
-            const paymentSnap = await firestore.collection('playerPayments').where('id', '==', paymentId).limit(1).get();
-            const paymentDoc = paymentSnap.docs[0];
-            if (!paymentDoc) {
-                continue;
-            }
-
-            await paymentDoc.ref.set({
-                status: 'paid',
-                date: new Date(),
-                provider: 'stripe',
-                currency: params.currency,
-                stripeCheckoutSessionId: params.checkoutSessionId,
-                stripePaymentIntentId: params.paymentIntentId,
-                receiptUrl: params.receiptUrl,
-                feeIds: params.fees.map((fee) => fee.id),
-            }, { merge: true });
-            updatedExistingRows += 1;
-        }
-    }
-
-    if (updatedExistingRows === params.fees.length) {
-        return { updated: updatedExistingRows };
-    }
-
     const now = new Date();
-    if (usePostgresPayments) {
-        const inserted = await db
-            .insert(pgPlayerPayments)
-            .values({
-                playerId: params.playerId,
-                amount: Math.round(params.amount),
-                month: now.getMonth() + 1,
-                year: now.getFullYear(),
-                status: 'paid',
-                date: now.toISOString(),
-                createdAt: now.toISOString(),
-            })
-            .returning();
-        return inserted[0];
-    }
-
-    const id = await nextNumericId('playerPayments');
-    const record = {
-        id,
-        playerId: params.playerId,
-        amount: params.amount,
-        month: now.getMonth() + 1,
-        year: now.getFullYear(),
-        status: 'paid',
-        date: now,
-        createdAt: now,
-        description: params.label,
-        provider: 'stripe',
-        currency: params.currency,
-        stripeCheckoutSessionId: params.checkoutSessionId,
-        stripePaymentIntentId: params.paymentIntentId,
-        receiptUrl: params.receiptUrl,
-        feeIds: params.fees.map((fee) => fee.id),
-    };
-
-    await firestore.collection('playerPayments').doc(String(id)).set(record);
-    return record;
+    const inserted = await db
+        .insert(pgPlayerPayments)
+        .values({
+            playerId: params.playerId,
+            amount: Math.round(params.amount),
+            month: now.getMonth() + 1,
+            year: now.getFullYear(),
+            status: 'paid',
+            date: now.toISOString(),
+            createdAt: now.toISOString(),
+        })
+        .returning();
+    return inserted[0];
 }
 
 async function markCheckoutSessionFailed(sessionId: string, reason: 'failed' | 'expired') {
@@ -1271,33 +955,6 @@ async function markCheckoutSessionFailed(sessionId: string, reason: 'failed' | '
         };
     }
 
-    let usePostgresPayments = false;
-    try {
-        const existingSessionSnap = await firestore
-            .collection('playerPayments')
-            .where('stripeCheckoutSessionId', '==', session.id)
-            .limit(1)
-            .get();
-
-        if (!existingSessionSnap.empty) {
-            const existingDoc = existingSessionSnap.docs[0];
-            await existingDoc.ref.set({
-                status: 'failed',
-                failureReason: reason,
-                updatedAt: new Date(),
-            }, { merge: true });
-            return {
-                recorded: true,
-                payment: existingDoc.data(),
-            };
-        }
-    } catch (error) {
-        if (!isFirestoreNotFound(error)) {
-            throw error;
-        }
-        usePostgresPayments = true;
-    }
-
     const playerId = Number(session.metadata?.playerId);
     if (!Number.isFinite(playerId)) {
         throw new Error(`Stripe session ${session.id} is missing playerId metadata.`);
@@ -1306,53 +963,22 @@ async function markCheckoutSessionFailed(sessionId: string, reason: 'failed' | '
     const currency = (session.currency || DEFAULT_PAYMENT_CURRENCY).toLowerCase();
     const amount = fromMinorUnits(session.amount_total, currency);
     const now = new Date();
-    if (usePostgresPayments) {
-        const inserted = await db
-            .insert(pgPlayerPayments)
-            .values({
-                playerId,
-                amount: Math.round(amount),
-                month: now.getMonth() + 1,
-                year: now.getFullYear(),
-                status: 'failed',
-                date: now.toISOString(),
-                createdAt: now.toISOString(),
-            })
-            .returning();
+    const inserted = await db
+        .insert(pgPlayerPayments)
+        .values({
+            playerId,
+            amount: Math.round(amount),
+            month: now.getMonth() + 1,
+            year: now.getFullYear(),
+            status: 'failed',
+            date: now.toISOString(),
+            createdAt: now.toISOString(),
+        })
+        .returning();
 
-        return {
-            recorded: true,
-            payment: inserted[0],
-        };
-    }
-
-    const id = await nextNumericId('playerPayments');
-    const record = {
-        id,
-        playerId,
-        amount,
-        month: now.getMonth() + 1,
-        year: now.getFullYear(),
-        status: 'failed',
-        failureReason: reason,
-        date: now,
-        createdAt: now,
-        description: session.metadata?.label || (reason === 'expired' ? 'Expired Stripe checkout' : 'Failed Stripe checkout'),
-        provider: 'stripe',
-        currency,
-        stripeCheckoutSessionId: session.id,
-        stripePaymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : null,
-        receiptUrl: null,
-        feeIds: String(session.metadata?.feeIds ?? '')
-            .split(',')
-            .map((value) => value.trim())
-            .filter(Boolean),
-    };
-
-    await firestore.collection('playerPayments').doc(String(id)).set(record);
     return {
         recorded: true,
-        payment: record,
+        payment: inserted[0],
     };
 }
 
@@ -1513,40 +1139,13 @@ router.get('/documents', async (req, res) => {
             return;
         }
 
-        try {
-            let query: FirebaseFirestore.Query = firestore.collection('financialDocuments');
-            if (clubId !== null) {
-                query = query.where('clubId', '==', clubId);
-            }
-            const snap = await query.orderBy('date', 'desc').get();
-            const docs = snap.docs.map((docSnap) => {
-                const data = docSnap.data() as {
-                    id: number;
-                    type: string;
-                    amount: number;
-                    description: string;
-                    date?: FirebaseFirestore.Timestamp | Date | string | null;
-                    documentUrl?: string | null;
-                    status: 'pending' | 'processed' | 'rejected';
-                    clubId?: number | null;
-                };
-
-                return {
-                    ...data,
-                    date: toIso(data.date) ?? new Date().toISOString(),
-                };
-            });
-            res.json(docs);
-        } catch (firestoreError) {
-            console.error('[GET /api/finance/documents] Firestore fallback:', firestoreError);
-            const docs = clubId !== null
-                ? await db.select().from(pgFinancialDocuments).where(eq(pgFinancialDocuments.clubId, clubId)).orderBy(desc(pgFinancialDocuments.date))
-                : await db.select().from(pgFinancialDocuments).orderBy(desc(pgFinancialDocuments.date));
-            res.json(docs.map((doc) => ({
-                ...doc,
-                date: toIso(doc.date) ?? new Date().toISOString(),
-            })));
-        }
+        const docs = clubId !== null
+            ? await db.select().from(pgFinancialDocuments).where(eq(pgFinancialDocuments.clubId, clubId)).orderBy(desc(pgFinancialDocuments.date))
+            : await db.select().from(pgFinancialDocuments).orderBy(desc(pgFinancialDocuments.date));
+        res.json(docs.map((doc) => ({
+            ...doc,
+            date: toIso(doc.date) ?? new Date().toISOString(),
+        })));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch documents' });
@@ -1568,72 +1167,41 @@ router.patch('/documents/:id/status', async (req, res) => {
     }
 
     try {
-        try {
-            const snap = await firestore.collection('financialDocuments').where('id', '==', id).limit(1).get();
-            const docSnap = snap.docs[0];
-            if (!docSnap) {
-                res.status(404).json({ error: 'Document not found' });
-                return;
-            }
-
-            const existing = docSnap.data() as { clubId?: number | null; status?: string };
-            if (clubId !== null && existing.clubId != null && Number(existing.clubId) !== clubId) {
-                res.status(403).json({ error: 'This document belongs to a different club.' });
-                return;
-            }
-
-            await docSnap.ref.set({ status }, { merge: true });
-            const updated = await docSnap.ref.get();
-            res.json({
-                ...(updated.data() as Record<string, unknown>),
-                date: toIso((updated.data() as { date?: unknown }).date) ?? null,
-            });
-            await recordFinanceAudit({
-                action: 'finance.document.status',
-                entityType: 'financial_document',
-                entityId: id,
-                clubId,
-                metadata: { store: 'firestore', previousStatus: existing.status ?? null, nextStatus: status },
-                ...financeAuditActor(req),
-            });
-        } catch (firestoreError) {
-            console.error('[PATCH /api/finance/documents/:id/status] Firestore fallback:', firestoreError);
-            const existingRows = await db.select().from(pgFinancialDocuments).where(eq(pgFinancialDocuments.id, id)).limit(1);
-            const existing = existingRows[0];
-            if (!existing) {
-                res.status(404).json({ error: 'Document not found' });
-                return;
-            }
-            if (clubId !== null && existing.clubId != null && Number(existing.clubId) !== clubId) {
-                res.status(403).json({ error: 'This document belongs to a different club.' });
-                return;
-            }
-
-            const updatedRows = await db
-                .update(pgFinancialDocuments)
-                .set({ status: status as 'pending' | 'processed' | 'rejected' })
-                .where(eq(pgFinancialDocuments.id, id))
-                .returning();
-
-            const updated = updatedRows[0];
-            if (!updated) {
-                res.status(404).json({ error: 'Document not found' });
-                return;
-            }
-
-            res.json({
-                ...updated,
-                date: toIso(updated.date) ?? null,
-            });
-            await recordFinanceAudit({
-                action: 'finance.document.status',
-                entityType: 'financial_document',
-                entityId: id,
-                clubId,
-                metadata: { store: 'postgres', previousStatus: existing.status ?? null, nextStatus: status },
-                ...financeAuditActor(req),
-            });
+        const existingRows = await db.select().from(pgFinancialDocuments).where(eq(pgFinancialDocuments.id, id)).limit(1);
+        const existing = existingRows[0];
+        if (!existing) {
+            res.status(404).json({ error: 'Document not found' });
+            return;
         }
+        if (clubId !== null && existing.clubId != null && Number(existing.clubId) !== clubId) {
+            res.status(403).json({ error: 'This document belongs to a different club.' });
+            return;
+        }
+
+        const updatedRows = await db
+            .update(pgFinancialDocuments)
+            .set({ status: status as 'pending' | 'processed' | 'rejected' })
+            .where(eq(pgFinancialDocuments.id, id))
+            .returning();
+
+        const updated = updatedRows[0];
+        if (!updated) {
+            res.status(404).json({ error: 'Document not found' });
+            return;
+        }
+
+        res.json({
+            ...updated,
+            date: toIso(updated.date) ?? null,
+        });
+        await recordFinanceAudit({
+            action: 'finance.document.status',
+            entityType: 'financial_document',
+            entityId: id,
+            clubId,
+            metadata: { previousStatus: existing.status ?? null, nextStatus: status },
+            ...financeAuditActor(req),
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to update document status' });
@@ -1676,31 +1244,19 @@ router.post('/upload', (req, res, next) => {
             clubId: clubId ?? null,
         };
 
-        try {
-            const id = await nextNumericId('financialDocuments');
-            await firestore.collection('financialDocuments').doc(String(id)).set({ id, ...record });
+        const inserted = await db.insert(pgFinancialDocuments).values({
+            type: String(record.type),
+            amount: record.amount,
+            description: String(record.description),
+            documentUrl,
+            status: 'pending',
+            clubId: record.clubId,
+        }).returning();
 
-            res.json({
-                id,
-                ...record,
-                date: new Date().toISOString(),
-            });
-        } catch (firestoreError) {
-            console.error('[POST /api/finance/upload] Firestore fallback:', firestoreError);
-            const inserted = await db.insert(pgFinancialDocuments).values({
-                type: String(record.type),
-                amount: record.amount,
-                description: String(record.description),
-                documentUrl,
-                status: 'pending',
-                clubId: record.clubId,
-            }).returning();
-
-            res.json({
-                ...inserted[0],
-                date: toIso(inserted[0].date) ?? new Date().toISOString(),
-            });
-        }
+        res.json({
+            ...inserted[0],
+            date: toIso(inserted[0].date) ?? new Date().toISOString(),
+        });
     } catch (error) {
         console.error('[POST /api/finance/upload] error:', error);
         if (req.file) {
@@ -1825,74 +1381,34 @@ router.post('/admin/manual-payment', async (req, res) => {
         const when = body.date ? (toDate(body.date) ?? new Date()) : new Date();
         const currency = DEFAULT_PAYMENT_CURRENCY;
 
-        try {
-            const id = await nextNumericId('playerPayments');
-            const record = {
-                id,
+        const inserted = await db
+            .insert(pgPlayerPayments)
+            .values({
                 playerId,
                 amount: Math.round(amount),
                 month: when.getMonth() + 1,
                 year: when.getFullYear(),
                 status: 'paid',
-                date: when,
-                createdAt: when,
-                description,
-                provider: method,
+                date: when.toISOString(),
+                createdAt: when.toISOString(),
+            })
+            .returning();
+        res.json({ success: true, payment: inserted[0] });
+        await recordFinanceAudit({
+            action: 'finance.payment.manual',
+            entityType: 'player_payment',
+            entityId: inserted[0]?.id ?? null,
+            clubId,
+            metadata: {
+                playerId,
+                amount: Math.round(amount),
                 currency,
-                receiptUrl: null,
-            };
-            await firestore.collection('playerPayments').doc(String(id)).set(record);
-            res.json({ success: true, payment: record });
-            await recordFinanceAudit({
-                action: 'finance.payment.manual',
-                entityType: 'player_payment',
-                entityId: id,
-                clubId,
-                metadata: {
-                    store: 'firestore',
-                    playerId,
-                    amount: record.amount,
-                    currency,
-                    method,
-                    month: record.month,
-                    year: record.year,
-                },
-                ...financeAuditActor(req),
-            });
-        } catch (firestoreError) {
-            if (!isFirestoreNotFound(firestoreError)) {
-                console.error('[POST /api/finance/admin/manual-payment] Firestore fallback:', firestoreError);
-            }
-            const inserted = await db
-                .insert(pgPlayerPayments)
-                .values({
-                    playerId,
-                    amount: Math.round(amount),
-                    month: when.getMonth() + 1,
-                    year: when.getFullYear(),
-                    status: 'paid',
-                    date: when.toISOString(),
-                    createdAt: when.toISOString(),
-                })
-                .returning();
-            res.json({ success: true, payment: inserted[0] });
-            await recordFinanceAudit({
-                action: 'finance.payment.manual',
-                entityType: 'player_payment',
-                entityId: inserted[0]?.id ?? null,
-                clubId,
-                metadata: {
-                    store: 'postgres',
-                    playerId,
-                    amount: Math.round(amount),
-                    currency,
-                    method,
-                    month: when.getMonth() + 1,
-                    year: when.getFullYear(),
-                },
-                ...financeAuditActor(req),
-            });
-        }
+                method,
+                month: when.getMonth() + 1,
+                year: when.getFullYear(),
+            },
+            ...financeAuditActor(req),
+        });
     } catch (error) {
         handleRouteError(res, error, '[POST /api/finance/admin/manual-payment]');
     }
@@ -2134,41 +1650,6 @@ router.patch('/settings', async (req, res) => {
 
         if (autoAdjust !== undefined) {
             updates.autoAdjust = Number(autoAdjust) ? 1 : 0;
-        }
-
-        try {
-            const ref = firestore.collection('financialSettings').doc(getSettingsDocId(clubId));
-            await ensureSettings(clubId);
-            // Captured before the write so the audit row can carry what the fees were,
-            // which is the evidence this endpoint has never produced.
-            const beforeSnap = await ref.get();
-            const before = beforeSnap.data() as FinancialSettingsDoc | undefined;
-            await ref.set(updates, { merge: true });
-
-            const snap = await ref.get();
-            const data = snap.data() as FinancialSettingsDoc;
-            res.json({
-                ...data,
-                monthlyPlayerFee: normalizeMoneyValue(data.monthlyPlayerFee) ?? 0,
-                trainingLevy: normalizeMoneyValue(data.trainingLevy) ?? 0,
-                facilityFee: normalizeMoneyValue(data.facilityFee) ?? 0,
-                autoAdjust: Number(data.autoAdjust ?? 1) ? 1 : 0,
-                paymentDueDay: resolveDueDay(data.paymentDueDay),
-                updatedAt: toIso(data.updatedAt as any) ?? new Date().toISOString(),
-            });
-            await recordFinanceAudit({
-                action: 'finance.settings.update',
-                entityType: 'financial_settings',
-                entityId: clubId,
-                clubId,
-                metadata: { store: 'firestore', changes: settingsAuditChanges(before, updates) },
-                ...financeAuditActor(req),
-            });
-            return;
-        } catch (error) {
-            if (!isFirestoreNotFound(error)) {
-                console.error('[PATCH /api/finance/settings] Firestore settings fallback:', error);
-            }
         }
 
         const pgUpdates: Partial<typeof pgFinancialSettings.$inferInsert> = {

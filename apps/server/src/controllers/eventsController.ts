@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import axios from 'axios';
-import { toDate, toIso } from '../lib/firebaseAdmin';
+import { toDate, toIso } from '../lib/dateUtils';
 import { db } from '../db';
 import { attendance, events, players, teams, users } from '../db/schema';
 import { and, eq, gte, inArray, isNull, lte, or } from 'drizzle-orm';
@@ -18,18 +18,18 @@ type EventDoc = {
     title: string;
     description?: string | null;
     location?: string | null;
-    startTime: FirebaseFirestore.Timestamp | Date | string;
-    endTime: FirebaseFirestore.Timestamp | Date | string;
+    startTime: Date | string;
+    endTime: Date | string;
     teamId?: number | null;
     coachId?: number | null;
     amount?: number | null;
     status?: string;
-    createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
+    createdAt?: Date | string | null;
     coachNote?: string | null;
 };
 
 type PlayerDoc = { id: number; firstName?: string | null; lastName?: string | null; number?: number | null; };
-type AttendanceDoc = { id: number; eventId?: number | null; playerId: number; teamId: number; status: string; date?: FirebaseFirestore.Timestamp | Date | string | null; };
+type AttendanceDoc = { id: number; eventId?: number | null; playerId: number; teamId: number; status: string; date?: Date | string | null; };
 
 function parseRequiredDate(value: unknown, fieldName: string) {
     const date = value ? new Date(String(value)) : null;

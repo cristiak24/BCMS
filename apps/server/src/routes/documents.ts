@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { admin, firestore, nextNumericId, toIso } from '../lib/firebaseAdmin';
+import { toIso } from '../lib/dateUtils';
 import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
@@ -7,7 +7,7 @@ import { authenticate, requireRoles, type AuthenticatedRequest } from '../middle
 import { db } from '../db';
 import { l12Documents, players as playersTable, playersToTeams, teams } from '../db/schema';
 import { desc, eq, inArray } from 'drizzle-orm';
-import { assertTeamInClub, filterIdsToClub, isSuperadmin, resolveRequestClubId } from '../lib/tenantScope';
+import { assertTeamInClub, isSuperadmin, resolveRequestClubId } from '../lib/tenantScope';
 
 const router = Router();
 const MAX_L12_PLAYERS = 24;
@@ -98,15 +98,7 @@ router.post('/generate-l12', async (req: AuthenticatedRequest, res) => {
             return;
         }
 
-        let team = { id: numericTeamId, name: 'Echipă Necunoscută' };
-        try {
-            const teamSnap = await firestore.collection('teams').doc(String(teamId)).get();
-            if (teamSnap.exists) {
-                team = teamSnap.data() as { id: number; name: string };
-            }
-        } catch (teamError) {
-            console.error('Error loading team for L12:', teamError);
-        }
+        const team = { id: numericTeamId, name: teamRows[0]?.name ?? 'Echipă Necunoscută' };
 
         const htmlContent = `
             <!DOCTYPE html>
@@ -203,29 +195,13 @@ router.post('/generate-l12', async (req: AuthenticatedRequest, res) => {
         const matchTitle = `${team.name} vs ${matchDetails?.opponent || 'Adversar Necunoscut'}`;
         const documentUrl = `/uploads/l12/${filename}`;
 
-        void (async () => {
-            try {
-                const id = await nextNumericId('l12Documents');
-                await firestore.collection('l12Documents').doc(String(id)).set({
-                    id,
-                    teamId: Number(teamId),
-                    matchTitle,
-                    documentUrl,
-                    createdAt: new Date(),
-                });
-            } catch (archiveError) {
-                console.error('Error saving L12 archive entry:', archiveError);
-                try {
-                    await db.insert(l12Documents).values({
-                        teamId: Number(teamId),
-                        matchTitle,
-                        documentUrl,
-                    });
-                } catch (dbArchiveError) {
-                    console.error('Error saving L12 archive entry to Postgres:', dbArchiveError);
-                }
-            }
-        })();
+        void db.insert(l12Documents).values({
+            teamId: Number(teamId),
+            matchTitle,
+            documentUrl,
+        }).catch((archiveError) => {
+            console.error('Error saving L12 archive entry:', archiveError);
+        });
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -265,40 +241,15 @@ router.get('/l12', async (req: AuthenticatedRequest, res) => {
             }
         }
 
-        try {
-            const snap = await firestore.collection('l12Documents').orderBy('createdAt', 'desc').limit(50).get();
-            const docs = snap.docs.map((docSnap) => {
-                const data = docSnap.data() as {
-                    id: number;
-                    teamId: number;
-                    matchTitle: string;
-                    documentUrl: string;
-                    createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
-                };
-
-                return {
-                    ...data,
-                    createdAt: toIso(data.createdAt) ?? new Date().toISOString(),
-                };
-            });
-
-            const visibleTeamIds = new Set(
-                filterIdsToClub(docs.map((doc) => doc.teamId), allowedTeamIds, superadmin),
-            );
-
-            res.json(docs.filter((doc) => visibleTeamIds.has(Number(doc.teamId))));
-        } catch (firestoreError) {
-            console.error('[GET /api/documents/l12] Firestore fallback:', firestoreError);
-            const baseQuery = db.select().from(l12Documents);
-            const docs = await (superadmin
-                ? baseQuery
-                : baseQuery.where(inArray(l12Documents.teamId, allowedTeamIds))
-            ).orderBy(desc(l12Documents.createdAt)).limit(50);
-            res.json(docs.map((doc) => ({
-                ...doc,
-                createdAt: toIso(doc.createdAt) ?? new Date().toISOString(),
-            })));
-        }
+        const baseQuery = db.select().from(l12Documents);
+        const docs = await (superadmin
+            ? baseQuery
+            : baseQuery.where(inArray(l12Documents.teamId, allowedTeamIds))
+        ).orderBy(desc(l12Documents.createdAt)).limit(50);
+        res.json(docs.map((doc) => ({
+            ...doc,
+            createdAt: toIso(doc.createdAt) ?? new Date().toISOString(),
+        })));
     } catch (error) {
         console.error('Error fetching L12 documents:', error);
         res.status(500).json({ error: 'Failed to fetch' });

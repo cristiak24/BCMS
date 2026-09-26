@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import type { InviteRole } from '../types/manageAccess';
-import { toIso } from './firebaseAdmin';
+import { toIso } from './dateUtils';
 
 export type InviteTokenPayload = {
     rawToken: string;

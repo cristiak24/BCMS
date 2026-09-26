@@ -1,5 +1,5 @@
 import { Router, type Request } from 'express';
-import { firestore, toDate } from '../lib/firebaseAdmin';
+import { toDate } from '../lib/dateUtils';
 import { db } from '../db';
 import {
     attendance as pgAttendance,
@@ -43,43 +43,16 @@ function amountOf(value: unknown) {
     return Number.isFinite(amount) ? amount : 0;
 }
 
-function canUseFirestoreDocuments() {
-    return Boolean(
-        process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim() ||
-        (process.env.FIREBASE_CLIENT_EMAIL?.trim() && process.env.FIREBASE_PRIVATE_KEY?.trim()) ||
-        process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim() ||
-        process.env.K_SERVICE ||
-        process.env.FUNCTION_TARGET
-    );
+// The dashboard used to blend in Firestore documents (a leftover data store from
+// before Postgres became the source of truth). getFirestoreDocs always returns
+// [] now, so every `firestoreXxx` variable below stays at its zero/empty
+// identity value and the totals reduce to their Postgres-only terms — kept as a
+// stub instead of unwinding every arithmetic expression below it.
+async function getFirestoreDocs(_collectionName: string) {
+    return [] as Array<{ data: () => Record<string, unknown> }>;
 }
 
-async function getFirestoreDocs(collectionName: string) {
-    if (!canUseFirestoreDocuments()) {
-        return [];
-    }
-
-    try {
-        const snap = await firestore.collection(collectionName).get();
-        return snap.docs;
-    } catch (error) {
-        console.error(`[dashboard/summary] Firestore ${collectionName} fallback:`, error);
-        return [];
-    }
-}
-
-async function getDashboardFinancialSettings(clubId: number | null) {
-    if (canUseFirestoreDocuments()) {
-        try {
-            const docId = clubId != null ? `club:${clubId}` : '1';
-            const snap = await firestore.collection('financialSettings').doc(docId).get();
-            if (snap.exists) {
-                return snap.data() as { monthlyPlayerFee?: number; trainingLevy?: number; facilityFee?: number };
-            }
-        } catch (error) {
-            console.error('[dashboard/summary] financialSettings fallback:', error);
-        }
-    }
-
+async function getDashboardFinancialSettings(_clubId: number | null) {
     const rows = await db.select().from(pgFinancialSettings).where(eq(pgFinancialSettings.id, 1)).limit(1);
     return rows[0] ?? null;
 }
@@ -166,7 +139,7 @@ router.get('/summary', async (req, res) => {
             amount?: number;
             status?: string;
             type?: string;
-            date?: FirebaseFirestore.Timestamp | Date | string | null;
+            date?: Date | string | null;
         });
 
         const processedFirestoreDocs = financialDocs.filter((doc) => normalizeStatus(doc.status) === 'processed');
@@ -195,8 +168,8 @@ router.get('/summary', async (req, res) => {
             .map((docSnap) => docSnap.data() as {
                 amount?: number | string | null;
                 status?: string | null;
-                date?: FirebaseFirestore.Timestamp | Date | string | null;
-                createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
+                date?: Date | string | null;
+                createdAt?: Date | string | null;
                 playerId?: number | string | null;
             })
             .filter((payment) => isPaidStatus(payment.status));
@@ -264,7 +237,7 @@ router.get('/summary', async (req, res) => {
 
         const attendanceRows = attendanceDocs.map((docSnap) => docSnap.data() as {
             status: string;
-            date?: FirebaseFirestore.Timestamp | Date | string | null;
+            date?: Date | string | null;
         });
 
         const firestorePresentCount = attendanceRows.filter((row) => {
@@ -301,7 +274,7 @@ router.get('/summary', async (req, res) => {
             : null;
 
         const firestorePlayerCreatedAt = playerDocs.map((docSnap) => docSnap.data() as {
-            createdAt?: FirebaseFirestore.Timestamp | Date | string | null;
+            createdAt?: Date | string | null;
         });
         const newPlayersThisMonth = scopedPlayers.length > 0
             ? scopedPlayers.filter((player) => inRange(toDate(player.createdAt), startOfMonth, endOfMonth)).length
@@ -318,7 +291,7 @@ router.get('/summary', async (req, res) => {
         type MedicalCheckCandidate = {
             firstName?: string | null;
             lastName?: string | null;
-            medicalCheckExpiry?: FirebaseFirestore.Timestamp | Date | string | null;
+            medicalCheckExpiry?: Date | string | null;
         };
 
         const medicalCheckCandidates: MedicalCheckCandidate[] = scopedPlayers.length > 0
