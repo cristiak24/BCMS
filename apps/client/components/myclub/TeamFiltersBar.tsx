@@ -129,8 +129,8 @@ export default function TeamFiltersBar({
     ];
     const genderOptions: ChipOption<GenderFilter>[] = [
         { value: 'all', label: 'Toate', count: counts.gender.all },
-        { value: 'M', label: 'Masculin', dot: '#28345E', count: counts.gender.M },
-        { value: 'F', label: 'Feminin', dot: '#7C3560', count: counts.gender.F },
+        { value: 'M', label: 'Masculin', dot: 'var(--c-gender-m)', count: counts.gender.M },
+        { value: 'F', label: 'Feminin', dot: 'var(--c-gender-f)', count: counts.gender.F },
     ];
     const levelOptions: ChipOption<LevelFilter>[] = [
         { value: 'all', label: 'Toate', count: counts.level.all },

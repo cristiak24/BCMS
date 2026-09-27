@@ -89,7 +89,7 @@ function PlayerTabsLayoutContent() {
         <div className="flex flex-1 min-h-screen bg-[#EAF1F8] lg:flex-row flex-col">
             <Sidebar items={menuItems} />
 
-            <div className="flex flex-1 min-w-0 flex-col h-full relative">
+            <div className="flex flex-1 min-w-0 flex-col relative">
                 <div className="lg:hidden sticky top-0 z-30">
                     <AppHeader
                         mobile
@@ -120,7 +120,7 @@ function PlayerTabsLayoutContent() {
 
                 {/* ── Main Content ────────────────────────────────── */}
                 <div className="flex-1 min-w-0 overflow-auto overflow-x-hidden flex flex-col relative h-full">
-                    <div className="flex-1 min-w-0 pb-24 lg:pb-0 relative w-full">
+                    <div className="flex-1 min-w-0 pb-24 lg:pb-0 relative w-full flex flex-col">
                         <Outlet />
                     </div>
                 </div>

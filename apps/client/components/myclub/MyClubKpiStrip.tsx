@@ -21,8 +21,8 @@ export default function MyClubKpiStrip({ teams }: { teams: Team[] }) {
         { label: 'Echipe FRB', value: stats.frb, dot: 'var(--c-danger)' },
         { label: 'Echipe manuale', value: stats.manual, dot: 'var(--c-success)' },
         { label: 'Total jucători', value: stats.players, dot: 'var(--c-muted)' },
-        { label: 'Echipe masculine', value: stats.masculine, dot: '#28345E' },
-        { label: 'Echipe feminine', value: stats.feminine, dot: '#7C3560' },
+        { label: 'Echipe masculine', value: stats.masculine, dot: 'var(--c-gender-m)' },
+        { label: 'Echipe feminine', value: stats.feminine, dot: 'var(--c-gender-f)' },
     ];
 
     // One row of compact stat cells rather than six tall cards. The numbers are

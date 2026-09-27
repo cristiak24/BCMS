@@ -87,6 +87,9 @@
   --c-danger-fg: #B42318;
   --c-danger-bg: #FEF3F2;
   --c-danger-border: #FECDCA;
+  /* Team gender labels/dots (on --c-surface-tint / --c-danger-bg chips). */
+  --c-gender-m: #28345E;
+  --c-gender-f: #7C3560;
   --c-warning: #F79009;
   --c-warning-fg: #B54708;
   --c-warning-bg: #FFFAEB;
@@ -189,6 +192,8 @@ html[data-theme="dark"] {
   --c-danger-fg: #FDA29B;
   --c-danger-bg: #2E1615;
   --c-danger-border: #58231F;
+  --c-gender-m: #C7C4FF;
+  --c-gender-f: #F5B3D6;
   --c-warning: #FDB022;
   --c-warning-fg: #FEC84B;
   --c-warning-bg: #2C1F0B;

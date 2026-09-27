@@ -73,7 +73,7 @@ export default function TeamCard({
                 </View>
                 {team.gender && (
                     <View className="px-2 py-1 rounded-full" style={{ backgroundColor: team.gender === 'M' ? 'var(--c-surface-tint)' : 'var(--c-danger-bg)' }}>
-                        <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: team.gender === 'M' ? '#28345E' : '#7C3560' }}>
+                        <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: team.gender === 'M' ? 'var(--c-gender-m)' : 'var(--c-gender-f)' }}>
                             {GENDER_LABELS[team.gender]}
                         </Text>
                     </View>

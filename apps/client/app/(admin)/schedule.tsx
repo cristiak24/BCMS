@@ -124,7 +124,7 @@ export default function ScheduleScreen() {
                 shadowRadius: 4,
               }}
             >
-              <Text style={{ fontSize: 12, fontWeight: '800', color: activeTab === tab ? 'var(--c-brand-fg)' : 'var(--c-faint)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: activeTab === tab ? 'var(--c-brand-fg)' : 'var(--c-faint)', textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' } as any}>
                 {TOP_TAB_LABELS[tab]}
               </Text>
             </TouchableOpacity>
@@ -139,7 +139,7 @@ export default function ScheduleScreen() {
           }}
         >
           <Plus color="#fff" size={14} />
-          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.8 }}>Adaugă eveniment</Text>
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.8, whiteSpace: 'nowrap' } as any}>Adaugă eveniment</Text>
         </TouchableOpacity>
       </View>
     );

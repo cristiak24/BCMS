@@ -40,9 +40,11 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS }: SidebarProps) {
     return (
         // Structural surfaces use tokens (not opacity-modifier utilities like
         // bg-white/95, which the palette layer can't retarget) so the sidebar
-        // tracks light/dark like the rest of the shell.
+        // tracks light/dark like the rest of the shell. Pinned to the viewport:
+        // `h-full` against a min-h-screen parent never resolved, so the sidebar
+        // stopped at its content and left a darker seam below it.
         <View
-            className="w-[244px] h-full flex flex-col shrink-0 border-r"
+            className="w-[244px] sticky top-0 h-screen overflow-y-auto flex flex-col shrink-0 border-r"
             style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
         >
             {/* Logo Area */}

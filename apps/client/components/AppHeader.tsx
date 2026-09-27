@@ -220,7 +220,9 @@ export default function AppHeader({
 
   return (
     <View className="hidden lg:flex px-6 flex-row items-center z-10 shrink-0 border-b" style={{ height: 60, backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
-      <View style={{ flex: 1, maxWidth: 380 }}>
+      {/* Search is the flexible column: page actions keep their natural width
+          and the search field gives way first when the viewport is narrow. */}
+      <View style={{ flex: 1, maxWidth: 380, minWidth: 160 }}>
         <View className="flex-row items-center rounded-[10px] px-3 py-2 border" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
           <MaterialIcons name="search" size={18} color={theme.colors.faint} />
           <TextInput
@@ -233,7 +235,7 @@ export default function AppHeader({
         </View>
       </View>
 
-      <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flexGrow: 1, flexShrink: 0, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
         {headerActions ?? null}
       </View>
 
