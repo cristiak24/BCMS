@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { db } from '../db';
 import { users, clubs, players, playersToTeams } from '../db/schema';
 import { eq } from 'drizzle-orm';
-import { ensureDefaultClub } from '../lib/manageAccessRepository';
 import { splitDisplayName } from '../lib/password';
 import { authenticate, requireSuperadmin, AuthenticatedRequest } from '../middleware/auth';
 import { acceptInvitation, createSuperAdminInvitation, validateInvitationToken } from '../services/invitationsService';
@@ -89,47 +88,11 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res: any) => {
 });
 
 // POST /api/auth/complete-signup
-router.post('/complete-signup', authenticate, async (req: AuthenticatedRequest, res: any) => {
-    try {
-        const { name, role } = req.body;
-        const firebaseUser = req.firebaseUser;
-
-        if (!name || !role) {
-            return res.status(400).json({ error: 'Name and role are required' });
-        }
-
-        if (role !== 'player' && role !== 'coach' && role !== 'parent') {
-            return res.status(400).json({ error: 'Invalid role for public signup' });
-        }
-
-        if (req.user) {
-            return res.status(409).json({ error: 'User already exists' });
-        }
-
-        const { firstName, lastName } = splitDisplayName(name);
-        const defaultClub = await ensureDefaultClub();
-
-        const insertResult = await db.insert(users).values({
-            firebaseUid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            name,
-            firstName,
-            lastName,
-            role,
-            status: 'active',
-            clubId: defaultClub.id,
-        }).returning();
-
-        const newUser = insertResult[0];
-
-        res.status(201).json({
-            success: true,
-            user: newUser
-        });
-    } catch (error) {
-        console.error('Signup error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
+// Public self-signup is closed: the role (and club) must come from an invite
+// created by a club admin, so it goes through /complete-invite-signup. This
+// route used to let anyone pick "coach" and land active in a default club.
+router.post('/complete-signup', authenticate, async (_req: AuthenticatedRequest, res: any) => {
+    res.status(403).json({ error: 'Ai nevoie de un cod de invitație de la administratorul clubului pentru a-ți crea cont.' });
 });
 
 // POST /api/auth/superadmin/create-admin-invite

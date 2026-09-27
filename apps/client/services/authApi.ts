@@ -17,8 +17,8 @@ export type SignupPayload = {
   password: string;
   firstName: string;
   lastName: string;
-  role?: 'player' | 'coach' | 'parent';
-  inviteToken?: string;
+  /** Required: the role and club come from the invite, never from the client. */
+  inviteToken: string;
 };
 
 export type InviteDetails = {
@@ -70,10 +70,14 @@ export const authApi = {
 
   /**
    * 1. Create the Clerk account
-   * 2. Call /api/auth/complete-signup (or complete-invite-signup) to create the
-   *    Postgres profile
+   * 2. Call /api/auth/complete-invite-signup to create the Postgres profile
+   *    with the role/club the invite carries
    */
   async signup(payload: SignupPayload): Promise<{ success: boolean; error?: string }> {
+    if (!payload.inviteToken) {
+      return { success: false, error: 'Ai nevoie de un cod de invitație pentru a-ți crea cont.' };
+    }
+
     const clerk = await getClerk();
     let createdAccount = false;
 
@@ -97,17 +101,10 @@ export const authApi = {
 
       const name = `${payload.firstName.trim()} ${payload.lastName.trim()}`.trim();
 
-      if (payload.inviteToken) {
-        await apiFetch('/auth/complete-invite-signup', {
-          method: 'POST',
-          body: JSON.stringify({ name, inviteToken: payload.inviteToken }),
-        });
-      } else {
-        await apiFetch('/auth/complete-signup', {
-          method: 'POST',
-          body: JSON.stringify({ name, role: payload.role ?? 'player' }),
-        });
-      }
+      await apiFetch('/auth/complete-invite-signup', {
+        method: 'POST',
+        body: JSON.stringify({ name, inviteToken: payload.inviteToken }),
+      });
 
       return { success: true };
     } catch (error: any) {
