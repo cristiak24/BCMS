@@ -7,9 +7,15 @@ import { authenticate, requireSuperadmin, AuthenticatedRequest } from '../middle
 import { acceptInvitation, createSuperAdminInvitation, validateInvitationToken } from '../services/invitationsService';
 import { createPendingAccessRequestForSignup, validateInviteToken } from '../lib/manageAccessService';
 import { loadServerEnv } from '../lib/loadEnv';
+import { consumeInviteCode, findUsableInviteCode, looksLikeInviteCode, releaseInviteCodeUse } from '../lib/clubInviteCodes';
+import { rateLimit } from '../middleware/rateLimit';
+import { writeAuditLog } from '../services/auditService';
 
 const router = Router();
 loadServerEnv();
+
+// Public, unauthenticated: throttles guessing short invite codes.
+const inviteValidateLimiter = rateLimit({ bucket: 'auth:invite-validate', limit: 20, windowMs: 60_000 });
 
 async function findClubName(clubId?: number | null) {
     if (clubId == null) {
@@ -122,12 +128,32 @@ router.post('/superadmin/create-admin-invite', authenticate, requireSuperadmin, 
 });
 
 // GET /api/auth/invites/validate
-router.get('/invites/validate', async (req: any, res: any) => {
+router.get('/invites/validate', inviteValidateLimiter as any, async (req: any, res: any) => {
     try {
         const { token } = req.query;
         if (!token) return res.status(400).json({ error: 'Token is required' });
 
         const rawToken = String(token);
+
+        if (looksLikeInviteCode(rawToken)) {
+            const code = await findUsableInviteCode(rawToken);
+            if (!code) {
+                return res.status(404).json({ error: 'Codul de invitație nu este valid, a expirat sau a atins numărul maxim de utilizări.' });
+            }
+            return res.json({
+                success: true,
+                source: 'code',
+                email: null,
+                status: 'pending',
+                canAccept: true,
+                message: null,
+                clubId: code.clubId,
+                clubName: code.clubName,
+                role: code.role,
+                expiresAt: code.expiresAt,
+            });
+        }
+
         const invitation = await validateInvitationToken(rawToken);
         if (invitation) {
             if (invitation.isExpired || invitation.status !== 'pending') {
@@ -169,6 +195,54 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
 
         const { firstName, lastName } = splitDisplayName(name);
         let result;
+
+        // Short club code: the admin already bounded who can use it (expiry +
+        // usage cap), so the account is active right away with the code's role.
+        if (looksLikeInviteCode(String(inviteToken))) {
+            const consumed = await consumeInviteCode(String(inviteToken));
+            if (!consumed) {
+                return res.status(400).json({ error: 'Codul de invitație nu este valid, a expirat sau a atins numărul maxim de utilizări.' });
+            }
+
+            try {
+                const values = {
+                    firebaseUid: firebaseUser.uid,
+                    email: firebaseUser.email || '',
+                    name,
+                    firstName,
+                    lastName,
+                    role: consumed.role as any,
+                    status: 'active' as const,
+                    clubId: consumed.clubId,
+                };
+                const saved = req.user
+                    ? await db.update(users).set({ ...values, updatedAt: new Date().toISOString() }).where(eq(users.id, req.user.id)).returning()
+                    : await db.insert(users).values(values).returning();
+                const userRecord = saved[0];
+
+                await writeAuditLog({
+                    action: 'auth.signup_with_invite_code',
+                    entityType: 'club_invite_code',
+                    entityId: consumed.id,
+                    actorUserId: userRecord.id,
+                    actorUid: firebaseUser.uid,
+                    actorRole: consumed.role,
+                    clubId: consumed.clubId,
+                    metadata: null,
+                    ipAddress: req.ip ?? null,
+                    userAgent: req.get('user-agent') ?? null,
+                });
+
+                return res.status(201).json({
+                    success: true,
+                    user: { userId: userRecord.id, clubId: consumed.clubId, role: consumed.role, status: 'active' },
+                });
+            } catch (error) {
+                await releaseInviteCodeUse(consumed.id).catch(() => undefined);
+                throw error;
+            }
+        }
+
         const classicInvitation = await validateInvitationToken(String(inviteToken));
 
         if (classicInvitation) {

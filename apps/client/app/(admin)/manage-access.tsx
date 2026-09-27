@@ -6,6 +6,7 @@ import GlassCard from '../../components/ui/GlassCard';
 import AdminActionButton from '../../components/admin/AdminActionButton';
 import AdminHero, { AdminMetricCard } from '../../components/admin/AdminHero';
 import InviteLinkGenerator from '../../components/manage-access/InviteLinkGenerator';
+import InviteCodesPanel from '../../components/manage-access/InviteCodesPanel';
 import PendingAccessRequestList from '../../components/manage-access/PendingAccessRequestList';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
@@ -172,7 +173,7 @@ export default function ManageAccessScreen() {
                 <View className="w-full px-4 lg:px-6">
                     <AdminHero
                         title="Manage Access"
-                        subtitle="Aprobă cereri de acces și generează linkuri de înregistrare."
+                        subtitle="Aprobă cereri de acces și generează linkuri și coduri de înregistrare."
                     >
                         <View className="flex-row flex-wrap gap-2">
                             <AdminMetricCard label="Pending" value={pendingCount} />
@@ -210,6 +211,9 @@ export default function ManageAccessScreen() {
                                     onCustomMinutesChange={setCustomMinutes}
                                     onGenerate={handleGenerateInviteLink}
                                 />
+                                <View className="mt-6">
+                                    <InviteCodesPanel />
+                                </View>
                             </View>
 
                             <View className="w-full lg:flex-1">

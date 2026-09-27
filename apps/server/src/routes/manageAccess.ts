@@ -4,6 +4,7 @@ import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import {
     approveManageAccessRequest,
     denyManageAccessRequest,
+    ensureClubForUser,
     generateClubInviteLink,
     getActiveClubInviteLink,
     listManageAccessRequests,
@@ -11,6 +12,7 @@ import {
 import { rateLimit } from '../middleware/rateLimit';
 import { writeAuditLog } from '../services/auditService';
 import type { InviteRole } from '../types/manageAccess';
+import { createClubInviteCode, listClubInviteCodes, revokeClubInviteCode } from '../lib/clubInviteCodes';
 
 const router = Router();
 
@@ -173,6 +175,102 @@ router.post('/invite-links/generate', inviteLimiter, async (req: AuthenticatedRe
     } catch (error) {
         console.error('Failed to generate invite link:', error);
         res.status(500).json({ error: 'Could not generate the invite link.' });
+    }
+});
+
+// ── Short club invite codes ─────────────────────────────────────────────────
+
+router.get('/invite-codes', async (req, res) => {
+    const user = await requireClubAdmin(req, res);
+    if (!user) {
+        return;
+    }
+
+    try {
+        const club = await ensureClubForUser(user);
+        res.json(await listClubInviteCodes(club.id));
+    } catch (error) {
+        console.error('Failed to list invite codes:', error);
+        res.status(500).json({ error: 'Could not load invite codes.' });
+    }
+});
+
+router.post('/invite-codes', inviteLimiter, async (req: AuthenticatedRequest, res) => {
+    const user = await requireClubAdmin(req, res);
+    if (!user) {
+        return;
+    }
+
+    const role = readInviteRole(req.body?.role);
+    if (!role) {
+        res.status(400).json({ error: 'A valid role is required.' });
+        return;
+    }
+
+    try {
+        const club = await ensureClubForUser(user);
+        const code = await createClubInviteCode({
+            clubId: club.id,
+            role,
+            expiresInHours: Number(req.body?.expiresInHours),
+            maxUses: Number(req.body?.maxUses),
+            createdBy: user.id,
+        });
+        await writeAuditLog({
+            action: 'manage_access.invite_code_created',
+            entityType: 'club_invite_code',
+            entityId: code.id,
+            actorUserId: user.id,
+            actorUid: req.firebaseUser?.uid ?? null,
+            actorRole: user.role ?? null,
+            clubId: club.id,
+            metadata: { role: code.role, maxUses: code.maxUses, expiresAt: code.expiresAt },
+            ipAddress: req.ip ?? null,
+            userAgent: req.get('user-agent') ?? null,
+        });
+        res.status(201).json(code);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Could not create the invite code.';
+        console.error('Failed to create invite code:', error);
+        res.status(400).json({ error: message });
+    }
+});
+
+router.post('/invite-codes/:id/revoke', mutateLimiter, async (req: AuthenticatedRequest, res) => {
+    const user = await requireClubAdmin(req, res);
+    if (!user) {
+        return;
+    }
+
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+        res.status(400).json({ error: 'Invalid invite code id.' });
+        return;
+    }
+
+    try {
+        const club = await ensureClubForUser(user);
+        const revoked = await revokeClubInviteCode(club.id, id);
+        if (!revoked) {
+            res.status(404).json({ error: 'Invite code not found or already revoked.' });
+            return;
+        }
+        await writeAuditLog({
+            action: 'manage_access.invite_code_revoked',
+            entityType: 'club_invite_code',
+            entityId: id,
+            actorUserId: user.id,
+            actorUid: req.firebaseUser?.uid ?? null,
+            actorRole: user.role ?? null,
+            clubId: club.id,
+            metadata: null,
+            ipAddress: req.ip ?? null,
+            userAgent: req.get('user-agent') ?? null,
+        });
+        res.json(revoked);
+    } catch (error) {
+        console.error('Failed to revoke invite code:', error);
+        res.status(500).json({ error: 'Could not revoke the invite code.' });
     }
 });
 

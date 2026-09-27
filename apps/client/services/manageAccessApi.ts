@@ -1,5 +1,5 @@
 import { apiFetch } from './apiClient';
-import type { AccessRequestItem, InviteLinkItem, InviteRole } from '../types/manageAccess';
+import type { AccessRequestItem, InviteCodeItem, InviteLinkItem, InviteRole } from '../types/manageAccess';
 
 export const manageAccessApi = {
     listRequests() {
@@ -24,5 +24,21 @@ export const manageAccessApi = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ role, refreshIntervalMinutes }),
         });
+    },
+
+    listInviteCodes() {
+        return apiFetch<InviteCodeItem[]>('/manage-access/invite-codes');
+    },
+
+    createInviteCode(payload: { role: InviteRole; expiresInHours: number; maxUses: number }) {
+        return apiFetch<InviteCodeItem>('/manage-access/invite-codes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+    },
+
+    revokeInviteCode(id: number) {
+        return apiFetch<InviteCodeItem>(`/manage-access/invite-codes/${id}/revoke`, { method: 'POST' });
     },
 };

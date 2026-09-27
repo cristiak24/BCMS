@@ -30,3 +30,19 @@ export type RefreshIntervalOption = {
     label: string;
     value: number;
 };
+
+export type InviteCodeStatus = 'active' | 'expired' | 'exhausted' | 'revoked';
+
+export type InviteCodeItem = {
+    id: number;
+    clubId: number;
+    /** Display form, e.g. "K7M4-QX2P". */
+    code: string;
+    role: InviteRole;
+    expiresAt: string;
+    maxUses: number;
+    useCount: number;
+    createdAt: string;
+    revokedAt: string | null;
+    status: InviteCodeStatus;
+};

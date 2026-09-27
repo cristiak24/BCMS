@@ -25,9 +25,10 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 /**
- * Accepts whatever the user pastes: the full registration link generated in
- * Manage Access (…/signup?inviteToken=…), an /invite/<token> link, or the bare
- * token itself.
+ * Accepts whatever the user pastes: a short club code (K7M4-QX2P), the full
+ * registration link generated in Manage Access (…/signup?inviteToken=…), an
+ * /invite/<token> link, or the bare token itself. The server tells codes and
+ * link tokens apart.
  */
 export function extractInviteToken(raw: string) {
     const value = raw.trim();
@@ -183,7 +184,7 @@ export default function Signup() {
                                     <Ticket size={18} className="shrink-0 text-blue-700" />
                                     <input
                                         className={`ml-2.5 ${authInputClass}`}
-                                        placeholder="Lipește linkul sau codul primit"
+                                        placeholder="Ex: K7M4-QX2P sau linkul primit"
                                         value={codeInput}
                                         onChange={(e) => setCodeInput(e.target.value)}
                                         autoCapitalize="none"

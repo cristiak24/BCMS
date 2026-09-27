@@ -280,6 +280,28 @@ export const inviteLinks = pgTable("invite_links", {
 	isActive: integer("is_active").default(1).notNull(),
 });
 
+// Short, shareable club join codes (e.g. "K7M4-QX2P"). The admin sets the role,
+// expiry and a usage cap; each successful signup consumes one use atomically.
+export const clubInviteCodes = pgTable("club_invite_codes", {
+	id: serial().primaryKey().notNull(),
+	clubId: integer("club_id").notNull(),
+	code: varchar({ length: 16 }).notNull(),
+	role: role().notNull(),
+	expiresAt: timestamp("expires_at", { mode: 'string' }).notNull(),
+	maxUses: integer("max_uses").notNull(),
+	useCount: integer("use_count").default(0).notNull(),
+	createdBy: integer("created_by"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	revokedAt: timestamp("revoked_at", { mode: 'string' }),
+}, (table) => [
+	unique("club_invite_codes_code_unique").on(table.code),
+	foreignKey({
+			columns: [table.clubId],
+			foreignColumns: [clubs.id],
+			name: "club_invite_codes_club_id_clubs_id_fk"
+		}),
+]);
+
 export const invites = pgTable("invites", {
 	id: serial().primaryKey().notNull(),
 	token: varchar({ length: 255 }).notNull(),

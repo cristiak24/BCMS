@@ -1,6 +1,7 @@
 import { ComponentProps } from 'react';
 import {
   AlertTriangle,
+  Ticket,
   AtSign,
   BadgeCheck,
   Bell,
@@ -102,6 +103,7 @@ const iconMap: Record<string, typeof Circle> = {
   'calendar-today': CalendarDays,
   cancel: XCircle,
   check: Check,
+  'confirmation-number': Ticket,
   'check-circle': CheckCircle,
   'check-circle-outline': CheckCircle,
   'chevron-left': ChevronLeft,
