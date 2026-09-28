@@ -62,12 +62,37 @@ export const authApi = {
     const alreadySignedInAs = () =>
       clerk.user?.primaryEmailAddress?.emailAddress?.toLowerCase() ?? null;
 
+    // Only an *active* session can be reused. A pending one (Clerk wants a
+    // session task first) is invisible to useAuth(), so reusing it bounced the
+    // user straight back to /login.
     if (clerk.session) {
-      if (alreadySignedInAs() === email) {
+      if (clerk.session.status === 'active' && alreadySignedInAs() === email) {
         return { success: true };
       }
       await clerk.signOut().catch(() => undefined);
     }
+
+    // Sign-in can succeed while Clerk still holds the session as "pending"
+    // behind a task (e.g. reset-password for a password found in a breach).
+    // useAuth() treats that as signed out, so the app sent the user back to
+    // /login even though Clerk had emailed a new-sign-in notice. Report it and
+    // drop the half-open session so "Ai uitat parola?" can run cleanly.
+    const pendingTaskResult = async (): Promise<LoginResponse | null> => {
+      const session = clerk.session;
+      if (!session || session.status !== 'pending') return null;
+      const task = session.currentTask?.key ?? 'pending';
+      await clerk.signOut().catch(() => undefined);
+      if (task === 'reset-password') {
+        return {
+          success: false,
+          error: 'Trebuie să îți schimbi parola înainte de a intra (parola a apărut într-o scurgere de date publică). Apasă „Ai uitat parola?” ca să setezi una nouă. (cod: reset-password)',
+        };
+      }
+      return {
+        success: false,
+        error: `Contul necesită un pas suplimentar înainte de conectare. Contactează administratorul clubului. (cod: ${task})`,
+      };
+    };
 
     const attempt = async () => {
       const result = await clerk.client.signIn.create({
@@ -78,7 +103,7 @@ export const authApi = {
 
       if (result.status === 'complete' && result.createdSessionId) {
         await clerk.setActive({ session: result.createdSessionId });
-        return { success: true } as LoginResponse;
+        return (await pendingTaskResult()) ?? ({ success: true } as LoginResponse);
       }
 
       return {
@@ -91,7 +116,7 @@ export const authApi = {
       return await attempt();
     } catch (error: any) {
       if (isAlreadySignedInError(error)) {
-        if (alreadySignedInAs() === email) {
+        if (clerk.session?.status === 'active' && alreadySignedInAs() === email) {
           return { success: true };
         }
         // Signed in as someone else: drop that session and try once more.
