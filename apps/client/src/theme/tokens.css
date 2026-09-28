@@ -31,8 +31,8 @@
 
   /* ── Surfaces ─────────────────────────────────
      Neutral, not blue. --c-bg is the page; --c-surface is what sits on it. */
-  --c-bg: #F7F8FA;            /* app page background */
-  --c-bg-alt: #F4F5F9;        /* alt page background (admin shell) */
+  --c-bg: #F4F5F8;            /* app page background — a touch deeper than before so white cards separate from the page */
+  --c-bg-alt: #F2F3F7;        /* alt page background (admin shell) */
   --c-surface: #FFFFFF;       /* cards / sheets */
   --c-surface-2: #F8F9FC;     /* subtle raised / inputs */
   --c-surface-3: #F1F2F7;     /* muted fill */
@@ -43,15 +43,15 @@
   --c-ink: #16192C;           /* primary text */
   --c-ink-strong: #0A0C1B;    /* headings / darkest */
   --c-ink-soft: #343A52;      /* secondary text */
-  --c-muted: #666D86;         /* muted text */
-  --c-faint: #7D869F;         /* faint / placeholder — darkened from #949BB1, which was 2.77:1 on white (fails WCAG's 3:1 floor for UI text) */
+  --c-muted: #5B6279;         /* muted text — 6.1:1 on white */
+  --c-faint: #6F7790;         /* faint / placeholder — 4.6:1 on white (was #7D869F at 3.7:1, below AA for the 11–12px meta text it carries) */
 
   /* ── Borders ──────────────────────────────────
      Hairlines only. A visible border and a shadow are two ways of saying the
      same thing; the app should pick one per element, not both. */
-  --c-border: #E7E8EF;
-  --c-border-soft: #F0F1F6;
-  --c-border-strong: #D3D6E1;
+  --c-border: #E2E4EC;
+  --c-border-soft: #EDEEF4;
+  --c-border-strong: #CDD1DD;
 
   /* ── Brand (indigo) ───────────────────────────
      -surface = filled brand backgrounds (primary button, active chip)
@@ -124,6 +124,23 @@
   --e-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
   --e-brand: 0 1px 2px rgba(16, 24, 40, 0.06), 0 6px 14px -4px rgba(79, 70, 229, 0.35);
 
+  /* ── Hero panels ──────────────────────────────
+     The greeting banners on the coach/player home stay dark in BOTH themes
+     (a deep indigo field with white type), so their text tokens are fixed
+     rather than theme-flipped. */
+  --c-hero-from: #1E1B4B;
+  --c-hero-via: #312E81;
+  --c-hero-to: #4F46E5;
+  --c-hero-fg: #FFFFFF;
+  --c-hero-muted: rgba(255, 255, 255, 0.74);
+  --c-hero-chip: rgba(255, 255, 255, 0.12);
+  --c-hero-chip-border: rgba(255, 255, 255, 0.18);
+
+  /* ── Motion ─────────────────────────────────── */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 160ms;
+  --dur-base: 240ms;
+
   /* ── Layout rhythm ────────────────────────────
      Single source of truth for the app shell's gutters and content width, so
      screens don't each invent their own padding. */
@@ -146,24 +163,26 @@ html[data-theme="dark"] {
   /* ── Surfaces ─────────────────────────────────
      Near-neutral charcoal with a violet cast, so the indigo brand still reads
      as a colour rather than disappearing into a blue field. */
-  --c-bg: #0C0D14;
-  --c-bg-alt: #0A0B12;
-  --c-surface: #14161F;
-  --c-surface-2: #1B1D28;
-  --c-surface-3: #232634;
-  --c-surface-tint: #232152;
+  --c-bg: #0A0B11;
+  --c-bg-alt: #08090F;
+  /* Surfaces step up ~6% lightness each so a card reads as a card against the
+     page — the old #14161F on #0C0D14 was close enough that cards dissolved. */
+  --c-surface: #151722;
+  --c-surface-2: #1C1F2C;
+  --c-surface-3: #262A3A;
+  --c-surface-tint: #26235A;
 
   /* ── Ink / text ───────────────────────────── */
   --c-ink: #E9EAF0;
   --c-ink-strong: #F7F8FB;
-  --c-ink-soft: #C6C9D6;
-  --c-muted: #949AAE;
-  --c-faint: #767C93;         /* lightened from #6B7186 (3.72:1 on surface) to clear 4:1 */
+  --c-ink-soft: #CDD0DC;
+  --c-muted: #A2A8BC;         /* 7.3:1 on surface */
+  --c-faint: #8A91A8;         /* 5.4:1 on surface — was #767C93 (4.1:1), too dim for meta text */
 
   /* ── Borders ──────────────────────────────── */
-  --c-border: #262936;
-  --c-border-soft: #1E212C;
-  --c-border-strong: #363A4B;
+  --c-border: #2A2E3E;
+  --c-border-soft: #202332;
+  --c-border-strong: #3B4055;
 
   /* ── Brand (indigo) ───────────────────────────
      Lifted toward the light end: #4F46E5 on a near-black surface fails
@@ -171,7 +190,7 @@ html[data-theme="dark"] {
      enough to hold white label text. */
   --c-brand-surface: #5B54EB;
   --c-brand-surface-deep: #1B1A3D;
-  --c-brand-fg: #A5A0FF;
+  --c-brand-fg: #ADA8FF;
   --c-brand-border: #4A44A8;
   --c-brand-strong: #6F68F0;
   --c-blue: #7C75F5;
@@ -203,6 +222,12 @@ html[data-theme="dark"] {
   --c-on-brand: #FFFFFF;
 
   --c-surface-inverse: #191B26;
+  /* Hero stays an indigo field, just a little deeper so it doesn't glow
+     against the near-black page. */
+  --c-hero-from: #17153A;
+  --c-hero-via: #25226A;
+  --c-hero-to: #4740C8;
+
   --c-tint-fg: #C9C7F7;
 
   /* Shadows carry almost no signal on dark surfaces — borders do the work

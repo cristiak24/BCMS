@@ -10,7 +10,8 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
 import { GENDER_LABELS, LEVEL_LABELS } from '../../components/myclub/teamDisplay';
 import { AttendanceRate, Chip, CoachPlayerRow, StatTile } from '../../components/coach/CoachPrimitives';
-import { getPlayerBadge } from '../../components/coach/coachDisplay';
+import { attendanceRateColor, getPlayerBadge } from '../../components/coach/coachDisplay';
+import ProgressRing from '../../components/ui/ProgressRing';
 import { formatCoachDate, getCoachScopedEvents, getEventTimestamp, isUpcoming } from '../../components/coach/coachUtils';
 
 /**
@@ -44,21 +45,39 @@ function TeamCard({ team }: { team: TeamWithPlayers }) {
   );
   const hidden = team.players.length - preview.length;
 
+  const rated = team.players.filter((player) => player.attendanceRate != null);
+  const average = rated.length
+    ? Math.round(rated.reduce((sum, player) => sum + (player.attendanceRate ?? 0), 0) / rated.length)
+    : null;
+
   return (
     <View
-      className="rounded-[16px] border p-5 gap-4 min-w-0"
+      className="ui-lift relative overflow-hidden rounded-[16px] border p-5 gap-4 min-w-0"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
-      <View className="flex-row items-start gap-3">
-        <View className="w-11 h-11 rounded-[13px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-          <MaterialIcons name="shield" size={21} color="var(--c-brand-fg)" />
+      {/* Brand edge — a thin gradient cap so squads read as distinct objects
+          rather than another grey panel. */}
+      <View
+        className="absolute left-0 right-0 top-0 h-[3px]"
+        style={{ background: 'linear-gradient(90deg, var(--c-hero-via), var(--c-hero-to), var(--c-sky))' } as any}
+      />
+
+      <View className="flex-row items-center gap-3.5">
+        <View
+          className="w-12 h-12 rounded-[14px] items-center justify-center shrink-0"
+          style={{ background: 'linear-gradient(135deg, var(--c-hero-via), var(--c-hero-to))', boxShadow: 'var(--e-brand)' } as any}
+        >
+          <MaterialIcons name="shield" size={22} color="#FFFFFF" />
         </View>
         <View className="flex-1 min-w-0">
-          <Text className="text-[17px] font-bold leading-tight" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{team.name}</Text>
+          <Text className="text-[18px] font-bold leading-tight" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{team.name}</Text>
           {team.leagueName ? (
-            <Text className="text-[12.5px] font-medium mt-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{team.leagueName}</Text>
+            <Text className="t-meta mt-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{team.leagueName}</Text>
           ) : null}
         </View>
+        <ProgressRing value={average} size={56} stroke={6} color={attendanceRateColor(average)} label={average == null ? 'Fără prezență marcată' : `Prezență medie ${average}%`}>
+          <Text className="t-num text-[12.5px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{average == null ? '—' : `${average}%`}</Text>
+        </ProgressRing>
       </View>
 
       {chips.length ? (
@@ -68,8 +87,10 @@ function TeamCard({ team }: { team: TeamWithPlayers }) {
       ) : null}
 
       <View className="flex-row gap-2 sm:gap-2.5">
-        <StatTile label="Lot" value={team.players.length} hint={team.players.length === 1 ? 'jucător' : 'jucători'} />
+        <StatTile icon="groups" tone="purple" label="Lot" value={team.players.length} hint={team.players.length === 1 ? 'jucător' : 'jucători'} />
         <StatTile
+          icon="event"
+          tone="brand"
           label="Urmează"
           value={team.nextEvent ? formatCoachDate(team.nextEvent.startTime) : '—'}
           hint={team.nextEvent ? team.nextEvent.title : 'nimic programat'}
@@ -78,21 +99,24 @@ function TeamCard({ team }: { team: TeamWithPlayers }) {
 
       {team.players.length ? (
         <View className="gap-2.5">
-          <Text className="text-[11px] font-bold uppercase tracking-[0.09em]" style={{ color: 'var(--c-faint)' }}>
+          <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>
             Prezența cea mai scăzută
           </Text>
-          {preview.map((player) => (
-            <CoachPlayerRow
-              key={player.id}
-              firstName={player.firstName}
-              lastName={player.lastName}
-              badge={getPlayerBadge(player)}
-              meta={player.position || player.status || 'Jucător'}
-              trailing={<AttendanceRate rate={player.attendanceRate} />}
-            />
-          ))}
+          <View className="gap-2 ui-stagger">
+            {preview.map((player) => (
+              <CoachPlayerRow
+                key={player.id}
+                firstName={player.firstName}
+                lastName={player.lastName}
+                badge={getPlayerBadge(player)}
+                meta={player.position || player.status || 'Jucător'}
+                rate={player.attendanceRate ?? null}
+                trailing={<AttendanceRate rate={player.attendanceRate} />}
+              />
+            ))}
+          </View>
           {hidden > 0 ? (
-            <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>
+            <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
               +{hidden} {hidden === 1 ? 'alt jucător' : 'alți jucători'} în lot
             </Text>
           ) : null}
@@ -213,7 +237,7 @@ export default function CoachTeamsScreen() {
         ) : (
           // Two columns only from xl: the cards carry a roster list, so at 1024px
           // a second column squeezed every player name to an ellipsis.
-          <View className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <View className="grid grid-cols-1 xl:grid-cols-2 gap-4 ui-stagger">
             {visibleTeams.map((team) => <TeamCard key={team.id} team={team} />)}
           </View>
         )}

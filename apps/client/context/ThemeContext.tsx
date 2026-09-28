@@ -33,8 +33,13 @@ function prefersDark(): boolean {
 
 function readStoredMode(): ThemeMode {
   if (typeof window === 'undefined') return 'system';
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  return stored === 'dark' || stored === 'light' || stored === 'system' ? stored : 'system';
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    return stored === 'dark' || stored === 'light' || stored === 'system' ? stored : 'system';
+  } catch {
+    // Storage can throw (Safari private mode, blocked site data).
+    return 'system';
+  }
 }
 
 function resolve(mode: ThemeMode): ResolvedTheme {
@@ -42,10 +47,28 @@ function resolve(mode: ThemeMode): ResolvedTheme {
   return mode;
 }
 
-/** Apply the resolved theme to <html> so all `[data-theme]` tokens switch. */
+/** Browser chrome colour (mobile address bar / PWA title bar) per theme — the page background. */
+const THEME_COLOR: Record<ResolvedTheme, string> = { light: '#F4F5F8', dark: '#0A0B11' };
+
+/**
+ * Apply the resolved theme to <html> so all `[data-theme]` tokens switch.
+ *
+ * Transitions are suspended for the swap: components that transition their
+ * colours (inputs, toggles, cards) otherwise fade from the old palette over
+ * ~200ms, so for a moment dark cards carried light borders — most visibly in
+ * the Appearance picker itself, right where the user just clicked.
+ */
 function applyTheme(theme: ResolvedTheme) {
   if (typeof document === 'undefined') return;
-  document.documentElement.setAttribute('data-theme', theme);
+  const root = document.documentElement;
+  if (root.getAttribute('data-theme') === theme) return;
+
+  root.classList.add('theme-switching');
+  root.setAttribute('data-theme', theme);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[theme]);
+  // Two frames: the first commits the new colours with transitions off, the
+  // second restores them.
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')));
 }
 
 export function ThemeProvider({ children }: PropsWithChildren) {
@@ -58,7 +81,11 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     setTheme(resolved);
     applyTheme(resolved);
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(STORAGE_KEY, mode);
+      try {
+        window.localStorage.setItem(STORAGE_KEY, mode);
+      } catch {
+        // Non-persistent storage: the choice still applies for this session.
+      }
     }
   }, [mode]);
 

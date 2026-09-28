@@ -4,13 +4,16 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { CalendarEvent, EventAttendance, eventsApi } from '../../services/eventsApi';
 import { teamsApi, type Player } from '../../services/teamsApi';
 import { useSession } from '../../context/AuthContext';
+import { useResponsive } from '../../hooks/useResponsive';
 import GlassCard from '../../components/ui/GlassCard';
 import PageContainer from '../../components/ui/PageContainer';
 import PageHeader from '../../components/ui/PageHeader';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
 import { CoachPlayerRow, SessionRow, StatTile } from '../../components/coach/CoachPrimitives';
-import { attendanceStatusTone, getPlayerBadge, isPresentStatus } from '../../components/coach/coachDisplay';
+import ProgressRing from '../../components/ui/ProgressRing';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { attendanceRateColor, attendanceStatusTone, eventTypeMeta, getPlayerBadge, isPresentStatus } from '../../components/coach/coachDisplay';
 import {
   formatCoachDate,
   formatCoachTimeRange,
@@ -38,6 +41,12 @@ type AttendancePlayer = {
 
 /** Sessions offered in the picker — anything older lives on /schedule. */
 const SESSION_LIMIT = 12;
+
+/**
+ * On a phone the picker sits ABOVE the roster, so twelve rows pushed the
+ * players a full screen down. Show a few and let the coach expand.
+ */
+const MOBILE_SESSION_PREVIEW = 4;
 
 const STATUS_OPTIONS: { status: AttendanceStatus; label: string; icon: string; color: string; bg: string }[] = [
   { status: 'present', label: 'Prezent', icon: 'check-circle', color: 'var(--c-success-fg)', bg: 'var(--c-success-bg)' },
@@ -99,9 +108,15 @@ function AttendanceRow({
 
   return (
     <View
-      className="rounded-[14px] border px-3.5 py-3 gap-3 flex-col md:flex-row md:items-center md:gap-4"
+      className="relative overflow-hidden rounded-[14px] border pl-4 pr-3.5 py-3 gap-3 flex-col md:flex-row md:items-center md:gap-4"
       style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any}
     >
+      {/* Status rail: the row's state is readable from the left edge alone,
+          so a coach scrolling a 15-player list sees the gaps at a glance. */}
+      <View
+        className="absolute left-0 top-0 bottom-0 w-[3px]"
+        style={{ backgroundColor: unmarked ? 'var(--c-border-strong)' : attendanceStatusTone(player.status).fg, transition: 'background-color 0.2s ease' } as any}
+      />
       <View className="flex-1 min-w-0">
         <CoachPlayerRow
           bare
@@ -128,19 +143,21 @@ function AttendanceRow({
               accessibilityRole="button"
               accessibilityState={{ selected: active, disabled: busy }}
               accessibilityLabel={`${option.label}: ${player.firstName} ${player.lastName}`}
-              className="flex-1 md:flex-none h-10 rounded-[11px] border px-2.5 flex-row items-center justify-center gap-1.5"
+              className="ui-press flex-1 md:flex-none h-10 rounded-[11px] border px-3 flex-row items-center justify-center gap-1.5"
               style={{
                 borderColor: active ? option.color : 'var(--c-border)',
                 backgroundColor: active ? option.bg : 'var(--c-surface-2)',
+                boxShadow: active ? `inset 0 0 0 1px ${option.color}` : 'none',
                 opacity: busy ? 0.6 : 1,
+                transition: 'background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease',
               } as any}
             >
               {busy ? (
                 <ActivityIndicator size="small" color={option.color} />
               ) : (
-                <MaterialIcons name={option.icon} size={15} color={active ? option.color : 'var(--c-muted)'} />
+                <MaterialIcons name={option.icon} size={16} color={active ? option.color : 'var(--c-muted)'} />
               )}
-              <Text className="text-[11.5px] font-bold" style={{ color: active ? option.color : 'var(--c-muted)' }} numberOfLines={1}>
+              <Text className="text-[12.5px] font-bold" style={{ color: active ? option.color : 'var(--c-muted)' }} numberOfLines={1}>
                 {option.label}
               </Text>
             </Pressable>
@@ -153,12 +170,16 @@ function AttendanceRow({
 
 export default function CoachAttendanceScreen() {
   const { session } = useSession();
+  const { isMobile } = useResponsive();
+  const [showAllSessions, setShowAllSessions] = useState(false);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [players, setPlayers] = useState<AttendancePlayer[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [savingPlayerId, setSavingPlayerId] = useState<number | null>(null);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadEvents = useCallback(async () => {
@@ -187,6 +208,16 @@ export default function CoachAttendanceScreen() {
   useEffect(() => {
     loadEvents();
   }, [loadEvents]);
+
+  const pickerSessions = useMemo(() => events.slice(0, SESSION_LIMIT), [events]);
+  // Keep the selected session visible even when it sits past the preview cut.
+  const visibleSessions = useMemo(() => {
+    if (!isMobile || showAllSessions) return pickerSessions;
+    const preview = pickerSessions.slice(0, MOBILE_SESSION_PREVIEW);
+    const selected = pickerSessions.find((event) => event.id === selectedEventId);
+    return selected && !preview.includes(selected) ? [...preview.slice(0, MOBILE_SESSION_PREVIEW - 1), selected] : preview;
+  }, [isMobile, pickerSessions, selectedEventId, showAllSessions]);
+  const hiddenSessionCount = pickerSessions.length - visibleSessions.length;
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === selectedEventId) ?? null,
@@ -234,9 +265,42 @@ export default function CoachAttendanceScreen() {
     }
   };
 
+  const unmarkedIds = players.filter((player) => !player.status).map((player) => player.playerId);
+
+  /**
+   * "Restul prezenți": the common courtside case is a full squad with one or
+   * two absences. Mark the exceptions by hand, then fill every still-unmarked
+   * player as present in ONE request — already-marked rows are never touched.
+   */
+  const markRemainingPresent = async () => {
+    if (!selectedEvent || !unmarkedIds.length) {
+      setBulkConfirmOpen(false);
+      return;
+    }
+
+    setBulkSaving(true);
+    try {
+      await eventsApi.updateEventAttendance(
+        selectedEvent.id,
+        unmarkedIds.map((playerId) => ({ playerId, status: 'present' })),
+      );
+      const ids = new Set(unmarkedIds);
+      setPlayers((current) => current.map((player) => (ids.has(player.playerId) ? { ...player, status: 'present' } : player)));
+      setBulkConfirmOpen(false);
+    } catch (err) {
+      setBulkConfirmOpen(false);
+      Alert.alert('Prezență', err instanceof Error ? err.message : 'Nu s-a putut actualiza prezența.');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   const markedCount = players.filter((player) => player.status).length;
   const presentCount = players.filter((player) => isPresentStatus(player.status)).length;
   const presentRate = markedCount ? Math.round((presentCount / markedCount) * 100) : null;
+  const unmarkedCount = players.length - markedCount;
+  const markedPercent = players.length ? Math.round((markedCount / players.length) * 100) : 0;
+  const selectedMeta = selectedEvent ? eventTypeMeta(selectedEvent.type) : null;
 
   return (
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
@@ -271,7 +335,7 @@ export default function CoachAttendanceScreen() {
         <View className="flex-col xl:flex-row gap-4">
           {/* Picker first on mobile — a coach chooses the session before they
               can mark anyone, so it must not sit below a full roster. */}
-          <View className="w-full xl:w-[340px] shrink-0">
+          <View className="w-full xl:w-[360px] shrink-0">
             <GlassCard className="gap-3">
               <View>
                 <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Sesiuni</Text>
@@ -287,15 +351,33 @@ export default function CoachAttendanceScreen() {
                   ))}
                 </View>
               ) : events.length ? (
-                <View className="gap-2.5">
-                  {events.slice(0, SESSION_LIMIT).map((event) => (
+                <View className="gap-2 ui-stagger">
+                  {visibleSessions.map((event) => (
                     <SessionRow
                       key={event.id}
+                      compact
                       event={event}
                       active={event.id === selectedEventId}
-                      onPress={() => setSelectedEventId(event.id)}
+                      onPress={() => {
+                        setSelectedEventId(event.id);
+                        if (isMobile) setShowAllSessions(false);
+                      }}
                     />
                   ))}
+                  {hiddenSessionCount > 0 || (isMobile && showAllSessions) ? (
+                    <Pressable
+                      onPress={() => setShowAllSessions((value) => !value)}
+                      accessibilityRole="button"
+                      accessibilityLabel={showAllSessions ? 'Arată mai puține sesiuni' : `Arată toate sesiunile (${pickerSessions.length})`}
+                      className="ui-press h-10 rounded-[11px] border flex-row items-center justify-center gap-1.5"
+                      style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
+                    >
+                      <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
+                        {showAllSessions ? 'Arată mai puține' : `Arată toate (${pickerSessions.length})`}
+                      </Text>
+                      <MaterialIcons name="expand-more" size={16} color="var(--c-brand-fg)" style={{ transform: showAllSessions ? 'rotate(180deg)' : undefined }} />
+                    </Pressable>
+                  ) : null}
                 </View>
               ) : (
                 <EmptyState
@@ -310,8 +392,28 @@ export default function CoachAttendanceScreen() {
 
           <View className="flex-1 min-w-0 gap-4">
             <GlassCard className="gap-4">
-              <View>
-                <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
+              <View className="flex-row items-center gap-4">
+                <ProgressRing
+                  value={players.length ? markedPercent : null}
+                  size={64}
+                  stroke={7}
+                  color={markedPercent === 100 ? 'var(--c-success)' : 'var(--c-brand-fg)'}
+                  label={`${markedCount} din ${players.length} marcați`}
+                >
+                  {markedPercent === 100 ? (
+                    <MaterialIcons name="check" size={22} color="var(--c-success-fg)" />
+                  ) : (
+                    <Text className="t-num text-[14px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{markedPercent}%</Text>
+                  )}
+                </ProgressRing>
+              <View className="flex-1 min-w-0">
+                {selectedMeta ? (
+                  <View className="flex-row items-center gap-1.5 mb-1">
+                    <MaterialIcons name={selectedMeta.icon} size={13} color={selectedMeta.fg} />
+                    <Text className="t-eyebrow" style={{ color: selectedMeta.fg }}>{selectedMeta.label}</Text>
+                  </View>
+                ) : null}
+                <Text className="text-[18px] font-bold leading-snug" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
                   {selectedEvent?.title ?? 'Selectează o sesiune'}
                 </Text>
                 <Text className="text-[12.5px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
@@ -320,17 +422,39 @@ export default function CoachAttendanceScreen() {
                     : 'Lista de prezență apare aici.'}
                 </Text>
               </View>
+              </View>
 
               <View className="flex-row gap-2 sm:gap-2.5">
-                <StatTile label="Marcați" value={`${markedCount}/${players.length}`} hint="din lot" />
-                <StatTile label="Prezenți" value={presentCount} hint="jucători" color="var(--c-success-fg)" />
+                <StatTile icon="fact-check" label="Marcați" value={`${markedCount}/${players.length}`} hint="din lot" />
+                <StatTile icon="check-circle" tone="success" label="Prezenți" value={presentCount} hint="jucători" />
                 <StatTile
+                  icon="trending-up"
                   label="Rată"
                   value={presentRate == null ? '—' : `${presentRate}%`}
                   hint={markedCount ? 'din marcați' : 'nemarcată'}
-                  color={presentRate == null ? undefined : 'var(--c-ink)'}
+                  color={presentRate == null ? undefined : attendanceRateColor(presentRate)}
                 />
               </View>
+
+              {unmarkedCount > 0 && players.length > 0 ? (
+                <Pressable
+                  onPress={() => setBulkConfirmOpen(true)}
+                  disabled={bulkSaving}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Marchează restul prezenți (${unmarkedCount})`}
+                  className="ui-press h-11 rounded-[12px] px-4 flex-row items-center justify-center gap-2 border"
+                  style={{ backgroundColor: 'var(--c-success-bg)', borderColor: 'var(--c-success-border)', opacity: bulkSaving ? 0.7 : 1 } as any}
+                >
+                  {bulkSaving ? (
+                    <ActivityIndicator size="small" color="var(--c-success-fg)" />
+                  ) : (
+                    <MaterialIcons name="check-circle" size={17} color="var(--c-success-fg)" />
+                  )}
+                  <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-success-fg)' }}>
+                    Marchează restul prezenți ({unmarkedCount})
+                  </Text>
+                </Pressable>
+              ) : null}
             </GlassCard>
 
             {loadingAttendance ? (
@@ -340,12 +464,12 @@ export default function CoachAttendanceScreen() {
                 ))}
               </View>
             ) : players.length ? (
-              <View className="gap-2.5">
+              <View className="gap-2.5 ui-stagger">
                 {players.map((player) => (
                   <AttendanceRow
                     key={player.playerId}
                     player={player}
-                    busy={savingPlayerId === player.playerId}
+                    busy={bulkSaving || savingPlayerId === player.playerId}
                     onMark={(status) => markPlayer(player.playerId, status)}
                   />
                 ))}
@@ -362,6 +486,18 @@ export default function CoachAttendanceScreen() {
           </View>
         </View>
       </PageContainer>
+
+      <ConfirmDialog
+        visible={bulkConfirmOpen}
+        icon="check-circle"
+        title="Marchează restul prezenți"
+        message={`${unmarkedIds.length} ${unmarkedIds.length === 1 ? 'jucător nemarcat va fi trecut' : 'jucători nemarcați vor fi trecuți'} ca prezenți. Cei deja marcați nu se schimbă.`}
+        confirmLabel="Confirmă"
+        cancelLabel="Anulează"
+        loading={bulkSaving}
+        onConfirm={markRemainingPresent}
+        onCancel={() => setBulkConfirmOpen(false)}
+      />
     </ScrollView>
   );
 }

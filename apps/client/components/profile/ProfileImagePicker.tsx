@@ -114,21 +114,31 @@ export default function ProfileImagePicker({
     <Pressable
       onPress={handlePickImage}
       disabled={uploading}
-      className="relative self-start"
+      accessibilityRole="button"
+      accessibilityLabel={avatarUrl ? 'Schimbă fotografia de profil' : 'Adaugă o fotografie de profil'}
+      className="ui-press relative self-start"
     >
-      <View className="w-24 h-24 rounded-full bg-[#EBF1FF] border-4 border-white shadow-lg overflow-hidden items-center justify-center">
+      {/* Ring is the card surface colour, not white, so the avatar sits cleanly
+          on the cover band in dark mode too. */}
+      <View
+        className="w-24 h-24 md:w-28 md:h-28 rounded-full border-4 overflow-hidden items-center justify-center"
+        style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-surface)', boxShadow: 'var(--e-md)' } as any}
+      >
         {avatarUrl ? (
           <Image source={{ uri: avatarUrl }} className="w-full h-full" />
         ) : (
-          <Text className="text-[#1D3E90] text-2xl font-black tracking-tight">{initials}</Text>
+          <Text className="text-[30px] font-bold" style={{ color: 'var(--c-brand-fg)', letterSpacing: '-0.5px' } as any}>{initials}</Text>
         )}
       </View>
 
-      <View className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-[#1D3E90] border-2 border-white items-center justify-center shadow-md">
+      <View
+        className="absolute bottom-0.5 right-0.5 w-9 h-9 rounded-full border-[3px] items-center justify-center"
+        style={{ backgroundColor: 'var(--c-brand-surface)', borderColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any}
+      >
         {uploading ? (
-          <ActivityIndicator size="small" color="var(--c-surface)" />
+          <ActivityIndicator size="small" color="#FFFFFF" />
         ) : (
-          <MaterialIcons name="photo-camera" size={18} color="var(--c-surface)" />
+          <MaterialIcons name="photo-camera" size={16} color="var(--c-on-brand)" />
         )}
       </View>
     </Pressable>

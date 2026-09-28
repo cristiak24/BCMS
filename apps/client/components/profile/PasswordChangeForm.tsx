@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from '@/src/web/reactNative';
-import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import AuraInput from '../ui/AuraInput';
+import { Text, View } from '@/src/web/reactNative';
+import { FormNotice, PrimaryButton, ProfileCard, ProfileField } from './ProfileParts';
 
 type PasswordChangeFormProps = {
   onChangePassword: (payload: {
@@ -11,6 +10,28 @@ type PasswordChangeFormProps = {
   }) => Promise<void>;
 };
 
+/**
+ * 0–4 from length and character variety. A guide for the person typing, not a
+ * security control — the real policy is enforced by the auth provider.
+ */
+function getPasswordStrength(value: string) {
+  if (!value) return 0;
+  let score = 0;
+  if (value.length >= 8) score += 1;
+  if (value.length >= 12) score += 1;
+  if (/[a-z]/.test(value) && /[A-Z]/.test(value)) score += 1;
+  if (/\d/.test(value) && /[^A-Za-z0-9]/.test(value)) score += 1;
+  return Math.min(4, score);
+}
+
+const STRENGTH_META = [
+  { label: 'Prea scurtă', color: 'var(--c-danger)' },
+  { label: 'Slabă', color: 'var(--c-danger)' },
+  { label: 'Acceptabilă', color: 'var(--c-warning)' },
+  { label: 'Bună', color: 'var(--c-success)' },
+  { label: 'Puternică', color: 'var(--c-success)' },
+];
+
 export default function PasswordChangeForm({ onChangePassword }: PasswordChangeFormProps) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -18,6 +39,11 @@ export default function PasswordChangeForm({ onChangePassword }: PasswordChangeF
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const strength = getPasswordStrength(newPassword);
+  const strengthMeta = STRENGTH_META[newPassword.length < 8 ? 0 : strength];
+  const mismatch = confirmPassword.length > 0 && confirmPassword !== newPassword;
+  const canSubmit = Boolean(currentPassword && newPassword.length >= 8 && confirmPassword && !mismatch);
 
   const handleSubmit = async () => {
     if (!currentPassword.trim()) {
@@ -58,64 +84,71 @@ export default function PasswordChangeForm({ onChangePassword }: PasswordChangeF
   };
 
   return (
-    <View className="bg-[var(--c-surface)] rounded-[28px] p-6 border border-gray-100 shadow-sm">
-      <Text className="text-[#0E2041] text-[12px] font-black uppercase tracking-widest mb-5">Securitate</Text>
-
+    <ProfileCard icon="lock" tone="warning" title="Securitate" description="Schimbă parola contului tău.">
       <View className="gap-4">
-        <AuraInput
+        <ProfileField
           label="Parola curentă"
-          iconName="lock-outline"
+          icon="lock-outline"
           secureTextEntry
           value={currentPassword}
-          onChangeText={setCurrentPassword}
+          onChangeText={(value: string) => { setCurrentPassword(value); setError(null); setSuccess(null); }}
           autoCapitalize="none"
+          autoComplete="current-password"
         />
-        <AuraInput
-          label="Parolă nouă"
-          iconName="lock"
-          secureTextEntry
-          value={newPassword}
-          onChangeText={setNewPassword}
-          autoCapitalize="none"
-        />
-        <AuraInput
+        <View>
+          <ProfileField
+            label="Parolă nouă"
+            icon="key"
+            secureTextEntry
+            value={newPassword}
+            onChangeText={(value: string) => { setNewPassword(value); setError(null); setSuccess(null); }}
+            autoCapitalize="none"
+            autoComplete="new-password"
+            hint={newPassword ? undefined : 'Minimum 8 caractere; combină litere mari, cifre și simboluri.'}
+          />
+          {newPassword ? (
+            <View className="mt-2" accessibilityLabel={`Putere parolă: ${strengthMeta.label}`}>
+              <View className="flex-row gap-1">
+                {[0, 1, 2, 3].map((index) => (
+                  <View
+                    key={index}
+                    className="flex-1 h-1.5 rounded-full"
+                    style={{
+                      backgroundColor: index < Math.max(1, strength) ? strengthMeta.color : 'var(--c-surface-3)',
+                      transition: 'background-color 0.2s ease',
+                    } as any}
+                  />
+                ))}
+              </View>
+              <Text className="text-[12px] font-semibold mt-1.5" style={{ color: strengthMeta.color }}>{strengthMeta.label}</Text>
+            </View>
+          ) : null}
+        </View>
+        <ProfileField
           label="Confirmă parola nouă"
-          iconName="lock"
+          icon="key"
           secureTextEntry
           value={confirmPassword}
-          onChangeText={setConfirmPassword}
+          onChangeText={(value: string) => { setConfirmPassword(value); setError(null); setSuccess(null); }}
           autoCapitalize="none"
+          autoComplete="new-password"
+          error={mismatch ? 'Parolele nu coincid.' : null}
         />
-      </View>
 
-      {error ? (
-        <View className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
-          <Text className="text-red-700 text-sm font-semibold">{error}</Text>
+        {error ? <FormNotice tone="danger" message={error} /> : null}
+        {success ? <FormNotice tone="success" message={success} /> : null}
+
+        <View className="flex-row justify-end">
+          <PrimaryButton
+            label="Schimbă parola"
+            loadingLabel="Se actualizează…"
+            icon="verified-user"
+            onPress={handleSubmit}
+            loading={loading}
+            disabled={!canSubmit}
+          />
         </View>
-      ) : null}
-
-      {success ? (
-        <View className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <Text className="text-emerald-700 text-sm font-semibold">{success}</Text>
-        </View>
-      ) : null}
-
-      <View className="mt-6 flex-row justify-end">
-        <Pressable
-          onPress={handleSubmit}
-          disabled={loading}
-          className={`min-w-[220px] rounded-2xl px-5 py-4 flex-row items-center justify-center ${loading ? 'bg-[#8FA3D8]' : 'bg-[#1D3E90]'}`}
-        >
-          {loading ? (
-            <ActivityIndicator color="var(--c-surface)" />
-          ) : (
-            <>
-              <MaterialIcons name="verified-user" size={18} color="var(--c-surface)" />
-              <Text className="text-white font-black text-[12px] uppercase tracking-widest ml-2">Schimbă parola</Text>
-            </>
-          )}
-        </Pressable>
       </View>
-    </View>
+    </ProfileCard>
   );
 }

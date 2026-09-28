@@ -80,6 +80,19 @@ import {
   WalletCards,
   XCircle,
   X,
+  BellRing,
+  Clock,
+  History,
+  KeyRound,
+  LogIn,
+  MessageSquareText,
+  MonitorSmartphone,
+  Moon,
+  Palette,
+  Smartphone,
+  Sun,
+  UserMinus,
+  UserSearch,
 } from 'lucide-react';
 
 type IconProps = {
@@ -206,6 +219,29 @@ const iconMap: Record<string, typeof Circle> = {
   warning: AlertTriangle,
   'warning-amber': AlertTriangle,
   badge: BadgeCheck,
+  // Names used by screens that previously fell through to the Circle fallback
+  // (the profile theme picker rendered three identical circles).
+  insights: TrendingUp,
+  'wb-sunny': Sun,
+  'light-mode': Sun,
+  nightlight: Moon,
+  'dark-mode': Moon,
+  'settings-brightness': MonitorSmartphone,
+  devices: MonitorSmartphone,
+  'notifications-active': BellRing,
+  'access-time': Clock,
+  smartphone: Smartphone,
+  sms: MessageSquareText,
+  key: KeyRound,
+  palette: Palette,
+  history: History,
+  login: LogIn,
+  'mail-outline': Mail,
+  email: Mail,
+  'person-remove': UserMinus,
+  'person-search': UserSearch,
+  'account-circle': UserCircle,
+  security: ShieldCheck,
 };
 
 function Icon({ name = 'circle', size = 20, color = 'currentColor', style, className }: IconProps) {

@@ -1,5 +1,9 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+// Self-hosted Inter (variable, unicode-range subsets incl. latin-ext for ș/ț).
+// Bundled rather than pulled from Google Fonts so no visitor IP leaves for a
+// third-party CDN, and the face is identical on macOS, Windows and Android.
+import '@fontsource-variable/inter';
 import './theme/tokens.css';
 import './web/styles.css';
 import '../global.css';

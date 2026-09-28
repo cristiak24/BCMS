@@ -40,6 +40,14 @@
   .skip-link:focus-visible {
     transform: translateY(0);
   }
+
+  /* Set for two frames by ThemeContext while data-theme flips. */
+  .theme-switching,
+  .theme-switching *,
+  .theme-switching *::before,
+  .theme-switching *::after {
+    transition: none !important;
+  }
 }
 
 @layer utilities {
@@ -119,6 +127,118 @@
   .dash-pulse-dot {
     animation: dashPulse 2s ease-in-out infinite;
   }
+
+  /* ── Motion kit (coach / player / profile) ────────────────────────────
+     Every entrance animation below ends WITHOUT a transform in its `to`
+     keyframe (see the dashFadeIn note) so nothing stays a promoted layer at
+     rest. All of it is switched off under prefers-reduced-motion. */
+
+  .ui-rise {
+    animation: dashFadeIn 0.55s var(--ease-out) both;
+  }
+
+  .ui-stagger > * {
+    animation: dashFadeIn 0.55s var(--ease-out) both;
+  }
+  .ui-stagger > *:nth-child(1) { animation-delay: 0.03s; }
+  .ui-stagger > *:nth-child(2) { animation-delay: 0.08s; }
+  .ui-stagger > *:nth-child(3) { animation-delay: 0.13s; }
+  .ui-stagger > *:nth-child(4) { animation-delay: 0.18s; }
+  .ui-stagger > *:nth-child(5) { animation-delay: 0.23s; }
+  .ui-stagger > *:nth-child(6) { animation-delay: 0.28s; }
+  .ui-stagger > *:nth-child(7) { animation-delay: 0.33s; }
+  .ui-stagger > *:nth-child(8) { animation-delay: 0.38s; }
+  .ui-stagger > *:nth-child(n + 9) { animation-delay: 0.42s; }
+
+  /* Hover lift for interactive cards. Gated on a real hover pointer so a tap
+     on a phone doesn't leave a card stuck in its raised state. */
+  /* Only transform + shadow transition: animating colours here made cards
+     lag half a second behind the rest of the page on a theme switch. */
+  .ui-lift {
+    transition:
+      transform var(--dur-base) var(--ease-out),
+      box-shadow var(--dur-base) ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .ui-lift:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--e-md);
+      border-color: color-mix(in srgb, var(--c-brand-border) 45%, var(--c-border)) !important;
+    }
+  }
+
+  .ui-press {
+    transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) ease, filter var(--dur-fast) ease;
+  }
+  .ui-press:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .ui-press:hover:not(:disabled) {
+      filter: brightness(1.06);
+    }
+  }
+
+  /* Progress fills grow in from the left. */
+  .ui-bar {
+    transform-origin: left center;
+    animation: uiBarGrow 0.9s var(--ease-out) both;
+    animation-delay: 0.15s;
+  }
+
+  /* SVG ring arcs draw in. The element's own stroke-dashoffset is the end
+     state; the keyframe only supplies the start (the full circumference, set
+     by the component as --ring-len). */
+  .ui-ring-arc {
+    animation: uiRingDraw 1.1s var(--ease-out) both;
+    animation-delay: 0.1s;
+  }
+
+  /* Slow drifting sheen on hero panels. Opacity-only + background-position,
+     so it never promotes a layer. */
+  .ui-hero-sheen {
+    background-image: radial-gradient(60% 80% at 85% 0%, rgba(255, 255, 255, 0.16), transparent 60%),
+      radial-gradient(40% 60% at 0% 100%, rgba(129, 140, 248, 0.28), transparent 70%);
+    background-size: 140% 140%;
+    animation: uiSheen 14s ease-in-out infinite alternate;
+  }
+
+  /* "Up next" live dot. */
+  .ui-ping {
+    position: relative;
+  }
+  .ui-ping::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: inherit;
+    animation: uiPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  .ui-spin-slow {
+    animation: uiSpin 24s linear infinite;
+  }
+
+  /* Type scale for the redesigned screens. Micro labels were 9.5–10px
+     uppercase, which is below comfortable reading size on a phone; 11px is
+     the floor now, and meta copy sits at 12.5–13px. */
+  .t-eyebrow {
+    font-size: 11px;
+    line-height: 14px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .t-meta {
+    font-size: 12.5px;
+    line-height: 17px;
+    font-weight: 500;
+  }
+  .t-num {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
 }
 
 @keyframes dashFadeIn {
@@ -157,14 +277,62 @@
   }
 }
 
+
+@keyframes uiBarGrow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    /* no transform at rest — see dashFadeIn */
+  }
+}
+
+@keyframes uiRingDraw {
+  from {
+    stroke-dashoffset: var(--ring-len, 0);
+  }
+}
+
+@keyframes uiSheen {
+  from {
+    background-position: 0% 0%;
+  }
+  to {
+    background-position: 100% 100%;
+  }
+}
+
+@keyframes uiPing {
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes uiSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dash-fade-in,
   .dash-stagger > *,
   .dash-skeleton,
-  .dash-pulse-dot {
+  .dash-pulse-dot,
+  .ui-rise,
+  .ui-stagger > *,
+  .ui-bar,
+  .ui-ring-arc,
+  .ui-hero-sheen,
+  .ui-ping::after,
+  .ui-spin-slow {
     animation: none !important;
   }
-  .dash-card-hover:hover {
-    transform: none;
+  .dash-card-hover:hover,
+  .ui-lift:hover,
+  .ui-press:active {
+    transform: none !important;
   }
 }

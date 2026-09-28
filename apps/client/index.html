@@ -10,7 +10,7 @@
     <meta name="description" content="BCMS web app for basketball club operations." />
     <meta name="format-detection" content="telephone=no" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="theme-color" content="#2563EB" />
+    <meta name="theme-color" content="#F4F5F8" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="/pwa-icon.svg" />
     <link rel="apple-touch-icon" href="/pwa-icon.svg" />
@@ -20,9 +20,13 @@
       (function () {
         try {
           var stored = localStorage.getItem('bcms.theme');
-          var mode = stored === 'dark' || stored === 'light' || stored === 'system' ? stored : 'light';
+          // Must match ThemeContext's default ('system'), or first-time
+          // visitors on a dark OS get a light frame, then a flip to dark.
+          var mode = stored === 'dark' || stored === 'light' || stored === 'system' ? stored : 'system';
           var dark = mode === 'dark' || (mode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
           document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', dark ? '#0A0B11' : '#F4F5F8');
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'light');
         }

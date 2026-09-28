@@ -1,25 +1,51 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Switch, Text, View } from '@/src/web/reactNative';
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, Switch, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import AuraInput from '../ui/AuraInput';
 import type { ProfileRecord, UpdateProfilePayload } from '../../services/profileApi';
 import type { NotificationPreferences } from '../../utils/authSession';
+import { FormNotice, PrimaryButton, ProfileCard, ProfileField } from './ProfileParts';
 
 type ProfileFormProps = {
   profile: ProfileRecord;
   onSave: (payload: UpdateProfilePayload) => Promise<ProfileRecord>;
 };
 
+const DEFAULT_NOTIFICATIONS: NotificationPreferences = { email: true, push: false, sms: false };
+
+/**
+ * Languages the app actually ships copy for. This used to be a free-text field,
+ * which is how profiles ended up storing "ro", "Romana" and "romanian" for the
+ * same thing.
+ */
+const LANGUAGE_OPTIONS = [
+  { value: 'ro', label: 'Română' },
+  { value: 'en', label: 'English' },
+];
+
+const NOTIFICATION_OPTIONS = [
+  { key: 'email', icon: 'mail', label: 'Email', description: 'Program, schimbări de ultim moment și plăți.' },
+  { key: 'push', icon: 'notifications-active', label: 'Notificări push', description: 'Alerte instant pe acest dispozitiv.' },
+  { key: 'sms', icon: 'sms', label: 'SMS', description: 'Doar pentru anunțuri urgente ale clubului.' },
+] as const;
+
+function normalizeLanguage(value?: string | null) {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (normalized.startsWith('ro')) return 'ro';
+  if (normalized.startsWith('en')) return 'en';
+  return normalized;
+}
+
+function sameNotifications(a: NotificationPreferences, b: NotificationPreferences) {
+  return Boolean(a.email) === Boolean(b.email) && Boolean(a.push) === Boolean(b.push) && Boolean(a.sms) === Boolean(b.sms);
+}
+
 export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [preferredLanguage, setPreferredLanguage] = useState('');
-  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({
-    email: true,
-    push: false,
-    sms: false,
-  });
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(DEFAULT_NOTIFICATIONS);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -28,32 +54,49 @@ export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
     setFirstName(profile.firstName ?? '');
     setLastName(profile.lastName ?? '');
     setPhone(profile.phone ?? '');
-    setPreferredLanguage(profile.preferredLanguage ?? '');
-    setNotificationPreferences(profile.notificationPreferences ?? { email: true, push: false, sms: false });
+    setPreferredLanguage(normalizeLanguage(profile.preferredLanguage));
+    setNotificationPreferences(profile.notificationPreferences ?? DEFAULT_NOTIFICATIONS);
     setError(null);
     setSuccess(null);
   }, [profile]);
 
+  // Save is only offered when something actually changed — the old always-on
+  // button invited a no-op PATCH and a "saved" toast for nothing.
+  const dirty = useMemo(() => (
+    firstName !== (profile.firstName ?? '')
+    || lastName !== (profile.lastName ?? '')
+    || phone.trim() !== (profile.phone ?? '').trim()
+    || preferredLanguage !== normalizeLanguage(profile.preferredLanguage)
+    || !sameNotifications(notificationPreferences, profile.notificationPreferences ?? DEFAULT_NOTIFICATIONS)
+  ), [firstName, lastName, notificationPreferences, phone, preferredLanguage, profile]);
+
+  const firstNameError = firstName.trim() ? null : 'Prenumele este obligatoriu.';
+  const lastNameError = lastName.trim() ? null : 'Numele este obligatoriu.';
+  const phoneError = phone.trim() && !/^[+()\d\s.-]{6,20}$/.test(phone.trim()) ? 'Număr de telefon invalid.' : null;
+  const invalid = Boolean(firstNameError || lastNameError || phoneError);
+
   const handleSave = async () => {
+    if (invalid || !dirty) return;
+
     setSaving(true);
     setError(null);
     setSuccess(null);
 
     try {
       const updated = await onSave({
-        firstName,
-        lastName,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         phone: phone.trim() ? phone.trim() : null,
-        preferredLanguage: preferredLanguage.trim() ? preferredLanguage.trim() : null,
+        preferredLanguage: preferredLanguage || null,
         notificationPreferences,
       });
 
       setFirstName(updated.firstName ?? '');
       setLastName(updated.lastName ?? '');
       setPhone(updated.phone ?? '');
-      setPreferredLanguage(updated.preferredLanguage ?? '');
-      setNotificationPreferences(updated.notificationPreferences ?? { email: true, push: false, sms: false });
-      setSuccess('Profil salvat cu succes.');
+      setPreferredLanguage(normalizeLanguage(updated.preferredLanguage));
+      setNotificationPreferences(updated.notificationPreferences ?? DEFAULT_NOTIFICATIONS);
+      setSuccess('Modificările au fost salvate.');
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Nu s-a putut salva profilul.');
     } finally {
@@ -61,89 +104,155 @@ export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
     }
   };
 
+  const handleReset = () => {
+    setFirstName(profile.firstName ?? '');
+    setLastName(profile.lastName ?? '');
+    setPhone(profile.phone ?? '');
+    setPreferredLanguage(normalizeLanguage(profile.preferredLanguage));
+    setNotificationPreferences(profile.notificationPreferences ?? DEFAULT_NOTIFICATIONS);
+    setError(null);
+  };
+
   return (
-    <View className="space-y-4">
-      <View className="bg-[var(--c-surface)] rounded-[28px] p-6 border border-gray-100 shadow-sm">
-        <Text className="text-[#0E2041] text-[12px] font-black uppercase tracking-widest mb-5">Informații personale</Text>
-
-        <View className="gap-4">
-          <AuraInput
+    <View className="gap-4">
+      <ProfileCard icon="person" title="Informații personale" description="Cum te văd antrenorii și administratorii clubului.">
+        <View className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <ProfileField
             label="Prenume"
-            iconName="person"
+            icon="person"
             value={firstName}
-            onChangeText={setFirstName}
+            onChangeText={(value: string) => { setFirstName(value); setSuccess(null); }}
+            autoComplete="given-name"
+            error={firstName !== (profile.firstName ?? '') ? firstNameError : null}
           />
-          <AuraInput
+          <ProfileField
             label="Nume"
-            iconName="person"
+            icon="person"
             value={lastName}
-            onChangeText={setLastName}
+            onChangeText={(value: string) => { setLastName(value); setSuccess(null); }}
+            autoComplete="family-name"
+            error={lastName !== (profile.lastName ?? '') ? lastNameError : null}
           />
-          <AuraInput
-            label="Număr de telefon"
-            iconName="phone"
+          <ProfileField
+            label="Telefon"
+            icon="phone"
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(value: string) => { setPhone(value); setSuccess(null); }}
             keyboardType="phone-pad"
-            placeholder="Opțional"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="+40 7xx xxx xxx"
+            hint="Opțional — folosit doar de club pentru urgențe."
+            error={phoneError}
           />
-          <AuraInput
-            label="Limbă preferată"
-            iconName="language"
-            value={preferredLanguage}
-            onChangeText={setPreferredLanguage}
-            placeholder="Opțional"
-          />
-        </View>
 
-        <View className="mt-2">
-          <Text className="text-[#64748B] text-[11px] font-bold tracking-wider uppercase mb-3">Preferințe notificări</Text>
-          <View className="gap-3">
-            {([
-              { key: 'email', label: 'Actualizări email' },
-              { key: 'push', label: 'Notificări push' },
-              { key: 'sms', label: 'Alerte SMS' },
-            ] as const).map((item) => (
-              <View key={item.key} className="flex-row items-center justify-between bg-[#F8FAFC] rounded-2xl px-4 py-3 border border-gray-100">
-                <Text className="text-[#0E2041] font-semibold">{item.label}</Text>
+          <View className="min-w-0">
+            <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Limbă preferată</Text>
+            <View
+              className="flex-row h-11 rounded-[11px] border p-1 gap-1"
+              style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
+              accessibilityRole="radiogroup"
+              accessibilityLabel="Limbă preferată"
+            >
+              {LANGUAGE_OPTIONS.map((option) => {
+                const active = preferredLanguage === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => { setPreferredLanguage(option.value); setSuccess(null); }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={option.label}
+                    className="flex-1 rounded-[8px] items-center justify-center"
+                    style={{
+                      backgroundColor: active ? 'var(--c-surface)' : 'transparent',
+                      boxShadow: active ? 'var(--e-sm)' : 'none',
+                      transition: 'background-color 0.15s ease, box-shadow 0.15s ease',
+                    } as any}
+                  >
+                    <Text className="text-[13px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>{option.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </ProfileCard>
+
+      <ProfileCard icon="notifications" tone="sky" title="Notificări" description="Alege pe ce canale primești noutăți de la club.">
+        <View className="gap-2">
+          {NOTIFICATION_OPTIONS.map((item) => {
+            const enabled = Boolean(notificationPreferences[item.key]);
+            return (
+              <View
+                key={item.key}
+                className="flex-row items-center gap-3 rounded-[12px] border px-3.5 py-3"
+                style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}
+              >
+                <View
+                  className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0"
+                  style={{ backgroundColor: enabled ? 'var(--c-surface-tint)' : 'var(--c-surface-3)', transition: 'background-color 0.2s ease' } as any}
+                >
+                  <MaterialIcons name={item.icon} size={17} color={enabled ? 'var(--c-brand-fg)' : 'var(--c-muted)'} />
+                </View>
+                <View className="flex-1 min-w-0">
+                  <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>{item.label}</Text>
+                  <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>{item.description}</Text>
+                </View>
                 <Switch
-                  value={Boolean(notificationPreferences[item.key])}
-                  onValueChange={(value) => setNotificationPreferences((current) => ({ ...current, [item.key]: value }))}
-                  trackColor={{ false: 'var(--c-border-strong)', true: '#C7D2FE' }}
-                  thumbColor={notificationPreferences[item.key] ? 'var(--c-brand-fg)' : 'var(--c-surface-2)'}
+                  value={enabled}
+                  onValueChange={(value: boolean) => {
+                    setNotificationPreferences((current) => ({ ...current, [item.key]: value }));
+                    setSuccess(null);
+                  }}
+                  accessibilityLabel={item.label}
                 />
               </View>
-            ))}
-          </View>
+            );
+          })}
         </View>
+      </ProfileCard>
 
-        {error ? (
-          <View className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
-            <Text className="text-red-700 text-sm font-semibold">{error}</Text>
-          </View>
-        ) : null}
+      {error ? <FormNotice tone="danger" message={error} /> : null}
+      {success ? <FormNotice tone="success" message={success} /> : null}
 
-        {success ? (
-          <View className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-            <Text className="text-emerald-700 text-sm font-semibold">{success}</Text>
-          </View>
-        ) : null}
-
-        <View className="mt-6 flex-row justify-end">
-          <Pressable
+      {/* Save bar. Sticks to the bottom of the viewport while there are unsaved
+          edits, so the action is reachable without scrolling back. On mobile it
+          clears the fixed bottom tab bar. */}
+      <View
+        className="sticky bottom-[88px] lg:bottom-4 z-10 flex-row items-center justify-between gap-3 rounded-[14px] border px-4 py-3"
+        style={{
+          backgroundColor: 'var(--c-surface)',
+          borderColor: dirty ? 'var(--c-brand-border)' : 'var(--c-border)',
+          boxShadow: dirty ? 'var(--e-lg)' : 'var(--e-xs)',
+          transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+        } as any}
+      >
+        <View className="flex-row items-center gap-2 flex-1 min-w-0">
+          <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dirty ? 'var(--c-warning)' : 'var(--c-success)' }} />
+          <Text className="text-[13px] font-medium" style={{ color: 'var(--c-ink-soft)' }} numberOfLines={1}>
+            {dirty ? 'Ai modificări nesalvate' : 'Totul este salvat'}
+          </Text>
+        </View>
+        <View className="flex-row items-center gap-2 shrink-0">
+          {dirty && !saving ? (
+            <Pressable
+              onPress={handleReset}
+              accessibilityRole="button"
+              accessibilityLabel="Renunță la modificări"
+              className="ui-press h-11 px-3.5 rounded-[11px] items-center justify-center"
+            >
+              <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-muted)' }}>Renunță</Text>
+            </Pressable>
+          ) : null}
+          <PrimaryButton
+            label="Salvează"
+            loadingLabel="Se salvează…"
+            icon="save"
             onPress={handleSave}
-            disabled={saving}
-            className={`min-w-[180px] rounded-2xl px-5 py-4 flex-row items-center justify-center ${saving ? 'bg-[#8FA3D8]' : 'bg-[#1D3E90]'}`}
-          >
-            {saving ? (
-              <ActivityIndicator color="var(--c-surface)" />
-            ) : (
-              <>
-                <MaterialIcons name="save" size={18} color="var(--c-surface)" />
-                <Text className="text-white font-black text-[12px] uppercase tracking-widest ml-2">Salvează</Text>
-              </>
-            )}
-          </Pressable>
+            loading={saving}
+            disabled={!dirty || invalid}
+          />
         </View>
       </View>
     </View>

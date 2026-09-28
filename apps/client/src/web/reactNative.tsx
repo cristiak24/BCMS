@@ -617,11 +617,14 @@ export function Modal({
   return createPortal(<div className="rn-modal">{children}</div>, document.body);
 }
 
-export function Switch({ value, onValueChange, disabled, className }: AnyProps) {
+export function Switch({ value, onValueChange, disabled, className, accessibilityLabel }: AnyProps) {
   return (
     <input
       className={cx('rn-switch', className)}
       type="checkbox"
+      role="switch"
+      aria-label={accessibilityLabel}
+      aria-checked={!!value}
       checked={!!value}
       disabled={disabled}
       onChange={(event) => onValueChange?.(event.target.checked)}
