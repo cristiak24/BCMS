@@ -469,7 +469,7 @@ export default function ManageAccountsScreen() {
         if (pending.kind === 'delete') {
             return {
                 title: `Permanently delete ${pending.account.name}?`,
-                message: `This removes ${pending.account.email}'s account and sign-in for good. It cannot be undone or reactivated — they would need a new invite to rejoin. To only pause access, use Deactivate instead.`,
+                message: `This removes ${pending.account.email}'s account, sign-in and roster record — including attendance, payments and team memberships — for good. It cannot be undone or reactivated; they would need a new invite to rejoin. To only pause access, use Deactivate instead.`,
                 confirmLabel: 'Delete permanently',
                 destructive: true,
                 icon: 'delete-forever',

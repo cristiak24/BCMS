@@ -1,7 +1,7 @@
 import { Response, Router } from 'express';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
-import { accessRequests, auditLogs, clubInviteCodes, clubs, events, inviteLinks, invites, notifications, teams, users } from '../db/schema';
+import { accessRequests, attendance, auditLogs, clubInviteCodes, clubs, events, inviteLinks, invites, notifications, playerPayments, players, playersToTeams, teams, users } from '../db/schema';
 import { db } from '../db';
 import { createSuperAdminInvitation, isVisiblePendingInvite, resendClubInvitation, syncInvitationStatuses } from '../services/invitationsService';
 import { writeAuditLog } from '../services/auditService';
@@ -446,8 +446,10 @@ router.post('/accounts/:id/reactivate', rateLimit({ bucket: 'club-admin:mutate',
 });
 
 // Permanently removes a member: the Postgres row, everything that only exists
-// for that user, and their Clerk sign-in. References that are history (teams /
-// events they coached, invites they sent, audit entries) are kept but detached.
+// for that user, their roster record(s) in this club (players are linked to the
+// account by email) with attendance, payments and team memberships, and their
+// Clerk sign-in. References that are history (teams / events they coached,
+// invites they sent, audit entries) are kept but detached.
 // Irreversible — the client asks for explicit confirmation first.
 router.delete('/accounts/:id', rateLimit({ bucket: 'club-admin:mutate', limit: 30, windowMs: 60_000 }), async (req: AuthenticatedRequest, res) => {
     const actor = ensureClubAdmin(req, res);
@@ -483,7 +485,46 @@ router.delete('/accounts/:id', rateLimit({ bucket: 'club-admin:mutate', limit: 3
             return res.status(403).json({ error: 'Admin accounts cannot be deleted from this screen.' });
         }
 
+        // Roster records for this person. Only ones that sit entirely inside the
+        // admin's club are removed — a player row also attached to another
+        // club's team is left alone.
+        const linkedPlayers = await db
+            .select({ id: players.id, teamId: players.teamId })
+            .from(players)
+            .where(sql`lower(${players.email}) = ${targetUser.email.trim().toLowerCase()}`);
+        const linkedPlayerIds = linkedPlayers.map((player) => player.id);
+        const membershipRows = linkedPlayerIds.length > 0
+            ? await db
+                .select({ playerId: playersToTeams.playerId, teamId: playersToTeams.teamId })
+                .from(playersToTeams)
+                .where(inArray(playersToTeams.playerId, linkedPlayerIds))
+            : [];
+        const teamIdsByPlayer = new Map<number, Set<number>>();
+        for (const player of linkedPlayers) {
+            teamIdsByPlayer.set(player.id, new Set(player.teamId != null ? [player.teamId] : []));
+        }
+        for (const row of membershipRows) {
+            teamIdsByPlayer.get(row.playerId)?.add(row.teamId);
+        }
+        const allTeamIds = [...new Set(membershipRows.map((row) => row.teamId).concat(
+            linkedPlayers.map((player) => player.teamId).filter((teamId): teamId is number => teamId != null),
+        ))];
+        const teamClubRows = allTeamIds.length > 0
+            ? await db.select({ id: teams.id, clubId: teams.clubId }).from(teams).where(inArray(teams.id, allTeamIds))
+            : [];
+        const teamClub = new Map(teamClubRows.map((team) => [team.id, team.clubId]));
+        const playerIdsToDelete = linkedPlayers
+            .filter((player) => [...(teamIdsByPlayer.get(player.id) ?? [])].every((teamId) => teamClub.get(teamId) === actor.clubId))
+            .map((player) => player.id);
+
         await db.transaction(async (tx) => {
+            if (playerIdsToDelete.length > 0) {
+                await tx.delete(attendance).where(inArray(attendance.playerId, playerIdsToDelete));
+                await tx.delete(playerPayments).where(inArray(playerPayments.playerId, playerIdsToDelete));
+                await tx.delete(playersToTeams).where(inArray(playersToTeams.playerId, playerIdsToDelete));
+                await tx.delete(notifications).where(inArray(notifications.playerId, playerIdsToDelete));
+                await tx.delete(players).where(inArray(players.id, playerIdsToDelete));
+            }
             await tx.update(teams).set({ coachId: null }).where(eq(teams.coachId, id));
             await tx.update(events).set({ coachId: null }).where(eq(events.coachId, id));
             await tx.update(invites).set({ createdBy: null }).where(eq(invites.createdBy, id));
@@ -517,11 +558,11 @@ router.delete('/accounts/:id', rateLimit({ bucket: 'club-admin:mutate', limit: 3
             actorUid: req.firebaseUser?.uid ?? null,
             actorRole: req.user?.role ?? null,
             clubId: actor.clubId,
-            metadata: { email: targetUser.email, name: targetUser.name, role: targetUser.role },
+            metadata: { email: targetUser.email, name: targetUser.name, role: targetUser.role, deletedPlayerIds: playerIdsToDelete },
         });
 
         invalidate(accountsCacheKey(actor.clubId!));
-        res.json({ success: true });
+        res.json({ success: true, deletedPlayers: playerIdsToDelete.length });
     } catch (error) {
         console.error('Club admin delete account error:', error);
         res.status(500).json({ error: 'Could not delete this account.' });
