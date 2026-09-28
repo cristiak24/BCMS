@@ -124,7 +124,10 @@ async function findClubById(clubId: number) {
   return club;
 }
 
-async function sendInviteEmail(params: { to: string; clubName: string; role: string; url: string; expiresAt: Date; fullName?: string | null }) {
+// The admin-entered `fullName` on an invite is an internal label, not the
+// member's name (they enter their real first/last name when registering), so it
+// is deliberately kept out of the email.
+async function sendInviteEmail(params: { to: string; clubName: string; role: string; url: string; expiresAt: Date }) {
   if (!resend) {
     throw new Error('RESEND_API_KEY is missing.');
   }
@@ -139,24 +142,23 @@ async function sendInviteEmail(params: { to: string; clubName: string; role: str
     to: params.to,
     subject: `Invitation to join ${params.clubName}`,
     html: `
-      <div style="margin:0;padding:0;background:#eef3ff;font-family:Inter,Arial,sans-serif">
+      <div style="margin:0;padding:0;background:#f3f4f6;font-family:Inter,Arial,sans-serif">
         <div style="max-width:640px;margin:0 auto;padding:32px 18px">
-          <div style="background:#fff;border:1px solid #dbe4ff;border-radius:28px;padding:32px;box-shadow:0 24px 70px rgba(23,58,168,.08)">
-            <div style="display:inline-block;padding:8px 12px;border-radius:999px;background:#e7eeff;color:#173aa8;font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase">BCMS invitation</div>
-            <h1 style="margin:20px 0 12px;font-size:30px;line-height:1.1;color:#102a72">Finish your registration</h1>
-            ${params.fullName ? `<p style="font-size:16px;line-height:1.7;color:#334155;margin:0 0 10px">Hi ${params.fullName},</p>` : ''}
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:32px;box-shadow:0 24px 70px rgba(17,24,39,.06)">
+            <div style="display:inline-block;padding:8px 12px;border-radius:999px;background:#eef2ff;color:#4f46e5;font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase">BCMS invitation</div>
+            <h1 style="margin:20px 0 12px;font-size:30px;line-height:1.1;color:#111827">Finish your registration</h1>
             <p style="font-size:16px;line-height:1.7;color:#334155;margin:0 0 10px">You were invited to join <strong>${params.clubName}</strong> as <strong>${params.role}</strong>.</p>
             <p style="font-size:14px;line-height:1.7;color:#64748b;margin:0 0 10px">This invitation expires in 10 minutes and can be used only once.</p>
             <p style="font-size:13px;line-height:1.7;color:#64748b;margin:0 0 22px">Expires at ${expiresLabel}.</p>
             <p style="margin:0 0 18px">
-              <a href="${params.url}" style="display:inline-block;background:#173aa8;color:#fff;text-decoration:none;padding:14px 24px;border-radius:999px;font-weight:800">Complete registration</a>
+              <a href="${params.url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 24px;border-radius:10px;font-weight:700">Complete registration</a>
             </p>
             <p style="font-size:13px;color:#64748b;word-break:break-all;line-height:1.5;margin:0">${params.url}</p>
           </div>
         </div>
       </div>
     `,
-    text: `${params.fullName ? `Hi ${params.fullName}. ` : ''}You were invited to ${params.clubName} as ${params.role}. This invitation expires in 10 minutes. Complete registration: ${params.url}`,
+    text: `You were invited to ${params.clubName} as ${params.role}. This invitation expires in 10 minutes. Complete registration: ${params.url}`,
   });
 }
 
@@ -209,7 +211,6 @@ export async function createSuperAdminInvitation(
       role,
       url: inviteUrl,
       expiresAt,
-      fullName,
     });
   } catch (error) {
     await db.update(invites).set({ status: 'revoked' }).where(eq(invites.id, invite.id));
@@ -285,7 +286,6 @@ export async function resendClubInvitation(
       role: invite.role,
       url: inviteUrl,
       expiresAt,
-      fullName: invite.email.split('@')[0],
     });
   } catch (error) {
     await db.update(invites).set({ status: 'revoked' }).where(eq(invites.id, invite.id));

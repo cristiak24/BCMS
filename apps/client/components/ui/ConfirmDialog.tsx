@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { ActivityIndicator, Modal, Pressable, Text, View } from '@/src/web/reactNative';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 
 type IconName = string;
@@ -15,6 +15,11 @@ type ConfirmDialogProps = {
     /** Shows a spinner on the confirm button and disables both actions. */
     loading?: boolean;
     icon?: IconName;
+    /**
+     * For irreversible actions: the user must type this exact phrase before the
+     * confirm button enables (e.g. "DELETE").
+     */
+    requireTypedConfirmation?: string;
     onConfirm: () => void;
     onCancel: () => void;
 };
@@ -38,11 +43,19 @@ export default function ConfirmDialog({
     destructive = false,
     loading = false,
     icon,
+    requireTypedConfirmation,
     onConfirm,
     onCancel,
 }: ConfirmDialogProps) {
     const cardRef = useRef<HTMLDivElement | null>(null);
     const previouslyFocused = useRef<HTMLElement | null>(null);
+    const [typed, setTyped] = useState('');
+
+    useEffect(() => {
+        if (!visible) setTyped('');
+    }, [visible]);
+
+    const confirmBlocked = !!requireTypedConfirmation && typed.trim().toUpperCase() !== requireTypedConfirmation.toUpperCase();
 
     useEffect(() => {
         if (!visible || typeof document === 'undefined') return;
@@ -58,8 +71,12 @@ export default function ConfirmDialog({
                 ) ?? [],
             ).filter((el) => !el.hasAttribute('disabled'));
 
-        // Focus the primary action once the portal has mounted.
-        const focusTimer = window.setTimeout(() => focusables().at(-1)?.focus(), 0);
+        // Focus the primary action once the portal has mounted — or the
+        // confirmation field, when the action is gated on typing a phrase.
+        const focusTimer = window.setTimeout(() => {
+            const items = focusables();
+            (items.find((el) => el.tagName === 'INPUT') ?? items.at(-1))?.focus();
+        }, 0);
 
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape' && !loading) {
@@ -154,6 +171,24 @@ export default function ConfirmDialog({
                         </View>
                     </View>
 
+                    {requireTypedConfirmation ? (
+                        <View className="mt-5 gap-1.5">
+                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>
+                                Type <Text className="font-bold" style={{ color: 'var(--c-ink)' }}>{requireTypedConfirmation}</Text> to confirm
+                            </Text>
+                            <TextInput
+                                value={typed}
+                                onChangeText={setTyped}
+                                autoCapitalize="characters"
+                                autoCorrect={false}
+                                accessibilityLabel={`Type ${requireTypedConfirmation} to confirm`}
+                                onSubmitEditing={() => { if (!confirmBlocked && !loading) onConfirm(); }}
+                                className="rounded-[10px] border px-3.5 h-11 text-[14px]"
+                                style={{ backgroundColor: 'var(--c-surface-2)', borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}
+                            />
+                        </View>
+                    ) : null}
+
                     <View className="mt-6 flex-row justify-end gap-3">
                         <Pressable
                             onPress={onCancel}
@@ -170,12 +205,12 @@ export default function ConfirmDialog({
                         </Pressable>
                         <Pressable
                             onPress={onConfirm}
-                            disabled={loading}
+                            disabled={loading || confirmBlocked}
                             accessibilityRole="button"
                             className="rounded-2xl px-5 py-3 min-h-[44px] min-w-[120px] items-center justify-center"
                             style={{
                                 backgroundColor: destructive ? 'var(--c-danger)' : 'var(--c-brand-surface)',
-                                opacity: loading ? 0.7 : 1,
+                                opacity: loading ? 0.7 : confirmBlocked ? 0.45 : 1,
                             }}
                         >
                             {loading ? (

@@ -58,6 +58,13 @@ export const clubAdminApi = {
         });
     },
 
+    /** Irreversible: removes the member's profile and sign-in entirely. */
+    deleteAccount(id: string | number) {
+        return apiFetch<{ success: boolean }>(`/club-admin/accounts/${id}`, {
+            method: 'DELETE',
+        });
+    },
+
     resendInvitation(id: string | number) {
         return apiFetch<{
             success: boolean;

@@ -1,32 +1,59 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import GlassCard from '../ui/GlassCard';
 import { clubAdminApi, type ClubAdminAccountRole } from '../../services/clubAdminApi';
 
-const ROLE_OPTIONS: { label: string; value: ClubAdminAccountRole; description: string; }[] = [
-    { label: 'Coach', value: 'coach', description: 'Can help run trainings and club operations.' },
-    { label: 'Player', value: 'player', description: 'Can join the club roster and complete registration.' },
+const ROLE_OPTIONS: { label: string; value: ClubAdminAccountRole; description: string; icon: 'sports' | 'person' }[] = [
+    { label: 'Coach', value: 'coach', description: 'Can help run trainings and club operations.', icon: 'sports' },
+    { label: 'Player', value: 'player', description: 'Can join the club roster and complete registration.', icon: 'person' },
 ];
 
 type Props = {
     onCreated?: () => void;
 };
 
+// Colours come from tokens only (no [#hex] / bg-white utilities) so the card
+// reads as one surface in both themes — the old light-blue header strip and
+// pale input fills showed up as an odd second background in dark mode.
+const labelStyle = { color: 'var(--c-muted)' } as const;
+
+function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: ReactNode }) {
+    return (
+        <View className="gap-1.5">
+            <Text className="text-[12px] font-semibold" style={labelStyle}>{label}</Text>
+            {children}
+            {error ? (
+                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-danger)' }}>{error}</Text>
+            ) : hint ? (
+                <Text className="text-[12px] leading-4" style={{ color: 'var(--c-faint)' }}>{hint}</Text>
+            ) : null}
+        </View>
+    );
+}
+
 export default function CreateClubAccountForm({ onCreated }: Props) {
-    const [fullName, setFullName] = useState('');
+    const [label, setLabel] = useState('');
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<ClubAdminAccountRole>('coach');
     const [loading, setLoading] = useState(false);
-    const [errors, setErrors] = useState<{ fullName?: string; email?: string; }>({});
+    const [errors, setErrors] = useState<{ label?: string; email?: string; }>({});
+
+    const inputStyle = (hasError: boolean) => ({
+        backgroundColor: 'var(--c-surface-2)',
+        borderWidth: 1,
+        borderStyle: 'solid',
+        borderColor: hasError ? 'var(--c-danger)' : 'var(--c-border)',
+        color: 'var(--c-ink)',
+    }) as any;
 
     const submit = async () => {
-        const normalizedFullName = fullName.trim().replace(/\s+/g, ' ');
+        const normalizedLabel = label.trim().replace(/\s+/g, ' ');
         const normalizedEmail = email.trim().toLowerCase();
 
         const nextErrors: typeof errors = {};
-        if (!normalizedFullName) {
-            nextErrors.fullName = 'Full name is required.';
+        if (!normalizedLabel) {
+            nextErrors.label = 'Add a label so you can recognise this invite.';
         }
         if (!normalizedEmail) {
             nextErrors.email = 'Email is required.';
@@ -43,11 +70,13 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
             setLoading(true);
             const response = await clubAdminApi.createInvitation({
                 email: normalizedEmail,
-                fullName: normalizedFullName,
+                // Admin-only identifier. The member's real first/last name is
+                // whatever they enter when they register from the invite.
+                fullName: normalizedLabel,
                 role,
             });
             Alert.alert('Invite sent', `${response.invitation.email} will receive the registration invite shortly.`);
-            setFullName('');
+            setLabel('');
             setEmail('');
             setRole('coach');
             setErrors({});
@@ -60,52 +89,65 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
     };
 
     return (
-        <GlassCard className="p-0 overflow-hidden">
-            <View className="px-6 py-5 border-b border-slate-200 bg-[#FBFCFF]">
+        <GlassCard className="p-0">
+            <View className="px-5 md:px-6 py-5 border-b" style={{ borderColor: 'var(--c-border)' } as any}>
                 <View className="flex-row items-start justify-between gap-4">
                     <View className="flex-1">
-                        <Text className="text-[#102A72] text-[24px] font-black tracking-tight">Create account</Text>
-                        <Text className="text-[#7483A6] text-[13px] mt-2 leading-5">
+                        <Text className="text-[18px] font-bold tracking-tight" style={{ color: 'var(--c-ink-strong)' }}>New invite</Text>
+                        <Text className="text-[13px] mt-1 leading-5" style={{ color: 'var(--c-muted)' }}>
                             Send a secure invite for a coach or player inside your club.
                         </Text>
                     </View>
-                    <View className="w-12 h-12 rounded-2xl bg-[#E7EEFF] items-center justify-center">
-                        <MaterialIcons name="person-add-alt-1" size={24} color="var(--c-brand-fg)" />
+                    <View className="w-10 h-10 rounded-[10px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-tint)' } as any}>
+                        <MaterialIcons name="person-add-alt-1" size={20} color="var(--c-brand-fg)" />
                     </View>
                 </View>
             </View>
 
-            <View className="p-6 gap-4">
-                <TextInput
-                    value={fullName}
-                    onChangeText={(value) => {
-                        setFullName(value);
-                        setErrors((current) => ({ ...current, fullName: undefined }));
-                    }}
-                    placeholder="Full name *"
-                    autoCapitalize="words"
-                    className={`rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72] border ${errors.fullName ? 'border-red-300' : 'border-[#DDE6FF]'}`}
-                    placeholderTextColor="var(--c-faint)"
-                />
-                {errors.fullName ? <Text className="-mt-2 text-xs font-bold text-red-600">{errors.fullName}</Text> : null}
+            <View className="p-5 md:p-6 gap-5">
+                <View className="flex-col md:flex-row gap-4">
+                    <View className="flex-1">
+                        <Field
+                            label="Label (admins only)"
+                            hint="Only admins see this. The member sets their real name when they create the account."
+                            error={errors.label}
+                        >
+                            <TextInput
+                                value={label}
+                                onChangeText={(value) => {
+                                    setLabel(value);
+                                    setErrors((current) => ({ ...current, label: undefined }));
+                                }}
+                                placeholder="e.g. Andrei U14 goalkeeper"
+                                autoCapitalize="sentences"
+                                className="rounded-[10px] border px-3.5 h-11 text-[14px]"
+                                style={inputStyle(Boolean(errors.label))}
+                                placeholderTextColor="var(--c-faint)"
+                            />
+                        </Field>
+                    </View>
+                    <View className="flex-1">
+                        <Field label="Email address" error={errors.email}>
+                            <TextInput
+                                value={email}
+                                onChangeText={(value) => {
+                                    setEmail(value);
+                                    setErrors((current) => ({ ...current, email: undefined }));
+                                }}
+                                placeholder="name@example.com"
+                                autoCapitalize="none"
+                                keyboardType="email-address"
+                                className="rounded-[10px] border px-3.5 h-11 text-[14px]"
+                                style={inputStyle(Boolean(errors.email))}
+                                placeholderTextColor="var(--c-faint)"
+                            />
+                        </Field>
+                    </View>
+                </View>
 
-                <TextInput
-                    value={email}
-                    onChangeText={(value) => {
-                        setEmail(value);
-                        setErrors((current) => ({ ...current, email: undefined }));
-                    }}
-                    placeholder="Email address *"
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                    className={`rounded-2xl bg-[#F7F9FF] px-4 py-4 text-[#102A72] border ${errors.email ? 'border-red-300' : 'border-[#DDE6FF]'}`}
-                    placeholderTextColor="var(--c-faint)"
-                />
-                {errors.email ? <Text className="-mt-2 text-xs font-bold text-red-600">{errors.email}</Text> : null}
-
-                <View className="gap-2">
-                    <Text className="text-[11px] font-black uppercase tracking-[0.2em] text-[#6B7AA6]">Role</Text>
-                    <View className="gap-3">
+                <View className="gap-1.5">
+                    <Text className="text-[12px] font-semibold" style={labelStyle}>Role</Text>
+                    <View className="flex-col md:flex-row gap-3">
                         {ROLE_OPTIONS.map((option) => {
                             const active = role === option.value;
 
@@ -113,18 +155,29 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                                 <Pressable
                                     key={option.value}
                                     onPress={() => setRole(option.value)}
-                                    className={`rounded-2xl border px-4 py-4 ${active ? 'border-[#173AA8] bg-[#EEF4FF]' : 'border-slate-200 bg-white'}`}
+                                    accessibilityRole="radio"
+                                    accessibilityState={{ selected: active }}
+                                    className="flex-1 rounded-[12px] border px-4 py-3.5"
+                                    style={{
+                                        backgroundColor: active ? 'var(--c-surface-tint)' : 'var(--c-surface)',
+                                        borderColor: active ? 'var(--c-brand-border)' : 'var(--c-border)',
+                                    } as any}
                                 >
-                                    <View className="flex-row items-start justify-between gap-4">
+                                    <View className="flex-row items-start gap-3">
+                                        <MaterialIcons name={option.icon} size={20} color={active ? 'var(--c-brand-fg)' : 'var(--c-muted)'} />
                                         <View className="flex-1">
-                                            <Text className={`font-black text-[15px] ${active ? 'text-[#173AA8]' : 'text-[#102A72]'}`}>
+                                            <Text className="font-bold text-[14px]" style={{ color: active ? 'var(--c-brand-fg)' : 'var(--c-ink)' }}>
                                                 {option.label}
                                             </Text>
-                                            <Text className="text-[#7483A6] text-[12px] mt-1 leading-5">
+                                            <Text className="text-[12px] mt-0.5 leading-4" style={{ color: 'var(--c-muted)' }}>
                                                 {option.description}
                                             </Text>
                                         </View>
-                                        {active ? <MaterialIcons name="check-circle" size={22} color="var(--c-brand-fg)" /> : null}
+                                        <MaterialIcons
+                                            name={active ? 'radio-button-checked' : 'radio-button-unchecked'}
+                                            size={18}
+                                            color={active ? 'var(--c-brand-fg)' : 'var(--c-faint)'}
+                                        />
                                     </View>
                                 </Pressable>
                             );
@@ -132,27 +185,28 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                     </View>
                 </View>
 
-                <View className="flex-row items-center justify-between rounded-2xl bg-[#F7F9FF] border border-dashed border-[#DDE6FF] px-4 py-3">
-                    <View className="flex-1 pr-3">
-                        <Text className="text-[#102A72] text-[13px] font-bold">Invitation policy</Text>
-                        <Text className="text-[#7483A6] text-[12px] mt-1 leading-4">
-                            Invites expire automatically after 10 minutes and can be revoked from Manage Accounts.
-                        </Text>
-                    </View>
-                    <MaterialIcons name="schedule" size={22} color="var(--c-brand-fg)" />
+                <View className="flex-row items-start gap-2.5">
+                    <MaterialIcons name="schedule" size={16} color="var(--c-faint)" />
+                    <Text className="flex-1 text-[12px] leading-4" style={{ color: 'var(--c-muted)' }}>
+                        Invites expire automatically after 10 minutes and can be revoked from Manage Accounts.
+                    </Text>
                 </View>
 
                 <Pressable
                     onPress={submit}
                     disabled={loading}
-                    className="rounded-2xl bg-[#173AA8] py-4 items-center justify-center mt-1 shadow-lg shadow-blue-900/20 disabled:opacity-60"
+                    className={`rounded-[10px] h-11 flex-row items-center justify-center gap-2 ${loading ? 'opacity-60' : ''}`}
+                    style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)' } as any}
                 >
                     {loading ? (
-                        <ActivityIndicator color="#fff" />
+                        <ActivityIndicator color="var(--c-on-brand)" />
                     ) : (
-                        <Text className="text-white font-black tracking-[0.16em] uppercase text-[12px]">
-                            Send Invite
-                        </Text>
+                        <>
+                            <MaterialIcons name="send" size={16} color="var(--c-on-brand)" />
+                            <Text className="font-semibold text-[14px]" style={{ color: 'var(--c-on-brand)' }}>
+                                Send invite
+                            </Text>
+                        </>
                     )}
                 </Pressable>
             </View>

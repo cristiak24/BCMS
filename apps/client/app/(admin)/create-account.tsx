@@ -26,6 +26,7 @@ export default function CreateAccountScreen() {
     return (
         <ScrollView
             className="flex-1"
+            style={{ backgroundColor: 'var(--c-bg)' } as any}
             contentContainerStyle={{ paddingBottom: 120 }}
             showsVerticalScrollIndicator={false}
         >

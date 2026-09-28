@@ -40,3 +40,19 @@ export async function verifyBearerToken(token: string): Promise<ClerkAuthUser> {
 
     return { uid, email };
 }
+
+/**
+ * Deletes a Clerk user (their sign-in). A 404 is treated as success — legacy
+ * rows can carry a pre-Clerk uid, and a user already removed needs no action.
+ */
+export async function deleteClerkUser(clerkUserId: string): Promise<void> {
+    try {
+        await clerkClient.users.deleteUser(clerkUserId);
+    } catch (error) {
+        const status = (error as { status?: number } | null)?.status;
+        if (status === 404) {
+            return;
+        }
+        throw error;
+    }
+}

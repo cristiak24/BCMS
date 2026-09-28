@@ -1,12 +1,13 @@
 import { Response, Router } from 'express';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
-import { clubs, invites, users } from '../db/schema';
+import { accessRequests, auditLogs, clubInviteCodes, clubs, events, inviteLinks, invites, notifications, teams, users } from '../db/schema';
 import { db } from '../db';
 import { createSuperAdminInvitation, isVisiblePendingInvite, resendClubInvitation, syncInvitationStatuses } from '../services/invitationsService';
 import { writeAuditLog } from '../services/auditService';
 import { rateLimit } from '../middleware/rateLimit';
 import { getOrCompute, invalidate } from '../lib/microCache';
+import { deleteClerkUser } from '../lib/clerkAuth';
 
 const router = Router();
 
@@ -86,12 +87,37 @@ router.get('/accounts', async (req: AuthenticatedRequest, res) => {
             ]);
 
             const clubName = clubRows[0]?.name ?? null;
-            const pendingInvites = inviteRows
-                .filter((invite) => isVisiblePendingInvite(invite, userRows))
+            const visibleInvites = inviteRows.filter((invite) => isVisiblePendingInvite(invite, userRows));
+
+            // The admin-only label typed on the invite form isn't a column on
+            // `invites`; it lives in the invitation.created audit entry.
+            const inviteLabels = new Map<string, string>();
+            if (visibleInvites.length > 0) {
+                const labelRows = await db
+                    .select({ entityId: auditLogs.entityId, metadata: auditLogs.metadata })
+                    .from(auditLogs)
+                    .where(and(
+                        eq(auditLogs.action, 'invitation.created'),
+                        eq(auditLogs.entityType, 'invitation'),
+                        inArray(auditLogs.entityId, visibleInvites.map((invite) => String(invite.id))),
+                    ));
+                for (const row of labelRows) {
+                    try {
+                        const label = JSON.parse(row.metadata ?? '{}')?.fullName;
+                        if (row.entityId && typeof label === 'string' && label.trim()) {
+                            inviteLabels.set(row.entityId, label.trim());
+                        }
+                    } catch {
+                        // Unparseable metadata — fall back to the email prefix.
+                    }
+                }
+            }
+
+            const pendingInvites = visibleInvites
                 .map((invite) => ({
                     id: `invite-${invite.id}`,
                     email: invite.email,
-                    name: invite.email.split('@')[0],
+                    name: inviteLabels.get(String(invite.id)) ?? invite.email.split('@')[0],
                     role: invite.role,
                     status: invite.status,
                     clubId: invite.clubId,
@@ -416,6 +442,89 @@ router.post('/accounts/:id/reactivate', rateLimit({ bucket: 'club-admin:mutate',
     } catch (error) {
         console.error('Club admin reactivate account error:', error);
         res.status(500).json({ error: 'Could not reactivate this account.' });
+    }
+});
+
+// Permanently removes a member: the Postgres row, everything that only exists
+// for that user, and their Clerk sign-in. References that are history (teams /
+// events they coached, invites they sent, audit entries) are kept but detached.
+// Irreversible — the client asks for explicit confirmation first.
+router.delete('/accounts/:id', rateLimit({ bucket: 'club-admin:mutate', limit: 30, windowMs: 60_000 }), async (req: AuthenticatedRequest, res) => {
+    const actor = ensureClubAdmin(req, res);
+
+    if (!actor) {
+        return;
+    }
+
+    const id = Number(req.params.id);
+
+    if (Number.isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid user id.' });
+    }
+
+    if (req.user?.id === id) {
+        return res.status(400).json({ error: 'You cannot delete your own account from this screen.' });
+    }
+
+    try {
+        const userRows = await db
+            .select()
+            .from(users)
+            .where(and(eq(users.id, id), eq(users.clubId, actor.clubId!)))
+            .limit(1);
+
+        const targetUser = userRows[0];
+
+        if (!targetUser) {
+            return res.status(404).json({ error: 'User not found in your club.' });
+        }
+
+        if (PRIVILEGED_ROLES.has(targetUser.role)) {
+            return res.status(403).json({ error: 'Admin accounts cannot be deleted from this screen.' });
+        }
+
+        await db.transaction(async (tx) => {
+            await tx.update(teams).set({ coachId: null }).where(eq(teams.coachId, id));
+            await tx.update(events).set({ coachId: null }).where(eq(events.coachId, id));
+            await tx.update(invites).set({ createdBy: null }).where(eq(invites.createdBy, id));
+            await tx.update(invites).set({ usedBy: null }).where(eq(invites.usedBy, id));
+            await tx.update(inviteLinks).set({ createdBy: null }).where(eq(inviteLinks.createdBy, id));
+            await tx.update(clubInviteCodes).set({ createdBy: null }).where(eq(clubInviteCodes.createdBy, id));
+            await tx.update(accessRequests).set({ reviewedBy: null }).where(eq(accessRequests.reviewedBy, id));
+            await tx.update(auditLogs).set({ actorUserId: null }).where(eq(auditLogs.actorUserId, id));
+            await tx.delete(notifications).where(eq(notifications.userId, id));
+            await tx.delete(accessRequests).where(eq(accessRequests.userId, id));
+            await tx.delete(users).where(eq(users.id, id));
+        });
+
+        // Remove the sign-in too, otherwise the person could still log in to a
+        // Clerk session with no profile behind it. Best effort: the DB row is
+        // already gone, so a Clerk failure is logged rather than surfaced.
+        const clerkIds = [...new Set([targetUser.firebaseUid, targetUser.uid].filter((value): value is string => Boolean(value)))];
+        for (const clerkId of clerkIds) {
+            try {
+                await deleteClerkUser(clerkId);
+            } catch (clerkError) {
+                console.error('Club admin delete account: Clerk user removal failed:', clerkError);
+            }
+        }
+
+        await writeAuditLog({
+            action: 'club_admin.user_deleted',
+            entityType: 'user',
+            entityId: id,
+            actorUserId: req.user?.id ?? null,
+            actorUid: req.firebaseUser?.uid ?? null,
+            actorRole: req.user?.role ?? null,
+            clubId: actor.clubId,
+            metadata: { email: targetUser.email, name: targetUser.name, role: targetUser.role },
+        });
+
+        invalidate(accountsCacheKey(actor.clubId!));
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Club admin delete account error:', error);
+        res.status(500).json({ error: 'Could not delete this account.' });
     }
 });
 

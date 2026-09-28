@@ -29,6 +29,7 @@ type BulkKind = 'deactivate' | 'reactivate' | ClubAdminAccountRole;
 type PendingAction =
     | { kind: 'deactivate'; account: ClubAdminAccount }
     | { kind: 'reactivate'; account: ClubAdminAccount }
+    | { kind: 'delete'; account: ClubAdminAccount }
     | { kind: 'resend'; account: ClubAdminAccount }
     | { kind: 'role'; account: ClubAdminAccount; role: ClubAdminAccountRole }
     | { kind: 'bulk'; action: BulkKind; ids: (string | number)[] };
@@ -110,6 +111,7 @@ const ACTION_STYLE = {
     reactivate: { tint: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },
     deactivate: { tint: 'var(--c-danger-bg)', fg: 'var(--c-danger)' },
     cancel: { tint: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' },
+    delete: { tint: 'transparent', fg: 'var(--c-danger)', border: 'var(--c-danger-border)' },
 } as const;
 
 const ROLE_ACTIONS = [
@@ -324,6 +326,27 @@ export default function ManageAccountsScreen() {
         }
     }, [accounts, showToast]);
 
+    // Permanent delete. Not optimistic: the row only leaves the list once the
+    // server confirms, since there is nothing to roll back to afterwards.
+    const performDelete = useCallback(async (account: ClubAdminAccount) => {
+        setBusyId(account.id);
+        try {
+            await clubAdminApi.deleteAccount(account.id);
+            setAccounts((current) => current.filter((item) => item.id !== account.id));
+            setSelectedIds((current) => {
+                if (!current.has(account.id)) return current;
+                const next = new Set(current);
+                next.delete(account.id);
+                return next;
+            });
+            showToast({ variant: 'success', message: `${account.name} was permanently deleted.` });
+        } catch (error) {
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete this account.' });
+        } finally {
+            setBusyId(null);
+        }
+    }, [showToast]);
+
     // Resend a pending invitation (mints a fresh link + expiry, re-sends the email).
     const performResend = useCallback(async (account: ClubAdminAccount) => {
         setBusyId(account.id);
@@ -414,12 +437,14 @@ export default function ManageAccountsScreen() {
             void performReactivate(action.account);
         } else if (action.kind === 'resend') {
             void performResend(action.account);
+        } else if (action.kind === 'delete') {
+            void performDelete(action.account);
         } else if (action.kind === 'bulk') {
             void performBulk(action.action, action.ids);
         } else {
             void performDeactivate(action.account);
         }
-    }, [pending, performUpdateRole, performDeactivate, performReactivate, performResend, performBulk]);
+    }, [pending, performUpdateRole, performDeactivate, performReactivate, performResend, performDelete, performBulk]);
 
     const confirmCopy = useMemo(() => {
         if (!pending) {
@@ -439,6 +464,16 @@ export default function ManageAccountsScreen() {
                 message: 'They will regain access to the club with their previous role.',
                 confirmLabel: 'Reactivate',
                 destructive: false,
+            };
+        }
+        if (pending.kind === 'delete') {
+            return {
+                title: `Permanently delete ${pending.account.name}?`,
+                message: `This removes ${pending.account.email}'s account and sign-in for good. It cannot be undone or reactivated — they would need a new invite to rejoin. To only pause access, use Deactivate instead.`,
+                confirmLabel: 'Delete permanently',
+                destructive: true,
+                icon: 'delete-forever',
+                requireTypedConfirmation: 'DELETE',
             };
         }
         if (pending.kind === 'resend') {
@@ -666,8 +701,9 @@ export default function ManageAccountsScreen() {
                                     const canReactivate = !isInvite && !isPrivileged && isInactive;
                                     const canDeactivate = !isPrivileged && !isInactive;
                                     const canResend = isInvite;
+                                    const canDelete = !isInvite && !isPrivileged;
                                     const roleActions = canChangeRole ? ROLE_ACTIONS.filter((option) => option.role !== account.role) : [];
-                                    const hasActions = roleActions.length > 0 || canReactivate || canDeactivate || canResend;
+                                    const hasActions = roleActions.length > 0 || canReactivate || canDeactivate || canResend || canDelete;
                                     const isSelectable = isManageableMember(account);
                                     const isSelected = selectedIds.has(account.id);
                                     const rv = roleVisual(account.role);
@@ -815,6 +851,19 @@ export default function ManageAccountsScreen() {
                                                             </Text>
                                                         </Pressable>
                                                     ) : null}
+
+                                                    {canDelete ? (
+                                                        <Pressable
+                                                            onPress={() => setPending({ kind: 'delete', account })}
+                                                            disabled={isBusy}
+                                                            accessibilityLabel={`Delete ${account.name} permanently`}
+                                                            className={`flex-row items-center gap-1.5 rounded-full border px-3.5 py-2 min-h-[36px] ${isBusy ? 'opacity-60' : ''}`}
+                                                            style={{ backgroundColor: ACTION_STYLE.delete.tint, borderColor: ACTION_STYLE.delete.border } as any}
+                                                        >
+                                                            <MaterialIcons name="delete-forever" size={14} color={ACTION_STYLE.delete.fg} />
+                                                            <Text className="text-[12px] font-bold" style={{ color: ACTION_STYLE.delete.fg }}>Delete permanently</Text>
+                                                        </Pressable>
+                                                    ) : null}
                                                 </View>
                                             ) : null}
                                         </View>
@@ -875,6 +924,8 @@ export default function ManageAccountsScreen() {
                 message={confirmCopy?.message}
                 confirmLabel={confirmCopy?.confirmLabel}
                 destructive={confirmCopy?.destructive}
+                icon={confirmCopy && 'icon' in confirmCopy ? confirmCopy.icon : undefined}
+                requireTypedConfirmation={confirmCopy && 'requireTypedConfirmation' in confirmCopy ? confirmCopy.requireTypedConfirmation : undefined}
                 onConfirm={confirmPending}
                 onCancel={() => setPending(null)}
             />
