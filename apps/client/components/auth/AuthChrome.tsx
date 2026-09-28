@@ -26,10 +26,15 @@ export function PageBackdrop() {
             <div className="absolute inset-0 bg-[#EDF4FA]" />
             <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(18,59,149,0.08)_0%,rgba(18,59,149,0.025)_31%,rgba(255,255,255,0)_58%),linear-gradient(245deg,rgba(217,119,6,0.12)_0%,rgba(217,119,6,0.035)_28%,rgba(255,255,255,0)_56%)]" />
             <div className="absolute inset-0 opacity-55 [background-image:linear-gradient(rgba(18,59,149,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(18,59,149,0.045)_1px,transparent_1px)] [background-size:34px_34px]" />
-            <div className="absolute -left-24 top-0 h-full w-[58%] skew-x-[-10deg] bg-white/34" />
-            <div className="absolute bottom-0 right-0 h-[48%] w-[62%] skew-x-[-14deg] bg-[#FFF7E8]/52" />
+            {/* The skewed light panels read as a hard diagonal split on a narrow,
+                tall screen, so they only appear from tablet width up. */}
+            <div className="absolute -left-24 top-0 hidden h-full w-[58%] skew-x-[-10deg] bg-white/34 md:block" />
+            <div className="absolute bottom-0 right-0 hidden h-[48%] w-[62%] skew-x-[-14deg] bg-[#FFF7E8]/52 md:block" />
 
-            <svg className="absolute inset-0 h-full w-full opacity-80" viewBox="0 0 1440 900" fill="none" preserveAspectRatio="none">
+            {/* "slice" keeps circles round and boxes square on a portrait phone
+                (the old "none" stretched them into tall ellipses); it just crops
+                the sides of the drawing instead. */}
+            <svg className="absolute inset-0 h-full w-full opacity-80" viewBox="0 0 1440 900" fill="none" preserveAspectRatio="xMidYMid slice">
                 <path d="M-80 713C154 585 302 635 472 517C638 402 795 317 1057 374C1222 410 1340 351 1510 268" stroke="var(--c-brand-fg)" strokeOpacity="0.10" strokeWidth="3" />
                 <path d="M-92 252C145 334 279 279 463 355C643 429 688 552 905 555C1100 558 1217 482 1510 533" stroke="var(--c-success-fg)" strokeOpacity="0.13" strokeWidth="3" />
                 <path d="M83 108H587V365H83V108Z" stroke="var(--c-brand-fg)" strokeOpacity="0.08" strokeWidth="2" />
