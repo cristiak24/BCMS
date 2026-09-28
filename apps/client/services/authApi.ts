@@ -83,7 +83,7 @@ export const authApi = {
 
       return {
         success: false,
-        error: 'Contul necesită un pas suplimentar de verificare. Verifică emailul sau contactează administratorul clubului.',
+        error: `Contul necesită un pas suplimentar de verificare. Verifică emailul sau contactează administratorul clubului. (cod: ${result.status})`,
       } as LoginResponse;
     };
 
@@ -241,8 +241,13 @@ function isAlreadySignedInError(error: unknown) {
 function describeLoginError(error: unknown) {
   const mapped = mapClerkError(error);
   if (mapped) return mapped;
-  console.error('[authApi.login] Unexpected sign-in error:', clerkErrorCode(error) ?? error);
-  return 'Nu am putut finaliza conectarea. Încearcă din nou.';
+  const code = clerkErrorCode(error)
+    ?? (error instanceof Error ? error.name : null)
+    ?? 'unknown';
+  console.error('[authApi.login] Unexpected sign-in error:', code, error);
+  // The code is shown on screen so it can be reported from a phone, where
+  // there is no console to read.
+  return `Nu am putut finaliza conectarea. Încearcă din nou. (cod: ${code})`;
 }
 
 function mapClerkError(error: unknown): string | null {
