@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { authApi } from '../services/authApi';
 import { useSession } from '../context/AuthContext';
 
@@ -19,8 +19,12 @@ export function useLogin() {
     const [resetStage, setResetStage] = useState<'idle' | 'code-sent'>('idle');
     const [resetCode, setResetCode] = useState('');
     const [newPassword, setNewPassword] = useState('');
+    // Enter + click, or a double tap, fired two sign-ins before `loading`
+    // re-rendered; the second failed with "already signed in".
+    const inFlight = useRef(false);
 
     const login = async () => {
+        if (inFlight.current) return;
         setErrorMsg(null);
         setForgotPasswordMsg(null);
 
@@ -29,6 +33,7 @@ export function useLogin() {
             return;
         }
 
+        inFlight.current = true;
         setLoading(true);
 
         try {
@@ -48,6 +53,7 @@ export function useLogin() {
         } catch (error) {
             setErrorMsg(error instanceof Error ? error.message : 'Nu ne-am putut conecta la server.');
         } finally {
+            inFlight.current = false;
             setLoading(false);
         }
     };

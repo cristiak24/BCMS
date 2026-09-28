@@ -222,17 +222,25 @@ function AuthBridge({ children }: PropsWithChildren) {
   }, [isLoaded, currentUser]);
 
   const reloadSession = useCallback(async () => {
-    if (!currentUser) {
+    // Read the live Clerk user, not the render-time `currentUser`: callers run
+    // right after clerk.setActive(), before React has re-rendered, so the
+    // closure still says "signed out" and the profile was never loaded here —
+    // a failed profile load then left the user on /login with no message.
+    const liveUser: CurrentUser = clerk.user
+      ? { uid: clerk.user.id, email: clerk.user.primaryEmailAddress?.emailAddress ?? null }
+      : currentUser;
+
+    if (!liveUser) {
       setSession(null);
       return null;
     }
 
-    const nextSession = await fetchMeFromBackend(currentUser);
+    const nextSession = await fetchMeFromBackend(liveUser);
     setCachedAuthSession(nextSession);
     setSession(nextSession);
     await saveAuthSession(nextSession);
     return nextSession;
-  }, [currentUser]);
+  }, [clerk, currentUser]);
 
   const signOut = useCallback(async () => {
     await clerk.signOut();

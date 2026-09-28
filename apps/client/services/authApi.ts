@@ -49,8 +49,27 @@ export const authApi = {
    * the Postgres profile once the session becomes active.
    */
   async login(email: string, password: string): Promise<LoginResponse> {
-    try {
-      const clerk = await getClerk();
+    const clerk = await getClerk().catch(() => null);
+    if (!clerk) {
+      return { success: false, error: 'Autentificarea nu este pregătită încă. Încearcă din nou în câteva secunde.' };
+    }
+
+    // Clerk may already hold a session the app never picked up (an earlier
+    // attempt that signed in but whose profile load failed, or a double
+    // submit). Signing in again then fails with "session_exists", which used
+    // to be shown as "wrong email or password" even though the credentials
+    // were fine and Clerk had just emailed a new-sign-in notice.
+    const alreadySignedInAs = () =>
+      clerk.user?.primaryEmailAddress?.emailAddress?.toLowerCase() ?? null;
+
+    if (clerk.session) {
+      if (alreadySignedInAs() === email) {
+        return { success: true };
+      }
+      await clerk.signOut().catch(() => undefined);
+    }
+
+    const attempt = async () => {
       const result = await clerk.client.signIn.create({
         strategy: 'password',
         identifier: email,
@@ -59,12 +78,31 @@ export const authApi = {
 
       if (result.status === 'complete' && result.createdSessionId) {
         await clerk.setActive({ session: result.createdSessionId });
-        return { success: true };
+        return { success: true } as LoginResponse;
       }
 
-      return { success: false, error: 'Contul necesită un pas suplimentar de verificare.' };
+      return {
+        success: false,
+        error: 'Contul necesită un pas suplimentar de verificare. Verifică emailul sau contactează administratorul clubului.',
+      } as LoginResponse;
+    };
+
+    try {
+      return await attempt();
     } catch (error: any) {
-      return { success: false, error: mapClerkError(error) ?? 'Email sau parola incorecte.' };
+      if (isAlreadySignedInError(error)) {
+        if (alreadySignedInAs() === email) {
+          return { success: true };
+        }
+        // Signed in as someone else: drop that session and try once more.
+        try {
+          await clerk.signOut();
+          return await attempt();
+        } catch (retryError) {
+          return { success: false, error: describeLoginError(retryError) };
+        }
+      }
+      return { success: false, error: describeLoginError(error) };
     }
   },
 
@@ -185,6 +223,27 @@ export const authApi = {
 // ────────────────────────────────────────────────────────────────────────────────
 // Clerk error → human-readable message
 // ────────────────────────────────────────────────────────────────────────────────
+
+function clerkErrorCode(error: unknown) {
+  return (error as { errors?: Array<{ code?: string }> } | undefined)?.errors?.[0]?.code;
+}
+
+function isAlreadySignedInError(error: unknown) {
+  const code = clerkErrorCode(error);
+  return code === 'session_exists' || code === 'identifier_already_signed_in';
+}
+
+/**
+ * Only real credential failures say "wrong email or password". Anything else
+ * (network, Clerk hiccup, an unexpected state) gets a neutral message and is
+ * logged, so a failure after a successful sign-in is no longer misreported.
+ */
+function describeLoginError(error: unknown) {
+  const mapped = mapClerkError(error);
+  if (mapped) return mapped;
+  console.error('[authApi.login] Unexpected sign-in error:', clerkErrorCode(error) ?? error);
+  return 'Nu am putut finaliza conectarea. Încearcă din nou.';
+}
 
 function mapClerkError(error: unknown): string | null {
   const code = (error as { errors?: Array<{ code?: string }> } | undefined)?.errors?.[0]?.code;
