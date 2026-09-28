@@ -44,7 +44,7 @@
   --c-ink-strong: #0A0C1B;    /* headings / darkest */
   --c-ink-soft: #343A52;      /* secondary text */
   --c-muted: #666D86;         /* muted text */
-  --c-faint: #949BB1;         /* faint / placeholder */
+  --c-faint: #7D869F;         /* faint / placeholder — darkened from #949BB1, which was 2.77:1 on white (fails WCAG's 3:1 floor for UI text) */
 
   /* ── Borders ──────────────────────────────────
      Hairlines only. A visible border and a shadow are two ways of saying the
@@ -158,7 +158,7 @@ html[data-theme="dark"] {
   --c-ink-strong: #F7F8FB;
   --c-ink-soft: #C6C9D6;
   --c-muted: #949AAE;
-  --c-faint: #6B7186;
+  --c-faint: #767C93;         /* lightened from #6B7186 (3.72:1 on surface) to clear 4:1 */
 
   /* ── Borders ──────────────────────────────── */
   --c-border: #262936;

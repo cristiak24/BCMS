@@ -8,7 +8,7 @@ import GlassCard from '../../../components/ui/GlassCard';
 import { ToastHost, useToasts } from '../../../components/ui/Toast';
 import { LoadingState, ErrorState } from '../../../components/dashboard/ScreenStates';
 
-const ROLES: User['role'][] = ['admin', 'coach', 'player', 'parent', 'accountant'];
+const ROLES: User['role'][] = ['superadmin', 'admin', 'coach', 'player', 'parent', 'accountant'];
 
 export default function UserDetail() {
     const { id } = useLocalSearchParams();
