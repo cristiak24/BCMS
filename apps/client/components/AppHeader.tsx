@@ -223,7 +223,10 @@ export default function AppHeader({
       {/* Search is the flexible column: page actions keep their natural width
           and the search field gives way first when the viewport is narrow. */}
       <View style={{ flex: 1, maxWidth: 380, minWidth: 160 }}>
-        <View className="flex-row items-center rounded-[10px] px-3 py-2 border" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
+        <View
+          className="flex-row items-center rounded-[10px] px-3 py-2 border overflow-hidden"
+          style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
+        >
           <MaterialIcons name="search" size={18} color={theme.colors.faint} />
           <TextInput
             placeholder={searchPlaceholder}
@@ -231,6 +234,7 @@ export default function AppHeader({
             onChangeText={onSearchChange}
             className="flex-1 ml-3 text-[13px] font-semibold text-[#0E2041] outline-none"
             placeholderTextColor={theme.colors.faint}
+            style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' } as any}
           />
         </View>
       </View>

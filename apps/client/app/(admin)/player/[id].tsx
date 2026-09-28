@@ -91,7 +91,7 @@ export default function PlayerProfile() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
+      <View className="flex-1 items-center justify-center bg-[var(--c-surface)]">
         <ActivityIndicator size="large" color="var(--c-brand-fg)" />
       </View>
     );
@@ -150,7 +150,7 @@ export default function PlayerProfile() {
     color: string;
     progress: number;
   }) => (
-    <View className="flex-1 min-w-[210px] rounded-[24px] border border-[#E5ECF6] bg-white p-5 shadow-sm">
+    <View className="flex-1 min-w-[210px] rounded-[24px] border border-[#E5ECF6] bg-[var(--c-surface)] p-5 shadow-sm">
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
           <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</Text>
@@ -187,7 +187,7 @@ export default function PlayerProfile() {
     <ScrollView className="flex-1 bg-[#F1F5F9]" showsVerticalScrollIndicator={false} contentContainerClassName="pb-16">
       <View className="pt-6 md:pt-8" style={{ paddingHorizontal: isCompact ? 16 : 32 }}>
         <View className="mb-5 flex-row items-center justify-between gap-3">
-          <TouchableOpacity onPress={handleGoBack} className="h-11 w-11 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white shadow-sm">
+          <TouchableOpacity onPress={handleGoBack} className="h-11 w-11 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[var(--c-surface)] shadow-sm">
             <ArrowLeft color="var(--c-ink)" size={19} />
           </TouchableOpacity>
           <TouchableOpacity
@@ -200,7 +200,7 @@ export default function PlayerProfile() {
           </TouchableOpacity>
         </View>
 
-        <View className="overflow-hidden rounded-[34px] border border-[#DCE7F5] bg-white shadow-sm">
+        <View className="overflow-hidden rounded-[34px] border border-[#DCE7F5] bg-[var(--c-surface)] shadow-sm">
           <LinearGradient
             colors={['#0E2F7F', 'var(--c-brand-fg)', '#2F6FE4']}
             start={{ x: 0, y: 0 }}
@@ -246,7 +246,7 @@ export default function PlayerProfile() {
             </View>
           </LinearGradient>
 
-          <View className="flex-row flex-wrap border-t border-[#E8EEF7] bg-white">
+          <View className="flex-row flex-wrap border-t border-[#E8EEF7] bg-[var(--c-surface)]">
             <View className="min-w-[170px] flex-1 border-r border-[#EEF3F8] px-5 py-4">
               <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email</Text>
               <Text className="mt-1 text-sm font-black text-[#0E2041] break-anywhere">{email || 'No email'}</Text>
@@ -308,7 +308,7 @@ export default function PlayerProfile() {
         </View>
 
         <View className="mt-6" style={{ flexDirection: isCompact ? 'column' : 'row', gap: 20, alignItems: 'flex-start' }}>
-          <View className="w-full flex-1 rounded-[30px] border border-[#E1EAF5] bg-white p-5 shadow-sm md:p-7" style={{ minWidth: isCompact ? undefined : 0 }}>
+          <View className="w-full flex-1 rounded-[30px] border border-[#E1EAF5] bg-[var(--c-surface)] p-5 shadow-sm md:p-7" style={{ minWidth: isCompact ? undefined : 0 }}>
             <View className="mb-6 flex-row items-center justify-between gap-4">
               <View className="flex-row items-center gap-3">
                 <View className="h-10 w-10 items-center justify-center rounded-2xl bg-[#EEF4FF]">
@@ -361,21 +361,21 @@ export default function PlayerProfile() {
             </View>
 
             <View className="mt-7 rounded-[24px] border border-red-100 bg-red-50/50 p-4" style={{ flexDirection: isCompact ? 'column' : 'row', gap: 14, alignItems: isCompact ? 'flex-start' : 'center' }}>
-              <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white">
+              <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[var(--c-surface)]">
                 <Info color="var(--c-danger)" size={18} />
               </View>
               <View className="flex-1">
                 <Text className="font-black text-slate-900">Danger Zone</Text>
                 <Text className="mt-1 text-[11px] font-bold text-slate-500">Once removed, all data is archived.</Text>
               </View>
-              <TouchableOpacity className="h-10 items-center justify-center rounded-2xl border border-red-200 bg-white px-5">
+              <TouchableOpacity className="h-10 items-center justify-center rounded-2xl border border-red-200 bg-[var(--c-surface)] px-5">
                 <Text className="text-[10px] font-black uppercase tracking-widest text-red-600">Remove player</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           <View className="w-full gap-4 md:w-[410px]">
-            <View className="rounded-[30px] border border-[#E1EAF5] bg-white p-5 shadow-sm">
+            <View className="rounded-[30px] border border-[#E1EAF5] bg-[var(--c-surface)] p-5 shadow-sm">
               <View className="mb-5 flex-row items-center justify-between">
                 <View className="flex-row items-center gap-3">
                   <View className={`h-11 w-11 items-center justify-center rounded-2xl ${isMedicalValid ? 'bg-emerald-50' : 'bg-red-50'}`}>
@@ -398,7 +398,7 @@ export default function PlayerProfile() {
               </TouchableOpacity>
             </View>
 
-            <View className="rounded-[30px] border border-[#E1EAF5] bg-white p-5 shadow-sm">
+            <View className="rounded-[30px] border border-[#E1EAF5] bg-[var(--c-surface)] p-5 shadow-sm">
               <View className="mb-5 flex-row items-center justify-between">
                 <View className="flex-row items-center gap-3">
                   <View className={`h-11 w-11 items-center justify-center rounded-2xl ${paymentTone === 'blue' ? 'bg-blue-50' : 'bg-orange-50'}`}>
@@ -452,7 +452,7 @@ export default function PlayerProfile() {
           className="flex-1 bg-black/40 justify-center items-center p-6"
           onPress={() => setShowCalendar(false)}
         >
-          <View className="bg-white rounded-[40px] w-full max-w-lg p-8 shadow-2xl">
+          <View className="bg-[var(--c-surface)] rounded-[40px] w-full max-w-lg p-8 shadow-2xl">
              <View className="flex-row justify-between items-center mb-6">
                 <View>
                    <Text className="text-2xl font-black text-slate-900 tracking-tight">Match Presence Log</Text>
@@ -487,7 +487,7 @@ export default function PlayerProfile() {
       {/* Date Picker Modal (Simplified) */}
       <Modal visible={showDatePicker} transparent animationType="slide">
          <View className="flex-1 bg-black/50 justify-end">
-            <View className="bg-white rounded-t-[40px] p-8">
+            <View className="bg-[var(--c-surface)] rounded-t-[40px] p-8">
                <View className="flex-row justify-between items-center mb-8">
                   <Text className="text-2xl font-black text-slate-900">Set Expiry Date</Text>
                   <TouchableOpacity onPress={() => setShowDatePicker(false)}>
@@ -517,7 +517,7 @@ export default function PlayerProfile() {
 
       <Modal visible={showTransactions} transparent animationType="fade">
         <Pressable className="flex-1 bg-black/40 justify-center items-center p-6" onPress={() => setShowTransactions(false)}>
-          <Pressable className="bg-white rounded-[32px] w-full max-w-lg p-6" onPress={(event) => event.stopPropagation()}>
+          <Pressable className="bg-[var(--c-surface)] rounded-[32px] w-full max-w-lg p-6" onPress={(event) => event.stopPropagation()}>
             <View className="flex-row items-center justify-between mb-5">
               <View>
                 <Text className="text-xl font-black text-[#1E293B]">Transactions</Text>

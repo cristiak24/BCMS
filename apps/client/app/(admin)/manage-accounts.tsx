@@ -607,7 +607,7 @@ export default function ManageAccountsScreen() {
                                 <Text className="text-[#1D3E90] text-[13px] font-black">
                                     {selectedAccounts.length} selected
                                 </Text>
-                                <Pressable onPress={clearSelection} className="w-7 h-7 rounded-full items-center justify-center hover:bg-white/60">
+                                <Pressable onPress={clearSelection} className="w-7 h-7 rounded-full items-center justify-center hover:bg-[var(--c-surface-3)]">
                                     <MaterialIcons name="close" size={16} color="var(--c-brand-fg)" />
                                 </Pressable>
                             </View>
@@ -617,7 +617,7 @@ export default function ManageAccountsScreen() {
                                         key={role}
                                         disabled={bulkBusy}
                                         onPress={() => setPending({ kind: 'bulk', action: role, ids: selectedAccounts.map((account) => account.id) })}
-                                        className={`px-3 py-2 rounded-full border border-[#1D3E90] bg-white ${bulkBusy ? 'opacity-60' : ''}`}
+                                        className={`px-3 py-2 rounded-full border border-[#1D3E90] bg-[var(--c-surface)] ${bulkBusy ? 'opacity-60' : ''}`}
                                     >
                                         <Text className="text-[#1D3E90] text-[11.5px] font-bold capitalize">Set {role}</Text>
                                     </Pressable>
@@ -625,14 +625,14 @@ export default function ManageAccountsScreen() {
                                 <Pressable
                                     disabled={bulkBusy}
                                     onPress={() => setPending({ kind: 'bulk', action: 'reactivate', ids: selectedAccounts.map((account) => account.id) })}
-                                    className={`px-3 py-2 rounded-full border border-emerald-300 bg-white ${bulkBusy ? 'opacity-60' : ''}`}
+                                    className={`px-3 py-2 rounded-full border border-emerald-300 bg-[var(--c-surface)] ${bulkBusy ? 'opacity-60' : ''}`}
                                 >
                                     <Text className="text-emerald-700 text-[11.5px] font-bold">Reactivate</Text>
                                 </Pressable>
                                 <Pressable
                                     disabled={bulkBusy}
                                     onPress={() => setPending({ kind: 'bulk', action: 'deactivate', ids: selectedAccounts.map((account) => account.id) })}
-                                    className={`px-3 py-2 rounded-full border border-rose-300 bg-white ${bulkBusy ? 'opacity-60' : ''}`}
+                                    className={`px-3 py-2 rounded-full border border-rose-300 bg-[var(--c-surface)] ${bulkBusy ? 'opacity-60' : ''}`}
                                 >
                                     <Text className="text-rose-700 text-[11.5px] font-bold">Deactivate</Text>
                                 </Pressable>
@@ -645,8 +645,8 @@ export default function ManageAccountsScreen() {
                     ) : filteredAccounts.length === 0 ? (
                         <GlassCard className="items-center py-12">
                             <MaterialIcons name="group-off" size={42} color="var(--c-muted)" />
-                            <Text className="text-slate-900 font-bold text-lg mt-3">No accounts found</Text>
-                            <Text className="text-slate-500 text-center mt-2">
+                            <Text className="font-bold text-lg mt-3" style={{ color: 'var(--c-ink)' }}>No accounts found</Text>
+                            <Text className="text-center mt-2" style={{ color: 'var(--c-muted)' }}>
                                 Try another search or create a new invite for your club.
                             </Text>
                         </GlassCard>
@@ -678,7 +678,7 @@ export default function ManageAccountsScreen() {
                                     return (
                                         <View
                                             key={`${account.source}-${account.id}`}
-                                            className={`flex-col bg-white rounded-[20px] border p-4 md:p-5 transition-all duration-150 ${
+                                            className={`flex-col bg-[var(--c-surface)] rounded-[20px] border p-4 md:p-5 transition-all duration-150 ${
                                                 isSelected
                                                     ? 'border-[#1D3E90] shadow-[0_0_0_3px_rgba(29,62,144,0.10)]'
                                                     : 'border-[#E3E9F2] shadow-[0_1px_2px_rgba(16,24,40,0.04)] hover:border-[#CBD8EC] hover:shadow-[0_8px_24px_rgba(16,24,40,0.08)]'
@@ -832,7 +832,7 @@ export default function ManageAccountsScreen() {
                                             onPress={() => setPage((current) => Math.max(1, current - 1))}
                                             disabled={page === 1}
                                             accessibilityLabel="Previous page"
-                                            className={`w-9 h-9 rounded-xl items-center justify-center border ${page === 1 ? 'border-[#E4EAF7] opacity-50' : 'border-[#CBD8EC] bg-white hover:border-blue-200'}`}
+                                            className={`w-9 h-9 rounded-xl items-center justify-center border ${page === 1 ? 'border-[#E4EAF7] opacity-50' : 'border-[#CBD8EC] bg-[var(--c-surface)] hover:border-blue-200'}`}
                                         >
                                             <MaterialIcons name="chevron-left" size={20} color="var(--c-brand-fg)" />
                                         </Pressable>
@@ -846,7 +846,7 @@ export default function ManageAccountsScreen() {
                                                     onPress={() => setPage(item)}
                                                     accessibilityRole="button"
                                                     accessibilityState={{ selected: item === page }}
-                                                    className={`min-w-[36px] h-9 px-2 rounded-xl items-center justify-center border ${item === page ? 'bg-[#123A97] border-[#123A97]' : 'border-[#CBD8EC] bg-white hover:border-blue-200'}`}
+                                                    className={`min-w-[36px] h-9 px-2 rounded-xl items-center justify-center border ${item === page ? 'bg-[#123A97] border-[#123A97]' : 'border-[#CBD8EC] bg-[var(--c-surface)] hover:border-blue-200'}`}
                                                 >
                                                     <Text className={`text-[13px] font-bold ${item === page ? 'text-white' : 'text-[#56627F]'}`}>{item}</Text>
                                                 </Pressable>
@@ -857,7 +857,7 @@ export default function ManageAccountsScreen() {
                                             onPress={() => setPage((current) => Math.min(totalPages, current + 1))}
                                             disabled={page === totalPages}
                                             accessibilityLabel="Next page"
-                                            className={`w-9 h-9 rounded-xl items-center justify-center border ${page === totalPages ? 'border-[#E4EAF7] opacity-50' : 'border-[#CBD8EC] bg-white hover:border-blue-200'}`}
+                                            className={`w-9 h-9 rounded-xl items-center justify-center border ${page === totalPages ? 'border-[#E4EAF7] opacity-50' : 'border-[#CBD8EC] bg-[var(--c-surface)] hover:border-blue-200'}`}
                                         >
                                             <MaterialIcons name="chevron-right" size={20} color="var(--c-brand-fg)" />
                                         </Pressable>

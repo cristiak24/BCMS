@@ -243,7 +243,7 @@ export default function TeamDetailsScreen() {
                     </View>
 
                     {/* Hero */}
-                    <View className="bg-white rounded-[16px] border border-[#E3E9F2] p-5 mb-3 flex-col lg:flex-row lg:items-center gap-4">
+                    <View className="bg-[var(--c-surface)] rounded-[16px] border border-[#E3E9F2] p-5 mb-3 flex-col lg:flex-row lg:items-center gap-4">
                         <View className="flex-row items-center gap-4 flex-1 min-w-0">
                             <View className="w-16 h-16 rounded-[18px] items-center justify-center flex-none" style={{ backgroundColor: crestTint }}>
                                 <Shield size={30} color={accentColor} fill={accentColor} />
@@ -263,7 +263,7 @@ export default function TeamDetailsScreen() {
                                         <View className="px-2 py-1 rounded-full bg-[#F1F5F9]"><Text className="text-[10px] font-black uppercase tracking-wide text-[#64748B]">{LEVEL_LABELS[team.level]}</Text></View>
                                     )}
                                     {!team.isActive && (
-                                        <View className="px-2 py-1 rounded-full bg-slate-100"><Text className="text-[10px] font-black uppercase tracking-wide text-slate-500">Inactivă</Text></View>
+                                        <View className="px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--c-surface-3)' }}><Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: 'var(--c-muted)' }}>Inactivă</Text></View>
                                     )}
                                 </View>
                                 <Text className="text-[#94A3B8] text-[12px] font-bold mt-2" numberOfLines={1}>{team.leagueName} • {team.seasonName}</Text>
@@ -276,7 +276,7 @@ export default function TeamDetailsScreen() {
                                 <Text className="text-[#94A3B8] text-[10px] font-black uppercase tracking-widest mb-1">Cod invitație</Text>
                                 <Text className="text-[#1D3E90] text-[22px] font-black tracking-[2px]">{team.inviteCode}</Text>
                             </View>
-                            <Pressable onPress={handleCopyInvite} className="w-10 h-10 rounded-[12px] items-center justify-center bg-white border border-[#E3E9F2] active:bg-[#F4F8FD]" accessibilityLabel="Copiază codul">
+                            <Pressable onPress={handleCopyInvite} className="w-10 h-10 rounded-[12px] items-center justify-center bg-[var(--c-surface)] border border-[#E3E9F2] active:bg-[#F4F8FD]" accessibilityLabel="Copiază codul">
                                 {copied ? <Check size={17} color="var(--c-success-fg)" /> : <Copy size={16} color="var(--c-brand-fg)" />}
                             </Pressable>
                         </View>
@@ -307,7 +307,7 @@ export default function TeamDetailsScreen() {
                     </View>
 
                     {/* Tabs */}
-                    <View className="flex-row flex-wrap bg-white p-1 rounded-[14px] border border-[#E3E9F2] self-start mb-4 gap-1">
+                    <View className="flex-row flex-wrap bg-[var(--c-surface)] p-1 rounded-[14px] border border-[#E3E9F2] self-start mb-4 gap-1">
                         <TabButton active={tab === 'roster'} onPress={() => setTab('roster')} icon={<Users size={14} color={tab === 'roster' ? 'var(--c-surface)' : 'var(--c-faint)'} />} label={`Lot (${players.length})`} />
                         <TabButton active={tab === 'events'} onPress={() => setTab('events')} icon={<CalendarClock size={14} color={tab === 'events' ? 'var(--c-surface)' : 'var(--c-faint)'} />} label="Evenimente" />
                         <TabButton active={tab === 'history'} onPress={() => setTab('history')} icon={<History size={14} color={tab === 'history' ? 'var(--c-surface)' : 'var(--c-faint)'} />} label="Istoric" />
@@ -323,7 +323,7 @@ export default function TeamDetailsScreen() {
                     ) : tab === 'frb' && frb ? (
                         <TeamFrbPanel team={team} />
                     ) : (
-                        <View className="bg-white rounded-[20px] border border-[#E3E9F2] p-5">
+                        <View className="bg-[var(--c-surface)] rounded-[20px] border border-[#E3E9F2] p-5">
                             {/* Roster toolbar */}
                             <View className="flex-row flex-wrap items-center gap-3 mb-4">
                                 <View className="relative flex-1 min-w-[200px]">
@@ -338,10 +338,10 @@ export default function TeamDetailsScreen() {
                                 </View>
                                 {players.length > 0 && (
                                     <View className="flex-row rounded-[12px] border border-[#DDE7F5] overflow-hidden flex-none">
-                                        <Pressable onPress={() => setRosterView('grid')} className={`flex-row items-center gap-1.5 h-10 px-3 ${rosterView === 'grid' ? 'bg-[#1D3E90]' : 'bg-white'}`} accessibilityLabel="Vizualizare grid">
+                                        <Pressable onPress={() => setRosterView('grid')} className={`flex-row items-center gap-1.5 h-10 px-3 ${rosterView === 'grid' ? 'bg-[#1D3E90]' : 'bg-[var(--c-surface)]'}`} accessibilityLabel="Vizualizare grid">
                                             <LayoutGrid size={14} color={rosterView === 'grid' ? 'var(--c-surface)' : 'var(--c-muted)'} />
                                         </Pressable>
-                                        <Pressable onPress={() => setRosterView('list')} className={`flex-row items-center gap-1.5 h-10 px-3 border-l border-[#DDE7F5] ${rosterView === 'list' ? 'bg-[#1D3E90]' : 'bg-white'}`} accessibilityLabel="Vizualizare listă">
+                                        <Pressable onPress={() => setRosterView('list')} className={`flex-row items-center gap-1.5 h-10 px-3 border-l border-[#DDE7F5] ${rosterView === 'list' ? 'bg-[#1D3E90]' : 'bg-[var(--c-surface)]'}`} accessibilityLabel="Vizualizare listă">
                                             <List size={14} color={rosterView === 'list' ? 'var(--c-surface)' : 'var(--c-muted)'} />
                                         </Pressable>
                                     </View>
@@ -362,14 +362,14 @@ export default function TeamDetailsScreen() {
                                             onChangeText={setSearchQuery}
                                             placeholder="Caută jucători existenți după nume"
                                             placeholderTextColor="var(--c-faint)"
-                                            className="w-full h-10 rounded-[12px] border border-[#DDE7F5] bg-white pl-9 pr-9 text-[13px] font-semibold text-[#0E2041]"
+                                            className="w-full h-10 rounded-[12px] border border-[#DDE7F5] bg-[var(--c-surface)] pl-9 pr-9 text-[13px] font-semibold text-[#0E2041]"
                                         />
                                         {isSearching && <View className="absolute right-3 top-2.5"><ActivityIndicator size="small" color="var(--c-brand-fg)" /></View>}
                                     </View>
                                     {searchResults.length > 0 && (
                                         <View className="gap-1.5 max-h-[260px] overflow-y-auto">
                                             {searchResults.map((rp) => (
-                                                <View key={rp.id} className="flex-row items-center justify-between px-3.5 py-2.5 rounded-[12px] bg-white border border-[#F1F5F9]">
+                                                <View key={rp.id} className="flex-row items-center justify-between px-3.5 py-2.5 rounded-[12px] bg-[var(--c-surface)] border border-[#F1F5F9]">
                                                     <View className="flex-row items-center gap-2.5 min-w-0">
                                                         <View className="w-8 h-8 rounded-full bg-[#EBF1FF] items-center justify-center flex-none"><Text className="text-[11px] font-black text-[#1D3E90]">{rp.firstName.charAt(0)}{rp.lastName.charAt(0)}</Text></View>
                                                         <Text className="text-[13px] font-bold text-[#0E2041] truncate" numberOfLines={1}>{rp.firstName} {rp.lastName}</Text>
@@ -497,7 +497,7 @@ function TabButton({ active, onPress, icon, label }: { active: boolean; onPress:
 
 function StatCard({ icon, value, label, tint, valueSize = 20 }: { icon: React.ReactNode; value: string; label: string; tint: string; valueSize?: number }) {
     return (
-        <View className="bg-white rounded-[16px] border border-[#E3E9F2] p-4">
+        <View className="bg-[var(--c-surface)] rounded-[16px] border border-[#E3E9F2] p-4">
             <View className="w-9 h-9 rounded-[11px] items-center justify-center mb-2.5" style={{ backgroundColor: tint }}>{icon}</View>
             <Text className="font-black text-[#0E2041] leading-tight" style={{ fontSize: valueSize }} numberOfLines={1}>{value}</Text>
             <Text className="text-[11px] font-bold text-[#94A3B8] mt-0.5">{label}</Text>
@@ -529,10 +529,10 @@ function PaymentPill({ status }: { status: 'paid' | 'due' | 'none' }) {
 function RowActions({ removing, onOpen, onRemove }: { removing: boolean; onOpen: () => void; onRemove: () => void }) {
     return (
         <View className="flex-row items-center gap-0.5 flex-none">
-            <Pressable onPress={onOpen} className="w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[#F1F5F9]" accessibilityLabel="Detalii jucător">
+            <Pressable onPress={onOpen} className="w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[var(--c-surface-3)]" accessibilityLabel="Detalii jucător">
                 <Pencil size={14} color="var(--c-muted)" />
             </Pressable>
-            <Pressable onPress={onRemove} disabled={removing} className="w-8 h-8 rounded-[9px] items-center justify-center hover:bg-red-50" accessibilityLabel="Scoate din echipă">
+            <Pressable onPress={onRemove} disabled={removing} className="w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[var(--c-danger-bg)]" accessibilityLabel="Scoate din echipă">
                 {removing ? <ActivityIndicator size="small" color="var(--c-danger)" /> : <Trash2 size={14} color="var(--c-danger)" />}
             </Pressable>
         </View>

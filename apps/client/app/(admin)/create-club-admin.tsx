@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
+import { ActivityIndicator, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
 import GlassCard from '../../components/ui/GlassCard';
+import AdminHero from '../../components/admin/AdminHero';
+import AdminActionButton from '../../components/admin/AdminActionButton';
 import InviteForm from '../../components/user-access/InviteForm';
 import { getHomeRouteForRole, isSuperadmin } from '../../utils/authSession';
 import { useSession } from '../../context/AuthContext';
@@ -28,7 +30,7 @@ export default function CreateClubAdminScreen() {
 
   if (initializing) {
     return (
-      <View className="flex-1 items-center justify-center bg-slate-50">
+      <View className="flex-1 items-center justify-center" style={{ backgroundColor: 'var(--c-bg)' }}>
         <ActivityIndicator size="large" color="var(--c-blue)" />
       </View>
     );
@@ -36,69 +38,58 @@ export default function CreateClubAdminScreen() {
 
   if (!session || !isSuperadmin(session)) {
     return (
-      <View className="flex-1 items-center justify-center bg-slate-50 px-4">
+      <View className="flex-1 items-center justify-center px-4" style={{ backgroundColor: 'var(--c-bg)' }}>
         <GlassCard className="items-center px-6 py-10 max-w-xl">
           <MaterialIcons name="lock-outline" size={34} color="var(--c-muted)" />
-          <Text className="text-2xl font-black text-slate-900 mt-4 text-center">Superadmin access required</Text>
-          <Text className="text-slate-500 text-center mt-2">
+          <Text className="text-2xl font-black mt-4 text-center" style={{ color: 'var(--c-ink-strong)' }}>
+            Superadmin access required
+          </Text>
+          <Text className="text-center mt-2" style={{ color: 'var(--c-muted)' }}>
             This page is restricted to superadmin accounts only.
           </Text>
-          <Pressable
-            onPress={() => router.replace(getHomeRouteForRole(session?.role ?? 'player'))}
-            className="mt-6 rounded-2xl bg-blue-700 px-5 py-3"
-          >
-            <Text className="text-white font-bold">Go back</Text>
-          </Pressable>
+          <View className="mt-6">
+            <AdminActionButton
+              label="Go back"
+              icon="arrow-back"
+              variant="primary"
+              onPress={() => router.replace(getHomeRouteForRole(session?.role ?? 'player'))}
+            />
+          </View>
         </GlassCard>
       </View>
     );
   }
 
   return (
-    <ScrollView className="flex-1 bg-slate-50" contentContainerStyle={{ padding: 20, gap: 20 }}>
-      <View className="flex-row items-start justify-between gap-4">
-        <View className="flex-1">
-          <Text className="text-4xl font-black text-slate-900 tracking-tight">Create Club Admin</Text>
-          <Text className="text-slate-500 mt-2 max-w-2xl">
-            Superadmins can create a club, issue an admin invite, and send the signup email without exposing raw invite tokens.
-          </Text>
+    <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <View className="w-full max-w-[1000px] mx-auto px-4 md:px-0 pt-6 gap-5">
+        <AdminHero
+          title="Create Club Admin"
+          subtitle="Create a club, issue an admin invite, and send the signup email without exposing raw invite tokens."
+        >
+          <View className="flex-row flex-wrap gap-2.5">
+            <AdminActionButton label="Refresh" icon="refresh" onPress={reloadSession} />
+            <AdminActionButton label="Logout" icon="logout" onPress={signOut} />
+          </View>
+        </AdminHero>
+
+        <InviteForm />
+
+        <View className="flex-row flex-wrap gap-4">
+          <GlassCard className="p-6 flex-1 min-w-[280px]">
+            <Text className="text-xl font-black" style={{ color: 'var(--c-ink-strong)' }}>Club creation</Text>
+            <Text className="mt-3 leading-6" style={{ color: 'var(--c-muted)' }}>
+              The backend normalizes the club name, creates the club document if needed, and keeps admin membership in adminIds.
+            </Text>
+          </GlassCard>
+
+          <GlassCard className="p-6 flex-1 min-w-[280px]">
+            <Text className="text-xl font-black" style={{ color: 'var(--c-ink-strong)' }}>Invite safety</Text>
+            <Text className="mt-3 leading-6" style={{ color: 'var(--c-muted)' }}>
+              Invite tokens are hashed before persistence. The client only sees safe invite metadata and never receives the raw token from Firestore.
+            </Text>
+          </GlassCard>
         </View>
-
-        <View className="flex-row gap-3">
-          <Pressable
-            onPress={reloadSession}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 flex-row items-center gap-2"
-          >
-            <MaterialIcons name="refresh" size={18} color="var(--c-ink-strong)" />
-            <Text className="font-bold text-slate-900">Refresh</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={signOut}
-            className="rounded-2xl bg-slate-900 px-4 py-3 flex-row items-center gap-2"
-          >
-            <MaterialIcons name="logout" size={18} color="var(--c-surface)" />
-            <Text className="font-black text-white uppercase tracking-[0.2em] text-[11px]">Logout</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      <InviteForm />
-
-      <View className="flex-row flex-wrap gap-4">
-        <GlassCard className="p-6 flex-1 min-w-[280px]">
-          <Text className="text-xl font-black text-slate-900">Club creation</Text>
-          <Text className="text-slate-500 mt-3 leading-6">
-            The backend normalizes the club name, creates the club document if needed, and keeps admin membership in adminIds.
-          </Text>
-        </GlassCard>
-
-        <GlassCard className="p-6 flex-1 min-w-[280px]">
-          <Text className="text-xl font-black text-slate-900">Invite safety</Text>
-          <Text className="text-slate-500 mt-3 leading-6">
-            Invite tokens are hashed before persistence. The client only sees safe invite metadata and never receives the raw token from Firestore.
-          </Text>
-        </GlassCard>
       </View>
     </ScrollView>
   );

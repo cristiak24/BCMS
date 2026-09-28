@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, ScrollView, Text, Pressable, ActivityIndicator } from '@/src/web/reactNative';
+import { View, ScrollView, Text, Pressable, ActivityIndicator, TouchableOpacity } from '@/src/web/reactNative';
 import { useHeader } from '../../../components/HeaderContext';
+import { useResponsive } from '../../../hooks/useResponsive';
 import { Plus, PenLine } from 'lucide-react';
 
 // Import Components
@@ -16,8 +17,9 @@ import { computeComplianceMetrics } from '../../../components/compliance/complia
 import { teamsApi, Player } from '../../../services/teamsApi';
 
 export default function ComplianceDashboard() {
-  const { setSearchPlaceholder, setHeaderActions } = useHeader();
-  
+  const { setSearchPlaceholder, setHeaderActions, setMobileFab } = useHeader();
+  const { isMobile } = useResponsive();
+
   const [activeTab, setActiveTab] = useState<'active' | 'archives'>('active');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isNewEntryOpen, setIsNewEntryOpen] = useState(false);
@@ -26,33 +28,68 @@ export default function ComplianceDashboard() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Sync Header Context
+  // Sync Header Context. On mobile the header actions row has no room for two
+  // buttons (and the desktop header that renders `headerActions` isn't even
+  // shown on phones — see (admin)/_layout.tsx), so New Entry moves to a FAB
+  // and Update File follows it as a second stacked FAB.
   useEffect(() => {
     setSearchPlaceholder("Căutare atleți sau documente...");
-    setHeaderActions(
-        <View className="flex-row gap-3">
-          <Pressable 
-            onPress={() => setIsNewEntryOpen(true)}
-            className="bg-[#1D3E90] px-5 py-2.5 rounded-[14px] flex-row items-center gap-2 shadow-sm hover:scale-105 transition-transform"
-          >
-            <Plus size={16} color="white" strokeWidth={3} />
-            <Text className="text-white font-black text-[12px] uppercase tracking-wider">New Entry</Text>
-          </Pressable>
-          <Pressable 
+
+    if (isMobile) {
+      setHeaderActions(null);
+      setMobileFab(
+        <View style={{ position: 'absolute', bottom: 96, right: 24, gap: 12, alignItems: 'flex-end', zIndex: 30 }}>
+          <TouchableOpacity
             onPress={() => setIsUpdateOpen(true)}
-            className="bg-white border border-gray-200 px-5 py-2.5 rounded-[14px] flex-row items-center gap-2 shadow-sm hover:bg-gray-50 transition-colors"
+            style={{
+              width: 48, height: 48, borderRadius: 24,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: 'var(--c-surface)', borderWidth: 1, borderColor: 'var(--c-border)',
+              boxShadow: 'var(--e-card)',
+            } as any}
           >
-            <PenLine size={16} color="var(--c-ink)" />
-            <Text className="text-[#0D2040] font-black text-[12px] uppercase tracking-wider">Update File</Text>
-          </Pressable>
+            <PenLine color="var(--c-ink)" size={19} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setIsNewEntryOpen(true)}
+            style={{
+              width: 56, height: 56, borderRadius: 28,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)',
+            } as any}
+          >
+            <Plus color="var(--c-on-brand)" size={24} strokeWidth={3} />
+          </TouchableOpacity>
         </View>
-    );
+      );
+    } else {
+      setMobileFab(null);
+      setHeaderActions(
+          <View className="flex-row gap-3">
+            <Pressable
+              onPress={() => setIsNewEntryOpen(true)}
+              className="bg-[#1D3E90] px-5 py-2.5 rounded-[14px] flex-row items-center gap-2 shadow-sm hover:scale-105 transition-transform"
+            >
+              <Plus size={16} color="white" strokeWidth={3} />
+              <Text className="text-white font-black text-[12px] uppercase tracking-wider">New Entry</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setIsUpdateOpen(true)}
+              className="bg-[var(--c-surface)] border border-gray-200 px-5 py-2.5 rounded-[14px] flex-row items-center gap-2 shadow-sm hover:bg-gray-50 transition-colors"
+            >
+              <PenLine size={16} color="var(--c-ink)" />
+              <Text className="text-[#0D2040] font-black text-[12px] uppercase tracking-wider">Update File</Text>
+            </Pressable>
+          </View>
+      );
+    }
 
     return () => {
       setSearchPlaceholder('Căutare atleți, meciuri, rapoarte...');
       setHeaderActions(null);
+      setMobileFab(null);
     };
-  }, [setHeaderActions, setSearchPlaceholder]);
+  }, [isMobile, setHeaderActions, setMobileFab, setSearchPlaceholder]);
 
   const loadData = async () => {
       setLoading(true);
