@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { CalendarEvent, EventAttendance, eventsApi } from '../../services/eventsApi';
@@ -224,25 +224,35 @@ export default function CoachAttendanceScreen() {
     [events, selectedEventId],
   );
 
+  // The session whose sheet is on screen. Responses (loads AND saves) that
+  // come back for any other session are dropped: tapping through the picker
+  // quickly used to let a slow response for session A overwrite session B's
+  // list — and a save for A could flip the same player's row on B.
+  const activeEventIdRef = useRef<number | null>(null);
+
   const loadAttendance = useCallback(async () => {
+    activeEventIdRef.current = selectedEvent?.id ?? null;
     if (!selectedEvent) {
       setPlayers([]);
       return;
     }
 
+    const eventId = selectedEvent.id;
     setLoadingAttendance(true);
     setError(null);
 
     try {
       const [attendanceRows, teamPlayers] = await Promise.all([
-        eventsApi.getEventAttendance(selectedEvent.id),
+        eventsApi.getEventAttendance(eventId),
         selectedEvent.teamId != null ? teamsApi.getTeamPlayers(selectedEvent.teamId).catch(() => []) : Promise.resolve([]),
       ]);
+      if (activeEventIdRef.current !== eventId) return;
       setPlayers(mergeAttendance(teamPlayers, attendanceRows));
     } catch (err) {
+      if (activeEventIdRef.current !== eventId) return;
       setError(err instanceof Error ? err.message : 'Nu s-a putut încărca prezența.');
     } finally {
-      setLoadingAttendance(false);
+      if (activeEventIdRef.current === eventId) setLoadingAttendance(false);
     }
   }, [selectedEvent]);
 
@@ -253,10 +263,12 @@ export default function CoachAttendanceScreen() {
   const markPlayer = async (playerId: number, status: AttendanceStatus) => {
     if (!selectedEvent) return;
 
+    const eventId = selectedEvent.id;
     setSavingPlayerId(playerId);
 
     try {
-      await eventsApi.updateEventAttendance(selectedEvent.id, [{ playerId, status }]);
+      await eventsApi.updateEventAttendance(eventId, [{ playerId, status }]);
+      if (activeEventIdRef.current !== eventId) return;
       setPlayers((current) => current.map((player) => player.playerId === playerId ? { ...player, status } : player));
     } catch (err) {
       Alert.alert('Prezență', err instanceof Error ? err.message : 'Nu s-a putut actualiza prezența.');
@@ -278,12 +290,15 @@ export default function CoachAttendanceScreen() {
       return;
     }
 
+    const eventId = selectedEvent.id;
     setBulkSaving(true);
     try {
       await eventsApi.updateEventAttendance(
-        selectedEvent.id,
+        eventId,
         unmarkedIds.map((playerId) => ({ playerId, status: 'present' })),
       );
+      setBulkConfirmOpen(false);
+      if (activeEventIdRef.current !== eventId) return;
       const ids = new Set(unmarkedIds);
       setPlayers((current) => current.map((player) => (ids.has(player.playerId) ? { ...player, status: 'present' } : player)));
       setBulkConfirmOpen(false);

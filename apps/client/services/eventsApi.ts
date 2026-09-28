@@ -51,6 +51,26 @@ export const eventsApi = {
         await apiClient.delete(`/events/${id}`);
     },
 
+    /**
+     * The signed-in player's OWN attendance rows for the given events, in one
+     * request (GET /players/me/attendance). Max 100 ids per call.
+     */
+    async getMyAttendance(eventIds: number[]) {
+        if (!eventIds.length) return [] as (EventAttendance & { eventId: number })[];
+        const response = await apiClient.get<(EventAttendance & { eventId: number })[]>('/players/me/attendance', {
+            params: { eventIds: eventIds.join(',') },
+        });
+        return response.data;
+    },
+
+    /** The signed-in player's most recent marked sessions (own rows + events), newest first. */
+    async getMyRecentAttendance(limit = 40) {
+        const response = await apiClient.get<(EventAttendance & { eventId: number; event: CalendarEvent })[]>('/players/me/attendance', {
+            params: { limit },
+        });
+        return response.data;
+    },
+
     async getEventAttendance(id: number) {
         const response = await apiClient.get<EventAttendance[]>(`/events/${id}/attendance`);
         return response.data;

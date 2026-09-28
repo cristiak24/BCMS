@@ -51,11 +51,13 @@ export default function StatCard({
       className="ui-lift rounded-[16px] border p-4 min-w-0 h-full"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
-      <View className="flex-row items-center gap-2.5 min-w-0">
+      {/* Icon stacks above the label below sm: in a 3-up grid at 375px the
+          side-by-side layout left the label ~30px and cut it to "PREZ". */}
+      <View className="flex-col items-start sm:flex-row sm:items-center gap-2 sm:gap-2.5 min-w-0">
         <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: colors.bg }}>
           <MaterialIcons name={icon} size={18} color={colors.fg} />
         </View>
-        <Text className="t-eyebrow flex-1 min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+        <Text className="t-eyebrow w-full sm:w-auto sm:flex-1 min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
           {label}
         </Text>
       </View>

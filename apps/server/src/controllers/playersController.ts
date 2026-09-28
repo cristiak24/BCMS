@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
 import { players, teams, playersToTeams, attendance, playerPayments, users, events } from '../db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, lte, or, sql } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { buildPlayerUpdate } from '../lib/playerUpdate';
+import { toIso } from '../lib/dateUtils';
 
 const DEFAULT_PAYMENT_CURRENCY = (process.env.STRIPE_CURRENCY || 'ron').trim().toLowerCase();
 
@@ -155,44 +156,65 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
 
     if (allowedTeamIds !== null && allowedTeamIds.length === 0) return [];
 
-    let allPlayers = await db.select().from(players);
-    let membershipRows = await db.select().from(playersToTeams);
-    let allTeams = await db.select().from(teams);
-    const userRows = await db.select({
-        email: users.email,
-        clubId: users.clubId,
-    }).from(users);
+    let allPlayers: (typeof players.$inferSelect)[];
+    let membershipRows: (typeof playersToTeams.$inferSelect)[];
+    let allTeams: (typeof teams.$inferSelect)[];
+    let clubIdByUserEmail: Map<string, number>;
 
-    const clubIdByUserEmail = new Map(
-        userRows
-            .filter(user => user.clubId != null)
-            .map(user => [user.email.trim().toLowerCase(), Number(user.clubId)] as const)
-    );
-
-    if (allowedTeamIds !== null) {
-        const allowedTeamsSet = new Set(allowedTeamIds);
-        const allowedPlayerIds = new Set<number>();
+    if (allowedTeamIds === null) {
+        // Superadmin: genuinely every player.
+        const [playerRows, memberRows, teamRows, userRows] = await Promise.all([
+            db.select().from(players),
+            db.select().from(playersToTeams),
+            db.select().from(teams),
+            db.select({ email: users.email, clubId: users.clubId }).from(users),
+        ]);
+        allPlayers = playerRows;
+        membershipRows = memberRows;
+        allTeams = teamRows;
+        clubIdByUserEmail = new Map(
+            userRows
+                .filter(user => user.clubId != null)
+                .map(user => [user.email.trim().toLowerCase(), Number(user.clubId)] as const)
+        );
+    } else {
+        // Everyone else: query only what the caller's scope can contain. This
+        // used to load EVERY player, membership, team and user in the database
+        // on each roster call and filter in JS — cost grew with the whole
+        // platform, not with the club.
         const clubId = getRequestClubId(req);
-        
-        allPlayers.forEach(p => {
-            if (p.teamId != null && allowedTeamsSet.has(p.teamId)) {
-                allowedPlayerIds.add(p.id);
-            }
 
-            const playerClubId = p.email ? clubIdByUserEmail.get(p.email.trim().toLowerCase()) : null;
-            if (clubId != null && playerClubId === clubId) {
-                allowedPlayerIds.add(p.id);
-            }
-        });
-        membershipRows.forEach(m => {
-            if (allowedTeamsSet.has(m.teamId)) {
-                allowedPlayerIds.add(m.playerId);
-            }
-        });
+        // A club member who plays for no team yet is still on the club roster
+        // (matched through their user account's club). NOT for player/parent
+        // sessions though: their roster is their own team(s) only — including
+        // club-mates here fed other squads' names into the player's "my teams"
+        // set and leaked those squads' fixtures onto their home page.
+        const clubUsers = !isPlayerFacing && clubId != null
+            ? await db.select({ email: users.email }).from(users).where(eq(users.clubId, clubId))
+            : [];
+        const clubEmails = clubUsers.map(user => user.email.trim().toLowerCase()).filter(Boolean);
 
-        allPlayers = allPlayers.filter(p => allowedPlayerIds.has(p.id));
-        membershipRows = membershipRows.filter(m => allowedPlayerIds.has(m.playerId));
-        allTeams = allTeams.filter(t => allowedTeamsSet.has(t.id));
+        const scopedMemberships = await db.select().from(playersToTeams).where(inArray(playersToTeams.teamId, allowedTeamIds));
+        const memberPlayerIds = Array.from(new Set(scopedMemberships.map(m => m.playerId)));
+
+        const playerConditions = [inArray(players.teamId, allowedTeamIds)];
+        if (memberPlayerIds.length) playerConditions.push(inArray(players.id, memberPlayerIds));
+        if (clubEmails.length) playerConditions.push(inArray(sql<string>`lower(trim(${players.email}))`, clubEmails));
+
+        const [playerRows, teamRows] = await Promise.all([
+            db.select().from(players).where(or(...playerConditions)),
+            db.select().from(teams).where(inArray(teams.id, allowedTeamIds)),
+        ]);
+
+        allPlayers = playerRows;
+        allTeams = teamRows;
+        const allowedTeamsSet = new Set(allowedTeamIds);
+        const scopedPlayerIds = new Set(playerRows.map(p => p.id));
+        membershipRows = playerRows.length
+            ? (await db.select().from(playersToTeams).where(inArray(playersToTeams.playerId, Array.from(scopedPlayerIds))))
+                .filter(m => allowedTeamsSet.has(m.teamId))
+            : [];
+        clubIdByUserEmail = new Map(clubId != null ? clubEmails.map(email => [email, clubId] as const) : []);
     }
 
     if (!allPlayers.length) return [];
@@ -609,22 +631,38 @@ export const playersController = {
                 return res.status(403).json({ error: 'Forbidden' });
             }
 
-            const { playerId, teamId } = req.body;
-            if (!playerId || !teamId) return res.status(400).json({ error: 'playerId and teamId required' });
+            const playerId = Number(req.body?.playerId);
+            const teamId = Number(req.body?.teamId);
+            if (!Number.isInteger(playerId) || playerId <= 0 || !Number.isInteger(teamId) || teamId <= 0) {
+                return res.status(400).json({ error: 'playerId and teamId required' });
+            }
 
             const allowedTeamIds = await getAllowedTeamIds(req);
-            if (allowedTeamIds !== null && !allowedTeamIds.includes(Number(teamId))) {
+            if (allowedTeamIds !== null && !allowedTeamIds.includes(teamId)) {
                 return res.status(403).json({ error: 'Cannot add to a team outside your club' });
             }
 
-            const [inserted] = await db.insert(playersToTeams).values({
-                playerId: Number(playerId),
-                teamId: Number(teamId)
-            }).returning();
+            const pRows = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
+            const player = pRows[0];
+            if (!player) return res.status(404).json({ error: 'Player not found' });
 
-            await db.update(players).set({ teamId: Number(teamId), status: 'active' }).where(eq(players.id, Number(playerId)));
+            // The team check alone let a caller attach ANY player id — including
+            // another club's — to their own team, and then read that player's
+            // full record through the roster. The player must be ours too.
+            if (allowedTeamIds !== null && !await isPlayerAllowedForRequest(req, player)) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
 
-            res.json(inserted);
+            // Idempotent: a double-submit must not create duplicate memberships.
+            const existing = await db.select().from(playersToTeams)
+                .where(and(eq(playersToTeams.playerId, playerId), eq(playersToTeams.teamId, teamId)))
+                .limit(1);
+
+            const membership = existing[0] ?? (await db.insert(playersToTeams).values({ playerId, teamId }).returning())[0];
+
+            await db.update(players).set({ teamId, status: 'active' }).where(eq(players.id, playerId));
+
+            res.json(membership);
         } catch (error) {
             console.error('Add player to team error:', error);
             res.status(500).json({ error: 'Internal server error' });
@@ -704,6 +742,104 @@ export const playersController = {
             res.json(await buildFullPlayerPayload(req, self));
         } catch (error) {
             console.error('Get self player error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    /**
+     * The caller's OWN attendance rows, in one request. Two modes:
+     *
+     *  • `?eventIds=1,2,3` (max 100) — rows for those events. Used by the
+     *    player home, which already holds its team-scoped event list.
+     *  • no eventIds, `?limit=N` (default 40, max 100) — the most recent marked
+     *    sessions, joined with their events, newest first. Used by the Prezență
+     *    history, which previously fetched the whole CLUB's calendar and took
+     *    the latest 40 — in a multi-team club most of those weren't the
+     *    player's, so their own history came back short.
+     *
+     * Either way the answer is the caller's rows only: the player screens used
+     * to call GET /events/:id/attendance once per session (20–40 requests) and
+     * pick their row out of the full sheet.
+     */
+    async getMyAttendance(req: AuthenticatedRequest, res: Response) {
+        try {
+            const raw = String(req.query.eventIds ?? '').trim();
+            const self = await getSelfPlayerRecord(req);
+
+            if (raw) {
+                const eventIds = Array.from(new Set(
+                    raw.split(',').map((value) => Number(value.trim())).filter((id) => Number.isInteger(id) && id > 0),
+                ));
+                if (eventIds.length > 100) {
+                    return res.status(400).json({ error: 'Too many event ids (max 100).' });
+                }
+                if (!self || !eventIds.length) return res.json([]);
+
+                const rows = await db
+                    .select({ eventId: attendance.eventId, status: attendance.status, note: attendance.note })
+                    .from(attendance)
+                    .where(and(eq(attendance.playerId, self.id), inArray(attendance.eventId, eventIds)));
+
+                return res.json(rows.map((row) => ({
+                    eventId: row.eventId,
+                    playerId: self.id,
+                    status: row.status,
+                    note: row.note ?? null,
+                })));
+            }
+
+            const requested = Number(req.query.limit ?? 40);
+            const limit = Number.isInteger(requested) ? Math.min(Math.max(requested, 1), 100) : 40;
+            if (!self) return res.json([]);
+
+            const rows = await db
+                .select({
+                    status: attendance.status,
+                    note: attendance.note,
+                    event: {
+                        id: events.id,
+                        type: events.type,
+                        title: events.title,
+                        description: events.description,
+                        location: events.location,
+                        startTime: events.startTime,
+                        endTime: events.endTime,
+                        teamId: events.teamId,
+                        status: events.status,
+                        coachNote: events.coachNote,
+                    },
+                    teamName: teams.name,
+                })
+                .from(attendance)
+                .innerJoin(events, eq(attendance.eventId, events.id))
+                .leftJoin(teams, eq(events.teamId, teams.id))
+                .where(and(
+                    eq(attendance.playerId, self.id),
+                    lte(events.startTime, new Date().toISOString()),
+                    sql`coalesce(${events.status}, '') <> 'cancelled'`,
+                ))
+                .orderBy(desc(events.startTime))
+                .limit(limit);
+
+            res.json(rows.map((row) => ({
+                eventId: row.event.id,
+                playerId: self.id,
+                status: row.status,
+                note: row.note ?? null,
+                event: {
+                    ...row.event,
+                    // Same serialisation as GET /events, so the client parses
+                    // both identically.
+                    startTime: toIso(row.event.startTime) ?? row.event.startTime,
+                    endTime: toIso(row.event.endTime) ?? row.event.endTime,
+                    coachId: null,
+                    amount: null,
+                    status: row.event.status ?? 'scheduled',
+                    teamName: row.teamName ?? null,
+                },
+            })));
+        } catch (error) {
+            console.error('Get my attendance error:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     },

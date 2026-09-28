@@ -352,8 +352,9 @@ export default function CoachDashboardScreen() {
     ? Math.round(ratedPlayers.reduce((sum, player) => sum + (player.attendanceRate ?? 0), 0) / ratedPlayers.length)
     : null;
 
-  const goToAttendance = () => router.replace('/coach/attendance' as any);
-  const goToSchedule = () => router.replace('/schedule' as any);
+  // push, not replace: the browser/phone back button should return to the panel.
+  const goToAttendance = () => router.push('/coach/attendance' as any);
+  const goToSchedule = () => router.push('/schedule' as any);
 
   return (
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">

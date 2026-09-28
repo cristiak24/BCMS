@@ -2,11 +2,12 @@ import { Request, Response } from 'express';
 import axios from 'axios';
 import { toDate, toIso } from '../lib/dateUtils';
 import { db } from '../db';
-import { attendance, events, players, teams, users } from '../db/schema';
+import { attendance, events, players, playersToTeams, teams, users } from '../db/schema';
 import { and, eq, gte, inArray, isNull, lte, or } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { buildEventQueryPlan, type EventQueryParams } from '../lib/eventQuery';
 import { createFeedbackNotification } from '../lib/notifications';
+import { parseAttendancePayload, parseEventInput } from '../lib/eventValidation';
 
 const API_KEY = '9c3622c013ca2f69e8c373ecbf5af38e180f6d7d';
 const REFERER = 'https://www.frbaschet.ro/';
@@ -30,15 +31,6 @@ type EventDoc = {
 
 type PlayerDoc = { id: number; firstName?: string | null; lastName?: string | null; number?: number | null; };
 type AttendanceDoc = { id: number; eventId?: number | null; playerId: number; teamId: number; status: string; date?: Date | string | null; };
-
-function parseRequiredDate(value: unknown, fieldName: string) {
-    const date = value ? new Date(String(value)) : null;
-    if (!date || Number.isNaN(date.getTime())) {
-        throw new Error(`${fieldName} is invalid.`);
-    }
-
-    return date;
-}
 
 function parseFRBDate(dateStr: string) {
     const match = /(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2}))?/.exec(dateStr);
@@ -196,6 +188,55 @@ async function ensureTeamAccess(req: AuthenticatedRequest, teamId: number) {
     return { status: 200 as const, team };
 }
 
+function isPlayerFacingRole(req: AuthenticatedRequest) {
+    const role = req.user?.role;
+    return role === 'player' || role === 'parent';
+}
+
+/** The caller's own players row, resolved server-side from their account email. */
+async function getSelfPlayerId(req: AuthenticatedRequest) {
+    const email = req.user?.email;
+    if (!email) return null;
+    const rows = await db
+        .select({ id: players.id })
+        .from(players)
+        .where(eq(players.email, String(email).trim().toLowerCase()))
+        .limit(1);
+    return rows[0]?.id ?? null;
+}
+
+/**
+ * Of `playerIds`, the ones that belong to a team in `clubId` (via the legacy
+ * players.team_id column or the players_to_teams join). Attendance writes are
+ * checked against this so a request can't attach rows to another club's
+ * players by guessing ids.
+ */
+async function filterPlayersInClub(playerIds: number[], clubId: number) {
+    if (!playerIds.length) return new Set<number>();
+    const clubTeamIds = (await db.select({ id: teams.id }).from(teams).where(eq(teams.clubId, clubId))).map((row) => row.id);
+    if (!clubTeamIds.length) return new Set<number>();
+
+    const [direct, memberships] = await Promise.all([
+        db.select({ id: players.id }).from(players)
+            .where(and(inArray(players.id, playerIds), inArray(players.teamId, clubTeamIds))),
+        db.select({ playerId: playersToTeams.playerId }).from(playersToTeams)
+            .where(and(inArray(playersToTeams.playerId, playerIds), inArray(playersToTeams.teamId, clubTeamIds))),
+    ]);
+
+    return new Set<number>([...direct.map((row) => row.id), ...memberships.map((row) => row.playerId)]);
+}
+
+/** A coach assigned to an event must be staff of the same club. */
+async function validateCoachForClub(coachId: number | null | undefined, clubId: number | null) {
+    if (coachId == null) return null;
+    const rows = await db.select({ id: users.id, clubId: users.clubId, role: users.role }).from(users).where(eq(users.id, coachId)).limit(1);
+    const coach = rows[0];
+    if (!coach) return 'Coach not found.';
+    if (clubId != null && coach.clubId !== clubId) return 'Coach is not a member of this club.';
+    if (coach.role === 'player' || coach.role === 'parent') return 'Selected user cannot coach an event.';
+    return null;
+}
+
 export const eventsController = {
     async getEvents(req: AuthenticatedRequest, res: Response) {
         try {
@@ -285,80 +326,101 @@ export const eventsController = {
 
     async createEvent(req: AuthenticatedRequest, res: Response) {
         try {
-            const startTime = parseRequiredDate(req.body.startTime, 'startTime');
-            const endTime = parseRequiredDate(req.body.endTime, 'endTime');
-            const teamId = req.body.teamId != null ? Number(req.body.teamId) : null;
-
-            if (!req.body.title || !String(req.body.title).trim()) {
-                return res.status(400).json({ error: 'Event title is required.' });
+            const parsed = parseEventInput(req.body, 'create');
+            if (!parsed.ok) {
+                return res.status(400).json({ error: parsed.error });
             }
+            const input = parsed.data;
 
-            if (teamId == null || Number.isNaN(teamId)) {
-                return res.status(400).json({ error: 'A valid team is required.' });
-            }
-
-            const access = await ensureTeamAccess(req, teamId);
+            const access = await ensureTeamAccess(req, input.teamId as number);
             if (access.status !== 200) {
                 return res.status(access.status).json({ error: access.error });
             }
 
+            const coachError = await validateCoachForClub(input.coachId, access.team.clubId ?? null);
+            if (coachError) {
+                return res.status(400).json({ error: coachError });
+            }
+
             const [event] = await db.insert(events).values({
-                type: req.body.type || 'training',
-                title: String(req.body.title).trim(),
-                description: req.body.description ?? null,
-                location: req.body.location ?? null,
-                startTime: startTime.toISOString(),
-                endTime: endTime.toISOString(),
-                teamId,
-                coachId: req.body.coachId != null ? Number(req.body.coachId) : null,
-                amount: req.body.amount != null ? Number(req.body.amount) : null,
-                status: req.body.status || 'scheduled',
+                type: input.type ?? 'training',
+                title: input.title as string,
+                description: input.description ?? null,
+                location: input.location ?? null,
+                startTime: input.startTime as string,
+                endTime: input.endTime as string,
+                teamId: input.teamId as number,
+                coachId: input.coachId ?? null,
+                amount: input.amount ?? null,
+                status: input.status ?? 'scheduled',
                 createdAt: new Date().toISOString(),
-                coachNote: req.body.coachNote ?? null,
+                coachNote: input.coachNote ?? null,
             }).returning();
 
             res.json(await enrichEvent(event as EventDoc));
         } catch (error) {
             console.error('Create event error:', error);
-            const message = error instanceof Error ? error.message : 'Internal server error';
-            const isValidationError = /^(startTime|endTime) is invalid\.$/.test(message);
-            res.status(isValidationError ? 400 : 500).json({ error: message });
+            res.status(500).json({ error: 'Internal server error' });
         }
     },
 
     async updateEvent(req: AuthenticatedRequest, res: Response) {
         try {
             const eventId = Number(req.params.id);
+            if (!Number.isInteger(eventId)) {
+                return res.status(400).json({ error: 'Invalid event id' });
+            }
             const existingRows = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
             const existingEvent = existingRows[0];
             if (!existingEvent) {
                 return res.status(404).json({ error: 'Event not found' });
             }
 
+            let clubId: number | null = null;
             if (existingEvent.teamId != null) {
                 const access = await ensureTeamAccess(req, existingEvent.teamId);
                 if (access.status !== 200) {
                     return res.status(access.status).json({ error: access.error });
                 }
+                clubId = access.team.clubId ?? null;
             } else if (!isSuperadmin(req)) {
                 // No team means no club to scope the check to, so only a superadmin
                 // may touch it. Previously this branch was simply skipped.
                 return res.status(403).json({ error: 'Access denied' });
             }
 
-            const updates: Partial<typeof events.$inferInsert> = {
-                ...(req.body.type !== undefined ? { type: req.body.type } : {}),
-                ...(req.body.title !== undefined ? { title: req.body.title } : {}),
-                ...(req.body.description !== undefined ? { description: req.body.description } : {}),
-                ...(req.body.location !== undefined ? { location: req.body.location } : {}),
-                ...(req.body.startTime !== undefined ? { startTime: new Date(req.body.startTime).toISOString() } : {}),
-                ...(req.body.endTime !== undefined ? { endTime: new Date(req.body.endTime).toISOString() } : {}),
-                ...(req.body.teamId !== undefined ? { teamId: req.body.teamId == null ? null : Number(req.body.teamId) } : {}),
-                ...(req.body.coachId !== undefined ? { coachId: req.body.coachId == null ? null : Number(req.body.coachId) } : {}),
-                ...(req.body.amount !== undefined ? { amount: req.body.amount == null ? null : Number(req.body.amount) } : {}),
-                ...(req.body.status !== undefined ? { status: req.body.status } : {}),
-                ...(req.body.coachNote !== undefined ? { coachNote: req.body.coachNote } : {}),
-            };
+            const parsed = parseEventInput(req.body, 'update', {
+                startTime: String(existingEvent.startTime),
+                endTime: String(existingEvent.endTime),
+            });
+            if (!parsed.ok) {
+                return res.status(400).json({ error: parsed.error });
+            }
+            const updates = parsed.data;
+
+            // Moving an event to another team needs access to the DESTINATION
+            // too — checking only the current team let a coach re-home an event
+            // (and its attendance sheet) into another club.
+            if (updates.teamId !== undefined && updates.teamId !== existingEvent.teamId) {
+                if (updates.teamId == null) {
+                    if (!isSuperadmin(req)) {
+                        return res.status(403).json({ error: 'Only a superadmin can detach an event from its team.' });
+                    }
+                } else {
+                    const target = await ensureTeamAccess(req, updates.teamId);
+                    if (target.status !== 200) {
+                        return res.status(target.status).json({ error: target.error });
+                    }
+                    clubId = target.team.clubId ?? null;
+                }
+            }
+
+            if (updates.coachId !== undefined) {
+                const coachError = await validateCoachForClub(updates.coachId, clubId);
+                if (coachError) {
+                    return res.status(400).json({ error: coachError });
+                }
+            }
 
             const [updated] = await db.update(events).set(updates).where(eq(events.id, eventId)).returning();
             res.json(await enrichEvent(updated as EventDoc));
@@ -388,8 +450,12 @@ export const eventsController = {
                 return res.status(403).json({ error: 'Access denied' });
             }
 
-            await db.delete(attendance).where(eq(attendance.eventId, eventId));
-            await db.delete(events).where(eq(events.id, eventId));
+            // Together or not at all — a failure between the two used to leave
+            // an event with its attendance sheet already gone.
+            await db.transaction(async (tx) => {
+                await tx.delete(attendance).where(eq(attendance.eventId, eventId));
+                await tx.delete(events).where(eq(events.id, eventId));
+            });
             res.json({ success: true });
         } catch (error) {
             console.error('Delete event error:', error);
@@ -411,7 +477,20 @@ export const eventsController = {
                 return res.status(denied.status).json({ error: denied.error });
             }
 
-            const attendanceRows = await db.select().from(attendance).where(eq(attendance.eventId, eventId));
+            // A player/parent sees only their OWN row. The full sheet carries
+            // every teammate's status and the coach's private per-player notes,
+            // which this endpoint used to hand to any club member.
+            let attendanceRows;
+            if (isPlayerFacingRole(req)) {
+                const selfPlayerId = await getSelfPlayerId(req);
+                if (selfPlayerId == null) {
+                    return res.json([]);
+                }
+                attendanceRows = await db.select().from(attendance)
+                    .where(and(eq(attendance.eventId, eventId), eq(attendance.playerId, selfPlayerId)));
+            } else {
+                attendanceRows = await db.select().from(attendance).where(eq(attendance.eventId, eventId));
+            }
 
             // Fetch only the players on this event's sheet. This previously loaded
             // every player row in the database and filtered in JS with an O(n·m)
@@ -444,60 +523,86 @@ export const eventsController = {
     async updateEventAttendance(req: AuthenticatedRequest, res: Response) {
         try {
             const eventId = Number(req.params.id);
-            const playerAttendances = Array.isArray(req.body?.playerAttendances) ? req.body.playerAttendances : [];
+            if (!Number.isInteger(eventId)) {
+                return res.status(400).json({ error: 'Invalid event id' });
+            }
+
+            const parsed = parseAttendancePayload(req.body);
+            if (!parsed.ok) {
+                return res.status(400).json({ error: parsed.error });
+            }
+            const items = parsed.data;
+
             const eventRows = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
             const event = eventRows[0];
-
             if (!event) {
                 return res.status(404).json({ error: 'Event not found' });
             }
 
-            if (event.teamId != null) {
-                const access = await ensureTeamAccess(req, event.teamId);
-                if (access.status !== 200) {
-                    return res.status(access.status).json({ error: access.error });
-                }
-            } else if (!isSuperadmin(req)) {
-                return res.status(403).json({ error: 'Access denied' });
+            if (event.teamId == null) {
+                // attendance.team_id is NOT NULL with a FK to teams — a club-less
+                // event has nowhere valid to hang a row (the old code wrote 0).
+                return res.status(400).json({ error: 'This event is not linked to a team.' });
             }
 
-            for (const item of playerAttendances) {
-                const playerId = Number(item.playerId);
-                const status = String(item.status);
-                // Note is optional: only touch it when the caller explicitly sends
-                // a `note` key, so status-only updates (e.g. the quick toggle modal)
-                // never wipe an existing coach note.
-                const hasNote = Object.prototype.hasOwnProperty.call(item, 'note');
-                const note = hasNote ? (item.note == null ? null : String(item.note)) : undefined;
-                const existingRows = await db.select().from(attendance).where(and(eq(attendance.eventId, eventId), eq(attendance.playerId, playerId))).limit(1);
-                const existing = existingRows[0];
+            const access = await ensureTeamAccess(req, event.teamId);
+            if (access.status !== 200) {
+                return res.status(access.status).json({ error: access.error });
+            }
 
-                if (existing?.id != null) {
-                    await db.update(attendance)
-                        .set({ status, date: new Date().toISOString(), ...(hasNote ? { note } : {}) })
-                        .where(eq(attendance.id, existing.id));
-                } else {
-                    await db.insert(attendance).values({
-                        playerId,
-                        eventId,
-                        teamId: event.teamId ?? 0,
-                        status,
-                        date: new Date().toISOString(),
-                        note: note ?? null,
-                    });
+            const playerIds = items.map((item) => item.playerId);
+            if (!isSuperadmin(req) && access.team.clubId != null) {
+                const allowed = await filterPlayersInClub(playerIds, access.team.clubId);
+                const foreign = playerIds.filter((id) => !allowed.has(id));
+                if (foreign.length) {
+                    return res.status(403).json({ error: `Players not in this club: ${foreign.join(', ')}` });
                 }
+            }
 
-                // Notify the player only when a new/changed non-empty note was
-                // actually sent — a status-only re-save or an unchanged note
-                // must not spam a duplicate notification. A notification
-                // failure must not fail the attendance save itself.
-                if (hasNote && note && note !== existing?.note) {
+            // One read for the whole sheet instead of one per player, then all
+            // writes in a single transaction so a mid-batch failure can't leave
+            // half a squad marked.
+            const existingRows = await db.select().from(attendance)
+                .where(and(eq(attendance.eventId, eventId), inArray(attendance.playerId, playerIds)));
+            const existingByPlayer = new Map(existingRows.map((row) => [row.playerId, row]));
+            const now = new Date().toISOString();
+
+            await db.transaction(async (tx) => {
+                for (const item of items) {
+                    const existing = existingByPlayer.get(item.playerId);
+                    // Note is optional: only touch it when the caller explicitly
+                    // sent a `note` key, so status-only updates (quick toggles,
+                    // bulk "mark present") never wipe an existing coach note.
+                    const noteUpdate = item.note !== undefined ? { note: item.note } : {};
+                    if (existing) {
+                        await tx.update(attendance)
+                            .set({ status: item.status, date: now, ...noteUpdate })
+                            .where(eq(attendance.id, existing.id));
+                    } else {
+                        await tx.insert(attendance).values({
+                            playerId: item.playerId,
+                            eventId,
+                            teamId: event.teamId as number,
+                            status: item.status,
+                            date: now,
+                            note: item.note ?? null,
+                        });
+                    }
+                }
+            });
+
+            // Notify only for a new/changed non-empty note — a status-only
+            // re-save must not spam a duplicate. Notification failures never
+            // fail the (already committed) attendance save.
+            for (const item of items) {
+                const previousNote = existingByPlayer.get(item.playerId)?.note ?? null;
+                if (item.note && item.note !== previousNote) {
                     try {
                         await createFeedbackNotification({
-                            playerId,
+                            playerId: item.playerId,
                             eventId,
                             eventTitle: event.title,
-                            note,
+                            note: item.note,
                         });
                     } catch (notificationError) {
                         console.error('Create feedback notification error:', notificationError);
@@ -505,7 +610,7 @@ export const eventsController = {
                 }
             }
 
-            res.json({ success: true });
+            res.json({ success: true, updated: items.length });
         } catch (error) {
             console.error('Update event attendance error:', error);
             res.status(500).json({ error: 'Internal server error' });
