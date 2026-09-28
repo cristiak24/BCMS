@@ -19,7 +19,7 @@ import {
   type AuthUser,
   type UserRole,
 } from '../utils/authSession';
-import { apiFetch, setSessionTokenGetter, setUnauthorizedHandler } from '../services/apiClient';
+import { ApiError, apiFetch, setSessionTokenGetter, setUnauthorizedHandler } from '../services/apiClient';
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Types
@@ -130,6 +130,14 @@ async function fetchMeFromBackend(currentUser: NonNullable<CurrentUser>): Promis
   );
 }
 
+/** The Clerk session exists client-side but can no longer mint a valid token. */
+class DeadSessionError extends Error {
+  constructor() {
+    super('Clerk session is no longer valid.');
+    this.name = 'DeadSessionError';
+  }
+}
+
 // ────────────────────────────────────────────────────────────────────────────────
 // Provider
 // ────────────────────────────────────────────────────────────────────────────────
@@ -142,15 +150,19 @@ function AuthBridge({ children }: PropsWithChildren) {
   const [initializing, setInitializing] = useState(true);
   const authRequestId = useRef(0);
 
+  // Keyed on primitives, not the `clerkUser` object: Clerk hands back a new
+  // user object every time it refreshes its client (including after every
+  // failed token fetch), which re-ran the session effect below, which fetched
+  // /auth/me again, which failed the token again… — an endless 401 → 429 loop
+  // that kept the app on "Opening BCMS..." because `initializing` was only
+  // cleared by the latest run and every run got superseded.
+  const clerkEmail = clerkUser?.primaryEmailAddress?.emailAddress ?? null;
   const currentUser: CurrentUser = useMemo(() => {
     if (!isSignedIn || !userId) {
       return null;
     }
-    return {
-      uid: userId,
-      email: clerkUser?.primaryEmailAddress?.emailAddress ?? null,
-    };
-  }, [isSignedIn, userId, clerkUser]);
+    return { uid: userId, email: clerkEmail };
+  }, [isSignedIn, userId, clerkEmail]);
 
   useEffect(() => {
     if (isLoaded) {
@@ -185,13 +197,46 @@ function AuthBridge({ children }: PropsWithChildren) {
       }
 
       try {
-        const nextSession = await fetchMeFromBackend(currentUser);
+        let nextSession: AuthUser;
+        try {
+          nextSession = await fetchMeFromBackend(currentUser);
+        } catch (error) {
+          if (!(error instanceof ApiError && error.status === 401)) throw error;
+          // Clerk still lists a session but the backend rejects its token (it
+          // was revoked/expired server-side, or the user was deleted). Retry
+          // once with a freshly minted token; if that also fails the session
+          // is dead, so drop it and go to /login instead of spinning forever.
+          const freshToken = await getToken({ skipCache: true }).catch(() => null);
+          if (!freshToken) throw new DeadSessionError();
+          try {
+            nextSession = await fetchMeFromBackend(currentUser);
+          } catch (retryError) {
+            if (retryError instanceof ApiError && retryError.status === 401) throw new DeadSessionError();
+            throw retryError;
+          }
+        }
         setCachedAuthSession(nextSession);
         await saveAuthSession(nextSession);
         if (mounted && requestId === authRequestId.current) {
           setSession(nextSession);
         }
       } catch (error) {
+        if (error instanceof DeadSessionError) {
+          console.warn('[AuthContext] Clerk session is no longer valid; signing out.');
+          try {
+            await clerk.signOut();
+          } catch {
+            // The session may already be gone server-side; local cleanup below
+            // is what matters.
+          }
+          setCachedAuthSession(null);
+          await clearAuthSession();
+          if (mounted && requestId === authRequestId.current) {
+            setSession(null);
+          }
+          return;
+        }
+
         console.error('[AuthContext] Failed to load session from backend:', error);
         // The account is still signed in — the backend was just unreachable or
         // slow (fetchMeFromBackend already retried). Fall back to the persisted
@@ -219,6 +264,9 @@ function AuthBridge({ children }: PropsWithChildren) {
     return () => {
       mounted = false;
     };
+    // `clerk` and `getToken` are stable Clerk handles; the effect must only
+    // re-run when the signed-in identity actually changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded, currentUser]);
 
   const reloadSession = useCallback(async () => {
