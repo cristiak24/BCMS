@@ -5,6 +5,7 @@ import { ThemeProvider } from '../context/ThemeContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
 import { lazyRoute, prefetchRoutes } from './lazyRoute';
 import RouteProgress from '../components/ui/RouteProgress';
+import { InstallBanner } from '../components/pwa/InstallApp';
 import { useSession } from '../context/AuthContext';
 import { normalizeRole } from '../utils/authSession';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
@@ -149,6 +150,7 @@ export default function App() {
           <AuthProvider>
             <RouteProgress />
             <RoutePrefetcher />
+            <InstallBanner />
             <Suspense fallback={<LoadingScreen message="Se încarcă..." />}>
               <Routes>
                 <Route path="/" element={<Landing />} />

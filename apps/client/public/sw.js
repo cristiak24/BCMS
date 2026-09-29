@@ -14,8 +14,8 @@
  *
  * Bump CACHE_NAME to drop every previously cached response on activate.
  */
-const CACHE_NAME = 'bcms-web-v2';
-const APP_SHELL = ['/', '/manifest.webmanifest', '/pwa-icon.svg'];
+const CACHE_NAME = 'bcms-web-v3';
+const APP_SHELL = ['/', '/manifest.webmanifest', '/pwa-icon.svg', '/pwa-192.png', '/apple-touch-icon.png'];
 /** Old hashed bundles pile up across deploys; keep the cache bounded. */
 const MAX_ENTRIES = 150;
 

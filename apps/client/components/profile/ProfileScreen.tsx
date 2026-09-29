@@ -16,6 +16,7 @@ import PageHeader from '../ui/PageHeader';
 import { Skeleton } from '../ui/Skeleton';
 import { ErrorState } from '../ui/ScreenState';
 import { ProfileCard } from './ProfileParts';
+import { InstallAppCard } from '../pwa/InstallApp';
 
 const THEME_OPTIONS: { mode: ThemeMode; label: string; icon: string }[] = [
   { mode: 'light', label: 'Luminos', icon: 'wb-sunny' },
@@ -489,6 +490,8 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
           </View>
 
           <View className="lg:col-span-5 2xl:col-span-4 min-w-0 gap-4">
+            <InstallAppCard />
+
             <AppearanceCard />
 
             <ProfileCard icon="account-circle" tone="neutral" title="Cont" description="Datele gestionate de clubul tău.">

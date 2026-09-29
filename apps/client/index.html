@@ -7,13 +7,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="BCMS" />
-    <meta name="description" content="BCMS web app for basketball club operations." />
+    <meta name="description" content="Administrarea clubului de baschet: program, prezență, plăți și echipe." />
     <meta name="format-detection" content="telephone=no" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="theme-color" content="#F4F5F8" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="/pwa-icon.svg" />
-    <link rel="apple-touch-icon" href="/pwa-icon.svg" />
+    <!-- iOS ignores SVG touch icons (the home-screen tile became a page screenshot). -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <title>BCMS</title>
     <script>
       // Apply the saved theme before first paint to avoid a light→dark flash.

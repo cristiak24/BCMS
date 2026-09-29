@@ -16,6 +16,10 @@ import './theme/density.css';
 import './theme/dark.css';
 import './theme/dark-extras.css';
 import App from './App';
+import { captureInstallPrompt } from './pwa/installApp';
+
+// Before render: Chrome can fire beforeinstallprompt as soon as the page loads.
+captureInstallPrompt();
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
