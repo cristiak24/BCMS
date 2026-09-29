@@ -531,8 +531,8 @@ export default function ManageAccountsScreen() {
             >
                 <View className="w-full">
                     <AdminHero
-                        title="Manage Accounts"
-                        subtitle="Search, invite, and manage only the accounts that belong to your club."
+                        title="Conturi"
+                        subtitle="Caută, invită și administrează conturile clubului tău."
                         className="md:flex-row md:items-end md:justify-between"
                     >
                         <View className="mt-5 md:mt-0 flex-row flex-wrap gap-3">

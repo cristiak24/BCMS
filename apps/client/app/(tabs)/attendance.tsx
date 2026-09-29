@@ -199,6 +199,7 @@ function PlayerAttendanceScreen() {
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
       <PageContainer>
         <PageHeader
+          actionsOnMobile={false}
           title="Prezența mea"
           subtitle="Istoricul sesiunilor la care antrenorul ți-a marcat prezența."
           actions={

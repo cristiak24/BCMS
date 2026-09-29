@@ -370,58 +370,6 @@
   .route-progress-bar { animation: none; left: 0; width: 100%; }
 }
 
-/* ── Mobile widget carousel (admin dashboard) ───────────────────────────── */
-.m-carousel {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  /* Height eases to the active card instead of jumping between cards. */
-  transition: height 0.35s var(--ease-out);
-}
-.m-carousel::-webkit-scrollbar { display: none; }
-.m-carousel-item {
-  /* 28px of the next card stays visible: the swipe affordance. */
-  flex: 0 0 calc(100% - 28px);
-  min-width: 0;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-  opacity: 0.55;
-  transform: scale(0.97);
-  transform-origin: left center;
-  transition: opacity 0.3s ease, transform 0.35s var(--ease-out);
-}
-.m-carousel-item.is-active {
-  opacity: 1;
-  transform: none;
-}
-.m-carousel-dot {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  padding: 8px 3px;
-  cursor: pointer;
-}
-.m-carousel-dot > span {
-  display: block;
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--c-border-strong);
-  transition: width 0.3s var(--ease-out), background-color 0.3s ease;
-}
-.m-carousel-dot > span.is-active {
-  width: 20px;
-  background: var(--c-brand-surface);
-}
-@media (prefers-reduced-motion: reduce) {
-  .m-carousel, .m-carousel-item, .m-carousel-dot > span { transition: none; }
-}
 
 /* ── Sheets & backdrops ─────────────────────────────────────────────────── */
 .ui-backdrop {
@@ -490,7 +438,7 @@
 }
 
 /* ── Horizontal snap row with peek (phones) ────────────────────────────────
-   Simpler sibling of .m-carousel: no active tracking, just a swipeable row
+   A swipeable row of equal-height cards (no active tracking)
    where the next card shows 18% so the swipe is obvious. Desktop: a grid. */
 .m-scroller {
   display: flex;

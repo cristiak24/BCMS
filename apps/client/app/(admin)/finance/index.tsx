@@ -622,6 +622,7 @@ export default function FinancialSettingsPage() {
        RENDER
        ═══════════════════════════════════════════════════════════════ */
     const TABS = ['Configuration', 'Finances', 'Payment Gateways'];
+    const TAB_LABELS: Record<string, string> = { Configuration: 'Configurare', Finances: 'Situație', 'Payment Gateways': 'Plăți online' };
 
     return (
         <ScrollView
@@ -633,8 +634,8 @@ export default function FinancialSettingsPage() {
 
             {/* ──────────── HEADER + TABS ──────────── */}
             <AdminHero
-                title="Financial Settings"
-                subtitle="Club billing, payments, documents, and L12 exports."
+                title="Finanțe"
+                subtitle="Facturare, plăți, documente și exporturi L12."
                 className={`${isMobile ? 'gap-5' : 'flex-row items-end justify-between'} mb-6`}
             >
                 {/* Segmented control on the page surface (was a white-on-navy
@@ -652,7 +653,7 @@ export default function FinancialSettingsPage() {
                                 className="rounded-[8px] px-3.5 h-8 justify-center"
                                 style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
                             >
-                                <Text className="text-[12px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>{tab}</Text>
+                                <Text className="text-[12px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>{TAB_LABELS[tab] ?? tab}</Text>
                             </Pressable>
                         );
                     })}

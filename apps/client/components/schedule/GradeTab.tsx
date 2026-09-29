@@ -215,7 +215,8 @@ export function GradeTab() {
           {/* Compact header on the page background (was a 32px navy slab that
               repeated the section title and pushed content down). */}
           <View className={`mb-4 ${isMobile ? 'gap-3' : 'flex-row items-center justify-between'}`}>
-            <View className="flex-1">
+            {/* Desktop only — on phones the Notare tab above already says it. */}
+            <View className="hidden lg:flex flex-1">
               <Text className="text-[22px] md:text-[26px] font-bold tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }}>
                 Centru de notare
               </Text>

@@ -463,6 +463,7 @@ function PlayerPaymentsScreen() {
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-20">
       <PageContainer>
         <PageHeader
+          actionsOnMobile={false}
           title="Plăți"
           subtitle="Cotizații, carduri salvate și istoricul plăților."
           actions={

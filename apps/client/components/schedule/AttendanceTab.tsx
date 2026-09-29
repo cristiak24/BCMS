@@ -1,20 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Platform, StyleSheet } from '@/src/web/reactNative';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from '@/src/web/reactNative';
 import {
   Download,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Check,
   X,
-  CheckCircle,
-  XCircle,
   AlertCircle,
   BriefcaseMedical,
-  CalendarX2,
-  BarChart3,
   Minus,
-  TrendingUp,
-  CalendarClock,
 } from 'lucide-react';
 import { useRouter } from '@/src/web/expoRouter';
 import { teamsApi, Team, Player } from '../../services/teamsApi';
@@ -42,7 +37,7 @@ interface AttendanceTabProps {
 type MobilePeriodMode = 'week' | 'month';
 
 export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabProps) {
-  const { isMobile, isSmallPhone, width } = useResponsive();
+  const { isMobile } = useResponsive();
   const router = useRouter();
   const [focusedDate, setFocusedDate] = useState(new Date());
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(
@@ -53,7 +48,6 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attendanceData, setAttendanceData] = useState<Record<number, any[]>>({});
-  const [matrixContainerWidth, setMatrixContainerWidth] = useState(0);
 
   // Year-wide attendance used for the "current year" and "selected month" stat
   // cards. Loaded once per team/year (independent of the week the matrix shows).
@@ -97,29 +91,10 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
   const selectedTeam = teams.find((t) => t.id === selectedTeamId) || null;
   const selectedTeamName = selectedTeam?.name || 'Alege o echipă';
   const weekLabel = `Săpt. ${weekNumber}`;
-  const weekRangeLabel = `${weekStartDate.toLocaleDateString(RO_LOCALE, { month: 'short', day: 'numeric' })} - ${weekEndDate.toLocaleDateString(RO_LOCALE, { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
   const activePeriodDayKeys = isMobile ? mobilePeriodDayKeys : currentWeekDayKeys;
   const activePeriodDayKeySet = isMobile ? mobilePeriodDayKeySet : currentWeekDayKeySet;
 
-  // Matrix sizing:
-  // - mobile: fixed min widths + horizontal scroll inside matrix viewport
-  // - web/tablet: use available width, keep readable day column min width
-  const playerColumnWidth = isMobile ? (isSmallPhone ? 188 : 208) : 240;
-  const dayColumnWidthMobile = isSmallPhone ? 64 : 70;
-  const dayColumnMinWeb = 64;
-  // Fallback width is conservative (sidebar + card padding ≈ 360px) so the grid
-  // never renders wider than the card before onLayout measures it — that was
-  // pushing the 7th day (Sunday) off-screen behind a horizontal scrollbar.
-  const measuredMatrixWidth = matrixContainerWidth > 0 ? matrixContainerWidth : Math.max(320, width - (isMobile ? 24 : 360));
-  const dayColumnWidth = isMobile
-    ? dayColumnWidthMobile
-    : Math.max(dayColumnMinWeb, Math.floor((measuredMatrixWidth - playerColumnWidth) / 7));
-
-  const matrixMinWidth = playerColumnWidth + (dayColumnWidth * 7);
-  // On desktop we fit the 7 columns to the measured width (no horizontal scroll);
-  // on mobile we keep the fixed min width and scroll inside the matrix.
-  const renderedMatrixWidth = isMobile ? matrixMinWidth : Math.max(matrixMinWidth, measuredMatrixWidth);
 
   useEffect(() => {
     if (teams.length > 0 && !selectedTeamId) {
@@ -353,7 +328,7 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
   // Same session-level rate, per player, over the current week — for the mobile
   // player card so the % matches the day circles shown next to it.
   const playerWeekRates = useMemo(() => {
-    return players.reduce<Record<number, number>>((acc, player) => {
+    return players.reduce<Record<number, number | null>>((acc, player) => {
       let present = 0;
       let absent = 0;
       for (const key of currentWeekDayKeys) {
@@ -365,7 +340,7 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
         }
       }
       const denom = present + absent;
-      acc[player.id] = denom > 0 ? Math.round((present / denom) * 100) : 0;
+      acc[player.id] = denom > 0 ? Math.round((present / denom) * 100) : null;
       return acc;
     }, {});
   }, [players, currentWeekDayKeys, weeklyEventsByDay, attendanceData]);
@@ -383,7 +358,7 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
   };
 
   const exportWeeklyReport = () => {
-    const header = ['Player', ...currentWeekDayKeys, 'Present', 'Absent', 'Medical', 'Partial', 'Pending'];
+    const header = ['Jucător', ...currentWeekDayKeys, 'Prezent', 'Absent', 'Medical', 'Parțial', 'Neluată'];
     const rows = players.map((player) => {
       let present = 0;
       let absent = 0;
@@ -417,7 +392,7 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
       .join('\n');
 
     if (Platform.OS !== 'web' || typeof document === 'undefined') {
-      Alert.alert('Export unavailable', 'Weekly attendance export is currently available on web.');
+      Alert.alert('Export indisponibil', 'Exportul prezenței este disponibil doar pe web.');
       return;
     }
 
@@ -432,1274 +407,453 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
     URL.revokeObjectURL(url);
   };
 
-  const renderStatusIcon = (status: AggregateAttendance['status']) => {
-    const iconSize = isMobile ? 13 : 16;
-    if (status === 'present') return <CheckCircle size={iconSize} color="var(--c-success-fg)" />;
-    if (status === 'absent') return <XCircle size={iconSize} color="var(--c-danger)" />;
-    if (status === 'medical') return <BriefcaseMedical size={iconSize} color="var(--c-warning)" />;
-    if (status === 'partial') return <AlertCircle size={iconSize} color="var(--c-warning)" />;
-    if (status === 'pending') return <View style={styles.pendingDot} />;
-    return null;
-  };
-
   const mobilePeriodStartDate = mobilePeriodDays[0];
   const mobilePeriodEndDate = mobilePeriodDays[mobilePeriodDays.length - 1];
-  const mobileDateRangeLabel = `${mobilePeriodStartDate.toLocaleDateString(RO_LOCALE, { month: 'short', day: 'numeric' })} - ${mobilePeriodEndDate.toLocaleDateString(RO_LOCALE, { month: 'short', day: 'numeric' })}`;
-  const mobileSeasonLabel = selectedTeam?.seasonName || 'Sezon curent';
+  const periodLabel = mobilePeriodMode === 'week' || !isMobile
+    ? `${weekStartDate.toLocaleDateString(RO_LOCALE, { day: 'numeric', month: 'short' })} – ${weekEndDate.toLocaleDateString(RO_LOCALE, { day: 'numeric', month: 'short' })}`
+    : `${months[viewMonth]} ${viewYear}`;
+  const periodSub = mobilePeriodMode === 'week' || !isMobile
+    ? `${weekLabel}${selectedTeam?.seasonName ? ` · ${selectedTeam.seasonName}` : ''}`
+    : `${mobilePeriodStartDate.getDate()}–${mobilePeriodEndDate.getDate()} ${months[viewMonth].toLowerCase()}`;
 
-  const movePeriodBackward = () => {
-    if (mobilePeriodMode === 'week') {
-      setFocusedDate((prev) => addDays(prev, -7));
+  const movePeriod = (delta: number) => {
+    if (isMobile && mobilePeriodMode === 'month') {
+      setFocusedDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
       return;
     }
-
-    setFocusedDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, prev.getDate()));
+    setFocusedDate((prev) => addDays(prev, delta * 7));
   };
 
-  const movePeriodForward = () => {
-    if (mobilePeriodMode === 'week') {
-      setFocusedDate((prev) => addDays(prev, 7));
-      return;
-    }
-
-    setFocusedDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, prev.getDate()));
-  };
-
-  const renderMobileStatusCircle = (status: AggregateAttendance['status']) => {
-    if (status === 'no-session') {
-      return (
-        <View style={[styles.mobileStatusCircle, styles.mobileStatusCircleNeutral]}>
-          <Minus size={14} color="var(--c-faint)" />
-        </View>
-      );
-    }
-
-    if (status === 'present') {
-      return (
-        <View style={[styles.mobileStatusCircle, styles.mobileStatusCirclePresent]}>
-          <Check size={13} color="#fff" strokeWidth={3} />
-        </View>
-      );
-    }
-
-    if (status === 'absent') {
-      return (
-        <View style={[styles.mobileStatusCircle, styles.mobileStatusCircleAbsent]}>
-          <X size={13} color="var(--c-danger)" strokeWidth={3} />
-        </View>
-      );
-    }
-
-    if (status === 'medical' || status === 'partial') {
-      return (
-        <View style={[styles.mobileStatusCircle, styles.mobileStatusCircleMedical]}>
-          <AlertCircle size={12} color="var(--c-warning-fg)" />
-        </View>
-      );
-    }
-
-    return (
-      <View style={[styles.mobileStatusCircle, styles.mobileStatusCirclePending]}>
-        <View style={styles.mobilePendingDot} />
+  const teamSelect = (
+    <View className="relative flex-1 min-w-0">
+      <select
+        value={selectedTeamId ?? ''}
+        onChange={(e) => setSelectedTeamId(e.target.value ? Number(e.target.value) : null)}
+        aria-label="Echipă"
+        className="native-field"
+        style={{
+          width: '100%',
+          height: 40,
+          borderRadius: 10,
+          border: '1px solid var(--c-border)',
+          backgroundColor: 'var(--c-surface)',
+          padding: '0 34px 0 12px',
+          fontSize: 13.5,
+          fontWeight: 600,
+          color: 'var(--c-ink)',
+          cursor: 'pointer',
+          appearance: 'none',
+          WebkitAppearance: 'none',
+        } as any}
+      >
+        {teams.length === 0 && <option value="">Nicio echipă</option>}
+        {teams.map((team) => (
+          <option key={team.id} value={team.id}>{team.name}</option>
+        ))}
+      </select>
+      <View pointerEvents="none" className="absolute right-3 top-0 bottom-0 justify-center">
+        <ChevronDown size={15} color="var(--c-faint)" />
       </View>
+    </View>
+  );
+
+  const stepper = (
+    <View className="flex-row items-center gap-2">
+      <TouchableOpacity
+        onPress={() => movePeriod(-1)}
+        accessibilityLabel="Perioada anterioară"
+        className="ui-press w-9 h-9 rounded-[10px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
+      >
+        <ChevronLeft size={17} color="var(--c-ink-soft)" />
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => setFocusedDate(new Date())}
+        accessibilityLabel="Mergi la perioada curentă"
+        className={`${isMobile ? 'flex-1' : 'min-w-[150px]'} items-center justify-center h-9`}
+      >
+        <Text className="text-[15px] font-bold leading-tight" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{periodLabel}</Text>
+        <Text className="text-[11.5px] font-medium" style={{ color: 'var(--c-faint)' }} numberOfLines={1}>{periodSub}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => movePeriod(1)}
+        accessibilityLabel="Perioada următoare"
+        className="ui-press w-9 h-9 rounded-[10px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
+      >
+        <ChevronRight size={17} color="var(--c-ink-soft)" />
+      </TouchableOpacity>
+    </View>
+  );
+
+  const rateNumber = parseFloat(rateStats.rate);
+  const statCells = [
+    {
+      label: isMobile && mobilePeriodMode === 'month' ? 'Rată lună' : 'Rată săptămână',
+      value: rateStats.denom > 0 ? `${rateStats.rate}%` : '—',
+      hint: `${rateStats.present}/${rateStats.denom} prezențe`,
+      tone: rateTone(rateStats.denom > 0 ? rateNumber : null),
+      progress: rateStats.denom > 0 ? rateNumber : 0,
+    },
+    {
+      label: 'Absențe',
+      value: String(summary.totalAbsent),
+      hint: summary.totalMedical ? `${summary.totalMedical} medical` : 'în perioadă',
+      tone: summary.totalAbsent > 0 ? 'var(--c-danger-fg)' : 'var(--c-ink)',
+      progress: null,
+    },
+    {
+      label: `An ${viewYear}`,
+      value: statsLoading ? '—' : yearStat.denom > 0 ? `${yearStat.rate.toFixed(1)}%` : '—',
+      hint: `${yearStat.present}/${yearStat.denom} prezențe`,
+      tone: rateTone(statsLoading || !yearStat.denom ? null : yearStat.rate),
+      progress: statsLoading ? 0 : yearStat.rate,
+    },
+    {
+      label: months[viewMonth],
+      value: statsLoading ? '—' : monthStat.denom > 0 ? `${monthStat.rate.toFixed(1)}%` : '—',
+      hint: `${monthStat.present}/${monthStat.denom} prezențe`,
+      tone: rateTone(statsLoading || !monthStat.denom ? null : monthStat.rate),
+      progress: statsLoading ? 0 : monthStat.rate,
+    },
+  ];
+
+  // One card, four cells with hairline dividers — was four separate 2×2
+  // cards with 20px icons and ALL-CAPS labels.
+  const statsCard = (
+    <View
+      className="ui-rise rounded-[16px] border overflow-hidden grid grid-cols-2 lg:grid-cols-4"
+      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)', gap: 1 } as any}
+    >
+      {statCells.map((cell, index) => (
+        <View
+          key={cell.label}
+          className="px-4 py-3.5 min-w-0"
+          style={{
+            backgroundColor: 'var(--c-surface)',
+            // hairlines: the grid gap shows the border colour through
+            boxShadow: `${index % 2 === 1 ? '-1px 0 0 var(--c-border-soft)' : 'none'}${index > 1 ? ', 0 -1px 0 var(--c-border-soft)' : ''}`,
+          } as any}
+        >
+          <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{cell.label}</Text>
+          <Text className="t-num text-[22px] font-bold mt-0.5" style={{ color: cell.tone }}>{cell.value}</Text>
+          {cell.progress != null ? (
+            <View className="h-1 rounded-full overflow-hidden mt-2" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+              <View className="h-full rounded-full ui-bar" style={{ width: `${Math.max(0, Math.min(100, cell.progress))}%`, backgroundColor: cell.tone === 'var(--c-ink)' ? 'var(--c-brand-fg)' : cell.tone } as any} />
+            </View>
+          ) : null}
+          <Text className="text-[11.5px] mt-1.5 t-num" style={{ color: 'var(--c-faint)' }} numberOfLines={1}>{cell.hint}</Text>
+        </View>
+      ))}
+    </View>
+  );
+
+  const legend = (
+    <View className="flex-row flex-wrap items-center gap-x-3.5 gap-y-1.5">
+      {([
+        { status: 'present', label: 'Prezent', count: summary.totalPresent },
+        { status: 'absent', label: 'Absent', count: summary.totalAbsent },
+        { status: 'medical', label: 'Medical', count: summary.totalMedical },
+        { status: 'pending', label: 'Neluată', count: summary.totalPending },
+      ] as const).map(({ status, label, count }) => (
+        <View key={label} className="flex-row items-center gap-1.5">
+          <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: STATUS_STYLE[status].dot }} />
+          <Text className="text-[12px] font-medium t-num" style={{ color: 'var(--c-muted)' }}>{label} {count}</Text>
+        </View>
+      ))}
+    </View>
+  );
+
+  const avatar = (player: Player, size: number) => (
+    <View
+      className="rounded-full items-center justify-center shrink-0"
+      style={{ width: size, height: size, backgroundColor: 'var(--c-surface-tint)' }}
+    >
+      <Text className="text-[12.5px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>
+        {player.firstName?.[0] || 'J'}{player.lastName?.[0] || ''}
+      </Text>
+    </View>
+  );
+
+  const renderCell = (player: Player, day: Date, size: number) => {
+    const dayKey = formatDateKey(day);
+    const agg = playerAttendanceGrid[player.id]?.[dayKey]
+      || computeDailyAttendance(player.id, weeklyEventsByDay[dayKey] || [], attendanceData);
+    return (
+      <StatusDot
+        key={`${player.id}-${dayKey}`}
+        status={agg.status}
+        size={size}
+        label={`${player.firstName} ${player.lastName}, ${day.toLocaleDateString(RO_LOCALE, { weekday: 'long', day: 'numeric' })}`}
+        onPress={() => handleDayPress(player, day, agg.eventDetails)}
+      />
     );
   };
 
+  const detailsModal = modalData ? (
+    <AttendanceDetailsModal
+      visible={modalVisible}
+      onClose={() => setModalVisible(false)}
+      player={modalData.player}
+      date={modalData.date}
+      details={modalData.details}
+      onSelectEvent={openEventGrade}
+    />
+  ) : null;
+
+  const listState = loading ? 'loading' : loadError ? 'error' : players.length === 0 ? 'empty' : 'ready';
+  const stateBox = (text: string, danger?: boolean) => (
+    <View className="rounded-[16px] border border-dashed px-5 py-8 items-center" style={{ borderColor: 'var(--c-border)' } as any}>
+      <Text className="t-meta text-center" style={{ color: danger ? 'var(--c-danger-fg)' : 'var(--c-muted)' }}>{text}</Text>
+    </View>
+  );
+
   if (isMobile) {
     return (
-      <View style={styles.mobileRoot}>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.mobileContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.mobileHeaderRow}>
-            <Text style={styles.mobileHeaderTitle}>Evidența prezenței</Text>
-          </View>
+      <View className="flex-1">
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
+          <View className="gap-3">
+            {stepper}
 
-          <View style={styles.mobileTopRow}>
-            <Text style={styles.mobileOverviewText}>{mobilePeriodMode === 'week' ? 'Sumar săptămână' : 'Sumar lună'}</Text>
-
-            <View style={styles.mobileSegmentControl}>
-              <TouchableOpacity
-                onPress={() => setMobilePeriodMode('week')}
-                style={[styles.mobileSegmentOption, mobilePeriodMode === 'week' && styles.mobileSegmentOptionActive]}
-              >
-                <Text style={[styles.mobileSegmentText, mobilePeriodMode === 'week' && styles.mobileSegmentTextActive]}>Săptămână</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setMobilePeriodMode('month')}
-                style={[styles.mobileSegmentOption, mobilePeriodMode === 'month' && styles.mobileSegmentOptionActive]}
-              >
-                <Text style={[styles.mobileSegmentText, mobilePeriodMode === 'month' && styles.mobileSegmentTextActive]}>Lună</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.mobilePeriodCard}>
-            <TouchableOpacity onPress={movePeriodBackward} style={styles.mobileArrowBtn}>
-              <ChevronLeft size={20} color="var(--c-brand-fg)" />
-            </TouchableOpacity>
-            <View style={styles.mobilePeriodCenter}>
-              <Text style={styles.mobilePeriodLabel}>{mobileDateRangeLabel}</Text>
-              <Text style={styles.mobilePeriodSub}>{mobileSeasonLabel}</Text>
-            </View>
-            <TouchableOpacity onPress={movePeriodForward} style={styles.mobileArrowBtn}>
-              <ChevronRight size={20} color="var(--c-brand-fg)" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.mobileTeamRowWrap}>
-            <select
-              value={selectedTeamId ?? ''}
-              onChange={(e) => setSelectedTeamId(e.target.value ? Number(e.target.value) : null)}
-              style={{
-                flex: 1,
-                height: 44,
-                borderRadius: 16,
-                border: '1px solid #D9E2EC',
-                backgroundColor: 'var(--c-surface)',
-                paddingLeft: 14,
-                paddingRight: 14,
-                fontSize: 14,
-                fontWeight: 700,
-                color: 'var(--c-ink-soft)',
-                cursor: 'pointer',
-              } as any}
-            >
-              {teams.length === 0 && <option value="">Nicio echipă</option>}
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>{team.name}</option>
-              ))}
-            </select>
-          </View>
-
-          <View style={styles.mobileStatsRow}>
-            <View style={styles.mobileStatCard}>
-              <BarChart3 size={20} color="var(--c-sky)" />
-              <Text style={styles.mobileStatValue}>{rateStats.rate}%</Text>
-              <Text style={styles.mobileStatLabel}>RATĂ MEDIE</Text>
+            <View className="flex-row items-center gap-2">
+              {teamSelect}
+              <View className="flex-row p-[3px] rounded-[10px] shrink-0" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+                {(['week', 'month'] as const).map((mode) => {
+                  const active = mobilePeriodMode === mode;
+                  return (
+                    <TouchableOpacity
+                      key={mode}
+                      onPress={() => setMobilePeriodMode(mode)}
+                      accessibilityState={{ selected: active }}
+                      className="h-[34px] px-3 rounded-[8px] justify-center"
+                      style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
+                    >
+                      <Text className="text-[12.5px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>
+                        {mode === 'week' ? 'Săpt.' : 'Lună'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
 
-            <View style={styles.mobileStatCard}>
-              <CalendarX2 size={20} color="var(--c-danger)" />
-              <Text style={styles.mobileStatValue}>{summary.totalAbsent}</Text>
-              <Text style={styles.mobileStatLabel}>ABSENȚE</Text>
-            </View>
-          </View>
+            {statsCard}
 
-          <View style={styles.mobileStatsRow}>
-            <View style={styles.mobileStatCard}>
-              <TrendingUp size={20} color="var(--c-brand-fg)" />
-              <Text style={styles.mobileStatValue}>{statsLoading ? '—' : `${yearStat.rate.toFixed(1)}%`}</Text>
-              <Text style={styles.mobileStatLabel}>PREZENȚĂ AN {viewYear}</Text>
+            <View className="flex-row items-center justify-between mt-2 px-0.5">
+              <Text className="text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>
+                Jucători{players.length ? <Text style={{ color: 'var(--c-faint)' }}>{` · ${players.length}`}</Text> : null}
+              </Text>
+              <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>{weekLabel}</Text>
             </View>
 
-            <View style={styles.mobileStatCard}>
-              <CalendarClock size={20} color="var(--c-sky)" />
-              <Text style={styles.mobileStatValue}>{statsLoading ? '—' : `${monthStat.rate.toFixed(1)}%`}</Text>
-              <Text style={styles.mobileStatLabel}>PREZENȚĂ {months[viewMonth].toUpperCase()}</Text>
-            </View>
-          </View>
-
-          <View style={styles.mobileMatrixHeadingRow}>
-            <Text style={styles.mobileMatrixHeading}>Matrice jucători</Text>
-            <View style={styles.mobileRegisteredPill}>
-              <Text style={styles.mobileRegisteredText}>{players.length} înscriși</Text>
-            </View>
-          </View>
-
-          {loading ? (
-            <View style={{ gap: 12 }}>
-              {Array.from({ length: 3 }).map((_, i) => (
-                <View key={i} style={styles.mobilePlayerCard}>
-                  <View style={styles.mobilePlayerTop}>
-                    <Skeleton className="w-14 h-14 rounded-full" />
-                    <View style={{ flex: 1, gap: 8 }}>
-                      <Skeleton className="h-5 w-2/5" />
-                      <Skeleton className="h-3 w-1/4" />
-                    </View>
-                    <Skeleton className="h-10 w-16 rounded-lg" />
-                  </View>
-                  <View style={styles.mobileWeekRow}>
-                    {Array.from({ length: 7 }).map((__, j) => (
-                      <View key={j} style={styles.mobileDayItem}>
-                        <Skeleton className="w-8 h-8 rounded-full" />
+            {listState === 'error' ? stateBox(loadError ?? '', true)
+              : listState === 'empty' ? stateBox('Niciun jucător în această echipă.')
+              : (
+                <View
+                  className="ui-rise rounded-[16px] border overflow-hidden"
+                  style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
+                >
+                  {/* Weekday header once, aligned with every row's dots. */}
+                  <View className="flex-row justify-between px-4 pt-3 pb-1">
+                    {currentWeekDays.map((day, index) => (
+                      <View key={formatDateKey(day)} className="w-8 items-center">
+                        <Text className="text-[10.5px] font-bold" style={{ color: 'var(--c-faint)' }}>{WEEKDAY_LETTERS[index]}</Text>
+                        <Text className="text-[11px] font-semibold t-num" style={{ color: 'var(--c-muted)' }}>{day.getDate()}</Text>
                       </View>
                     ))}
                   </View>
-                </View>
-              ))}
-            </View>
-          ) : loadError ? (
-            <View style={styles.mobileCenterState}>
-              <Text style={styles.matrixErrorText}>{loadError}</Text>
-            </View>
-          ) : players.length === 0 ? (
-            <View style={styles.mobileCenterState}>
-              <Text style={styles.matrixEmptyText}>Niciun jucător în această echipă.</Text>
-            </View>
-          ) : (
-            players.map((player) => {
-              const playerRate = playerWeekRates[player.id] ?? 0;
-
-              return (
-                <View key={player.id} style={styles.mobilePlayerCard}>
-                  <View style={styles.mobilePlayerTop}>
-                    <View style={styles.mobileAvatarCircle}>
-                      <Text style={styles.mobileAvatarText}>
-                        {player.firstName?.[0] || 'P'}
-                        {player.lastName?.[0] || ''}
-                      </Text>
-                    </View>
-
-                    <View style={styles.mobilePlayerIdentity}>
-                      <Text numberOfLines={1} style={styles.mobilePlayerName}>
-                        {player.firstName} {player.lastName}
-                      </Text>
-                      <Text numberOfLines={1} style={styles.mobilePlayerSub}>
-                        {player.position || 'Jucător'}{player.number ? ` · #${player.number}` : ''}
-                      </Text>
-                    </View>
-
-                    <View style={styles.mobileRateBlock}>
-                      <Text style={styles.mobileRateValue}>{playerRate}%</Text>
-                      <Text style={styles.mobileRateLabel}>Rată prezență</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.mobileWeekRow}>
-                    {currentWeekDays.map((day) => {
-                      const dayKey = formatDateKey(day);
-                      const agg =
-                        playerAttendanceGrid[player.id]?.[dayKey] ||
-                        computeDailyAttendance(player.id, weeklyEventsByDay[dayKey] || [], attendanceData);
-
+                  {listState === 'loading'
+                    ? Array.from({ length: 4 }).map((_, i) => (
+                      <View key={i} className="px-4 py-3 border-t gap-2.5" style={{ borderColor: 'var(--c-border-soft)' } as any}>
+                        <View className="flex-row items-center gap-3">
+                          <Skeleton className="w-9 h-9 rounded-full" />
+                          <Skeleton className="h-4 w-2/5" />
+                        </View>
+                        <Skeleton className="h-8 rounded-full" />
+                      </View>
+                    ))
+                    : players.map((player) => {
+                      const rate = playerWeekRates[player.id] ?? null;
                       return (
-                        <View key={`${player.id}-${dayKey}`} style={styles.mobileDayItem}>
-                          <Text style={styles.mobileDayLabel}>
-                            {day.toLocaleDateString(RO_LOCALE, { weekday: 'short' }).slice(0, 3).toUpperCase()}
-                          </Text>
-                          <TouchableOpacity
-                            onPress={() => handleDayPress(player, day, agg.eventDetails)}
-                            disabled={agg.status === 'no-session'}
-                          >
-                            {renderMobileStatusCircle(agg.status)}
-                          </TouchableOpacity>
+                        <View key={player.id} className="px-4 py-3 border-t" style={{ borderColor: 'var(--c-border-soft)' } as any}>
+                          <View className="flex-row items-center gap-3">
+                            {avatar(player, 34)}
+                            <View className="flex-1 min-w-0">
+                              <Text numberOfLines={1} className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>
+                                {player.firstName} {player.lastName}
+                              </Text>
+                              <Text numberOfLines={1} className="t-meta" style={{ color: 'var(--c-faint)' }}>
+                                {player.position || 'Jucător'}{player.number ? ` · #${player.number}` : ''}
+                              </Text>
+                            </View>
+                            <Text className="t-num text-[15px] font-bold" style={{ color: rateTone(rate) }}>
+                              {rate == null ? '—' : `${rate}%`}
+                            </Text>
+                          </View>
+                          <View className="flex-row justify-between mt-2.5">
+                            {currentWeekDays.map((day) => renderCell(player, day, 32))}
+                          </View>
                         </View>
                       );
                     })}
+                  <View className="px-4 py-3 border-t" style={{ borderColor: 'var(--c-border-soft)', backgroundColor: 'var(--c-surface-2)' } as any}>
+                    {legend}
                   </View>
                 </View>
-              );
-            })
-          )}
-
-          <View style={styles.mobileBottomSpacer} />
+              )}
+          </View>
         </ScrollView>
-
-        {modalData && (
-          <AttendanceDetailsModal
-            visible={modalVisible}
-            onClose={() => setModalVisible(false)}
-            player={modalData.player}
-            date={modalData.date}
-            details={modalData.details}
-            onSelectEvent={openEventGrade}
-          />
-        )}
+        {detailsModal}
       </View>
     );
   }
 
+  const playerColumnWidth = 240;
+
   return (
-    <View style={[styles.root, { paddingHorizontal: 28, paddingTop: 24, paddingBottom: 24 }]}> 
-      <View style={styles.statRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Rată totală de prezență</Text>
-          <Text style={[styles.statValue, { fontSize: 36 }]}>{rateStats.rate}%</Text>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${parseFloat(rateStats.rate)}%` as any }]} />
-          </View>
-          <Text style={styles.statMeta}>
-            {rateStats.present} prezențe / {rateStats.denom} luate · medical și neluate excluse
-          </Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Prezență an {viewYear}</Text>
-          <Text style={[styles.statValue, { fontSize: 32 }]}>{statsLoading ? '—' : `${yearStat.rate.toFixed(1)}%`}</Text>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${statsLoading ? 0 : yearStat.rate}%` as any }]} />
-          </View>
-          <Text style={styles.statMeta}>{yearStat.present} prezențe / {yearStat.denom} luate</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Prezență {months[viewMonth]}</Text>
-          <Text style={[styles.statValue, { fontSize: 32 }]}>{statsLoading ? '—' : `${monthStat.rate.toFixed(1)}%`}</Text>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${statsLoading ? 0 : monthStat.rate}%`, backgroundColor: 'var(--c-sky)' } as any]} />
-          </View>
-          <Text style={styles.statMeta}>{monthStat.present} prezențe / {monthStat.denom} luate</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Detalii echipă</Text>
-          <Text style={[styles.statValueSm, { fontSize: 20 }]} numberOfLines={1}>
-            {selectedTeamName}
-          </Text>
-          <Text style={styles.statSub}>{players.length} jucători înscriși</Text>
-          <Text style={styles.statMeta}>{weekRangeLabel}</Text>
-        </View>
-      </View>
-
-      <View style={styles.matrixCard}>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardHeaderLeft}>
-            <Text style={styles.matrixTitle}>Matrice prezență</Text>
-
-            <View style={styles.teamSelectorBlock}>
-              <Text style={styles.teamLabel}>Echipă</Text>
-              <select
-                value={selectedTeamId ?? ''}
-                onChange={(e) => setSelectedTeamId(e.target.value ? Number(e.target.value) : null)}
-                style={{
-                  height: 40,
-                  borderRadius: 14,
-                  border: '1px solid #E2E8F0',
-                  backgroundColor: 'var(--c-surface-2)',
-                  paddingLeft: 14,
-                  paddingRight: 14,
-                  fontSize: 13,
-                  fontWeight: 800,
-                  color: 'var(--c-ink-soft)',
-                  minWidth: 220,
-                  maxWidth: 340,
-                  cursor: 'pointer',
-                } as any}
-              >
-                {teams.length === 0 && <option value="">Nicio echipă</option>}
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>{team.name}</option>
-                ))}
-              </select>
-            </View>
-          </View>
-
-          <View style={styles.cardHeaderRight}>
-            <View style={styles.monthTabs}>
-              {[-1, 0, 1].map((offset) => {
-                const d = new Date(viewYear, viewMonth + offset, 1);
-                const monthName = months[d.getMonth()];
-                const isSelected = offset === 0;
-
-                return (
-                  <TouchableOpacity
-                    key={offset}
-                    onPress={() => setFocusedDate(new Date(viewYear, viewMonth + offset, 1))}
-                    style={[styles.monthTab, isSelected && styles.monthTabActive]}
-                  >
-                    <Text style={[styles.monthTabText, isSelected && styles.monthTabTextActive]}>{monthName}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View style={styles.weekNavWrap}>
-              <TouchableOpacity onPress={() => setFocusedDate((prev) => addDays(prev, -7))} style={styles.weekNavBtn}>
-                <ChevronLeft size={16} color="var(--c-muted)" />
-              </TouchableOpacity>
-
-              <View style={styles.weekBadge}>
-                <Text style={styles.weekBadgeText} numberOfLines={1}>
-                  {weekLabel}
-                </Text>
-              </View>
-
-              <TouchableOpacity onPress={() => setFocusedDate((prev) => addDays(prev, 7))} style={styles.weekNavBtn}>
-                <ChevronRight size={16} color="var(--c-muted)" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
+      <View className="w-full max-w-[1180px] gap-5">
+        {statsCard}
 
         <View
-          style={styles.matrixContainer}
-          onLayout={(e) => {
-            const w = Math.floor(e.nativeEvent.layout.width);
-            if (w > 0 && w !== matrixContainerWidth) setMatrixContainerWidth(w);
-          }}
+          className="ui-rise rounded-[16px] border overflow-hidden"
+          style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
         >
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: renderedMatrixWidth }}>
-            <View style={{ width: renderedMatrixWidth }}>
-              <View style={[styles.matrixHeaderRow, { height: 66 }]}> 
-                <View style={[styles.playerCol, { width: playerColumnWidth, minWidth: playerColumnWidth }]}> 
-                  <Text style={[styles.colHeaderText, { fontSize: 12 }]}>Jucător</Text>
-                </View>
-                {currentWeekDays.map((day) => (
-                  <View key={formatDateKey(day)} style={[styles.dayCol, { width: dayColumnWidth, minWidth: dayColumnWidth }]}>
-                    <Text style={[styles.dayColDay, { fontSize: 12 }]}>{day.toLocaleDateString(RO_LOCALE, { weekday: 'short' })}</Text>
-                    <Text style={styles.dayColNum}>{day.getDate()}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {loading ? (
-                <View>
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <View key={i} style={[styles.playerRow, { height: 74 }]}>
-                      <View style={[styles.playerCol, { width: playerColumnWidth, minWidth: playerColumnWidth }]}>
-                        <Skeleton className="w-9 h-9 rounded-full mr-2" />
-                        <View style={{ flex: 1, gap: 6 }}>
-                          <Skeleton className="h-3 w-24" />
-                          <Skeleton className="h-2.5 w-16" />
-                        </View>
-                      </View>
-                      {currentWeekDays.map((day) => (
-                        <View key={formatDateKey(day)} style={[styles.dayCell, { width: dayColumnWidth, minWidth: dayColumnWidth }]}>
-                          <Skeleton className="w-8 h-8 rounded-full" />
-                        </View>
-                      ))}
-                    </View>
-                  ))}
-                </View>
-              ) : loadError ? (
-                <View style={styles.matrixCenterState}>
-                  <Text style={styles.matrixErrorText}>{loadError}</Text>
-                </View>
-              ) : players.length === 0 ? (
-                <View style={styles.matrixCenterState}>
-                  <Text style={styles.matrixEmptyText}>Niciun jucător în această echipă.</Text>
-                </View>
-              ) : (
-                <ScrollView style={{ maxHeight: 520 }} showsVerticalScrollIndicator>
-                  {players.map((player) => (
-                    <View key={player.id} style={[styles.playerRow, { height: 74 }]}> 
-                      <View style={[styles.playerCol, { width: playerColumnWidth, minWidth: playerColumnWidth }]}> 
-                        <View style={styles.playerAvatar}>
-                          <Text style={styles.playerAvatarText}>
-                            {player.firstName?.[0] || 'P'}
-                            {player.lastName?.[0] || ''}
-                          </Text>
-                        </View>
-                        <View style={styles.playerInfo}>
-                          <Text style={[styles.playerName, { fontSize: 14 }]} numberOfLines={1} ellipsizeMode="tail">
-                            {player.firstName} {player.lastName}
-                          </Text>
-                          <Text style={styles.playerSub} numberOfLines={1} ellipsizeMode="tail">
-                            {player.number ? `#${player.number} · ` : ''}{player.position || 'Jucător'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {currentWeekDays.map((day) => {
-                        const dayKey = formatDateKey(day);
-                        const agg =
-                          playerAttendanceGrid[player.id]?.[dayKey] ||
-                          computeDailyAttendance(player.id, weeklyEventsByDay[dayKey] || [], attendanceData);
-
-                        return (
-                          <View key={`${player.id}-${dayKey}`} style={[styles.dayCell, { width: dayColumnWidth, minWidth: dayColumnWidth }]}>
-                            {agg.status === 'no-session' ? (
-                              <Text style={styles.noSessionText}>–</Text>
-                            ) : (
-                              <TouchableOpacity
-                                onPress={() => handleDayPress(player, day, agg.eventDetails)}
-                                style={[styles.statusBubble, getStatusBubbleStyle(agg.status)]}
-                              >
-                                {renderStatusIcon(agg.status)}
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        );
-                      })}
-                    </View>
-                  ))}
-                </ScrollView>
-              )}
+          <View className="flex-row flex-wrap items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--c-border-soft)' } as any}>
+            <View className="flex-row items-center gap-3 flex-1 min-w-[260px]">
+              <Text className="text-[16px] font-bold shrink-0" style={{ color: 'var(--c-ink)' }}>Matrice prezență</Text>
+              <View className="flex-1 max-w-[320px]">{teamSelect}</View>
             </View>
-          </ScrollView>
-        </View>
-
-        <View style={styles.footer}>
-          <View style={styles.legend}>
-            {([
-              { color: 'var(--c-success)', label: 'Prezent', count: summary.totalPresent },
-              { color: 'var(--c-danger)', label: 'Absent', count: summary.totalAbsent },
-              { color: 'var(--c-warning)', label: 'Medical', count: summary.totalMedical },
-              { color: '#EAB308', label: 'Parțial', count: summary.totalPartial },
-              { color: 'var(--c-faint)', label: 'În așteptare', count: summary.totalPending },
-            ] as const).map(({ color, label, count }) => (
-              <View key={label} style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: color }]} />
-                <Text style={styles.legendText} numberOfLines={1}>
-                  {label} ({count})
-                </Text>
-              </View>
-            ))}
+            {stepper}
           </View>
 
-          <TouchableOpacity onPress={exportWeeklyReport} style={styles.exportBtn}>
-            <Download size={14} color="var(--c-brand-fg)" />
-            <Text style={styles.exportBtnText}>Export</Text>
-          </TouchableOpacity>
+          <View>
+            <View className="flex-row items-center border-b" style={{ borderColor: 'var(--c-border-soft)', backgroundColor: 'var(--c-surface-2)' } as any}>
+              <View className="px-4 py-2.5" style={{ width: playerColumnWidth }}>
+                <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Jucător · {players.length}</Text>
+              </View>
+              {currentWeekDays.map((day, index) => {
+                const isToday = formatDateKey(day) === formatDateKey(new Date());
+                return (
+                  <View key={formatDateKey(day)} className="flex-1 items-center py-2">
+                    <Text className="t-eyebrow" style={{ color: isToday ? 'var(--c-brand-fg)' : 'var(--c-faint)' }}>{WEEKDAY_SHORT[index]}</Text>
+                    <Text className="t-num text-[13.5px] font-bold mt-0.5" style={{ color: isToday ? 'var(--c-brand-fg)' : 'var(--c-ink)' }}>{day.getDate()}</Text>
+                  </View>
+                );
+              })}
+              <View className="w-[72px] items-center">
+                <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Rată</Text>
+              </View>
+            </View>
+
+            {listState === 'error' ? <View className="p-4">{stateBox(loadError ?? '', true)}</View>
+              : listState === 'empty' ? <View className="p-4">{stateBox('Niciun jucător în această echipă.')}</View>
+              : listState === 'loading' ? Array.from({ length: 6 }).map((_, i) => (
+                <View key={i} className="flex-row items-center h-[60px] border-b" style={{ borderColor: 'var(--c-border-soft)' } as any}>
+                  <View className="flex-row items-center gap-3 px-4" style={{ width: playerColumnWidth }}>
+                    <Skeleton className="w-9 h-9 rounded-full" />
+                    <Skeleton className="h-3 w-28" />
+                  </View>
+                  {currentWeekDays.map((day) => (
+                    <View key={formatDateKey(day)} className="flex-1 items-center"><Skeleton className="w-8 h-8 rounded-full" /></View>
+                  ))}
+                  <View className="w-[72px]" />
+                </View>
+              ))
+              : players.map((player) => {
+                const rate = playerWeekRates[player.id] ?? null;
+                return (
+                  <View key={player.id} className="flex-row items-center h-[60px] border-b hover:bg-[var(--c-surface-2)]" style={{ borderColor: 'var(--c-border-soft)' } as any}>
+                    <View className="flex-row items-center gap-3 px-4 min-w-0" style={{ width: playerColumnWidth }}>
+                      {avatar(player, 36)}
+                      <View className="flex-1 min-w-0">
+                        <Text numberOfLines={1} className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>{player.firstName} {player.lastName}</Text>
+                        <Text numberOfLines={1} className="t-meta" style={{ color: 'var(--c-faint)' }}>
+                          {player.number ? `#${player.number} · ` : ''}{player.position || 'Jucător'}
+                        </Text>
+                      </View>
+                    </View>
+                    {currentWeekDays.map((day) => (
+                      <View key={formatDateKey(day)} className="flex-1 items-center">{renderCell(player, day, 32)}</View>
+                    ))}
+                    <View className="w-[72px] items-center">
+                      <Text className="t-num text-[14px] font-bold" style={{ color: rateTone(rate) }}>{rate == null ? '—' : `${rate}%`}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+          </View>
+
+          <View className="flex-row flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ backgroundColor: 'var(--c-surface-2)' } as any}>
+            {legend}
+            <TouchableOpacity
+              onPress={exportWeeklyReport}
+              className="ui-press flex-row items-center gap-1.5 h-8 px-3 rounded-[9px] border"
+              style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+            >
+              <Download size={14} color="var(--c-brand-fg)" />
+              <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Export CSV</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-
-      {modalData && (
-        <AttendanceDetailsModal
-          visible={modalVisible}
-          onClose={() => setModalVisible(false)}
-          player={modalData.player}
-          date={modalData.date}
-          details={modalData.details}
-        />
-      )}
-    </View>
+      {detailsModal}
+    </ScrollView>
   );
 }
 
-function getStatusBubbleStyle(status: AggregateAttendance['status']): object {
-  if (status === 'present') return { backgroundColor: 'var(--c-success-bg)', borderColor: 'var(--c-success-bg)' };
-  if (status === 'absent') return { backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-bg)' };
-  if (status === 'medical' || status === 'partial') return { backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-bg)' };
-  return { backgroundColor: 'var(--c-surface-3)', borderColor: 'var(--c-border)' };
+const WEEKDAY_LETTERS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+const WEEKDAY_SHORT = ['Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm', 'Dum'];
+
+const STATUS_STYLE: Record<AggregateAttendance['status'], { bg: string; fg: string; dot: string; label: string }> = {
+  present: { bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', dot: 'var(--c-success-fg)', label: 'prezent' },
+  absent: { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', dot: 'var(--c-danger-fg)', label: 'absent' },
+  medical: { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', dot: 'var(--c-warning-fg)', label: 'medical' },
+  partial: { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', dot: 'var(--c-warning-fg)', label: 'parțial' },
+  pending: { bg: 'var(--c-surface-3)', fg: 'var(--c-faint)', dot: 'var(--c-faint)', label: 'prezență neluată' },
+  'no-session': { bg: 'transparent', fg: 'var(--c-border-strong)', dot: 'var(--c-border)', label: 'fără sesiune' },
+};
+
+/** Colour for an attendance percentage (null = nothing recorded yet). */
+function rateTone(rate: number | null): string {
+  if (rate == null) return 'var(--c-faint)';
+  if (rate >= 80) return 'var(--c-success-fg)';
+  if (rate >= 60) return 'var(--c-warning-fg)';
+  return 'var(--c-danger-fg)';
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  mobileRoot: {
-    flex: 1,
-    backgroundColor: 'var(--c-surface-2)',
-  },
-  mobileContent: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 120,
-    gap: 12,
-  },
-  mobileHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  mobileHeaderTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: 'var(--c-ink-strong)',
-    letterSpacing: 0.2,
-  },
-  mobileTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  mobileOverviewText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: 'var(--c-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  mobileSegmentControl: {
-    flexDirection: 'row',
-    backgroundColor: 'var(--c-surface-3)',
-    padding: 3,
-    borderRadius: 10,
-    gap: 2,
-  },
-  mobileSegmentOption: {
-    paddingHorizontal: 12,
-    height: 28,
-    justifyContent: 'center',
-    borderRadius: 8,
-  },
-  mobileSegmentOptionActive: {
-    backgroundColor: 'var(--c-surface)',
-  },
-  mobileSegmentText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'var(--c-muted)',
-  },
-  mobileSegmentTextActive: {
-    color: 'var(--c-ink)',
-  },
-  mobilePeriodCard: {
-    backgroundColor: 'var(--c-surface)',
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    shadowColor: 'var(--c-ink-strong)',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  mobileArrowBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mobilePeriodCenter: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  mobilePeriodLabel: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: 'var(--c-ink)',
-    letterSpacing: 0.2,
-    textAlign: 'center',
-  },
-  mobilePeriodSub: {
-    marginTop: 1,
-    fontSize: 11,
-    fontWeight: '600',
-    color: 'var(--c-faint)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  mobileTeamRowWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 2,
-    marginBottom: 2,
-  },
-  mobileTeamNavBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'var(--c-surface)',
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mobileTeamNavBtnDisabled: {
-    opacity: 0.35,
-  },
-  mobileTeamTrack: {
-    gap: 8,
-    paddingRight: 8,
-  },
-  mobileTeamPill: {
-    backgroundColor: 'var(--c-surface-2)',
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 16,
-  },
-  mobileTeamPillActive: {
-    backgroundColor: 'var(--c-sky)',
-    borderColor: 'var(--c-sky)',
-  },
-  mobileTeamPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: 'var(--c-ink-soft)',
-  },
-  mobileTeamPillTextActive: {
-    color: '#fff',
-  },
-  mobileStatsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 2,
-  },
-  mobileStatCard: {
-    flex: 1,
-    backgroundColor: 'var(--c-surface)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    minHeight: 78,
-    justifyContent: 'space-between',
-  },
-  mobileStatValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: 'var(--c-ink)',
-    marginTop: 4,
-  },
-  mobileStatLabel: {
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: 'var(--c-muted)',
-    marginTop: 2,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  mobileMatrixHeadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    marginBottom: 2,
-  },
-  mobileMatrixHeading: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: 'var(--c-ink-strong)',
-  },
-  mobileRegisteredPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+function StatusDot({
+  status, size, label, onPress,
+}: {
+  status: AggregateAttendance['status'];
+  size: number;
+  label: string;
+  onPress: () => void;
+}) {
+  const meta = STATUS_STYLE[status];
+  const icon = status === 'present' ? <Check size={size * 0.45} color={meta.fg} strokeWidth={3} />
+    : status === 'absent' ? <X size={size * 0.45} color={meta.fg} strokeWidth={3} />
+      : status === 'medical' ? <BriefcaseMedical size={size * 0.42} color={meta.fg} />
+        : status === 'partial' ? <AlertCircle size={size * 0.42} color={meta.fg} />
+          : status === 'pending' ? <View style={{ width: 6, height: 6, borderRadius: 999, backgroundColor: meta.fg }} />
+            : <Minus size={size * 0.4} color={meta.fg} />;
+  const style = {
+    width: size,
+    height: size,
     borderRadius: 999,
-    backgroundColor: 'var(--c-surface-3)',
-  },
-  mobileRegisteredText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'var(--c-muted)',
-  },
-  mobileCenterState: {
-    paddingVertical: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mobilePlayerCard: {
-    backgroundColor: 'var(--c-surface)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    overflow: 'hidden',
-    marginTop: 10,
-  },
-  mobilePlayerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 10,
-    gap: 10,
-  },
-  mobileAvatarCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'var(--c-surface-tint)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mobileAvatarText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: 'var(--c-brand-fg)',
-  },
-  mobilePlayerIdentity: {
-    flex: 1,
-    minWidth: 0,
-  },
-  mobilePlayerName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: 'var(--c-ink)',
-  },
-  mobilePlayerSub: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'var(--c-muted)',
-    marginTop: 1,
-  },
-  mobileRateBlock: {
-    alignItems: 'flex-end',
-  },
-  mobileRateValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: 'var(--c-ink)',
-  },
-  mobileRateLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: 'var(--c-faint)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  mobileWeekRow: {
-    backgroundColor: 'var(--c-surface-2)',
-    borderTopWidth: 1,
-    borderTopColor: 'var(--c-border)',
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  mobileDayItem: {
-    alignItems: 'center',
-    flex: 1,
-    gap: 7,
-  },
-  mobileDayLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: 'var(--c-muted)',
-    textTransform: 'uppercase',
-  },
-  mobileStatusCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  mobileStatusCirclePresent: {
-    backgroundColor: 'var(--c-sky)',
-    borderColor: 'var(--c-sky)',
-  },
-  mobileStatusCircleAbsent: {
-    backgroundColor: 'var(--c-danger-bg)',
-    borderColor: 'var(--c-danger-bg)',
-  },
-  mobileStatusCircleMedical: {
-    backgroundColor: 'var(--c-warning-bg)',
-    borderColor: '#FCD34D',
-  },
-  mobileStatusCirclePending: {
-    backgroundColor: 'var(--c-surface-2)',
-    borderColor: 'var(--c-border)',
-  },
-  mobileStatusCircleNeutral: {
-    backgroundColor: 'var(--c-surface-2)',
-    borderColor: '#C7D0DB',
-  },
-  mobilePendingDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: 'var(--c-faint)',
-  },
-  mobileBottomSpacer: {
-    height: 22,
-  },
-  statRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 14,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'var(--c-surface)',
-    borderRadius: 20,
-    padding: 18,
-    shadowColor: 'var(--c-ink-strong)',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: 'var(--c-surface-3)',
-  },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: 'var(--c-faint)',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 6,
-  },
-  statValue: {
-    fontWeight: '900',
-    color: 'var(--c-ink-soft)',
-  },
-  statValueSm: {
-    fontWeight: '900',
-    color: 'var(--c-ink-soft)',
-    marginBottom: 4,
-  },
-  statSub: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: 'var(--c-brand-fg)',
-    marginTop: 2,
-  },
-  statMeta: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'var(--c-faint)',
-    marginTop: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  progressTrack: {
-    height: 6,
-    backgroundColor: 'var(--c-surface-3)',
-    borderRadius: 4,
-    marginTop: 12,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: 'var(--c-brand-surface)',
-    borderRadius: 4,
-  },
-  matrixCard: {
-    flex: 1,
-    backgroundColor: 'var(--c-surface)',
-    borderRadius: 26,
-    shadowColor: 'var(--c-ink-strong)',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: 'var(--c-surface-3)',
-    padding: 16,
-    minWidth: 0,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-    gap: 12,
-  },
-  cardHeaderLeft: {
-    flex: 1,
-    minWidth: 0,
-  },
-  matrixTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: 'var(--c-ink-soft)',
-    marginBottom: 8,
-  },
-  teamSelectorBlock: {
-    minWidth: 0,
-  },
-  teamLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: 'var(--c-faint)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.7,
-    marginBottom: 4,
-  },
-  teamSelectorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: 0,
-    gap: 8,
-  },
-  navIconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'var(--c-surface-2)',
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    flexShrink: 0,
-  },
-  navIconDisabled: {
-    opacity: 0.35,
-  },
-  teamPillsViewport: {
-    flex: 1,
-    minWidth: 0,
-    overflow: 'hidden',
-  },
-  teamPillsTrack: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingRight: 4,
-  },
-  teamPill: {
-    maxWidth: 170,
-    minWidth: 0,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 18,
-    backgroundColor: 'var(--c-surface-3)',
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-  },
-  teamPillActive: {
-    backgroundColor: 'var(--c-brand-surface)',
-    borderColor: 'var(--c-brand-border)',
-  },
-  teamPillText: {
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    color: 'var(--c-muted)',
-  },
-  teamPillTextActive: {
-    color: '#fff',
-  },
-  cardHeaderRight: {
-    width: 360,
-    maxWidth: '100%',
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  monthTabs: {
-    flexDirection: 'row',
-    backgroundColor: 'var(--c-surface-2)',
-    borderRadius: 20,
-    padding: 3,
-    borderWidth: 1,
-    borderColor: 'var(--c-surface-3)',
-    alignSelf: 'flex-end',
-  },
-  monthTab: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    minWidth: 58,
-    alignItems: 'center',
-  },
-  monthTabActive: {
-    backgroundColor: 'var(--c-surface)',
-    shadowColor: 'var(--c-ink-strong)',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  monthTabText: {
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    color: 'var(--c-faint)',
-  },
-  monthTabTextActive: {
-    color: 'var(--c-brand-fg)',
-  },
-  weekNavWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  weekNavBtn: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 17,
-    backgroundColor: 'var(--c-surface-2)',
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    flexShrink: 0,
-  },
-  weekBadge: {
-    backgroundColor: 'var(--c-brand-surface)',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    minWidth: 88,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  weekBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  matrixContainer: {
-    backgroundColor: 'var(--c-surface)',
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'var(--c-surface-3)',
-    minHeight: 230,
-    minWidth: 0,
-  },
-  matrixHeaderRow: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(248,250,252,0.9)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'var(--c-border)',
-  },
-  playerCol: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    borderRightWidth: 1,
-    borderRightColor: 'var(--c-border)',
-  },
-  colHeaderText: {
-    fontWeight: '900',
-    color: 'var(--c-ink-soft)',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  dayCol: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderLeftWidth: 1,
-    borderLeftColor: 'var(--c-surface-3)',
-  },
-  dayColDay: {
-    fontWeight: '900',
-    color: 'var(--c-ink-soft)',
-  },
-  dayColNum: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'var(--c-faint)',
-    marginTop: 2,
-  },
-  playerRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: 'var(--c-surface-2)',
-  },
-  playerAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'var(--c-surface-3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    marginRight: 8,
-    flexShrink: 0,
-  },
-  playerAvatarText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: 'var(--c-faint)',
-    textTransform: 'uppercase',
-  },
-  playerInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  playerName: {
-    fontWeight: '900',
-    color: 'var(--c-ink-soft)',
-  },
-  playerSub: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'var(--c-faint)',
-    marginTop: 1,
-  },
-  dayCell: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderLeftWidth: 1,
-    borderLeftColor: 'var(--c-surface-2)',
-  },
-  noSessionText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: 'var(--c-border-strong)',
-  },
-  statusBubble: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  pendingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'var(--c-faint)',
-  },
-  matrixCenterState: {
-    paddingVertical: 64,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  matrixErrorText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: 'var(--c-muted)',
-    textAlign: 'center',
-    paddingHorizontal: 24,
-  },
-  matrixEmptyText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: 'var(--c-faint)',
-    textAlign: 'center',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'var(--c-surface-3)',
-    gap: 10,
-  },
-  legend: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    flex: 1,
-    minWidth: 0,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: 'var(--c-surface-2)',
-    borderWidth: 1,
-    borderColor: 'var(--c-surface-3)',
-    maxWidth: '100%',
-  },
-  legendDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-  },
-  legendText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: 'var(--c-muted)',
-  },
-  exportBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    backgroundColor: 'var(--c-surface-2)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    minWidth: 92,
-    flexShrink: 0,
-  },
-  exportBtnText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: 'var(--c-brand-fg)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-});
+    backgroundColor: meta.bg,
+    ...(status === 'no-session' ? { border: '1px dashed var(--c-border)' } : null),
+  } as any;
+
+  if (status === 'no-session') {
+    return <View className="items-center justify-center" style={style} accessibilityLabel={`${label}: ${meta.label}`}>{icon}</View>;
+  }
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      accessibilityLabel={`${label}: ${meta.label}`}
+      className="ui-press items-center justify-center"
+      style={style}
+    >
+      {icon}
+    </TouchableOpacity>
+  );
+}

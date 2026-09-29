@@ -298,7 +298,7 @@ export default function MyClubAdmin() {
             <ScrollView className="flex-1 w-full px-4 md:px-8 xl:px-12 pt-8 md:pt-10" showsVerticalScrollIndicator={false}>
 
                 <AdminHero
-                    title="My Club"
+                    title="Clubul meu"
                     subtitle="Administrarea echipelor clubului"
                 >
                     <View className="flex-row gap-2">

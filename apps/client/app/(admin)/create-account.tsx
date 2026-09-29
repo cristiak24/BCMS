@@ -32,8 +32,8 @@ export default function CreateAccountScreen() {
         >
             <View className="w-full max-w-[900px] mx-auto px-4 md:px-0 pt-6 gap-5">
                 <AdminHero
-                    title="Create account invitation"
-                    subtitle="Invite coaches and players directly into your club without leaving the admin area."
+                    title="Cont nou"
+                    subtitle="Invită antrenori și jucători direct în clubul tău."
                 />
 
                 <View className="flex-row flex-wrap gap-2.5">

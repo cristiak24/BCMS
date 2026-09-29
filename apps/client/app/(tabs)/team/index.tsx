@@ -196,6 +196,7 @@ export default function TeamScreen() {
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
       <PageContainer>
         <PageHeader
+          actionsOnMobile={false}
           title="Echipa mea"
           subtitle={subtitle}
           actions={

@@ -119,8 +119,9 @@ export default function ComplianceDashboard() {
     <View className="flex-1 w-full mx-auto bg-[#F1F5F9] pb-20">
       <ScrollView className="flex-1 w-full px-4 md:px-6 pt-5" showsVerticalScrollIndicator={false}>
 
-          <View className="mb-5">
-            <Text className="text-[24px] font-bold tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }}>Compliance Manager</Text>
+          {/* Desktop only — the mobile app header already names the page. */}
+          <View className="hidden lg:flex mb-5">
+            <Text className="text-[24px] font-bold tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }}>Conformitate</Text>
             <Text className="text-[13px] font-medium mt-1" style={{ color: 'var(--c-muted)' }}>Vize medicale & reînnoiri</Text>
           </View>
 

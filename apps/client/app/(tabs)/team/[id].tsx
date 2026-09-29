@@ -200,6 +200,7 @@ export default function PlayerTeamDetailScreen() {
         </Pressable>
 
         <PageHeader
+          keepTitleOnMobile
           title={team?.name || 'Echipă'}
           subtitle={team ? [team.leagueName, team.seasonName].filter(Boolean).join(' · ') : 'Se încarcă...'}
           actions={

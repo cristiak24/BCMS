@@ -566,7 +566,7 @@ const RiskManagementBlock = ({ expiringItems, expiredCount, loading, compact = f
         {showHeader ? (
             <View className="flex-row justify-between items-center mb-4 px-1 lg:px-0">
                 <View>
-                    <Text className="text-lg lg:text-xl font-semibold" style={{ color: dash.ink }}>Risk Management</Text>
+                    <Text className="text-lg lg:text-xl font-semibold" style={{ color: dash.ink }}>Riscuri și conformitate</Text>
                     <Text className="text-xs mt-0.5 font-medium" style={{ color: dash.muted }}>Conformitate &amp; scadențe</Text>
                 </View>
                 {expiredCount > 0 && (
@@ -823,7 +823,7 @@ const TeamStandingWidget = ({
         >
             <View className="flex-row items-start justify-between mb-3.5">
                 <View className="flex-1 pr-3">
-                    <Text className="text-[17px] font-semibold" style={{ color: dash.ink }}>Standings</Text>
+                    <Text className="text-[17px] font-semibold" style={{ color: dash.ink }}>Clasament</Text>
                     <Text className="text-xs mt-1 font-medium" style={{ color: dash.muted }} numberOfLines={1}>
                         {teamName ?? 'Alege o echipă din filtre'}
                     </Text>
@@ -971,7 +971,7 @@ const ClubHealthBlock = ({ attendanceRate, presentCount, totalRecords, loading, 
             <View pointerEvents="none" className="absolute inset-0" style={{ backgroundImage: dash.gradients.cardPurple } as any} />
             <View className="relative flex-row justify-between items-start mb-3">
                 <View>
-                    <Text className="text-base font-bold tracking-tight" style={{ color: dash.ink }}>Club Health</Text>
+                    <Text className="text-base font-bold tracking-tight" style={{ color: dash.ink }}>Prezență club</Text>
                     <Text className="text-xs mt-1 font-medium" style={{ color: dash.muted }}>Prezență luna curentă</Text>
                 </View>
                 {loading ? (
@@ -1037,89 +1037,57 @@ const ClubHealthBlock = ({ attendanceRate, presentCount, totalRecords, loading, 
  * measure heights) and synced state from debounced scroll-end events — double
  * the render cost on the most expensive screen, and a stutter at every snap.
  */
-function MobileWidgetStack({ children }: { children: React.ReactNode }) {
-    const widgetItems = React.Children.toArray(children);
-    const scrollerRef = React.useRef<HTMLDivElement | null>(null);
-    const itemRefs = React.useRef<Array<HTMLDivElement | null>>([]);
-    const [activeIndex, setActiveIndex] = React.useState(0);
-    const [height, setHeight] = React.useState<number | null>(null);
+type MobileWidget = { key: string; label: string; icon: string; badge?: number; node: React.ReactNode };
 
-    // Active index from scroll position, once per frame.
-    React.useEffect(() => {
-        const scroller = scrollerRef.current;
-        if (!scroller) return undefined;
-        let frame = 0;
-        const onScroll = () => {
-            cancelAnimationFrame(frame);
-            frame = requestAnimationFrame(() => {
-                const first = itemRefs.current[0];
-                if (!first) return;
-                const step = first.offsetWidth + 12;
-                const next = Math.round(scroller.scrollLeft / step);
-                setActiveIndex(Math.max(0, Math.min(next, widgetItems.length - 1)));
-            });
-        };
-        scroller.addEventListener('scroll', onScroll, { passive: true });
-        return () => {
-            cancelAnimationFrame(frame);
-            scroller.removeEventListener('scroll', onScroll);
-        };
-    }, [widgetItems.length]);
-
-    // Track the active card's height (content can change after data loads).
-    React.useEffect(() => {
-        const node = itemRefs.current[activeIndex];
-        if (!node) return undefined;
-        const update = () => setHeight(node.offsetHeight);
-        update();
-        if (typeof ResizeObserver === 'undefined') return undefined;
-        const observer = new ResizeObserver(update);
-        observer.observe(node);
-        return () => observer.disconnect();
-    }, [activeIndex]);
-
-    const goTo = (index: number) => {
-        const scroller = scrollerRef.current;
-        const node = itemRefs.current[index];
-        if (!scroller || !node) return;
-        scroller.scrollTo({ left: node.offsetLeft - scroller.offsetLeft, behavior: 'smooth' });
-    };
+/**
+ * Phones: the three dense widgets behind one segmented control.
+ *
+ * This was a horizontal swipe carousel. The cards have very different heights
+ * (Club Health ~300px, the standings table ~700px), so every swipe resized the
+ * carousel and shoved the rest of the page up or down mid-gesture, and the
+ * neighbouring cards peeked in cut off at the edges. Tabs change height only
+ * on an explicit tap, and show one whole card at a time.
+ */
+function MobileWidgetStack({ items }: { items: MobileWidget[] }) {
+    const [activeKey, setActiveKey] = React.useState(items[0]?.key);
+    const active = items.find((item) => item.key === activeKey) ?? items[0];
+    if (!active) return null;
 
     return (
-        <div className="lg:hidden mb-5">
-            <div
-                ref={scrollerRef}
-                className="m-carousel"
-                style={{ height: height ?? undefined }}
-                aria-roledescription="carusel"
+        <View className="lg:hidden mb-5">
+            <View
+                className="flex-row p-[3px] rounded-[12px] mb-3"
+                style={{ backgroundColor: 'var(--c-surface-3)' }}
+                accessibilityRole={'tablist' as any}
             >
-                {widgetItems.map((child, index) => (
-                    <div
-                        key={`mobile-widget-${index}`}
-                        ref={(node) => { itemRefs.current[index] = node; }}
-                        className={`m-carousel-item ${index === activeIndex ? 'is-active' : ''}`}
-                        aria-hidden={index !== activeIndex}
-                    >
-                        {child}
-                    </div>
-                ))}
-            </div>
-            <div className="flex flex-row justify-center items-center gap-1 mt-3" role="tablist" aria-label="Carduri">
-                {widgetItems.map((_, index) => (
-                    <button
-                        key={`mobile-widget-dot-${index}`}
-                        type="button"
-                        role="tab"
-                        aria-selected={index === activeIndex}
-                        aria-label={`Cardul ${index + 1} din ${widgetItems.length}`}
-                        onClick={() => goTo(index)}
-                        className="m-carousel-dot"
-                    >
-                        <span className={index === activeIndex ? 'is-active' : ''} />
-                    </button>
-                ))}
-            </div>
-        </div>
+                {items.map((item) => {
+                    const selected = item.key === active.key;
+                    return (
+                        <Pressable
+                            key={item.key}
+                            onPress={() => setActiveKey(item.key)}
+                            accessibilityRole={'tab' as any}
+                            accessibilityState={{ selected }}
+                            className="flex-1 min-w-0 h-9 rounded-[9px] flex-row items-center justify-center gap-1.5"
+                            style={selected ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
+                        >
+                            <MaterialIcons name={item.icon} size={15} color={selected ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
+                            <Text numberOfLines={1} className="text-[12.5px] font-semibold" style={{ color: selected ? 'var(--c-ink)' : 'var(--c-muted)' }}>
+                                {item.label}
+                            </Text>
+                            {item.badge ? (
+                                <View className="min-w-[17px] h-[17px] px-1 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-danger)' }}>
+                                    <Text className="text-[10px] font-bold t-num" style={{ color: '#FFFFFF' }}>{item.badge}</Text>
+                                </View>
+                            ) : null}
+                        </Pressable>
+                    );
+                })}
+            </View>
+            <View key={active.key} className="ui-rise">
+                {active.node}
+            </View>
+        </View>
     );
 }
 
@@ -1561,31 +1529,50 @@ export default function Dashboard() {
                 </View>
 
                 {/* Mobile: compact swipe stack for the dense dashboard widgets */}
-                <MobileWidgetStack>
-                    {[
-                        <ClubHealthBlock
-                            key="health"
-                            attendanceRate={summary?.attendanceRate ?? null}
-                            presentCount={summary?.presentCount ?? 0}
-                            totalRecords={summary?.totalAttendanceRecords ?? 0}
-                            loading={loadingSummary}
-                            isSmallPhone={isSmallPhone}
-                        />,
-                        <TeamStandingWidget
-                            key="standing"
-                            teamName={selectedTeam?.name}
-                            standing={selectedTeamStanding}
-                            loading={loadingStandings}
-                        />,
-                        <RiskManagementBlock
-                            key="risk"
-                            expiringItems={expiringItems}
-                            expiredCount={expiredCount}
-                            loading={loadingSummary}
-                            onOpenCompliance={openCompliance}
-                        />,
+                <MobileWidgetStack
+                    items={[
+                        {
+                            key: 'health',
+                            label: 'Prezență',
+                            icon: 'monitor-heart',
+                            node: (
+                                <ClubHealthBlock
+                                    attendanceRate={summary?.attendanceRate ?? null}
+                                    presentCount={summary?.presentCount ?? 0}
+                                    totalRecords={summary?.totalAttendanceRecords ?? 0}
+                                    loading={loadingSummary}
+                                    isSmallPhone={isSmallPhone}
+                                />
+                            ),
+                        },
+                        {
+                            key: 'standing',
+                            label: 'Clasament',
+                            icon: 'emoji-events',
+                            node: (
+                                <TeamStandingWidget
+                                    teamName={selectedTeam?.name}
+                                    standing={selectedTeamStanding}
+                                    loading={loadingStandings}
+                                />
+                            ),
+                        },
+                        {
+                            key: 'risk',
+                            label: 'Riscuri',
+                            icon: 'warning-amber',
+                            badge: expiredCount || undefined,
+                            node: (
+                                <RiskManagementBlock
+                                    expiringItems={expiringItems}
+                                    expiredCount={expiredCount}
+                                    loading={loadingSummary}
+                                    onOpenCompliance={openCompliance}
+                                />
+                            ),
+                        },
                     ]}
-                </MobileWidgetStack>
+                />
 
                 {/* Desktop: KPI Cards Row — date reale */}
                 <View className="hidden lg:flex dash-stagger flex-row flex-wrap justify-between gap-4 mb-6 mt-1">

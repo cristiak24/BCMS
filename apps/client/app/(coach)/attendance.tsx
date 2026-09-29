@@ -323,6 +323,7 @@ export default function CoachAttendanceScreen() {
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
       <PageContainer>
         <PageHeader
+          actionsOnMobile={false}
           title="Prezență"
           subtitle="Marchează disponibilitatea jucătorilor pentru sesiunile tale."
           actions={

@@ -11,12 +11,16 @@ type AdminHeroProps = {
 export default function AdminHero({ title, subtitle, children, className }: AdminHeroProps) {
     // Was a full-bleed 32px navy slab, ~180px tall, that repeated the page title
     // already shown in the app header and pushed real content down. Now a plain
-    // titled header row on the page background — the title carries the section,
-    // actions sit inline, no coloured block.
+    // titled header row on the page background.
+    //
+    // Below lg the title block is hidden entirely: the mobile app header
+    // already names the page ("Finanțe"), and repeating it as "Financial
+    // Settings" plus a sentence of description cost ~90px of a phone screen.
+    // Only the children (actions / tabs) remain there.
     return (
-        <View className={`mb-5 flex-row flex-wrap items-center justify-between gap-3 ${className ?? ''}`}>
-            <View className="flex-1 min-w-[220px]">
-                <Text className="text-[24px] md:text-[28px] font-bold tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }}>
+        <View className={`${children ? 'flex' : 'hidden lg:flex'} mb-4 lg:mb-5 flex-row flex-wrap items-center justify-between gap-3 ${className ?? ''}`}>
+            <View className="hidden lg:flex flex-1 min-w-[220px]">
+                <Text className="text-[28px] font-bold tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }}>
                     {title}
                 </Text>
                 <Text className="text-[13px] font-medium mt-1" style={{ color: 'var(--c-muted)' }}>

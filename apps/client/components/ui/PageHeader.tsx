@@ -17,7 +17,18 @@ export default function PageHeader({
   subtitle,
   actions,
   className,
+  keepTitleOnMobile = false,
+  actionsOnMobile = true,
 }: {
+  /** false for actions that are only a convenience on phones (a refresh icon
+   *  alone would otherwise keep a whole row alive under the app header). */
+  actionsOnMobile?: boolean;
+  /**
+   * Phones hide the title/subtitle by default: the mobile app header already
+   * names the page. Pass true when the title is content, not the section name
+   * (e.g. a team's name on its detail page).
+   */
+  keepTitleOnMobile?: boolean;
   title: string;
   subtitle?: string;
   actions?: ReactNode;
@@ -27,8 +38,10 @@ export default function PageHeader({
     // Actions share the title row at every width. Every caller passes one small
     // control (refresh / back); on phones it used to drop onto its own row,
     // spending ~50px of the screen on a lone icon. The title wraps instead.
-    <View className={`flex-row items-start justify-between gap-3 mb-4 ${className ?? ''}`}>
-      <View className="flex-1 min-w-0">
+    <View
+      className={`${keepTitleOnMobile || (actions && actionsOnMobile) ? 'flex' : 'hidden lg:flex'} flex-row items-start justify-between gap-3 mb-4 ${className ?? ''}`}
+    >
+      <View className={`${keepTitleOnMobile ? '' : 'hidden lg:flex'} flex-1 min-w-0`}>
         <Text
           className="text-[24px] md:text-[28px] font-bold leading-tight"
           style={{ color: 'var(--c-ink)', letterSpacing: '-0.7px' } as any}
@@ -42,7 +55,9 @@ export default function PageHeader({
           </Text>
         ) : null}
       </View>
-      {actions ? <View className="flex-row items-center flex-wrap gap-2 shrink-0">{actions}</View> : null}
+      {actions ? (
+        <View className={`${actionsOnMobile ? 'flex' : 'hidden lg:flex'} flex-row items-center flex-wrap gap-2 shrink-0 ml-auto`}>{actions}</View>
+      ) : null}
     </View>
   );
 }
