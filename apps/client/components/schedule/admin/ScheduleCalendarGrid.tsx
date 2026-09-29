@@ -18,37 +18,92 @@ export const CalendarLegend = React.memo(() => (
 CalendarLegend.displayName = 'CalendarLegend';
 
 const WeekdayHeader = React.memo(() => (
-  <View className="flex-row border-b border-[#E6EEF8] bg-[#F8FBFF]">
-    {WEEKDAY_LABELS.map((day, i) => (
-      <View
-        key={day}
-        className={`flex-1 py-3 items-center ${i >= 5 ? 'bg-[#F4F8FD]' : ''}`}
-      >
-        <Text className="text-[10.5px] font-black text-[#7C90B0] uppercase tracking-[0.18em]">{day}</Text>
+  <View className="flex-row border-b" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
+    {WEEKDAY_LABELS.map((day) => (
+      <View key={day} className="flex-1 py-2.5 items-center">
+        <Text className="text-[11px] font-bold uppercase tracking-[0.06em]" style={{ color: 'var(--c-muted)' }}>{day}</Text>
       </View>
     ))}
   </View>
 ));
 WeekdayHeader.displayName = 'WeekdayHeader';
 
+/**
+ * Phone cell: a ~50px column can't hold event titles (they rendered as "A…",
+ * "Pr…"), so the day shows its number plus one dot per event type, and the
+ * WHOLE cell is a single tap target that opens that day's list.
+ */
+const CompactCalendarCell = React.memo(({
+  dayData,
+  onSelectDay,
+}: {
+  dayData: CalendarDayCell;
+  onSelectDay: () => void;
+}) => {
+  const activeEvents = dayData.events.filter((event) => !isCancelledEvent(event));
+  const types = Array.from(new Set(activeEvents.map((e) => e.type))).slice(0, 3);
+  const hasMatch = activeEvents.some((e) => e.type === 'match');
+
+  return (
+    <TouchableOpacity
+      onPress={onSelectDay}
+      disabled={!activeEvents.length}
+      accessibilityLabel={`${dayData.dayNumber}: ${activeEvents.length} ${activeEvents.length === 1 ? 'eveniment' : 'evenimente'}`}
+      className="ui-press items-center justify-start pt-2"
+      style={{
+        width: '14.28%',
+        height: 58,
+        borderWidth: 0.5,
+        borderColor: 'var(--c-border-soft)',
+        backgroundColor: hasMatch && !dayData.isToday ? 'var(--c-surface-2)' : 'transparent',
+      } as any}
+    >
+      <View
+        className="w-7 h-7 rounded-full items-center justify-center"
+        style={dayData.isToday
+          ? { backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)' } as any
+          : undefined}
+      >
+        <Text
+          className="text-[13px] font-semibold"
+          style={{ color: dayData.isToday ? 'var(--c-on-brand)' : activeEvents.length ? 'var(--c-ink)' : 'var(--c-faint)' }}
+        >
+          {dayData.dayNumber}
+        </Text>
+      </View>
+      <View className="flex-row gap-[3px] mt-1.5 h-[6px] items-center">
+        {types.map((type) => (
+          <View key={type} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: EVENT_TYPE_META[type].solid }} />
+        ))}
+      </View>
+    </TouchableOpacity>
+  );
+});
+CompactCalendarCell.displayName = 'CompactCalendarCell';
+
 const CalendarCell = React.memo(({
   dayData,
   cellHeight,
   onSelectEvent,
   onSelectDay,
+  compact = false,
 }: {
   dayData: CalendarDayCell;
   cellHeight: number;
   onSelectEvent: (event: CalendarEvent) => void;
   onSelectDay: () => void;
+  compact?: boolean;
 }) => {
   if (dayData.dayNumber === null) {
     return (
       <View
-        style={{ width: '14.28%', height: cellHeight }}
-        className="border-[0.5px] border-[#EDF2F9] bg-[#FBFDFF]"
+        style={{ width: '14.28%', height: compact ? 58 : cellHeight, borderWidth: 0.5, borderColor: 'var(--c-border-soft)', backgroundColor: 'var(--c-surface-2)' } as any}
       />
     );
+  }
+
+  if (compact) {
+    return <CompactCalendarCell dayData={dayData} onSelectDay={onSelectDay} />;
   }
 
   const activeEvents = dayData.events.filter((event) => !isCancelledEvent(event));
@@ -189,6 +244,7 @@ export const MonthlyCalendarGrid = React.memo(({
               key={dayData.key}
               dayData={dayData}
               cellHeight={cellHeight}
+              compact={!isDesktop}
               onSelectEvent={onSelectEvent}
               onSelectDay={() => dayData.date && onSelectDay({
                 date: dayData.date,

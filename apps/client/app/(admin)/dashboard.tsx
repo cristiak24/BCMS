@@ -6,13 +6,11 @@ import {
     ActivityIndicator,
     Modal,
     FlatList,
-    type LayoutChangeEvent,
-    type NativeScrollEvent,
-    type NativeSyntheticEvent,
 } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from '@/src/web/reactNativeSvg';
 import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { basketballApi, League, Season, Team, Match, StandingRow } from '../../services/basketballApi';
 import { dashboardApi, DashboardSummary, ExpiringItem } from '../../services/dashboardApi';
 import { teamsApi, Team as SavedTeam } from '../../services/teamsApi';
@@ -278,7 +276,7 @@ function AttendanceRing({
                         numberOfLines={1}
                         adjustsFontSizeToFit
                     >
-                        {rate !== null ? `${Math.round(rate)}%` : '0%'}
+                        {rate !== null ? `${Math.round(rate)}%` : '—'}
                     </Text>
                 )}
             </View>
@@ -437,9 +435,11 @@ function calculateTeamStanding(matches: Match[], teamName?: string, officialRows
 
 const DropdownPicker = ({ visible, items, onSelect, onClose, title, icon = 'apps', selectedId }: PickerProps) => (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-        <Pressable className="flex-1 items-center justify-center p-4" style={{ backgroundColor: 'rgba(10,15,28,0.5)' }} onPress={onClose}>
+        {/* Bottom sheet on phones (thumb reach, slides up), centred dialog
+            from lg up. */}
+        <Pressable className="ui-backdrop flex-1 items-center justify-end lg:justify-center lg:p-4" style={{ backgroundColor: 'rgba(10,15,28,0.5)' }} onPress={onClose}>
             <Pressable
-                className="rounded-[22px] w-full max-w-[360px] max-h-[70vh] border dash-fade-in overflow-hidden flex-col"
+                className="ui-sheet rounded-t-[22px] lg:rounded-[22px] w-full lg:max-w-[360px] max-h-[78vh] lg:max-h-[70vh] border overflow-hidden flex-col"
                 style={{ backgroundColor: dash.surface, borderColor: 'rgba(15,23,42,0.06)', ...dash.shadow.lift }}
                 onPress={(event: any) => event.stopPropagation()}
             >
@@ -548,9 +548,20 @@ interface RiskManagementBlockProps {
     loading: boolean;
     compact?: boolean;
     showHeader?: boolean;
+    /** Opens the compliance screen from the expired-visa callout. */
+    onOpenCompliance?: () => void;
 }
 
-const RiskManagementBlock = ({ expiringItems, expiredCount, loading, compact = false, showHeader = true }: RiskManagementBlockProps) => (
+const RiskManagementBlock = ({ expiringItems, expiredCount, loading, compact = false, showHeader = true, onOpenCompliance }: RiskManagementBlockProps) => {
+    // "All good" only when there is truly nothing: no expired visas AND no
+    // upcoming deadlines. It used to key off the list alone, while the list
+    // (from an older API) held only FUTURE expiries — so the card showed
+    // "2 EXPIRATE" and "Totul e în regulă" at the same time.
+    const needsAttention = expiredCount > 0 || expiringItems.length > 0;
+    const listedExpired = expiringItems.filter((item) => item.expired || item.daysLeft === null).length;
+    const unlistedExpired = Math.max(0, expiredCount - listedExpired);
+
+    return (
     <View>
         {showHeader ? (
             <View className="flex-row justify-between items-center mb-4 px-1 lg:px-0">
@@ -575,15 +586,17 @@ const RiskManagementBlock = ({ expiringItems, expiredCount, loading, compact = f
                         className="w-9 h-9 rounded-[12px] items-center justify-center"
                         style={{ backgroundColor: expiredCount > 0 ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)' }}
                     >
-                        <MaterialIcons name={expiredCount > 0 ? 'warning' : 'verified'} size={17} color={expiredCount > 0 ? dash.danger : dash.success} />
+                        <MaterialIcons name={needsAttention ? 'warning' : 'verified'} size={17} color={expiredCount > 0 ? dash.danger : needsAttention ? dash.warning : dash.success} />
                     </View>
                     <View className="ml-3 flex-1">
-                        <Text className="text-[13px] font-semibold" style={{ color: expiredCount > 0 ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}>
-                            Necesită atenție
+                        <Text className="text-[13px] font-semibold" style={{ color: expiredCount > 0 ? 'var(--c-danger-fg)' : needsAttention ? 'var(--c-warning-fg)' : 'var(--c-success-fg)' }}>
+                            {needsAttention ? 'Necesită atenție' : 'Totul e în regulă'}
                         </Text>
                         {compact ? (
                             <Text className="text-[11px] font-medium mt-0.5" style={{ color: dash.muted }} numberOfLines={1}>
-                                {expiredCount > 0 ? `${expiredCount} documente expirate` : 'Status verificat'}
+                                {expiredCount > 0
+                                    ? `${expiredCount} ${expiredCount === 1 ? 'viză medicală expirată' : 'vize medicale expirate'}`
+                                    : expiringItems.length ? `${expiringItems.length} scadențe apropiate` : 'Status verificat'}
                             </Text>
                         ) : null}
                     </View>
@@ -602,7 +615,27 @@ const RiskManagementBlock = ({ expiringItems, expiredCount, loading, compact = f
                 </View>
             )}
 
-            {!loading && expiringItems.length === 0 && (
+            {!loading && unlistedExpired > 0 && (
+                <Pressable
+                    onPress={onOpenCompliance}
+                    disabled={!onOpenCompliance}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${unlistedExpired} vize medicale expirate — deschide Conformitate`}
+                    className="ui-press flex-row items-center gap-3 p-3 rounded-[14px] border mb-2.5 text-left"
+                    style={{ backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-border)' } as any}
+                >
+                    <MaterialIcons name="medical-services" size={18} color="var(--c-danger-fg)" />
+                    <View className="flex-1 min-w-0">
+                        <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>
+                            {unlistedExpired} {unlistedExpired === 1 ? 'viză medicală expirată' : 'vize medicale expirate'}
+                        </Text>
+                        <Text className="text-[12px] font-medium mt-0.5" style={{ color: dash.muted }}>Vezi detaliile în Conformitate</Text>
+                    </View>
+                    {onOpenCompliance ? <MaterialIcons name="chevron-right" size={18} color="var(--c-danger-fg)" /> : null}
+                </Pressable>
+            )}
+
+            {!loading && !needsAttention && (
                 <View className={`items-center ${compact ? 'py-2' : 'py-4'}`}>
                     {!compact ? (
                         <View className="w-10 h-10 rounded-full items-center justify-center mb-2" style={{ backgroundColor: 'rgba(16,185,129,0.1)' }}>
@@ -639,7 +672,7 @@ const RiskManagementBlock = ({ expiringItems, expiredCount, loading, compact = f
                                             style={{ backgroundColor: d.urgent ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.12)' }}
                                         >
                                             <Text className="text-[9px] font-semibold tracking-wide" style={{ color: d.urgent ? dash.danger : 'var(--c-warning-fg)' }}>
-                                                {d.daysLeft !== null ? `${d.daysLeft} ZILE RĂMASE` : 'EXPIRAT'}
+                                                {d.daysLeft !== null ? `${d.daysLeft} ZILE RĂMASE` : d.daysOverdue ? `EXPIRAT DE ${d.daysOverdue} ZILE` : 'EXPIRAT'}
                                             </Text>
                                         </View>
                                         {!compact ? <Text className="text-[10px] font-medium" style={{ color: dash.muted }}>Exp: {d.expiryDate}</Text> : null}
@@ -654,22 +687,22 @@ const RiskManagementBlock = ({ expiringItems, expiredCount, loading, compact = f
             {/* Mobile list */}
             {!loading && expiringItems.length > 0 && (
                 <View className="flex lg:hidden flex-col gap-2.5">
-                    {expiringItems.slice(0, 2).map((d, i) => (
+                    {expiringItems.slice(0, 3).map((d, i) => (
                         <React.Fragment key={i}>
                             <View
-                                className="flex-row items-center justify-between p-3 rounded-[14px] h-[62px] border"
+                                className="flex-row items-center justify-between p-3 rounded-[14px] min-h-[62px] border"
                                 style={{ backgroundColor: dash.lineSoft, borderColor: 'rgba(15,23,42,0.04)' }}
                             >
                                 <View className="flex-1 pr-2">
                                     <Text className="text-[13px] font-semibold" style={{ color: dash.ink }} numberOfLines={1}>{d.name}</Text>
-                                    <Text className="text-[10px] mt-1 font-medium" style={{ color: dash.muted }}>{d.type}</Text>
+                                    <Text className="text-[11.5px] mt-1 font-medium" style={{ color: dash.muted }}>{d.type === 'VIZĂ MEDICALĂ' ? 'Viză medicală' : d.type === 'COTIZAȚIE LUNARĂ' ? 'Cotizație lunară' : d.type}</Text>
                                 </View>
                                 <View
                                     className="px-2.5 py-1.5 rounded-full"
                                     style={{ backgroundColor: d.urgent ? dash.danger : dash.ink }}
                                 >
-                                    <Text className="text-white text-[9px] font-semibold tracking-wide leading-none">
-                                        {d.daysLeft !== null ? `${d.daysLeft} ZILE` : 'EXPIRAT'}
+                                    <Text className="text-white text-[11px] font-bold leading-none">
+                                        {d.daysLeft !== null ? `${d.daysLeft} zile` : 'Expirat'}
                                     </Text>
                                 </View>
                             </View>
@@ -690,7 +723,8 @@ const RiskManagementBlock = ({ expiringItems, expiredCount, loading, compact = f
             </View> : null}
         </View>
     </View>
-);
+    );
+};
 
 // ─────────────────────────────────────────────────────────────
 // Financial Summary — venit/cheltuială/profit într-un singur card compact
@@ -925,11 +959,12 @@ interface ClubHealthBlockProps {
 const ClubHealthBlock = ({ attendanceRate, presentCount, totalRecords, loading, isSmallPhone }: ClubHealthBlockProps) => {
     const absentCount = Math.max(0, totalRecords - presentCount);
     const rate = attendanceRate ?? 0;
-    const label = attendanceRate == null ? 'DATE LIPSĂ' : rate >= 80 ? 'OPTIMAL' : rate >= 60 ? 'MEDIU' : 'SCĂZUT';
+    const hasData = attendanceRate != null && totalRecords > 0;
+    const label = !hasData ? 'Nicio prezență marcată luna aceasta' : rate >= 80 ? 'Optim' : rate >= 60 ? 'Mediu' : 'Scăzut';
 
     return (
         <View
-            className="flex lg:hidden rounded-[20px] p-4 mb-6 mt-2 border overflow-hidden relative dash-fade-in"
+            className="flex lg:hidden rounded-[20px] p-4 border overflow-hidden relative"
             style={{ backgroundColor: dash.surface, borderColor: dash.hairline, ...dash.shadow.card }}
         >
             <View pointerEvents="none" className="absolute top-0 left-0 right-0 h-[3px]" style={{ backgroundImage: 'linear-gradient(90deg, #635BFF, #2563EB)' } as any} />
@@ -942,10 +977,13 @@ const ClubHealthBlock = ({ attendanceRate, presentCount, totalRecords, loading, 
                 {loading ? (
                     <ActivityIndicator size="small" color={dash.accentSky} />
                 ) : (
-                    <View className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full mt-1" style={{ backgroundColor: 'rgba(16,185,129,0.12)' }}>
-                        <View className="w-1.5 h-1.5 rounded-full dash-pulse-dot" style={{ backgroundColor: dash.success }} />
-                        <Text className="text-[10px] font-bold tracking-wider" style={{ color: dash.successDeep }}>LIVE</Text>
-                    </View>
+                    // "LIVE" only when there is something live to show.
+                    hasData ? (
+                        <View className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full mt-1" style={{ backgroundColor: 'var(--c-success-bg)' }}>
+                            <View className="w-1.5 h-1.5 rounded-full dash-pulse-dot" style={{ backgroundColor: dash.success }} />
+                            <Text className="text-[11px] font-bold" style={{ color: dash.successDeep }}>Live</Text>
+                        </View>
+                    ) : null
                 )}
             </View>
 
@@ -959,24 +997,24 @@ const ClubHealthBlock = ({ attendanceRate, presentCount, totalRecords, loading, 
                             strokeWidth={isSmallPhone ? 10 : 13}
                         />
                         {!loading ? (
-                            <Text className="text-[#1D3E90] text-[10px] font-bold tracking-widest uppercase mt-2">
+                            <Text className="text-[12px] font-semibold mt-2 text-center" style={{ color: hasData ? 'var(--c-brand-fg)' : dash.muted }}>
                                 {label}
                             </Text>
                         ) : null}
                     </View>
                     <View className="flex-row justify-around px-2 mt-3">
                         <View className="flex-row items-center gap-2">
-                            <View className="w-2.5 h-2.5 rounded-full bg-[#1D3E90]" />
+                            <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--c-brand-surface)' }} />
                             <View>
-                                <Text className="text-[10px] text-[#64748B] font-semibold">Prezenți</Text>
-                                <Text className="text-[#0E2041] font-bold text-lg mt-[-2px]">{presentCount}</Text>
+                                <Text className="text-[12px] font-semibold" style={{ color: dash.muted }}>Prezenți</Text>
+                                <Text className="font-bold text-lg mt-[-2px]" style={{ color: dash.ink }}>{presentCount}</Text>
                             </View>
                         </View>
                         <View className="flex-row items-center gap-2">
-                            <View className="w-2.5 h-2.5 rounded-full bg-[#E2E8F0]" />
+                            <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--c-border-strong)' }} />
                             <View>
-                                <Text className="text-[10px] text-[#64748B] font-semibold">Absenți</Text>
-                                <Text className="text-[#0E2041] font-bold text-lg mt-[-2px]">{absentCount}</Text>
+                                <Text className="text-[12px] font-semibold" style={{ color: dash.muted }}>Absenți</Text>
+                                <Text className="font-bold text-lg mt-[-2px]" style={{ color: dash.ink }}>{absentCount}</Text>
                             </View>
                         </View>
                     </View>
@@ -986,100 +1024,102 @@ const ClubHealthBlock = ({ attendanceRate, presentCount, totalRecords, loading, 
     );
 };
 
+/**
+ * Mobile widget carousel.
+ *
+ * The next card peeks in from the right edge, so "swipe for more" is obvious
+ * without the old "Un card pe ecran, glisează pentru următorul" caption. Native
+ * CSS scroll-snap does the swipe (momentum and all), the container height
+ * eases to the active card instead of jumping, and inactive cards dim slightly
+ * so the focus follows the swipe.
+ *
+ * The previous version rendered every widget TWICE (an off-screen copy just to
+ * measure heights) and synced state from debounced scroll-end events — double
+ * the render cost on the most expensive screen, and a stutter at every snap.
+ */
 function MobileWidgetStack({ children }: { children: React.ReactNode }) {
-    const { width } = useResponsive();
-    const cardWidth = Math.max(288, width - 32);
-    const scrollRef = React.useRef<ScrollView>(null);
-    const [activeIndex, setActiveIndex] = React.useState(0);
-    const [cardHeights, setCardHeights] = React.useState<Record<number, number>>({});
-    const activeHeight = cardHeights[activeIndex];
     const widgetItems = React.Children.toArray(children);
-    const maxIndex = Math.max(0, widgetItems.length - 1);
+    const scrollerRef = React.useRef<HTMLDivElement | null>(null);
+    const itemRefs = React.useRef<Array<HTMLDivElement | null>>([]);
+    const [activeIndex, setActiveIndex] = React.useState(0);
+    const [height, setHeight] = React.useState<number | null>(null);
 
-    const handleCardLayout = React.useCallback((index: number, event: LayoutChangeEvent) => {
-        const nextHeight = Math.ceil(event.nativeEvent.layout.height);
-        setCardHeights((current) => current[index] === nextHeight ? current : { ...current, [index]: nextHeight });
-    }, []);
+    // Active index from scroll position, once per frame.
+    React.useEffect(() => {
+        const scroller = scrollerRef.current;
+        if (!scroller) return undefined;
+        let frame = 0;
+        const onScroll = () => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => {
+                const first = itemRefs.current[0];
+                if (!first) return;
+                const step = first.offsetWidth + 12;
+                const next = Math.round(scroller.scrollLeft / step);
+                setActiveIndex(Math.max(0, Math.min(next, widgetItems.length - 1)));
+            });
+        };
+        scroller.addEventListener('scroll', onScroll, { passive: true });
+        return () => {
+            cancelAnimationFrame(frame);
+            scroller.removeEventListener('scroll', onScroll);
+        };
+    }, [widgetItems.length]);
 
-    const handleScrollEnd = React.useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const nextIndex = Math.round(event.nativeEvent.contentOffset.x / cardWidth);
-        setActiveIndex(Math.max(0, Math.min(nextIndex, maxIndex)));
-    }, [cardWidth, maxIndex]);
+    // Track the active card's height (content can change after data loads).
+    React.useEffect(() => {
+        const node = itemRefs.current[activeIndex];
+        if (!node) return undefined;
+        const update = () => setHeight(node.offsetHeight);
+        update();
+        if (typeof ResizeObserver === 'undefined') return undefined;
+        const observer = new ResizeObserver(update);
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, [activeIndex]);
 
-    const goToWidget = React.useCallback((direction: 'left' | 'right') => {
-        const nextIndex = Math.max(0, Math.min(activeIndex + (direction === 'right' ? 1 : -1), maxIndex));
-        setActiveIndex(nextIndex);
-        scrollRef.current?.scrollTo({ x: nextIndex * cardWidth, animated: true });
-    }, [activeIndex, cardWidth, maxIndex]);
+    const goTo = (index: number) => {
+        const scroller = scrollerRef.current;
+        const node = itemRefs.current[index];
+        if (!scroller || !node) return;
+        scroller.scrollTo({ left: node.offsetLeft - scroller.offsetLeft, behavior: 'smooth' });
+    };
 
     return (
-        <View className="flex lg:hidden mb-4 relative">
-            <View className="flex-row items-center justify-between px-1 mb-3">
-                <View>
-                    <Text className="text-[#07152F] text-lg font-black">Workspace pulse</Text>
-                    <Text className="text-[#64748B] text-xs font-bold mt-0.5">Un card pe ecran, glisează pentru următorul</Text>
-                </View>
-                <View className="flex-row items-center gap-2">
-                    <Pressable
-                        onPress={() => goToWidget('left')}
-                        disabled={activeIndex === 0}
-                        className={`w-9 h-9 rounded-full items-center justify-center border border-[#DCE6F5] ${activeIndex === 0 ? 'bg-white/60 opacity-50' : 'bg-white'}`}
-                    >
-                        <MaterialIcons name="chevron-left" size={20} color="var(--c-ink)" />
-                    </Pressable>
-                    <Pressable
-                        onPress={() => goToWidget('right')}
-                        disabled={activeIndex === maxIndex}
-                        className={`w-9 h-9 rounded-full items-center justify-center ${activeIndex === maxIndex ? 'bg-[#CBD5E1] opacity-60' : 'bg-[#0D2040]'}`}
-                    >
-                        <MaterialIcons name="chevron-right" size={20} color="var(--c-surface)" />
-                    </Pressable>
-                </View>
-            </View>
-
-            <View pointerEvents="none" style={{ position: 'absolute', opacity: 0, left: -10000, top: 0, width: cardWidth }}>
-                {widgetItems.map((child, index) => (
-                    <View
-                        key={`mobile-widget-measure-${index}`}
-                        onLayout={(event) => handleCardLayout(index, event)}
-                        style={{ width: cardWidth }}
-                    >
-                        {child}
-                    </View>
-                ))}
-            </View>
-
-            <ScrollView
-                ref={scrollRef}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={cardWidth}
-                snapToAlignment="start"
-                decelerationRate="fast"
-                contentContainerStyle={{ paddingRight: 0 }}
-                onMomentumScrollEnd={handleScrollEnd}
-                onScrollEndDrag={handleScrollEnd}
-                style={activeHeight ? { height: activeHeight } : undefined}
+        <div className="lg:hidden mb-5">
+            <div
+                ref={scrollerRef}
+                className="m-carousel"
+                style={{ height: height ?? undefined }}
+                aria-roledescription="carusel"
             >
                 {widgetItems.map((child, index) => (
-                    <View
+                    <div
                         key={`mobile-widget-${index}`}
-                        style={{ width: cardWidth }}
+                        ref={(node) => { itemRefs.current[index] = node; }}
+                        className={`m-carousel-item ${index === activeIndex ? 'is-active' : ''}`}
+                        aria-hidden={index !== activeIndex}
                     >
                         {child}
-                    </View>
+                    </div>
                 ))}
-            </ScrollView>
-            <View className="flex-row justify-center gap-1.5 mt-2">
+            </div>
+            <div className="flex flex-row justify-center items-center gap-1 mt-3" role="tablist" aria-label="Carduri">
                 {widgetItems.map((_, index) => (
-                    <View
+                    <button
                         key={`mobile-widget-dot-${index}`}
-                        className={`h-1.5 rounded-full ${activeIndex === index ? 'w-5 bg-[#1D3E90]' : 'w-1.5 bg-[#BFD0EA]'}`}
-                    />
+                        type="button"
+                        role="tab"
+                        aria-selected={index === activeIndex}
+                        aria-label={`Cardul ${index + 1} din ${widgetItems.length}`}
+                        onClick={() => goTo(index)}
+                        className="m-carousel-dot"
+                    >
+                        <span className={index === activeIndex ? 'is-active' : ''} />
+                    </button>
                 ))}
-            </View>
-        </View>
+            </div>
+        </div>
     );
 }
 
@@ -1278,6 +1318,8 @@ export default function Dashboard() {
 
     // KPI-uri din summary
     const expiringItems: ExpiringItem[] = summary?.expiringItems ?? [];
+    const navigate = useNavigate();
+    const openCompliance = React.useCallback(() => navigate('/admin/compliance'), [navigate]);
     const expiredCount = summary?.expiredVisasCount ?? 0;
 
     const scrollResults = (direction: 'left' | 'right') => {
@@ -1404,32 +1446,39 @@ export default function Dashboard() {
     );
 
     // ── Filter Bar ──
-    const MatchFilterBar = () => (
+    // An element, not an inline component: `const MatchFilterBar = () => …`
+    // declared inside render was a NEW component type every render, so React
+    // unmounted and remounted the whole bar on each state change.
+    const matchFilterBar = (
         <FilterBar
             items={[
                 {
                     key: 'league',
-                    label: 'League',
-                    value: selectedLeague?.name ?? 'Ligă',
+                    label: 'Ligă',
+                    icon: 'emoji-events',
+                    value: selectedLeague?.name ?? 'Alege liga',
                     onPress: () => setShowLeague(true),
                 },
                 {
                     key: 'season',
-                    label: 'Season',
-                    value: selectedSeason?.text ?? 'Sezon',
+                    label: 'Sezon',
+                    icon: 'date-range',
+                    value: selectedSeason?.text ?? 'Alege sezonul',
                     onPress: () => setShowSeason(true),
                 },
                 {
                     key: 'team',
-                    label: 'Team',
-                    value: selectedTeam?.name ?? 'Echipă',
+                    label: 'Echipă',
+                    icon: 'groups',
+                    value: selectedTeam?.name ?? 'Alege echipa',
                     loading: loadingTeams,
                     onPress: () => setShowTeam(true),
                 },
                 {
                     key: 'month',
-                    label: 'Month',
-                    value: MONTHS.find((m) => m.id === String(selectedMonth))?.label ?? 'Lună',
+                    label: 'Lună',
+                    icon: 'calendar-month',
+                    value: MONTHS.find((m) => m.id === String(selectedMonth))?.label ?? 'Alege luna',
                     active: true,
                     onPress: () => setShowMonth(true),
                 },
@@ -1440,7 +1489,9 @@ export default function Dashboard() {
     return (
         <ScrollView
             className="flex-1 bg-[#F5F7FB]"
-            contentContainerStyle={{ paddingBottom: 140 }}
+            // The shell already reserves room for the bottom nav (pb-24); 140
+            // on top of it left a screen of empty space under the last card.
+            contentContainerStyle={{ paddingBottom: 24 }}
             showsVerticalScrollIndicator={false}
             horizontal={false}
         >
@@ -1481,8 +1532,8 @@ export default function Dashboard() {
                                 </View>
                                 <View className="w-1 h-1 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.25)' }} />
                                 <View className="flex-row items-center gap-1.5">
-                                    <MaterialIcons name="warning" size={14} color={expiredCount > 0 ? 'var(--c-danger-bg)' : 'rgba(255,255,255,0.55)'} />
-                                    <Text className="text-[13px] font-semibold" style={{ color: expiredCount > 0 ? 'var(--c-danger-bg)' : 'rgba(255,255,255,0.7)' }}>{expiredCount} vize expirate</Text>
+                                    <MaterialIcons name="warning" size={14} color={expiredCount > 0 ? '#FCA5A5' : 'rgba(255,255,255,0.55)'} />
+                                    <Text className="text-[13px] font-semibold" style={{ color: expiredCount > 0 ? '#FCA5A5' : 'rgba(255,255,255,0.7)' }}>{expiredCount} vize expirate</Text>
                                 </View>
                             </View>
                         </View>
@@ -1531,6 +1582,7 @@ export default function Dashboard() {
                             expiringItems={expiringItems}
                             expiredCount={expiredCount}
                             loading={loadingSummary}
+                            onOpenCompliance={openCompliance}
                         />,
                     ]}
                 </MobileWidgetStack>
@@ -1637,6 +1689,7 @@ export default function Dashboard() {
                             expiringItems={expiringItems}
                             expiredCount={expiredCount}
                             loading={loadingSummary}
+                            onOpenCompliance={openCompliance}
                             compact
                             showHeader={false}
                         />
@@ -1678,7 +1731,7 @@ export default function Dashboard() {
 
                     {mainView === 'matches' && (
                         <View className="w-full min-w-0">
-                            <View className="flex-row justify-between items-center mb-4 px-1 lg:px-0 flex-wrap gap-2 relative z-10">
+                            <View className="flex-col lg:flex-row lg:justify-between lg:items-center mb-4 px-1 lg:px-0 gap-3 relative z-10">
                                 <View className="flex-row items-center gap-3">
                                     <View className="w-9 h-9 rounded-[12px] items-center justify-center" style={{ backgroundColor: 'rgba(14,165,233,0.1)' }}>
                                         <MaterialIcons name="sports-basketball" size={18} color={dash.accentSky} />
@@ -1692,7 +1745,7 @@ export default function Dashboard() {
                                         </Text>
                                     </View>
                                 </View>
-                                <MatchFilterBar />
+                                {matchFilterBar}
                             </View>
 
                             {loading && (

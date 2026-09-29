@@ -8,6 +8,9 @@ export interface ExpiringItem {
     daysLeft: number | null;
     expiryDate: string;
     urgent: boolean;  // true dacă mai sunt <= 7 zile
+    /** Already past its expiry date (daysLeft is null then). */
+    expired?: boolean;
+    daysOverdue?: number;
 }
 
 export interface DashboardSummary {

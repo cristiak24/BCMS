@@ -9,14 +9,14 @@ import { MobileBottomNavigation, MobileNavigationSheet } from '../../components/
 import { PLAYER_FEATURE_FLAGS } from '../../config/playerFeatureFlags';
 
 const PLAYER_MENU_ITEMS = [
-    { href: '/myclub' as const, label: 'Home', icon: 'grid-view' as const, match: 'myclub' },
-    { href: '/schedule' as const, label: 'Schedule', icon: 'calendar-today' as const, match: 'schedule' },
-    { href: '/attendance' as const, label: 'Attendance', icon: 'fact-check' as const, match: 'attendance' },
-    { href: '/payments' as const, label: 'Payments', icon: 'payments' as const, match: 'payments' },
+    { href: '/myclub' as const, label: 'Acasă', icon: 'grid-view' as const, match: 'myclub' },
+    { href: '/schedule' as const, label: 'Program', icon: 'calendar-today' as const, match: 'schedule' },
+    { href: '/attendance' as const, label: 'Prezență', icon: 'fact-check' as const, match: 'attendance' },
+    { href: '/payments' as const, label: 'Plăți', icon: 'payments' as const, match: 'payments' },
     ...(PLAYER_FEATURE_FLAGS.teammatesView
         ? [{ href: '/team' as const, label: 'Echipa mea', icon: 'groups' as const, match: 'team' }]
         : []),
-    { href: '/account' as const, label: 'Account', icon: 'person' as const, match: 'account' },
+    { href: '/account' as const, label: 'Profil', icon: 'person' as const, match: 'account' },
 ];
 
 // A coach gets their own `/coach/*` screens plus the two shared ones
@@ -28,11 +28,11 @@ const PLAYER_MENU_ITEMS = [
 // have to be real path fragments — 'coach-teams' would never highlight on
 // /coach/teams.
 const COACH_MENU_ITEMS = [
-    { href: '/coach/dashboard' as const, label: 'Home', icon: 'grid-view' as const, match: 'coach/dashboard' },
-    { href: '/schedule' as const, label: 'Schedule', icon: 'calendar-today' as const, match: 'schedule' },
-    { href: '/coach/attendance' as const, label: 'Attendance', icon: 'fact-check' as const, match: 'coach/attendance' },
-    { href: '/coach/teams' as const, label: 'Teams', icon: 'groups' as const, match: 'coach/teams' },
-    { href: '/account' as const, label: 'Account', icon: 'person' as const, match: 'account' },
+    { href: '/coach/dashboard' as const, label: 'Acasă', icon: 'grid-view' as const, match: 'coach/dashboard' },
+    { href: '/schedule' as const, label: 'Program', icon: 'calendar-today' as const, match: 'schedule' },
+    { href: '/coach/attendance' as const, label: 'Prezență', icon: 'fact-check' as const, match: 'coach/attendance' },
+    { href: '/coach/teams' as const, label: 'Echipe', icon: 'groups' as const, match: 'coach/teams' },
+    { href: '/account' as const, label: 'Profil', icon: 'person' as const, match: 'account' },
 ];
 
 // Bottom bar stays at 4 primary destinations on mobile so it never crowds or

@@ -304,16 +304,40 @@ router.get('/summary', async (req, res) => {
                 return expiry ? expiry.getTime() <= todayTs.getTime() : false;
             });
 
-        const expiringItems: Array<{
+        type RiskItem = {
             type: string;
             name: string;
+            /** null = already expired (clients render "EXPIRAT"). */
             daysLeft: number | null;
             expiryDate: string;
             urgent: boolean;
-        }> = medicalCheckCandidates
+            expired?: boolean;
+            daysOverdue?: number;
+        };
+
+        // Already-expired visas lead the list. They used to be COUNTED
+        // (expiredVisasCount) but never LISTED — the list only held visas
+        // expiring in the next 30 days — so the dashboard showed "2 EXPIRATE"
+        // next to "Totul e în regulă".
+        const expiredRiskItems: RiskItem[] = expiredVisasItems.map((player) => {
+            const expiry = toDate(player.medicalCheckExpiry);
+            const daysOverdue = expiry ? Math.max(0, Math.floor((todayTs.getTime() - expiry.getTime()) / 86400000)) : 0;
+            return {
+                type: 'VIZĂ MEDICALĂ',
+                name: `${player.firstName ?? ''} ${player.lastName ?? ''}`.trim() || 'Jucător',
+                daysLeft: null,
+                expiryDate: expiry ? expiry.toLocaleDateString('ro-RO') : '',
+                urgent: true,
+                expired: true,
+                daysOverdue,
+            };
+        });
+
+        const expiringItems: RiskItem[] = medicalCheckCandidates
             .filter((player) => {
                 const expiry = toDate(player.medicalCheckExpiry);
-                return expiry ? expiry >= todayTs && expiry <= in30Days : false;
+                // Strictly after today: "today" already counts as expired above.
+                return expiry ? expiry.getTime() > todayTs.getTime() && expiry <= in30Days : false;
             })
             .map((player) => {
                 const expiry = toDate(player.medicalCheckExpiry);
@@ -349,6 +373,9 @@ router.get('/summary', async (req, res) => {
         }
 
         expiringItems.sort((a, b) => (a.daysLeft ?? -Infinity) - (b.daysLeft ?? -Infinity));
+        // Longest-overdue first, then the soonest to expire.
+        expiredRiskItems.sort((a, b) => (b.daysOverdue ?? 0) - (a.daysOverdue ?? 0));
+        const riskItems = [...expiredRiskItems, ...expiringItems];
 
         res.json({
             activePlayerCount,
@@ -370,7 +397,7 @@ router.get('/summary', async (req, res) => {
             presentCount,
             totalAttendanceRecords,
             expiredVisasCount: expiredVisasItems.length,
-            expiringItems,
+            expiringItems: riskItems,
         });
     } catch (e) {
         console.error('[dashboard/summary] error:', e);

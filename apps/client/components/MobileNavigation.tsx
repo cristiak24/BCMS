@@ -57,7 +57,7 @@ export function MobileBottomNavigation({
             <View className="items-center justify-center py-1 px-1">
               <View className="items-center justify-center rounded-[18px] px-2 py-2 min-h-[52px] w-full" style={{ backgroundColor: isActive ? 'var(--c-surface-tint)' : 'transparent' }}>
                 <MaterialIcons name={item.icon} size={20} color={isActive ? theme.colors.royal : theme.colors.faint} />
-                <Text className="text-[10px] mt-1 font-black" style={{ color: isActive ? theme.colors.royal : theme.colors.faint }} numberOfLines={1}>
+                <Text className="text-[11px] mt-1 font-semibold" style={{ color: isActive ? theme.colors.royal : theme.colors.faint }} numberOfLines={1}>
                   {item.label}
                 </Text>
               </View>
@@ -70,12 +70,12 @@ export function MobileBottomNavigation({
           onPress={onOpenMore}
           className="flex-1 items-center justify-center py-1 px-1"
           accessibilityRole="button"
-          accessibilityLabel="Open all admin pages"
+          accessibilityLabel="Toate secțiunile"
         >
           <View className="items-center justify-center rounded-[18px] px-2 py-2 min-h-[52px] w-full" style={{ backgroundColor: moreIsActive ? 'var(--c-surface-tint)' : 'transparent' }}>
             <MaterialIcons name="apps" size={20} color={moreIsActive ? theme.colors.royal : theme.colors.faint} />
-            <Text className="text-[10px] mt-1 font-black" style={{ color: moreIsActive ? theme.colors.royal : theme.colors.faint }} numberOfLines={1}>
-              More
+            <Text className="text-[11px] mt-1 font-semibold" style={{ color: moreIsActive ? theme.colors.royal : theme.colors.faint }} numberOfLines={1}>
+              Mai mult
             </Text>
           </View>
         </Pressable>
@@ -95,43 +95,65 @@ export function MobileNavigationSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable className="flex-1 bg-black/35 justify-end" onPress={onClose}>
-        <Pressable className="bg-[#F8FBFF] rounded-t-[32px] px-4 pt-4" style={{ paddingBottom: Math.max(bottomInset + 18, 34) }}>
-          <View className="self-center w-12 h-1.5 rounded-full bg-[#CBD5E1] mb-4" />
-          <View className="flex-row items-center justify-between mb-3">
-            <View>
-              <Text className="text-[#07152F] text-xl font-black">Navigation</Text>
-              <Text className="text-[#64748B] text-xs font-bold mt-1">Club workspace sections</Text>
-            </View>
-            <Pressable onPress={onClose} className="w-10 h-10 rounded-full bg-white items-center justify-center border border-[#E4ECF7]">
-              <MaterialIcons name="close" size={20} color={theme.colors.text} />
+      <Pressable className="ui-backdrop flex-1 justify-end" style={{ backgroundColor: 'rgba(10,15,28,0.5)' }} onPress={onClose}>
+        <Pressable
+          className="ui-sheet rounded-t-[22px] px-4 pt-3 border-t"
+          style={{
+            backgroundColor: 'var(--c-surface)',
+            borderColor: 'var(--c-border)',
+            paddingBottom: Math.max(bottomInset + 18, 28),
+            boxShadow: '0 -12px 32px -12px rgba(0,0,0,0.35)',
+          } as any}
+        >
+          <View className="self-center w-10 h-1 rounded-full mb-4" style={{ backgroundColor: 'var(--c-border-strong)' }} />
+          <View className="flex-row items-center justify-between mb-3 px-1">
+            <Text className="text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>Meniu</Text>
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Închide meniul"
+              className="ui-press w-9 h-9 rounded-full items-center justify-center"
+              style={{ backgroundColor: 'var(--c-surface-2)' }}
+            >
+              <MaterialIcons name="close" size={18} color="var(--c-ink-soft)" />
             </Pressable>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
-            <View className="gap-2 pb-2">
+          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: '62vh' } as any}>
+            {/* Two-column tiles: every destination visible at once instead of a
+                long list to scroll. */}
+            <View className="grid grid-cols-2 gap-2 pb-2">
               {items.map((item) => {
                 const active = activeHref === item.href;
                 return (
                   <Pressable
-                      key={item.href}
-                      onPress={() => {
-                        onClose();
-                        navigate(item.href);
-                      }}
-                      className="min-h-[58px] rounded-[22px] px-4 flex-row items-center border"
-                      style={{
-                        backgroundColor: active ? 'var(--c-brand-surface-deep)' : 'var(--c-surface)',
-                        borderColor: active ? 'var(--c-ink-strong)' : theme.colors.lineSoft,
-                      }}
+                    key={item.href}
+                    onPress={() => {
+                      onClose();
+                      navigate(item.href);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={item.label}
+                    className="ui-press min-h-[64px] rounded-[14px] px-3 py-3 flex-row items-center gap-2.5 border text-left"
+                    style={{
+                      backgroundColor: active ? 'var(--c-brand-surface)' : 'var(--c-surface-2)',
+                      borderColor: active ? 'var(--c-brand-surface)' : 'var(--c-border-soft)',
+                    } as any}
+                  >
+                    <View
+                      className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0"
+                      style={{ backgroundColor: active ? 'rgba(255,255,255,0.18)' : 'var(--c-surface)' }}
                     >
-                      <View className="w-10 h-10 rounded-[16px] items-center justify-center mr-3" style={{ backgroundColor: active ? 'rgba(255,255,255,0.14)' : 'var(--c-surface-2)' }}>
-                        <MaterialIcons name={item.icon} size={19} color={active ? 'var(--c-surface)' : theme.colors.royal} />
-                      </View>
-                      <Text className="text-[14px] font-black flex-1" style={{ color: active ? 'var(--c-surface)' : theme.colors.text }}>
-                        {item.label}
-                      </Text>
-                      <MaterialIcons name="chevron-right" size={20} color={active ? 'var(--c-surface)' : theme.colors.faint} />
-                    </Pressable>
+                      <MaterialIcons name={item.icon} size={18} color={active ? '#FFFFFF' : 'var(--c-brand-fg)'} />
+                    </View>
+                    <Text
+                      className="text-[13.5px] font-semibold flex-1 min-w-0 leading-tight"
+                      style={{ color: active ? '#FFFFFF' : 'var(--c-ink)' }}
+                      numberOfLines={2}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
                 );
               })}
             </View>

@@ -52,12 +52,22 @@ function isCacheable(response) {
   return response && response.status === 200 && response.type === 'basic';
 }
 
+/**
+ * A request for a chunk that no longer exists (old deploy) is answered with
+ * index.html by the SPA fallback. Never cache that under the .js/.css URL —
+ * v1 did, which pinned the broken response on the device.
+ */
+function isAssetResponse(response) {
+  const type = (response.headers.get('content-type') || '').toLowerCase();
+  return !type.includes('text/html');
+}
+
 async function cacheFirst(request) {
   const cached = await caches.match(request);
   if (cached) return cached;
 
   const response = await fetch(request);
-  if (isCacheable(response)) {
+  if (isCacheable(response) && isAssetResponse(response)) {
     const copy = response.clone();
     caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).then(trimCache);
   }

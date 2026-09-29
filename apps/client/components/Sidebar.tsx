@@ -9,18 +9,18 @@ import { useResponsive } from '../hooks/useResponsive';
 export type AdminMenuIconName = keyof typeof MaterialIcons.glyphMap;
 
 export const ADMIN_MENU_ITEMS: { label: string; icon: AdminMenuIconName; href: string; superadminOnly?: boolean }[] = [
-    { label: 'Dashboard', icon: 'grid-view', href: '/admin/dashboard' },
-    { label: 'My Club', icon: 'shield', href: '/admin/my-club-admin' },
-    { label: 'Manage Access', icon: 'verified-user', href: '/admin/manage-access' },
-    { label: 'Manage Accounts', icon: 'groups', href: '/admin/manage-accounts' },
-    { label: 'Roster', icon: 'people', href: '/admin/roster' },
-    { label: 'Schedule', icon: 'calendar-today', href: '/admin/schedule' },
-    { label: 'Create Club Admin', icon: 'admin-panel-settings', href: '/admin/create-club-admin', superadminOnly: true },
-    { label: 'Finances', icon: 'payments', href: '/admin/finance' },
+    { label: 'Acasă', icon: 'grid-view', href: '/admin/dashboard' },
+    { label: 'Clubul meu', icon: 'shield', href: '/admin/my-club-admin' },
+    { label: 'Acces & invitații', icon: 'verified-user', href: '/admin/manage-access' },
+    { label: 'Conturi', icon: 'groups', href: '/admin/manage-accounts' },
+    { label: 'Lot', icon: 'people', href: '/admin/roster' },
+    { label: 'Program', icon: 'calendar-today', href: '/admin/schedule' },
+    { label: 'Admin club nou', icon: 'admin-panel-settings', href: '/admin/create-club-admin', superadminOnly: true },
+    { label: 'Finanțe', icon: 'payments', href: '/admin/finance' },
     // Compliance and Users were reachable only by typing the URL: with no menu
     // entry the header title also fell back to the first item ("Dashboard").
-    { label: 'Compliance', icon: 'verified-user', href: '/admin/compliance' },
-    { label: 'Users', icon: 'people', href: '/admin/users', superadminOnly: true },
+    { label: 'Conformitate', icon: 'verified-user', href: '/admin/compliance' },
+    { label: 'Utilizatori', icon: 'people', href: '/admin/users', superadminOnly: true },
 ];
 
 type SidebarProps = {

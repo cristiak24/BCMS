@@ -1,8 +1,12 @@
-import { lazy, Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
+import { lazyRoute, prefetchRoutes } from './lazyRoute';
+import RouteProgress from '../components/ui/RouteProgress';
+import { useSession } from '../context/AuthContext';
+import { normalizeRole } from '../utils/authSession';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import PublicRoute from '../components/auth/PublicRoute';
@@ -16,57 +20,126 @@ import Login from '../app/login';
 // Everything behind a login is code-split. The app previously shipped as a single
 // ~812 kB chunk, so a player on mobile downloaded the entire super-admin console
 // and the finance module before they could see their own schedule.
-const Signup = lazy(() => import('../app/signup'));
-const Profile = lazy(() => import('../app/profile'));
-const NotFound = lazy(() => import('../app/not-found'));
-const InviteRegistration = lazy(() => import('../app/invite/[token]'));
+const loadSignup = () => import('../app/signup');
+const Signup = lazyRoute(loadSignup);
+const loadProfile = () => import('../app/profile');
+const Profile = lazyRoute(loadProfile);
+const loadNotFound = () => import('../app/not-found');
+const NotFound = lazyRoute(loadNotFound);
+const loadInviteRegistration = () => import('../app/invite/[token]');
+const InviteRegistration = lazyRoute(loadInviteRegistration);
 
-const PlayerLayout = lazy(() => import('../app/(tabs)/_layout'));
-const PlayerHome = lazy(() => import('../app/(tabs)/index'));
-const PlayerAccount = lazy(() => import('../app/(tabs)/account'));
-const PlayerAttendance = lazy(() => import('../app/(tabs)/attendance'));
-const PlayerPayments = lazy(() => import('../app/(tabs)/payments'));
-const PlayerSchedule = lazy(() => import('../app/(tabs)/schedule'));
-const PlayerTeam = lazy(() => import('../app/(tabs)/team/index'));
-const PlayerTeamDetail = lazy(() => import('../app/(tabs)/team/[id]'));
+const loadPlayerLayout = () => import('../app/(tabs)/_layout');
+const PlayerLayout = lazyRoute(loadPlayerLayout);
+const loadPlayerHome = () => import('../app/(tabs)/index');
+const PlayerHome = lazyRoute(loadPlayerHome);
+const loadPlayerAccount = () => import('../app/(tabs)/account');
+const PlayerAccount = lazyRoute(loadPlayerAccount);
+const loadPlayerAttendance = () => import('../app/(tabs)/attendance');
+const PlayerAttendance = lazyRoute(loadPlayerAttendance);
+const loadPlayerPayments = () => import('../app/(tabs)/payments');
+const PlayerPayments = lazyRoute(loadPlayerPayments);
+const loadPlayerSchedule = () => import('../app/(tabs)/schedule');
+const PlayerSchedule = lazyRoute(loadPlayerSchedule);
+const loadPlayerTeam = () => import('../app/(tabs)/team/index');
+const PlayerTeam = lazyRoute(loadPlayerTeam);
+const loadPlayerTeamDetail = () => import('../app/(tabs)/team/[id]');
+const PlayerTeamDetail = lazyRoute(loadPlayerTeamDetail);
 
 // Coach screens share the player shell (same sidebar, same header) but get
 // their own `/coach/*` paths — they used to be rendered *inside* the player
 // routes, so a coach's roster lived at `/payments`.
-const CoachDashboard = lazy(() => import('../app/(coach)/dashboard'));
-const CoachTeams = lazy(() => import('../app/(coach)/teams'));
-const CoachAttendance = lazy(() => import('../app/(coach)/attendance'));
+const loadCoachDashboard = () => import('../app/(coach)/dashboard');
+const CoachDashboard = lazyRoute(loadCoachDashboard);
+const loadCoachTeams = () => import('../app/(coach)/teams');
+const CoachTeams = lazyRoute(loadCoachTeams);
+const loadCoachAttendance = () => import('../app/(coach)/attendance');
+const CoachAttendance = lazyRoute(loadCoachAttendance);
 
-const AdminLayout = lazy(() => import('../app/(admin)/_layout'));
-const AdminDashboard = lazy(() => import('../app/(admin)/dashboard'));
-const AdminRoster = lazy(() => import('../app/(admin)/roster'));
-const AdminSchedule = lazy(() => import('../app/(admin)/schedule'));
-const AdminRequests = lazy(() => import('../app/(admin)/requests'));
-const AdminUserAccess = lazy(() => import('../app/(admin)/user-access'));
-const AdminCreateClubAdmin = lazy(() => import('../app/(admin)/create-club-admin'));
-const AdminCreateAccount = lazy(() => import('../app/(admin)/create-account'));
-const AdminManageAccess = lazy(() => import('../app/(admin)/manage-access'));
-const AdminManageAccounts = lazy(() => import('../app/(admin)/manage-accounts'));
-const AdminMyClubAdmin = lazy(() => import('../app/(admin)/my-club-admin'));
-const AdminFinance = lazy(() => import('../app/(admin)/finance'));
-const AdminCompliance = lazy(() => import('../app/(admin)/compliance'));
-const AdminTeamDetails = lazy(() => import('../app/(admin)/team/[id]'));
-const AdminEventDetails = lazy(() => import('../app/(admin)/event/[id]'));
-const AdminAttendanceDetails = lazy(() => import('../app/(admin)/attendance/[id]'));
-const AdminPlayerDetails = lazy(() => import('../app/(admin)/player/[id]'));
-const AdminUsers = lazy(() => import('../app/(admin)/users'));
-const AdminUserDetails = lazy(() => import('../app/(admin)/users/[id]'));
+const loadAdminLayout = () => import('../app/(admin)/_layout');
+const AdminLayout = lazyRoute(loadAdminLayout);
+const loadAdminDashboard = () => import('../app/(admin)/dashboard');
+const AdminDashboard = lazyRoute(loadAdminDashboard);
+const loadAdminRoster = () => import('../app/(admin)/roster');
+const AdminRoster = lazyRoute(loadAdminRoster);
+const loadAdminSchedule = () => import('../app/(admin)/schedule');
+const AdminSchedule = lazyRoute(loadAdminSchedule);
+const loadAdminRequests = () => import('../app/(admin)/requests');
+const AdminRequests = lazyRoute(loadAdminRequests);
+const loadAdminUserAccess = () => import('../app/(admin)/user-access');
+const AdminUserAccess = lazyRoute(loadAdminUserAccess);
+const loadAdminCreateClubAdmin = () => import('../app/(admin)/create-club-admin');
+const AdminCreateClubAdmin = lazyRoute(loadAdminCreateClubAdmin);
+const loadAdminCreateAccount = () => import('../app/(admin)/create-account');
+const AdminCreateAccount = lazyRoute(loadAdminCreateAccount);
+const loadAdminManageAccess = () => import('../app/(admin)/manage-access');
+const AdminManageAccess = lazyRoute(loadAdminManageAccess);
+const loadAdminManageAccounts = () => import('../app/(admin)/manage-accounts');
+const AdminManageAccounts = lazyRoute(loadAdminManageAccounts);
+const loadAdminMyClubAdmin = () => import('../app/(admin)/my-club-admin');
+const AdminMyClubAdmin = lazyRoute(loadAdminMyClubAdmin);
+const loadAdminFinance = () => import('../app/(admin)/finance');
+const AdminFinance = lazyRoute(loadAdminFinance);
+const loadAdminCompliance = () => import('../app/(admin)/compliance');
+const AdminCompliance = lazyRoute(loadAdminCompliance);
+const loadAdminTeamDetails = () => import('../app/(admin)/team/[id]');
+const AdminTeamDetails = lazyRoute(loadAdminTeamDetails);
+const loadAdminEventDetails = () => import('../app/(admin)/event/[id]');
+const AdminEventDetails = lazyRoute(loadAdminEventDetails);
+const loadAdminAttendanceDetails = () => import('../app/(admin)/attendance/[id]');
+const AdminAttendanceDetails = lazyRoute(loadAdminAttendanceDetails);
+const loadAdminPlayerDetails = () => import('../app/(admin)/player/[id]');
+const AdminPlayerDetails = lazyRoute(loadAdminPlayerDetails);
+const loadAdminUsers = () => import('../app/(admin)/users');
+const AdminUsers = lazyRoute(loadAdminUsers);
+const loadAdminUserDetails = () => import('../app/(admin)/users/[id]');
+const AdminUserDetails = lazyRoute(loadAdminUserDetails);
 
-const SuperAdminLayout = lazy(() => import('../app/super-admin/_layout'));
-const SuperAdminIndex = lazy(() => import('../app/super-admin'));
-const SuperAdminDashboard = lazy(() => import('../app/super-admin/dashboard'));
-const SuperAdminClubs = lazy(() => import('../app/super-admin/clubs'));
-const SuperAdminUsers = lazy(() => import('../app/super-admin/users'));
-const SuperAdminCreateUser = lazy(() => import('../app/super-admin/create-user'));
-const SuperAdminRoles = lazy(() => import('../app/super-admin/roles'));
-const SuperAdminAuditLogs = lazy(() => import('../app/super-admin/audit-logs'));
-const SuperAdminSettings = lazy(() => import('../app/super-admin/settings'));
-const SuperAdminInviteRedirect = lazy(() => import('../app/super-admin/invite/[token]'));
+const loadSuperAdminLayout = () => import('../app/super-admin/_layout');
+const SuperAdminLayout = lazyRoute(loadSuperAdminLayout);
+const loadSuperAdminIndex = () => import('../app/super-admin');
+const SuperAdminIndex = lazyRoute(loadSuperAdminIndex);
+const loadSuperAdminDashboard = () => import('../app/super-admin/dashboard');
+const SuperAdminDashboard = lazyRoute(loadSuperAdminDashboard);
+const loadSuperAdminClubs = () => import('../app/super-admin/clubs');
+const SuperAdminClubs = lazyRoute(loadSuperAdminClubs);
+const loadSuperAdminUsers = () => import('../app/super-admin/users');
+const SuperAdminUsers = lazyRoute(loadSuperAdminUsers);
+const loadSuperAdminCreateUser = () => import('../app/super-admin/create-user');
+const SuperAdminCreateUser = lazyRoute(loadSuperAdminCreateUser);
+const loadSuperAdminRoles = () => import('../app/super-admin/roles');
+const SuperAdminRoles = lazyRoute(loadSuperAdminRoles);
+const loadSuperAdminAuditLogs = () => import('../app/super-admin/audit-logs');
+const SuperAdminAuditLogs = lazyRoute(loadSuperAdminAuditLogs);
+const loadSuperAdminSettings = () => import('../app/super-admin/settings');
+const SuperAdminSettings = lazyRoute(loadSuperAdminSettings);
+const loadSuperAdminInviteRedirect = () => import('../app/super-admin/invite/[token]');
+const SuperAdminInviteRedirect = lazyRoute(loadSuperAdminInviteRedirect);
+
+/**
+ * Once the session is known, warm the chunks of the screens this role actually
+ * navigates between (bottom-nav destinations first), so a tap on a phone swaps
+ * the page immediately instead of waiting on the network.
+ */
+function RoutePrefetcher() {
+  const { session } = useSession();
+  const role = normalizeRole(session?.role);
+
+  useEffect(() => {
+    if (!role) return;
+    if (role === 'coach') {
+      prefetchRoutes([loadPlayerLayout, loadCoachDashboard, loadPlayerSchedule, loadCoachAttendance, loadCoachTeams, loadPlayerAccount]);
+    } else if (role === 'player' || role === 'parent') {
+      prefetchRoutes([loadPlayerLayout, loadPlayerHome, loadPlayerSchedule, loadPlayerAttendance, loadPlayerPayments, loadPlayerTeam, loadPlayerAccount]);
+    } else if (role === 'superadmin') {
+      prefetchRoutes([loadSuperAdminLayout, loadSuperAdminDashboard, loadSuperAdminClubs, loadSuperAdminUsers, loadAdminLayout, loadAdminDashboard]);
+    } else {
+      prefetchRoutes([loadAdminLayout, loadAdminDashboard, loadAdminFinance, loadAdminRoster, loadAdminSchedule, loadAdminMyClubAdmin, loadProfile]);
+    }
+  }, [role]);
+
+  return null;
+}
 
 export default function App() {
   return (
@@ -74,6 +147,8 @@ export default function App() {
       <BrowserRouter>
         <ThemeProvider>
           <AuthProvider>
+            <RouteProgress />
+            <RoutePrefetcher />
             <Suspense fallback={<LoadingScreen message="Se încarcă..." />}>
               <Routes>
                 <Route path="/" element={<Landing />} />

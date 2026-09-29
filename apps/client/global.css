@@ -336,3 +336,111 @@
     transform: none !important;
   }
 }
+
+/* ── Route progress (components/ui/RouteProgress.tsx) ─────────────────── */
+.route-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 300;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.route-progress.is-visible {
+  opacity: 1;
+}
+.route-progress-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--c-brand-surface), var(--c-sky));
+  animation: routeProgress 1.1s ease-in-out infinite;
+}
+@keyframes routeProgress {
+  from { left: -40%; }
+  to { left: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-progress-bar { animation: none; left: 0; width: 100%; }
+}
+
+/* ── Mobile widget carousel (admin dashboard) ───────────────────────────── */
+.m-carousel {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* Height eases to the active card instead of jumping between cards. */
+  transition: height 0.35s var(--ease-out);
+}
+.m-carousel::-webkit-scrollbar { display: none; }
+.m-carousel-item {
+  /* 28px of the next card stays visible: the swipe affordance. */
+  flex: 0 0 calc(100% - 28px);
+  min-width: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  opacity: 0.55;
+  transform: scale(0.97);
+  transform-origin: left center;
+  transition: opacity 0.3s ease, transform 0.35s var(--ease-out);
+}
+.m-carousel-item.is-active {
+  opacity: 1;
+  transform: none;
+}
+.m-carousel-dot {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 8px 3px;
+  cursor: pointer;
+}
+.m-carousel-dot > span {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--c-border-strong);
+  transition: width 0.3s var(--ease-out), background-color 0.3s ease;
+}
+.m-carousel-dot > span.is-active {
+  width: 20px;
+  background: var(--c-brand-surface);
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-carousel, .m-carousel-item, .m-carousel-dot > span { transition: none; }
+}
+
+/* ── Sheets & backdrops ─────────────────────────────────────────────────── */
+.ui-backdrop {
+  animation: uiFade 0.2s ease both;
+}
+.ui-sheet {
+  animation: uiSheetUp 0.32s var(--ease-out) both;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (min-width: 1024px) {
+  .ui-sheet { animation-name: dashFadeIn; padding-bottom: 0; }
+}
+@keyframes uiFade {
+  from { opacity: 0; }
+}
+@keyframes uiSheetUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-backdrop, .ui-sheet { animation: none; }
+}

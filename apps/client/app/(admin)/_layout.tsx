@@ -9,10 +9,10 @@ import AppHeader from '../../components/AppHeader';
 import { MobileBottomNavigation, MobileNavigationSheet } from '../../components/MobileNavigation';
 
 const MOBILE_NAV_ITEMS = [
-    { href: '/admin/dashboard' as const, label: 'Dashboard', icon: 'grid-view' as const, match: 'dashboard' },
-    { href: '/admin/finance' as const, label: 'Finance', icon: 'payments' as const, match: 'finance' },
-    { href: '/admin/roster' as const, label: 'Roster', icon: 'groups' as const, match: 'roster' },
-    { href: '/admin/schedule' as const, label: 'Schedule', icon: 'calendar-today' as const, match: 'schedule' },
+    { href: '/admin/dashboard' as const, label: 'Acasă', icon: 'grid-view' as const, match: 'dashboard' },
+    { href: '/admin/finance' as const, label: 'Finanțe', icon: 'payments' as const, match: 'finance' },
+    { href: '/admin/roster' as const, label: 'Lot', icon: 'groups' as const, match: 'roster' },
+    { href: '/admin/schedule' as const, label: 'Program', icon: 'calendar-today' as const, match: 'schedule' },
 ];
 
 /**
@@ -23,13 +23,13 @@ const MOBILE_NAV_ITEMS = [
  * every one of these pages was labelled "Dashboard" in the header.
  */
 const ADMIN_SECTION_TITLES: { prefix: string; label: string }[] = [
-    { prefix: '/admin/create-account', label: 'Create Account' },
-    { prefix: '/admin/create-club-admin', label: 'Create Club Admin' },
-    { prefix: '/admin/team/', label: 'Team Details' },
-    { prefix: '/admin/player/', label: 'Player Details' },
-    { prefix: '/admin/event/', label: 'Event Details' },
-    { prefix: '/admin/attendance/', label: 'Attendance' },
-    { prefix: '/admin/users/', label: 'User Details' },
+    { prefix: '/admin/create-account', label: 'Cont nou' },
+    { prefix: '/admin/create-club-admin', label: 'Admin club nou' },
+    { prefix: '/admin/team/', label: 'Echipă' },
+    { prefix: '/admin/player/', label: 'Jucător' },
+    { prefix: '/admin/event/', label: 'Eveniment' },
+    { prefix: '/admin/attendance/', label: 'Prezență' },
+    { prefix: '/admin/users/', label: 'Utilizator' },
 ];
 
 function getAdminPath(pathname: string) {

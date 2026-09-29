@@ -306,10 +306,33 @@ export function ScheduleToolbar({
   ) : null;
 
   if (isMobile) {
+    // Month gets its own full-width row: sharing it with the view switcher
+    // and filter button squeezed "Septembrie 2026" to "Septembrie …".
     return (
       <View>
-        <View className="flex-row items-center justify-between gap-2">
-          {monthNav}
+        <View className="flex-row items-center gap-2">
+          <TouchableOpacity
+            onPress={() => onNavigateMonth(-1)}
+            accessibilityLabel="Luna anterioară"
+            className="ui-press w-10 h-10 rounded-[11px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
+          >
+            <ChevronLeft size={18} color="var(--c-ink-soft)" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onToday} accessibilityLabel="Mergi la luna curentă" className="flex-1 items-center justify-center h-10">
+            <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{monthTitle}</Text>
+            <Text className="text-[11.5px] font-medium" style={{ color: 'var(--c-faint)' }}>
+              {eventCount} {eventCount === 1 ? 'eveniment' : 'evenimente'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => onNavigateMonth(1)}
+            accessibilityLabel="Luna următoare"
+            className="ui-press w-10 h-10 rounded-[11px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
+          >
+            <ChevronRight size={18} color="var(--c-ink-soft)" />
+          </TouchableOpacity>
+        </View>
+        <View className="flex-row items-center justify-between gap-2 mt-2.5">
           <View className="flex-row items-center gap-1.5">
             {viewSwitcher}
             <IconButton
