@@ -1,6 +1,8 @@
 type PickerOptions = {
   type?: string | string[];
   multiple?: boolean;
+  /** Native-only; ignored on web (the File is read in place). */
+  copyToCacheDirectory?: boolean;
 };
 
 function pickFile(options: PickerOptions = {}): Promise<any> {

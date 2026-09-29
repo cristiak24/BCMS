@@ -18,105 +18,28 @@ import eventRoutes from './routes/eventRoutes';
 import documentRoutes from './routes/documents';
 import notificationRoutes from './routes/notificationRoutes';
 import { loadServerEnv } from './lib/loadEnv';
+import { createAllowedOrigins, isOriginAllowed } from './lib/corsOrigins';
 
 loadServerEnv();
 
-function normalizeOrigin(value?: string | null) {
-    return value?.trim().replace(/\/+$/, '') || null;
-}
-
-function normalizeAllowedOrigin(value?: string | null) {
-    const trimmed = value?.trim().replace(/\/+$/, '');
-    if (!trimmed) {
-        return null;
-    }
-
-    try {
-        return new URL(trimmed).origin;
-    } catch {
-        try {
-            return new URL(`https://${trimmed}`).origin;
-        } catch {
-            return null;
-        }
-    }
-}
-
-function createAllowedOrigins() {
-    const projectId = process.env.GCLOUD_PROJECT?.trim() || process.env.GOOGLE_CLOUD_PROJECT?.trim() || null;
-    const configuredOrigins = [
-        process.env.FRONTEND_URL,
-        process.env.APP_BASE_URL,
-        process.env.FIREBASE_HOSTING_URL,
-        'https://bcms.ro',
-        'https://www.bcms.ro',
-        projectId ? `https://${projectId}.web.app` : null,
-        projectId ? `https://${projectId}.firebaseapp.com` : null,
-    ]
-        .flatMap((value) => String(value ?? '').split(','))
-        .map(normalizeAllowedOrigin)
-        .filter((value): value is string => Boolean(value));
-
-    const developmentOrigins = [
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'http://localhost:8081',
-        'http://127.0.0.1:8081',
-        'http://localhost:8091',
-        'http://127.0.0.1:8091',
-        'http://localhost:19006',
-        'http://127.0.0.1:19006',
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://localhost:5000',
-        'http://127.0.0.1:5000',
-    ];
-
-    return new Set([
-        ...configuredOrigins,
-        ...(process.env.NODE_ENV === 'production' ? [] : developmentOrigins),
-    ]);
-}
-
 export function createServerApp() {
     const app = express();
-    const allowedOrigins = createAllowedOrigins();
+    const allowedOrigins = createAllowedOrigins(process.env);
 
     app.use(cors({
         origin(origin, callback) {
-            if (!origin) {
+            // No Origin header: same-origin, server-to-server, curl, Stripe
+            // webhooks. CORS is a browser mechanism; nothing to enforce.
+            if (!origin || isOriginAllowed(origin, allowedOrigins, process.env)) {
                 callback(null, true);
                 return;
             }
 
-            const normalizedOrigin = normalizeOrigin(origin);
-            if (normalizedOrigin && allowedOrigins.has(normalizedOrigin)) {
-                callback(null, true);
-                return;
-            }
-
-            try {
-                const parsedOrigin = new URL(origin);
-                const hostname = parsedOrigin.hostname.toLowerCase();
-                const isLocalDevelopment =
-                    process.env.NODE_ENV !== 'production' &&
-                    ['localhost', '127.0.0.1', '::1'].includes(hostname);
-                const trustedHostname =
-                    isLocalDevelopment ||
-                    hostname === 'bcms.ro' ||
-                    hostname === 'www.bcms.ro' ||
-                    hostname.endsWith('.web.app') ||
-                    hostname.endsWith('.firebaseapp.com');
-
-                if (trustedHostname) {
-                    callback(null, true);
-                    return;
-                }
-            } catch {
-                // Fall through to rejection below.
-            }
-
-            callback(new Error(`CORS blocked origin: ${origin}`));
+            // Answer WITHOUT CORS headers (the browser then blocks the read)
+            // instead of throwing — an Error here fell through to the global
+            // handler and turned every rejected preflight into a logged 500.
+            console.warn(`[CORS] rejected origin: ${origin}`);
+            callback(null, false);
         },
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         // Identity is proven by the Firebase ID token in `Authorization` only.

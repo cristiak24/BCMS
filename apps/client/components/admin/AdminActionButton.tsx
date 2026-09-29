@@ -1,4 +1,3 @@
-import type { ComponentProps } from 'react';
 import { Pressable, Text } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 
@@ -11,7 +10,8 @@ type AdminActionButtonProps = {
     variant?: 'primary' | 'secondary';
     className?: string;
     disabled?: boolean;
-} & Pick<ComponentProps<typeof Pressable>, 'accessibilityLabel'>;
+    accessibilityLabel?: string;
+};
 
 export default function AdminActionButton({
     label,

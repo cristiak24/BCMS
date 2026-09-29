@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, ApiError } from './apiClient';
 
 export interface CalendarEvent {
     id: number;
@@ -69,6 +69,40 @@ export const eventsApi = {
             params: { limit },
         });
         return response.data;
+    },
+
+    /**
+     * Attendance sheets for many events → { [eventId]: rows }. One request per
+     * 200 events (GET /events/attendance). If the server predates that
+     * endpoint it falls back to one request per event, so a frontend deployed
+     * before the API still works.
+     */
+    async getAttendanceForEvents(eventIds: number[]): Promise<Record<number, EventAttendance[]>> {
+        const ids = Array.from(new Set(eventIds.filter((id) => id > 0)));
+        if (!ids.length) return {};
+
+        const BATCH = 200;
+        try {
+            const chunks: number[][] = [];
+            for (let index = 0; index < ids.length; index += BATCH) chunks.push(ids.slice(index, index + BATCH));
+            const parts = await Promise.all(chunks.map(async (chunk) => {
+                const response = await apiClient.get<Record<string, EventAttendance[]>>('/events/attendance', {
+                    params: { eventIds: chunk.join(',') },
+                });
+                return response.data;
+            }));
+            const merged: Record<number, EventAttendance[]> = {};
+            parts.forEach((part) => Object.entries(part).forEach(([id, rows]) => { merged[Number(id)] = rows; }));
+            ids.forEach((id) => { merged[id] ??= []; });
+            return merged;
+        } catch (error) {
+            // An older API routes /events/attendance to /events/:id and fails
+            // on the non-numeric id (400/404/500). Auth failures are real.
+            if (!(error instanceof ApiError) || error.status === 401 || error.status === 403) throw error;
+        }
+
+        const entries = await Promise.all(ids.map(async (id) => [id, await eventsApi.getEventAttendance(id)] as const));
+        return Object.fromEntries(entries);
     },
 
     async getEventAttendance(id: number) {

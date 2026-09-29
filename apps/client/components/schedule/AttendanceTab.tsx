@@ -128,40 +128,44 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
   }, [teams, selectedTeamId]);
 
   useEffect(() => {
+    // Dropped when the team/period changes mid-flight, so a slow response for
+    // the previous selection can't overwrite the current one.
+    let cancelled = false;
+
     async function loadData() {
       if (!selectedTeamId) return;
       setLoading(true);
       setLoadError(null);
 
       try {
-        const roster = await teamsApi.getTeamPlayers(selectedTeamId);
-        setPlayers(roster);
-
         const periodEvents = events.filter((event) => {
           if (event.teamId !== selectedTeamId || event.type !== 'training') return false;
           return activePeriodDayKeySet.has(event.startTime.split('T')[0]);
         });
 
-        const newAttendanceData: Record<number, any[]> = {};
-        await Promise.all(
-          periodEvents.map(async (event) => {
-            const data = await eventsApi.getEventAttendance(event.id);
-            newAttendanceData[event.id] = data;
-          })
-        );
+        // Roster and the whole period's sheets in parallel, one batch request
+        // for the sheets instead of one per session.
+        const [roster, newAttendanceData] = await Promise.all([
+          teamsApi.getTeamPlayers(selectedTeamId),
+          eventsApi.getAttendanceForEvents(periodEvents.map((event) => event.id)),
+        ]);
+        if (cancelled) return;
 
+        setPlayers(roster);
         setAttendanceData(newAttendanceData);
       } catch (error) {
+        if (cancelled) return;
         console.error('Error loading attendance data', error);
         setLoadError('Nu s-au putut încărca datele de prezență pentru această perioadă.');
         setPlayers([]);
         setAttendanceData({});
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     loadData();
+    return () => { cancelled = true; };
   }, [selectedTeamId, events, activePeriodDayKeySet]);
 
   // Load all training sessions + attendance for the whole viewed year, once per
@@ -186,10 +190,9 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
         if (cancelled) return;
         setYearEvents(evs);
 
-        const att: Record<number, any[]> = {};
-        await Promise.all(evs.map(async (ev) => {
-          att[ev.id] = await eventsApi.getEventAttendance(ev.id);
-        }));
+        // A year of trainings was one request per session (100+ on open);
+        // now one batched request per 200 sessions.
+        const att = await eventsApi.getAttendanceForEvents(evs.map((ev) => ev.id));
         if (!cancelled) setYearAttendance(att);
       } catch (error) {
         console.error('Error loading yearly attendance stats', error);

@@ -7,6 +7,8 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', eventsController.getEvents);
+// Before '/:id', or "attendance" would be parsed as an event id.
+router.get('/attendance', eventsController.getAttendanceBatch);
 router.get('/:id', eventsController.getEventById);
 router.post('/', eventsController.createEvent);
 router.put('/:id', eventsController.updateEvent);

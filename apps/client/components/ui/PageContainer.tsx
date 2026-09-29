@@ -19,14 +19,24 @@ export default function PageContainer({
   children,
   className,
   style,
+  accessibilityRole,
+  accessibilityLabel,
 }: {
   children: ReactNode;
   className?: string;
   /** Escape hatch for safe-area insets only — do not use it to re-cap the measure. */
   style?: Record<string, unknown>;
+  /** e.g. role="progressbar" while a whole page is a loading skeleton. */
+  accessibilityRole?: string;
+  accessibilityLabel?: string;
 }) {
   return (
-    <View className={`w-full px-3 sm:px-4 lg:px-6 xl:px-8 pt-3 lg:pt-5 ${className ?? ''}`} style={style as any}>
+    <View
+      className={`w-full px-3 sm:px-4 lg:px-6 xl:px-8 pt-3 lg:pt-5 ${className ?? ''}`}
+      style={style as any}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel}
+    >
       {children}
     </View>
   );

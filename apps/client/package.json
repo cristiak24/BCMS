@@ -4,9 +4,10 @@
   "scripts": {
     "start": "vite",
     "web": "vite",
-    "build:web": "vite build",
+    "typecheck": "tsc --noEmit -p .",
+    "build:web": "tsc --noEmit -p . && vite build",
     "preview": "vite preview",
-    "lint": "vite build",
+    "lint": "tsc --noEmit -p .",
     "test": "tsx --test \"utils/**/*.test.ts\""
   },
   "dependencies": {

@@ -269,7 +269,10 @@ function Icon({ name = 'circle', size = 20, color = 'currentColor', style, class
   );
 }
 
-const glyphMap = new Proxy({}, { get: () => 1 });
+// Typed as a string-keyed record so `keyof typeof MaterialIcons.glyphMap` is
+// `string`. The bare `{}` made it `never`, which turned every `name` prop in
+// the app into a type error (~80 of the client's tsc errors).
+const glyphMap = new Proxy({}, { get: () => 1 }) as Record<string, number>;
 
 export const MaterialIcons = Object.assign(Icon, { glyphMap });
 export const FontAwesome5 = Object.assign(Icon, { glyphMap });

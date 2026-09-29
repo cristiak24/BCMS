@@ -8,10 +8,9 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { buildEventQueryPlan, type EventQueryParams } from '../lib/eventQuery';
 import { createFeedbackNotification } from '../lib/notifications';
 import { parseAttendancePayload, parseEventInput } from '../lib/eventValidation';
+import { FRB_HEADERS, getFrbApiKey } from '../lib/frbConfig';
 
-const API_KEY = '9c3622c013ca2f69e8c373ecbf5af38e180f6d7d';
-const REFERER = 'https://www.frbaschet.ro/';
-const HEADERS = { Referer: REFERER };
+const HEADERS = FRB_HEADERS;
 
 type EventDoc = {
     id: number;
@@ -306,6 +305,9 @@ export const eventsController = {
     async getEventById(req: AuthenticatedRequest, res: Response) {
         try {
             const eventId = Number(req.params.id);
+            if (!Number.isInteger(eventId)) {
+                return res.status(400).json({ error: 'Invalid event id' });
+            }
             const rows = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
             const event = rows[0];
             if (!event) {
@@ -433,6 +435,9 @@ export const eventsController = {
     async deleteEvent(req: AuthenticatedRequest, res: Response) {
         try {
             const eventId = Number(req.params.id);
+            if (!Number.isInteger(eventId)) {
+                return res.status(400).json({ error: 'Invalid event id' });
+            }
             const existingRows = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
             const existingEvent = existingRows[0];
             if (!existingEvent) {
@@ -463,9 +468,89 @@ export const eventsController = {
         }
     },
 
+    /**
+     * Attendance sheets for many events in one request:
+     * GET /events/attendance?eventIds=1,2,3 (max 200) → { [eventId]: rows[] }.
+     *
+     * The admin schedule's attendance tab loaded one sheet per training — for
+     * the yearly stats that was every training of the year, 100+ requests on
+     * open. Same rules as the single-event endpoint: events outside the
+     * caller's club are omitted, and player/parent sessions only get their
+     * own rows.
+     */
+    async getAttendanceBatch(req: AuthenticatedRequest, res: Response) {
+        try {
+            const eventIds = Array.from(new Set(
+                String(req.query.eventIds ?? '')
+                    .split(',')
+                    .map((value) => Number(value.trim()))
+                    .filter((id) => Number.isInteger(id) && id > 0),
+            ));
+            if (!eventIds.length) return res.json({});
+            if (eventIds.length > 200) {
+                return res.status(400).json({ error: 'Too many event ids (max 200).' });
+            }
+
+            const eventRows = await db.select({ id: events.id, teamId: events.teamId }).from(events).where(inArray(events.id, eventIds));
+
+            let permittedIds: number[];
+            if (isSuperadmin(req)) {
+                permittedIds = eventRows.map((event) => event.id);
+            } else {
+                const clubId = getRequestClubId(req);
+                if (clubId == null) {
+                    return res.status(403).json({ error: 'Your account is not assigned to a club.' });
+                }
+                const teamIds = Array.from(new Set(eventRows.map((event) => event.teamId).filter((id): id is number => id != null)));
+                const clubTeamIds = new Set(teamIds.length
+                    ? (await db.select({ id: teams.id }).from(teams).where(and(inArray(teams.id, teamIds), eq(teams.clubId, clubId)))).map((row) => row.id)
+                    : []);
+                permittedIds = eventRows.filter((event) => event.teamId != null && clubTeamIds.has(event.teamId)).map((event) => event.id);
+            }
+
+            const result: Record<number, unknown[]> = Object.fromEntries(permittedIds.map((id) => [id, []]));
+            if (!permittedIds.length) return res.json(result);
+
+            const conditions = [inArray(attendance.eventId, permittedIds)];
+            if (isPlayerFacingRole(req)) {
+                const selfPlayerId = await getSelfPlayerId(req);
+                if (selfPlayerId == null) return res.json(result);
+                conditions.push(eq(attendance.playerId, selfPlayerId));
+            }
+
+            const attendanceRows = await db.select().from(attendance).where(and(...conditions));
+            const playerIds = Array.from(new Set(attendanceRows.map((row) => row.playerId)));
+            const playerRows = playerIds.length
+                ? await db.select().from(players).where(inArray(players.id, playerIds))
+                : [];
+            const playersById = new Map<number, PlayerDoc>(playerRows.map((player) => [player.id, player as PlayerDoc]));
+
+            for (const row of attendanceRows) {
+                if (row.eventId == null) continue;
+                const player = playersById.get(row.playerId);
+                result[row.eventId]?.push({
+                    playerId: row.playerId,
+                    firstName: player?.firstName ?? '',
+                    lastName: player?.lastName ?? '',
+                    number: player?.number ?? null,
+                    status: row.status,
+                    note: row.note ?? null,
+                });
+            }
+
+            res.json(result);
+        } catch (error) {
+            console.error('Get attendance batch error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
     async getEventAttendance(req: AuthenticatedRequest, res: Response) {
         try {
             const eventId = Number(req.params.id);
+            if (!Number.isInteger(eventId)) {
+                return res.status(400).json({ error: 'Invalid event id' });
+            }
             const existingRows = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
             const existingEvent = existingRows[0];
             if (!existingEvent) {
@@ -631,7 +716,7 @@ export const eventsController = {
                 if (!team.frbTeamId || !team.frbSeasonId || !team.frbLeagueId) continue;
 
                 const responses: Array<{ data?: string } | null> = await Promise.all(Array.from({ length: 12 }, (_, idx) => idx + 1).map((month) => {
-                    const url = `https://widgets.baskethotel.com/widget-service/show?&api=${API_KEY}&lang=ro&request[0][widget]=200&request[0][part]=schedule_and_results&request[0][param][team_id]=${team.frbTeamId}&request[0][param][league_id]=${team.frbLeagueId}&request[0][param][season_id]=${team.frbSeasonId}&request[0][param][month]=${month}`;
+                    const url = `https://widgets.baskethotel.com/widget-service/show?&api=${getFrbApiKey()}&lang=ro&request[0][widget]=200&request[0][part]=schedule_and_results&request[0][param][team_id]=${team.frbTeamId}&request[0][param][league_id]=${team.frbLeagueId}&request[0][param][season_id]=${team.frbSeasonId}&request[0][param][month]=${month}`;
                     return axios.get(url, { headers: HEADERS }).catch(() => null);
                 }));
 

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import axios from 'axios';
 import { authenticate } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
+import { FRB_HEADERS, getFrbApiKey } from '../lib/frbConfig';
 
 const router = Router();
 
@@ -12,11 +13,7 @@ const router = Router();
 // is enough — no role gate, since every role legitimately reads it.
 router.use(authenticate);
 
-// Kept as a literal fallback so local dev and the current deploy keep working until
-// FRB_API_KEY is set in every environment. Rotate the key once it is.
-const API_KEY = process.env.FRB_API_KEY || '9c3622c013ca2f69e8c373ecbf5af38e180f6d7d';
-const REFERER = 'https://www.frbaschet.ro/';
-const HEADERS = { Referer: REFERER };
+const HEADERS = FRB_HEADERS;
 
 // Bounds how fast one caller can make us hammer the upstream widget service. It is a
 // per-instance guard against accidental render loops and casual abuse, layered on top
@@ -222,7 +219,7 @@ router.get('/seasons', basketballProxyRateLimit, async (req, res) => {
     }
 
     try {
-        const url = `https://widgets.baskethotel.com/widget-service/show?api=${API_KEY}&request[0][widget]=320&request[0][param][league_id]=${leagueId}`;
+        const url = `https://widgets.baskethotel.com/widget-service/show?api=${getFrbApiKey()}&request[0][widget]=320&request[0][param][league_id]=${leagueId}`;
         const response = await axios.get(url, { headers: HEADERS });
         const cleanData = (response.data as string).replace(/\\"/g, '"').replace(/\\\//g, '/');
 
@@ -249,7 +246,7 @@ router.get('/teams', basketballProxyRateLimit, async (req, res) => {
     }
 
     try {
-        const url = `https://widgets.baskethotel.com/widget-service/show?api=${API_KEY}&request[0][widget]=201&request[0][param][league_id][0]=${leagueId}&request[0][param][season_id]=${seasonId}&request[0][param][team_link_visible]=1&request[0][param][team_link_type]=3`;
+        const url = `https://widgets.baskethotel.com/widget-service/show?api=${getFrbApiKey()}&request[0][widget]=201&request[0][param][league_id][0]=${leagueId}&request[0][param][season_id]=${seasonId}&request[0][param][team_link_visible]=1&request[0][param][team_link_type]=3`;
         const response = await axios.get(url, { headers: HEADERS });
         const raw = (response.data as string).replace(/\\/g, '');
 
@@ -286,7 +283,7 @@ router.get('/matches', basketballProxyRateLimit, async (req, res) => {
     }
 
     try {
-        const url = `https://widgets.baskethotel.com/widget-service/show?&api=${API_KEY}&lang=ro&request[0][widget]=200&request[0][part]=schedule_and_results&request[0][param][team_id]=${teamId}&request[0][param][league_id]=${leagueId}&request[0][param][season_id]=${seasonId}&request[0][param][month]=${month || ''}`;
+        const url = `https://widgets.baskethotel.com/widget-service/show?&api=${getFrbApiKey()}&lang=ro&request[0][widget]=200&request[0][part]=schedule_and_results&request[0][param][team_id]=${teamId}&request[0][param][league_id]=${leagueId}&request[0][param][season_id]=${seasonId}&request[0][param][month]=${month || ''}`;
         const response = await axios.get(url, { headers: HEADERS });
 
         const htmlMatch = (response.data as string).match(/MBT\.API\.update\('.*?',\s*'([\s\S]*?)'\);/);
@@ -392,7 +389,7 @@ router.get('/standings', basketballProxyRateLimit, async (req, res) => {
     }
 
     try {
-        const baseUrl = `https://widgets.baskethotel.com/widget-service/show?api=${API_KEY}&lang=ro`;
+        const baseUrl = `https://widgets.baskethotel.com/widget-service/show?api=${getFrbApiKey()}&lang=ro`;
         const initialUrl = `${baseUrl}&request[0][widget]=300&request[0][param][league_id]=${leagueId}&request[0][param][season_id]=${seasonId}&request[0][param][template]=v2&request[0][param][show_stage_selector]=1&request[0][param][stage_selector]=dropdown&request[0][param][use_group_sort_index]=1`;
         const initialResponse = await axios.get(initialUrl, { headers: HEADERS });
         const initialRaw = String(initialResponse.data);

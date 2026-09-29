@@ -12,7 +12,53 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-type AnyProps = Record<string, any>;
+/**
+ * RN-style event payloads the shim hands to callbacks. Loosely typed on
+ * purpose (this is a compatibility layer), but NAMED, so call sites get a
+ * contextual type instead of an implicit-any error.
+ */
+export type LayoutChangeEvent = { nativeEvent: { layout: { x: number; y: number; width: number; height: number } } };
+export type NativeScrollEvent = {
+  contentOffset: { x: number; y: number };
+  contentSize: { width: number; height: number };
+  layoutMeasurement: { width: number; height: number };
+};
+export type NativeSyntheticEvent<T> = { nativeEvent: T; currentTarget?: unknown; target?: unknown };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type GestureResponderEvent = any;
+
+/**
+ * Props every shim primitive accepts. The index signature keeps RN props the
+ * shim silently ignores compiling; the named members give callbacks real
+ * parameter types (without them every `(event) => …` was an implicit any).
+ */
+/**
+ * forwardRef's PropsWithoutRef runs Omit<P, 'ref'> over AnyProps, and Omit on
+ * an index-signature type drops every named member — so the exported
+ * primitives are re-typed with the props intact.
+ */
+type ShimComponent<R> = React.ForwardRefExoticComponent<AnyProps & React.RefAttributes<R>>;
+
+// A single object type (index signature + named members), NOT
+// `Record<string, any> & {…}`: in an intersection the index signature's `any`
+// absorbs the named member types, and callbacks lose their parameter types.
+type AnyProps = {
+  [key: string]: any;
+  onPress?: (event: GestureResponderEvent) => void;
+  onLongPress?: (event: GestureResponderEvent) => void;
+  onPressIn?: (event: GestureResponderEvent) => void;
+  onPressOut?: (event: GestureResponderEvent) => void;
+  onLayout?: (event: LayoutChangeEvent) => void;
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onMomentumScrollEnd?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onScrollEndDrag?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onFocus?: (event: React.FocusEvent<any>) => void;
+  onBlur?: (event: React.FocusEvent<any>) => void;
+  onChangeText?: (text: string) => void;
+  onValueChange?: (value: any) => void;
+  accessibilityLabel?: string;
+  accessibilityRole?: string;
+};
 type StyleInput = CSSProperties | StyleInput[] | null | false | undefined;
 type RNStyle = CSSProperties & {
   paddingHorizontal?: number | string;
@@ -130,6 +176,7 @@ function omitNativeProps(props: AnyProps) {
     enablesReturnKeyAutomatically,
     hitSlop,
     keyboardShouldPersistTaps,
+    nativeID,
     numberOfLines,
     onSubmitEditing,
     onPress,
@@ -146,7 +193,12 @@ function omitNativeProps(props: AnyProps) {
   } = props;
 
   return {
-    rest,
+    // Whatever is left is forwarded to a DOM element. It stays loosely typed:
+    // the named RN callback types on AnyProps (onScroll's RN payload, etc.)
+    // would otherwise clash with the DOM's own handler signatures.
+    // RN's nativeID is the DOM id (ConfirmDialog points aria-describedby at
+    // one); forwarding it raw only produced a React unknown-prop warning.
+    rest: (nativeID != null && rest.id == null ? { ...rest, id: nativeID } : rest) as Record<string, any>,
     native: {
       accessibilityLabel,
       accessibilityRole,
@@ -202,7 +254,7 @@ function mergeRefs<T>(...refs: Array<React.Ref<T> | ((node: T | null) => void | 
   };
 }
 
-function createBox(tag: keyof JSX.IntrinsicElements, defaultClassName?: string) {
+function createBox(tag: keyof React.JSX.IntrinsicElements, defaultClassName?: string) {
   return React.forwardRef<HTMLElement, AnyProps>(function Box(props, ref) {
     const { rest, native } = omitNativeProps(props);
     const {
@@ -245,7 +297,7 @@ function createBox(tag: keyof JSX.IntrinsicElements, defaultClassName?: string) 
         {children}
       </Element>
     );
-  });
+  }) as ShimComponent<HTMLElement>;
 }
 
 export const View = createBox('div', 'rn-view');
@@ -278,7 +330,7 @@ export const Text = React.forwardRef<HTMLElement, AnyProps>(function Text(props,
       {children}
     </span>
   );
-});
+}) as ShimComponent<HTMLElement>;
 
 // Tracks whether we're already inside a Pressable. RN happily nests
 // touchables (backdrop wrapping a card, a card containing buttons, ...), but
@@ -352,15 +404,26 @@ export const Pressable = React.forwardRef<HTMLElement, AnyProps>(function Pressa
   );
 
   return <PressableNestingContext.Provider value={true}>{rendered}</PressableNestingContext.Provider>;
-});
+}) as ShimComponent<HTMLElement>;
 
 export const TouchableOpacity = Pressable;
 export const TouchableHighlight = Pressable;
+
+/** The RN scroll payload: offset plus content and viewport sizes. */
+function scrollMetrics(node: HTMLElement): NativeScrollEvent {
+  return {
+    contentOffset: { x: node.scrollLeft, y: node.scrollTop },
+    contentSize: { width: node.scrollWidth, height: node.scrollHeight },
+    layoutMeasurement: { width: node.clientWidth, height: node.clientHeight },
+  };
+}
 
 export type ScrollViewHandle = {
   scrollTo: (options: { x?: number; y?: number; animated?: boolean }) => void;
   scrollToEnd: (options?: { animated?: boolean }) => void;
 };
+/** RN code types refs as `useRef<ScrollView>(…)`; the instance is the handle. */
+export type ScrollView = ScrollViewHandle;
 
 export const ScrollView = React.forwardRef<ScrollViewHandle, AnyProps>(function ScrollView(props, ref) {
   const { rest, native } = omitNativeProps(props);
@@ -420,7 +483,7 @@ export const ScrollView = React.forwardRef<ScrollViewHandle, AnyProps>(function 
     const handleScroll = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        const evt = { nativeEvent: { contentOffset: { x: node.scrollLeft, y: node.scrollTop } } };
+        const evt = { nativeEvent: scrollMetrics(node) };
         endHandlersRef.current.onScrollEndDrag?.(evt);
         endHandlersRef.current.onMomentumScrollEnd?.(evt);
       }, 120);
@@ -449,7 +512,7 @@ export const ScrollView = React.forwardRef<ScrollViewHandle, AnyProps>(function 
                 ...event,
                 nativeEvent: {
                   ...event.nativeEvent,
-                  contentOffset: { x: target.scrollLeft, y: target.scrollTop },
+                  ...scrollMetrics(target),
                 },
               });
             }
@@ -469,7 +532,7 @@ export const ScrollView = React.forwardRef<ScrollViewHandle, AnyProps>(function 
       </div>
     </div>
   );
-});
+}) as ShimComponent<ScrollViewHandle>;
 
 export function FlatList<T>({
   data = [],
@@ -526,12 +589,15 @@ export function TextInput({
   onSubmitEditing,
   returnKeyType,
   textContentType,
+  autoCorrect,
   className,
   style,
   ...props
-}: AnyProps & (InputHTMLAttributes<HTMLInputElement> | TextareaHTMLAttributes<HTMLTextAreaElement>)) {
+}: AnyProps & { autoCorrect?: boolean | string }) {
   const common = {
     ...props,
+    // RN takes a boolean; the DOM attribute is "on"/"off".
+    autoCorrect: autoCorrect === false ? 'off' : autoCorrect === true ? 'on' : autoCorrect,
     className: cx('rn-text-input', className),
     'aria-label': accessibilityLabel,
     disabled: !editable,
@@ -556,7 +622,13 @@ export function TextInput({
   return (
     <input
       {...(common as InputHTMLAttributes<HTMLInputElement>)}
-      type={secureTextEntry ? 'password' : keyboardType === 'email-address' ? 'email' : keyboardType === 'numeric' ? 'number' : 'text'}
+      type={
+        secureTextEntry ? 'password'
+          : keyboardType === 'email-address' ? 'email'
+          : keyboardType === 'numeric' ? 'number'
+          : keyboardType === 'phone-pad' ? 'tel'
+          : 'text'
+      }
     />
   );
 }
@@ -600,6 +672,13 @@ export function Modal({
   visible?: boolean;
   children?: ReactNode;
   onRequestClose?: () => void;
+  // Accepted for RN source compatibility; the web modal always renders as a
+  // transparent, instantly-shown overlay.
+  transparent?: boolean;
+  animationType?: 'none' | 'slide' | 'fade' | string;
+  presentationStyle?: string;
+  statusBarTranslucent?: boolean;
+  onShow?: () => void;
 }) {
   useEffect(() => {
     if (!visible || !onRequestClose) return;
@@ -655,7 +734,7 @@ export const Platform = {
 };
 
 export const Alert = {
-  alert(title: string, message?: string, buttons?: Array<{ text?: string; onPress?: () => void; style?: string }>) {
+  alert(title: string, message?: string, buttons?: Array<{ text?: string; onPress?: () => void; style?: string }>, _options?: { cancelable?: boolean }) {
     const text = [title, message].filter(Boolean).join('\n\n');
     const cancel = buttons?.find((button) => button.style === 'cancel');
     const destructive = buttons?.find((button) => button.style === 'destructive');
@@ -673,9 +752,9 @@ export const Alert = {
 };
 
 export const Share = {
-  async share({ message, url }: { message?: string; url?: string }) {
+  async share({ message, url, title }: { message?: string; url?: string; title?: string }) {
     if (navigator.share) {
-      await navigator.share({ text: message, url });
+      await navigator.share({ title, text: message, url });
       return { action: 'sharedAction' };
     }
     await navigator.clipboard?.writeText(url || message || '');
@@ -722,7 +801,7 @@ class AnimatedValue {
 export const Animated = {
   Value: AnimatedValue,
   View,
-  timing(value: AnimatedValue, config: { toValue: number }) {
+  timing(value: AnimatedValue, config: { toValue: number; duration?: number; delay?: number; easing?: (value: number) => number; useNativeDriver?: boolean }) {
     return {
       start(callback?: (state: { finished: boolean }) => void) {
         value.setValue(config.toValue);
