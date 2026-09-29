@@ -488,3 +488,48 @@
   .rn-modal[data-animation] > *,
   .rn-modal[data-animation] > * > :last-child { animation: none; }
 }
+
+/* ── Horizontal snap row with peek (phones) ────────────────────────────────
+   Simpler sibling of .m-carousel: no active tracking, just a swipeable row
+   where the next card shows 18% so the swipe is obvious. Desktop: a grid. */
+.m-scroller {
+  display: flex;
+  flex-direction: row; /* .rn-view defaults to column */
+  align-items: stretch;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin: 0 calc(-1 * var(--m-scroller-bleed, 12px));
+  padding: 2px var(--m-scroller-bleed, 12px) 6px;
+  scroll-padding-inline: var(--m-scroller-bleed, 12px);
+}
+.m-scroller::-webkit-scrollbar { display: none; }
+.m-scroller > * {
+  flex: 0 0 82%;
+  min-width: 0;
+  scroll-snap-align: start;
+  /* Equal-height cards. `align-items: stretch` only applies to an AUTO
+     cross size, and the cards carry h-full (100% of an indefinite height),
+     so it is reset here; a wrapper (e.g. a Pressable) then stretches its card. */
+  height: auto !important;
+  display: flex;
+  flex-direction: column;
+}
+.m-scroller > * > * {
+  flex: 1 1 auto;
+  height: auto !important;
+}
+@media (min-width: 768px) {
+  .m-scroller {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+    gap: 16px;
+  }
+  .m-scroller > * { flex: none; }
+}

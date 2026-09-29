@@ -1148,7 +1148,9 @@ function PlayerHomeScreen() {
         {/* Real grid, not flex-wrap: with `basis-[220px] grow` a row broke into
             ragged remainders at intermediate widths. Fixed column counts keep
             every row full. Attendance moved up into the hero, so three cards. */}
-        <View className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5 ui-stagger">
+        {/* Phones: one swipeable row with the next card peeking (the three
+            cards stacked filled a whole screen before any list). md+: grid. */}
+        <View className="m-scroller mb-5 ui-stagger">
           <NextEventCard
             event={nextTraining}
             accent={palette.royal}
