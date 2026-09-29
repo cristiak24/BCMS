@@ -44,6 +44,8 @@ type HubEvent = CalendarEvent & {
  * dedicated schedule screen it was supposed to summarise.
  */
 const SECTION_LIMIT = 4;
+/** How far back the home screen loads events (results, form, attendance). */
+const HISTORY_MONTHS = 6;
 const RO_LOCALE = 'ro-RO';
 
 /** Accent per section — fg for text/icons, bg for the tinted chip behind it. */
@@ -941,8 +943,15 @@ function PlayerHomeScreen() {
     setAttendanceWarning(null);
 
     try {
+      // Last HISTORY_MONTHS months onward: enough for results, form, the
+      // attendance strip and month-over-month volume. This used to fetch the
+      // club's entire history on every visit to the home screen.
+      const historyStart = new Date();
+      historyStart.setMonth(historyStart.getMonth() - HISTORY_MONTHS, 1);
+      historyStart.setHours(0, 0, 0, 0);
+
       const [allEvents, savedTeams, roster, myRecord] = await Promise.all([
-        eventsApi.getEvents(),
+        eventsApi.getEvents({ start: historyStart.toISOString() }),
         teamsApi.getTeams().catch(() => [] as Team[]),
         teamsApi.getRoster().catch(() => [] as Player[]),
         teamsApi.getMyPlayerRecord().catch(() => null),
@@ -956,10 +965,18 @@ function PlayerHomeScreen() {
         .filter((event) => belongsToPlayerTeams(event, teamIds, teamNames))
         .map((event) => ({ ...event, source: 'internal' as const }));
 
-      // Only the player's OWN teams' fixtures — see isPlayerTeam.
+      // Only the player's OWN teams' fixtures — see isPlayerTeam. Teams whose
+      // fixtures the club already synced into the calendar are skipped: the
+      // live FRB fetch (3 requests per team) would only return duplicates.
+      const syncedTeamIds = new Set(
+        sessionEvents
+          .filter((event) => event.type === 'match' && /FRB/i.test(event.description ?? ''))
+          .map((event) => Number(event.teamId)),
+      );
       const scopedTeams = savedTeams
         .filter(hasFrbIds)
-        .filter((team) => isPlayerTeam(team, teamIds, teamNames));
+        .filter((team) => isPlayerTeam(team, teamIds, teamNames))
+        .filter((team) => !syncedTeamIds.has(Number(team.id)));
 
       const frbEventGroups = await Promise.all(
         scopedTeams.map(async (team) => {

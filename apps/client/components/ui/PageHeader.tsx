@@ -9,8 +9,8 @@ import { View, Text } from '@/src/web/reactNative';
  * 44px-tall icon tile beside them, which is what made them read as a different
  * product from admin.
  *
- * `actions` is right-aligned on desktop and wraps below the title on mobile so
- * a long club name can never push a button off-screen.
+ * `actions` sits right of the title at every width; the title column is
+ * min-w-0 and wraps, so a long name can never push the action off-screen.
  */
 export default function PageHeader({
   title,
@@ -24,10 +24,13 @@ export default function PageHeader({
   className?: string;
 }) {
   return (
-    <View className={`flex-col md:flex-row md:items-start md:justify-between gap-3 mb-4 ${className ?? ''}`}>
+    // Actions share the title row at every width. Every caller passes one small
+    // control (refresh / back); on phones it used to drop onto its own row,
+    // spending ~50px of the screen on a lone icon. The title wraps instead.
+    <View className={`flex-row items-start justify-between gap-3 mb-4 ${className ?? ''}`}>
       <View className="flex-1 min-w-0">
         <Text
-          className="text-[28px] font-bold"
+          className="text-[24px] md:text-[28px] font-bold leading-tight"
           style={{ color: 'var(--c-ink)', letterSpacing: '-0.7px' } as any}
           numberOfLines={2}
         >

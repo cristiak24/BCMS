@@ -668,6 +668,7 @@ export function Modal({
   visible,
   children,
   onRequestClose,
+  animationType = 'none',
 }: {
   visible?: boolean;
   children?: ReactNode;
@@ -693,7 +694,10 @@ export function Modal({
   // Render into document.body so `position: fixed` resolves against the viewport
   // instead of any ancestor that establishes a containing block (e.g. an element
   // with backdrop-filter/transform/filter such as the blurred app header).
-  return createPortal(<div className="rn-modal">{children}</div>, document.body);
+  // animationType drives an entrance animation in CSS (.rn-modal[data-animation]):
+  // "slide" → the sheet rises from the bottom, "fade" → it fades/rises in. It
+  // was accepted and ignored before, so every modal popped in abruptly.
+  return createPortal(<div className="rn-modal" data-animation={animationType}>{children}</div>, document.body);
 }
 
 export function Switch({ value, onValueChange, disabled, className, accessibilityLabel }: AnyProps) {

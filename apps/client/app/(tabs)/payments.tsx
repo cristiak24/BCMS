@@ -79,50 +79,73 @@ function feeIcon(icon: PlayerPaymentFee['icon']) {
   return 'sports-basketball' as const;
 }
 
+function formatDueDate(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'short' }).format(date);
+}
+
+/**
+ * One fee as a compact row: icon · label/meta · amount + pay. It was a tall
+ * card with a full-width button on phones — two fees filled the screen.
+ */
 function FeeCard({
   fee,
   busy,
   onPay,
+  disabled,
 }: {
   fee: PlayerPaymentFee;
   busy: boolean;
   onPay: () => void;
+  disabled?: boolean;
 }) {
+  const due = formatDueDate(fee.dueDate);
+  const failed = fee.status === 'failed';
+  const upcoming = fee.status === 'upcoming';
+
   return (
     <View
-      className="flex-1 min-w-[280px] rounded-[16px] border p-5"
-      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
+      className="ui-lift rounded-[14px] border px-3.5 py-3 flex-row items-center gap-3"
+      style={{
+        backgroundColor: 'var(--c-surface)',
+        borderColor: failed ? 'var(--c-danger-border)' : 'var(--c-border)',
+        boxShadow: 'var(--e-sm)',
+      } as any}
     >
-      {/* flex-col on mobile: a fixed flex-row squeezed the label/description
-          into a ~130px sliver between the icon and the button, truncating fee
-          names mid-word ("August Traini..."). */}
-      <View className="flex-col sm:flex-row items-start sm:items-center gap-4">
-        <View
-          className="h-10 w-10 rounded-[10px] items-center justify-center shrink-0"
-          style={{ backgroundColor: 'var(--c-surface-tint)' }}
-        >
-          <MaterialIcons name={feeIcon(fee.icon)} size={19} color="var(--c-brand-fg)" />
-        </View>
+      <View
+        className="h-10 w-10 rounded-[10px] items-center justify-center shrink-0"
+        style={{ backgroundColor: failed ? 'var(--c-danger-bg)' : 'var(--c-surface-tint)' }}
+      >
+        <MaterialIcons name={failed ? 'error-outline' : feeIcon(fee.icon)} size={19} color={failed ? 'var(--c-danger-fg)' : 'var(--c-brand-fg)'} />
+      </View>
 
-        <View className="flex-1 min-w-0 w-full sm:w-auto">
-          <Text className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{fee.label}</Text>
-          <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>{fee.description}</Text>
-          <Text className="text-[20px] font-bold mt-1.5 tracking-tight" style={{ color: 'var(--c-ink)' }}>
-            {formatCurrency(fee.amount, fee.currency)}
-          </Text>
-        </View>
+      <View className="flex-1 min-w-0">
+        <Text className="text-[14.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{fee.label}</Text>
+        <Text className="t-meta mt-0.5" style={{ color: failed ? 'var(--c-danger-fg)' : 'var(--c-muted)' }} numberOfLines={1}>
+          {failed
+            ? 'Plata a eșuat — încearcă din nou'
+            : [due ? `${upcoming ? 'Scadent' : 'Scadență'} ${due}` : null, fee.description].filter(Boolean).join(' · ')}
+        </Text>
+      </View>
 
+      <View className="items-end gap-1.5 shrink-0">
+        <Text className="t-num text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>
+          {formatCurrency(fee.amount, fee.currency)}
+        </Text>
         <Pressable
           onPress={onPay}
-          disabled={busy}
+          disabled={busy || disabled}
           accessibilityRole="button"
-          className={`h-9 px-4 rounded-[10px] items-center justify-center w-full sm:w-auto ${busy ? 'opacity-60' : ''}`}
-          style={{ backgroundColor: 'var(--c-brand-surface)' }}
+          accessibilityLabel={`Plătește ${fee.label}`}
+          className="ui-press h-8 px-3.5 rounded-[9px] items-center justify-center"
+          style={{ backgroundColor: 'var(--c-brand-surface)', opacity: busy || disabled ? 0.55 : 1 } as any}
         >
           {busy ? (
             <ActivityIndicator size="small" color="var(--c-on-brand)" />
           ) : (
-            <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-on-brand)' }}>Plătește</Text>
+            <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-on-brand)' }}>Plătește</Text>
           )}
         </Pressable>
       </View>
@@ -186,6 +209,14 @@ function TransactionRow({ transaction }: { transaction: PlayerPaymentTransaction
       <View className="flex-[2] min-w-0">
         <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{transaction.label}</Text>
         <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>{transaction.description}</Text>
+        {/* Phones: date + status under the label (those columns are md+). */}
+        <View className="flex-row items-center gap-1.5 mt-1 md:hidden">
+          <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>{formatDate(transaction.date)}</Text>
+          <Text className="text-[12px]" style={{ color: 'var(--c-faint)' }}>·</Text>
+          <Text className="text-[12px] font-semibold" style={{ color: isSuccess ? 'var(--c-success-fg)' : 'var(--c-danger-fg)' }}>
+            {isSuccess ? 'Reușită' : 'Eșuată'}
+          </Text>
+        </View>
       </View>
 
       <Text className="hidden md:flex flex-1 text-[13px] font-medium" style={{ color: 'var(--c-ink-soft)' }}>
@@ -204,7 +235,7 @@ function TransactionRow({ transaction }: { transaction: PlayerPaymentTransaction
             className="text-[11px] font-semibold"
             style={{ color: isSuccess ? 'var(--c-success-fg)' : 'var(--c-danger-fg)' }}
           >
-            {isSuccess ? 'Reușită' : 'Eroare'}
+            {isSuccess ? 'Reușită' : 'Eșuată'}
           </Text>
         </View>
       </View>
@@ -432,8 +463,8 @@ function PlayerPaymentsScreen() {
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-20">
       <PageContainer>
         <PageHeader
-          title="Finanțe"
-          subtitle={summary?.playerName ?? 'Cont jucător'}
+          title="Plăți"
+          subtitle="Cotizații, carduri salvate și istoricul plăților."
           actions={
             <Pressable
               onPress={() => loadSummary(true)}
@@ -448,23 +479,23 @@ function PlayerPaymentsScreen() {
         />
 
         {error ? (
-          <View className="mb-6 rounded-[24px] border border-red-100 bg-[var(--c-surface)] px-5 py-4 flex-row items-center gap-3">
-            <MaterialIcons name="error-outline" size={22} color="var(--c-danger)" />
-            <Text className="text-[#B91C1C] font-bold flex-1">{error}</Text>
+          <View className="mb-4 rounded-[14px] border px-4 py-3 flex-row items-center gap-3" style={{ backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-border)' } as any} accessibilityRole="alert">
+            <MaterialIcons name="error-outline" size={19} color="var(--c-danger-fg)" />
+            <Text className="text-[13px] font-semibold flex-1" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text>
           </View>
         ) : null}
 
         {notice ? (
-          <View className="mb-6 rounded-[24px] border border-emerald-100 bg-[var(--c-surface)] px-5 py-4 flex-row items-center gap-3">
-            <MaterialIcons name="check-circle" size={22} color="var(--c-success-fg)" />
-            <Text className="text-[#087A2F] font-bold flex-1">{notice}</Text>
+          <View className="ui-rise mb-4 rounded-[14px] border px-4 py-3 flex-row items-center gap-3" style={{ backgroundColor: 'var(--c-success-bg)', borderColor: 'var(--c-success-border)' } as any} accessibilityRole="alert">
+            <MaterialIcons name="check-circle" size={19} color="var(--c-success-fg)" />
+            <Text className="text-[13px] font-semibold flex-1" style={{ color: 'var(--c-success-fg)' }}>{notice}</Text>
           </View>
         ) : null}
 
         {summary && !summary.stripe.configured ? (
-          <View className="mb-6 rounded-[24px] border border-amber-100 bg-[var(--c-surface)] px-5 py-4 flex-row items-center gap-3">
-            <MaterialIcons name="warning-amber" size={22} color="var(--c-warning)" />
-            <Text className="text-[#92400E] font-bold flex-1">
+          <View className="mb-4 rounded-[14px] border px-4 py-3 flex-row items-center gap-3" style={{ backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-border)' } as any}>
+            <MaterialIcons name="warning-amber" size={19} color="var(--c-warning-fg)" />
+            <Text className="text-[13px] font-semibold flex-1" style={{ color: 'var(--c-warning-fg)' }}>
               Stripe Checkout nu este configurat încă pentru club. Plățile vor fi disponibile după configurarea cheilor Stripe.
             </Text>
           </View>
@@ -567,12 +598,13 @@ function PlayerPaymentsScreen() {
             isMobile={isMobile}
           />
           {payableFees.length ? (
-            <View className="flex-row flex-wrap gap-4">
+            <View className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 ui-stagger">
               {payableFees.map((fee) => (
                 <FeeCard
                   key={fee.id}
                   fee={fee}
                   busy={actionTarget === fee.id}
+                  disabled={!summary?.stripe.configured}
                   onPay={() => startCheckout([fee.id])}
                 />
               ))}

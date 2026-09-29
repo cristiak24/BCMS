@@ -187,7 +187,9 @@ export default function CoachAttendanceScreen() {
     setError(null);
 
     try {
-      const eventRows = await eventsApi.getEvents();
+      // The last month (sessions still being marked) plus everything ahead.
+      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const eventRows = await eventsApi.getEvents({ start: since.toISOString() });
       const scopedEvents = getCoachScopedEvents(eventRows, session)
         .filter((event) => event.type !== 'admin')
         .sort((a, b) => {

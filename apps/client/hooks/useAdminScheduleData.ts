@@ -53,12 +53,9 @@ export function useAdminScheduleData(currentDate: Date, filters: ScheduleFilters
     }
   }, [currentDate, filters.type, filters.coachId, filters.teamId]);
 
-  useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
-
-  // Refresh when the screen regains focus (e.g. after editing/deleting an
-  // event from its detail page).
+  // Runs on mount / month change AND when the app comes back to the
+  // foreground (see src/web/reactNavigationNative). A separate useEffect
+  // here used to fire every request twice.
   useFocusEffect(
     useCallback(() => {
       fetchEvents();

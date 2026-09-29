@@ -141,12 +141,14 @@ function getNextMatchLabel(match: CalendarEvent | null) {
     return 'Acum';
   }
 
+  // Readable, not "5z" / "40h".
   const hours = Math.ceil(diffMs / 3600000);
-  if (hours < 72) {
-    return `${hours}h`;
+  if (hours < 24) {
+    return `în ${hours} ${hours === 1 ? 'oră' : 'ore'}`;
   }
 
-  return `${Math.ceil(hours / 24)}z`;
+  const days = Math.ceil(hours / 24);
+  return days === 1 ? 'mâine' : `în ${days} zile`;
 }
 
 
@@ -350,7 +352,11 @@ export default function ScheduleScreen() {
     setError(null);
 
     try {
-      const allEvents = await eventsApi.getEvents();
+      // A year back plus everything ahead covers the season the calendar is
+      // browsed in; unbounded, this grew with every season the club recorded.
+      const since = new Date();
+      since.setFullYear(since.getFullYear() - 1);
+      const allEvents = await eventsApi.getEvents({ start: since.toISOString() });
       const teamIds = getSessionTeamIds(session);
       const roleEvents = isCoach ? getCoachScopedEvents(allEvents, session) : allEvents;
       const visibleEvents = [...roleEvents]

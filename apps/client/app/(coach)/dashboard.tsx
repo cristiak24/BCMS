@@ -314,8 +314,12 @@ export default function CoachDashboardScreen() {
     setError(null);
 
     try {
+      // Upcoming only (plus today): the panel never shows past sessions, and
+      // this used to download the club's whole history.
+      const since = new Date();
+      since.setHours(0, 0, 0, 0);
       const [eventRows, teamRows, rosterRows] = await Promise.all([
-        eventsApi.getEvents(),
+        eventsApi.getEvents({ start: since.toISOString() }),
         teamsApi.getTeams(),
         teamsApi.getRoster().catch(() => []),
       ]);

@@ -163,6 +163,19 @@ function isPlayerFacingRole(req: AuthenticatedRequest) {
     return role === 'player' || role === 'parent';
 }
 
+/** Team ids of the caller's own player record (legacy team_id + memberships). */
+async function getSelfTeamIds(req: AuthenticatedRequest) {
+    const selfPlayerId = await getSelfPlayerId(req);
+    if (selfPlayerId == null) return [];
+    const [direct, memberships] = await Promise.all([
+        db.select({ teamId: players.teamId }).from(players).where(eq(players.id, selfPlayerId)).limit(1),
+        db.select({ teamId: playersToTeams.teamId }).from(playersToTeams).where(eq(playersToTeams.playerId, selfPlayerId)),
+    ]);
+    const ids = new Set<number>(memberships.map((row) => row.teamId));
+    if (direct[0]?.teamId != null) ids.add(direct[0].teamId);
+    return Array.from(ids);
+}
+
 /** The caller's own players row, resolved server-side from their account email. */
 async function getSelfPlayerId(req: AuthenticatedRequest) {
     const email = req.user?.email;
@@ -221,10 +234,31 @@ export const eventsController = {
                 }
             }
 
+            // Players/parents: only their own team(s). The endpoint used to
+            // return every event the club had ever recorded to any member —
+            // unbounded, and every other squad's schedule on the wire — and
+            // the player screens filtered it down in the browser. A member not
+            // yet linked to a team keeps the club-wide view (no blank page).
+            let playerScoped = false;
+            if (isPlayerFacingRole(req) && allowedTeamIds) {
+                const selfTeamIds = await getSelfTeamIds(req);
+                if (selfTeamIds.length) {
+                    const clubSet = new Set(allowedTeamIds);
+                    allowedTeamIds = selfTeamIds.filter((id) => clubSet.has(id));
+                    playerScoped = true;
+                }
+            }
+
             const plan = buildEventQueryPlan(req.query as EventQueryParams, {
                 isSuperadmin: isSuperadmin(req),
                 allowedTeamIds,
             });
+            // Explicit team filter for scoped players: this also excludes the
+            // club-less (team_id NULL) rows the club-wide branch lets through.
+            if (playerScoped && !plan.empty && !plan.teamIds) {
+                plan.teamIds = plan.clubTeamIds ?? [];
+                if (!plan.teamIds.length) return res.json([]);
+            }
 
             // No club, an out-of-club team request, or an unmatchable filter: answer
             // without touching the database.

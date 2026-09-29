@@ -152,9 +152,12 @@ export default function CoachTeamsScreen() {
     setError(null);
 
     try {
+      const since = new Date();
+      since.setHours(0, 0, 0, 0);
       const [teamRows, eventRows] = await Promise.all([
         teamsApi.getTeams(),
-        eventsApi.getEvents(),
+        // Only "next session" is shown per team — no need for past events.
+        eventsApi.getEvents({ start: since.toISOString() }),
       ]);
       const playerPairs = await Promise.all(
         teamRows.map(async (team) => [team.id, await teamsApi.getTeamPlayers(team.id).catch(() => [])] as const),

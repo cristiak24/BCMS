@@ -5,7 +5,6 @@ import {
   AtSign,
   BadgeCheck,
   Bell,
-  Building2,
   Calendar,
   CalendarCheck,
   CalendarClock,
@@ -197,7 +196,8 @@ const iconMap: Record<string, typeof Circle> = {
   search: Search,
   send: Send,
   settings: Settings,
-  shield: Building2,
+  // A shield, not a building: this name marks TEAMS everywhere it is used.
+  shield: Shield,
   sports: Trophy,
   'admin-panel-settings': UserCog,
   // A ball, not a Trophy. This name means "player"/"match" at every call site
