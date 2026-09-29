@@ -2,13 +2,28 @@ import type { InviteLinkItem } from '../types/manageAccess';
 import { getPublicAppUrl } from '../config/serverUrl';
 
 export const DEFAULT_REFRESH_INTERVAL_MINUTES = 30;
-export const PRESET_REFRESH_INTERVALS = [10, 30, 60];
+/** Server clamps the lifetime to 5–1440 minutes. */
+export const MIN_REFRESH_INTERVAL_MINUTES = 5;
+export const MAX_REFRESH_INTERVAL_MINUTES = 24 * 60;
+export const PRESET_REFRESH_INTERVALS = [30, 60, 24 * 60];
+
+export function formatIntervalLabel(minutes: number) {
+    if (minutes % (24 * 60) === 0) {
+        const days = minutes / (24 * 60);
+        return days === 1 ? '1 zi' : `${days} zile`;
+    }
+    if (minutes % 60 === 0) {
+        const hours = minutes / 60;
+        return hours === 1 ? '1 oră' : `${hours} ore`;
+    }
+    return `${minutes} min`;
+}
 
 export function formatTimeRemaining(expiresAt: string) {
     const remainingMs = new Date(expiresAt).getTime() - Date.now();
 
     if (remainingMs <= 0) {
-        return 'Expired';
+        return 'Expirat';
     }
 
     const totalSeconds = Math.floor(remainingMs / 1000);
@@ -18,7 +33,8 @@ export function formatTimeRemaining(expiresAt: string) {
     const normalizedMinutes = minutes % 60;
 
     if (hours > 0) {
-        return `${hours}h ${String(normalizedMinutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
+        // Seconds are noise at this range and made the label too wide on phones.
+        return `${hours}h ${String(normalizedMinutes).padStart(2, '0')}m`;
     }
 
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;

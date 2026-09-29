@@ -49,7 +49,7 @@ export function useManageAccess() {
         }
 
         if (!session) {
-            setAuthError('Please sign in again to manage access.');
+            setAuthError('Autentifică-te din nou pentru a gestiona accesul.');
             setVerifiedIsAdmin(false);
             setRequestsLoading(false);
             setInviteLoading(false);
@@ -59,7 +59,7 @@ export function useManageAccess() {
         setVerifiedIsAdmin(sessionCanAdmin);
 
         if (!sessionCanAdmin) {
-            setAuthError('Only club admins can manage access.');
+            setAuthError('Doar administratorii clubului pot gestiona accesul.');
             setRequestsLoading(false);
             setInviteLoading(false);
         }
@@ -77,7 +77,7 @@ export function useManageAccess() {
             const data = await manageAccessApi.listRequests();
             setRequests(data);
         } catch (error) {
-            setRequestsError(error instanceof Error ? error.message : 'Could not load access requests.');
+            setRequestsError(error instanceof Error ? error.message : 'Nu am putut încărca cererile de acces.');
         } finally {
             setRequestsLoading(false);
         }
@@ -94,7 +94,7 @@ export function useManageAccess() {
                 setRefreshIntervalMinutes(activeLink.refreshIntervalMinutes);
             }
         } catch (error) {
-            setInviteError(error instanceof Error ? error.message : 'Could not load the invite link.');
+            setInviteError(error instanceof Error ? error.message : 'Nu am putut încărca linkul de invitație.');
             setInviteLink(null);
         } finally {
             setInviteLoading(false);
@@ -136,7 +136,7 @@ export function useManageAccess() {
             setRefreshIntervalMinutes(nextLink.refreshIntervalMinutes);
             return true;
         } catch (error) {
-            setInviteError(error instanceof Error ? error.message : 'Could not regenerate the invite link.');
+            setInviteError(error instanceof Error ? error.message : 'Nu am putut genera linkul de invitație.');
             return false;
         } finally {
             setRegenerating(false);
@@ -165,7 +165,6 @@ export function useManageAccess() {
 
     const approveRequest = useCallback(async (id: number): Promise<boolean> => {
         setRequestAction({ id, type: 'approve' });
-        setRequestsError(null);
 
         try {
             await manageAccessApi.approveRequest(id);
@@ -175,8 +174,8 @@ export function useManageAccess() {
                     : request
             )));
             return true;
-        } catch (error) {
-            setRequestsError(error instanceof Error ? error.message : 'Could not approve the request.');
+        } catch {
+            // Surfaced as a toast by the page; the list itself stays visible.
             return false;
         } finally {
             setRequestAction(null);
@@ -185,7 +184,6 @@ export function useManageAccess() {
 
     const denyRequest = useCallback(async (id: number): Promise<boolean> => {
         setRequestAction({ id, type: 'deny' });
-        setRequestsError(null);
 
         try {
             await manageAccessApi.denyRequest(id);
@@ -195,8 +193,8 @@ export function useManageAccess() {
                     : request
             )));
             return true;
-        } catch (error) {
-            setRequestsError(error instanceof Error ? error.message : 'Could not deny the request.');
+        } catch {
+            // Surfaced as a toast by the page; the list itself stays visible.
             return false;
         } finally {
             setRequestAction(null);

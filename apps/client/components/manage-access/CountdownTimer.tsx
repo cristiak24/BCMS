@@ -20,6 +20,6 @@ export default function CountdownTimer({ expiresAt }: Props) {
     }, [expiresAt]);
 
     return (
-        <Text className="text-sm font-semibold text-slate-700">{remaining}</Text>
+        <Text className="t-num font-semibold" style={{ color: 'var(--c-ink)' }}>{remaining}</Text>
     );
 }

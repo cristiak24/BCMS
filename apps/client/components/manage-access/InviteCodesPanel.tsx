@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from '@/src/web/reactNative';
-import GlassCard from '../ui/GlassCard';
-import RoleSelector from './RoleSelector';
+import { Pressable, Text, TextInput, View } from '@/src/web/reactNative';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import { SkeletonList } from '../ui/Skeleton';
+import RoleSelector, { AccessButton, AccessCard, FieldLabel, OptionChip, ROLE_LABELS } from './RoleSelector';
 import { manageAccessApi } from '../../services/manageAccessApi';
 import type { InviteCodeItem, InviteCodeStatus, InviteRole } from '../../types/manageAccess';
 
@@ -13,12 +14,6 @@ const VALIDITY_OPTIONS: { label: string; hours: number }[] = [
     { label: '30 zile', hours: 24 * 30 },
 ];
 
-const ROLE_LABELS: Record<InviteRole, string> = {
-    player: 'Jucător',
-    parent: 'Părinte',
-    coach: 'Antrenor',
-};
-
 const STATUS_META: Record<InviteCodeStatus, { label: string; fg: string; bg: string }> = {
     active: { label: 'Activ', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)' },
     expired: { label: 'Expirat', fg: 'var(--c-muted)', bg: 'var(--c-surface-3)' },
@@ -27,8 +22,7 @@ const STATUS_META: Record<InviteCodeStatus, { label: string; fg: string; bg: str
 };
 
 function formatExpiry(iso: string) {
-    const date = new Date(iso);
-    return date.toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 async function copyText(value: string) {
@@ -40,12 +34,17 @@ async function copyText(value: string) {
     }
 }
 
+type Props = {
+    onNotify?: (toast: { variant: 'success' | 'error'; message: string }) => void;
+};
+
 /**
- * Short club join codes: the admin picks the role, how long the code works and
- * how many accounts it can create. People type it in "Cod de invitație" on the
- * signup page and join this club with that role right away.
+ * Short club join codes. The form is one compact card (role, validity, max
+ * accounts); below it only the codes that still work are listed. Expired,
+ * used-up and revoked codes fold into a "Istoric" toggle — they were most of
+ * the list and all of the visual noise.
  */
-export default function InviteCodesPanel() {
+export default function InviteCodesPanel({ onNotify }: Props) {
     const [role, setRole] = useState<InviteRole>('player');
     const [validityHours, setValidityHours] = useState(24 * 7);
     const [maxUsesInput, setMaxUsesInput] = useState('25');
@@ -54,6 +53,9 @@ export default function InviteCodesPanel() {
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [copiedId, setCopiedId] = useState<number | null>(null);
+    const [freshId, setFreshId] = useState<number | null>(null);
+    const [showHistory, setShowHistory] = useState(false);
+    const [pendingRevoke, setPendingRevoke] = useState<InviteCodeItem | null>(null);
 
     const load = useCallback(async () => {
         try {
@@ -69,10 +71,13 @@ export default function InviteCodesPanel() {
         void load();
     }, [load]);
 
+    const activeCodes = useMemo(() => codes.filter((item) => item.status === 'active'), [codes]);
+    const pastCodes = useMemo(() => codes.filter((item) => item.status !== 'active'), [codes]);
+
     const handleCreate = async () => {
         const maxUses = Number(maxUsesInput);
         if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 500) {
-            setError('Numărul maxim de utilizări trebuie să fie între 1 și 500.');
+            setError('Numărul maxim de conturi trebuie să fie între 1 și 500.');
             return;
         }
 
@@ -81,6 +86,8 @@ export default function InviteCodesPanel() {
         try {
             const created = await manageAccessApi.createInviteCode({ role, expiresInHours: validityHours, maxUses });
             setCodes((current) => [created, ...current]);
+            setFreshId(created.id);
+            onNotify?.({ variant: 'success', message: `Cod nou pentru ${ROLE_LABELS[created.role].toLowerCase()}: ${created.code}` });
         } catch (createError) {
             setError(createError instanceof Error ? createError.message : 'Nu am putut genera codul.');
         } finally {
@@ -88,12 +95,13 @@ export default function InviteCodesPanel() {
         }
     };
 
-    const handleRevoke = async (id: number) => {
+    const handleRevoke = async (item: InviteCodeItem) => {
         try {
-            const revoked = await manageAccessApi.revokeInviteCode(id);
-            setCodes((current) => current.map((item) => (item.id === id ? revoked : item)));
+            const revoked = await manageAccessApi.revokeInviteCode(item.id);
+            setCodes((current) => current.map((code) => (code.id === item.id ? revoked : code)));
+            onNotify?.({ variant: 'success', message: `Codul ${item.code} a fost revocat.` });
         } catch (revokeError) {
-            setError(revokeError instanceof Error ? revokeError.message : 'Nu am putut revoca codul.');
+            onNotify?.({ variant: 'error', message: revokeError instanceof Error ? revokeError.message : 'Nu am putut revoca codul.' });
         }
     };
 
@@ -104,119 +112,178 @@ export default function InviteCodesPanel() {
         }
     };
 
-    return (
-        <GlassCard className="p-6">
-            <View className="flex-row items-center justify-between mb-5">
-                <View className="flex-1 pr-4">
-                    <Text className="text-xl font-black" style={{ color: 'var(--c-ink-strong)' }}>Coduri de invitație</Text>
-                    <Text className="mt-1" style={{ color: 'var(--c-muted)' }}>
-                        Un cod scurt pentru un grup. Cine îl folosește la „Creează cont” intră în club cu rolul ales.
+    const renderCode = (item: InviteCodeItem) => {
+        const meta = STATUS_META[item.status];
+        const isActive = item.status === 'active';
+        const usage = item.maxUses > 0 ? Math.min(1, item.useCount / item.maxUses) : 0;
+        return (
+            <View
+                key={item.id}
+                className={`rounded-[12px] border px-3.5 py-3 ${item.id === freshId ? 'ui-rise' : ''}`}
+                style={{
+                    backgroundColor: 'var(--c-surface)',
+                    borderColor: item.id === freshId ? 'var(--c-brand-border)' : 'var(--c-border)',
+                    opacity: isActive ? 1 : 0.72,
+                } as any}
+            >
+                <View className="flex-row items-center gap-2">
+                    <Text
+                        selectable
+                        className="text-[16px] font-bold tracking-[0.12em] flex-1 min-w-0"
+                        numberOfLines={1}
+                        style={{ color: 'var(--c-ink-strong)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' } as any}
+                    >
+                        {item.code}
+                    </Text>
+                    {isActive ? (
+                        <>
+                            <Pressable
+                                onPress={() => void handleCopy(item)}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Copiază codul ${item.code}`}
+                                className="ui-press w-9 h-9 rounded-[9px] items-center justify-center"
+                                style={{ backgroundColor: copiedId === item.id ? 'var(--c-success-bg)' : 'var(--c-surface-tint)' }}
+                            >
+                                <MaterialIcons
+                                    name={copiedId === item.id ? 'check' : 'content-copy'}
+                                    size={16}
+                                    color={copiedId === item.id ? 'var(--c-success-fg)' : 'var(--c-brand-fg)'}
+                                />
+                            </Pressable>
+                            <Pressable
+                                onPress={() => setPendingRevoke(item)}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Revocă codul ${item.code}`}
+                                className="ui-press w-9 h-9 rounded-[9px] items-center justify-center"
+                                style={{ backgroundColor: 'var(--c-surface-2)' }}
+                            >
+                                <MaterialIcons name="block" size={16} color="var(--c-danger-fg)" />
+                            </Pressable>
+                        </>
+                    ) : (
+                        <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: meta.bg }}>
+                            <Text className="text-[10.5px] font-bold uppercase tracking-wide" style={{ color: meta.fg }}>{meta.label}</Text>
+                        </View>
+                    )}
+                </View>
+                <Text className="t-meta mt-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+                    {ROLE_LABELS[item.role]}
+                    {isActive ? ` · expiră ${formatExpiry(item.expiresAt)}` : item.status === 'expired' ? ` · a expirat ${formatExpiry(item.expiresAt)}` : ''}
+                </Text>
+                <View className="flex-row items-center gap-2 mt-2">
+                    <View className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+                        <View
+                            className="h-full rounded-full ui-bar"
+                            style={{ width: `${Math.round(usage * 100)}%`, backgroundColor: isActive ? 'var(--c-brand-fg)' : 'var(--c-faint)' } as any}
+                        />
+                    </View>
+                    <Text className="text-[11.5px] font-semibold t-num" style={{ color: 'var(--c-faint)' }}>
+                        {item.useCount}/{item.maxUses} conturi
                     </Text>
                 </View>
-                <MaterialIcons name="confirmation-number" size={28} color="var(--c-brand-fg)" />
             </View>
+        );
+    };
 
-            <Text className="text-sm font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--c-muted)' }}>Rol</Text>
-            <RoleSelector selectedRole={role} onSelectRole={setRole} />
+    return (
+        <View className="gap-4">
+            <AccessCard>
+                <View className="gap-4">
+                    <View>
+                        <FieldLabel>Pentru</FieldLabel>
+                        <RoleSelector selectedRole={role} onSelectRole={setRole} />
+                    </View>
 
-            <Text className="text-sm font-bold uppercase tracking-wide mt-5 mb-2" style={{ color: 'var(--c-muted)' }}>Valabil</Text>
-            <View className="flex-row flex-wrap gap-2">
-                {VALIDITY_OPTIONS.map((option) => {
-                    const active = option.hours === validityHours;
-                    return (
-                        <Pressable
-                            key={option.hours}
-                            onPress={() => setValidityHours(option.hours)}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: active }}
-                            className="px-3.5 py-2 rounded-full border"
-                            style={active
-                                ? { backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' } as any
-                                : { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
-                        >
-                            <Text className="text-[13px] font-bold" style={{ color: active ? 'var(--c-brand-fg)' : 'var(--c-muted)' }}>
-                                {option.label}
-                            </Text>
-                        </Pressable>
-                    );
-                })}
-            </View>
-
-            <Text className="text-sm font-bold uppercase tracking-wide mt-5 mb-2" style={{ color: 'var(--c-muted)' }}>Număr maxim de conturi</Text>
-            <View className="flex-row items-center gap-3">
-                <TextInput
-                    value={maxUsesInput}
-                    onChangeText={(value: string) => setMaxUsesInput(value.replace(/[^0-9]/g, ''))}
-                    keyboardType="number-pad"
-                    className="w-24 rounded-xl border px-3 py-2.5 text-[15px] font-bold outline-none"
-                    style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink-strong)' } as any}
-                    accessibilityLabel="Număr maxim de conturi"
-                />
-                <Text className="text-[13px] flex-1" style={{ color: 'var(--c-faint)' }}>între 1 și 500</Text>
-            </View>
-
-            <Pressable
-                onPress={() => void handleCreate()}
-                disabled={creating}
-                className={`mt-5 rounded-2xl py-3.5 min-h-[44px] items-center justify-center ${creating ? 'opacity-70' : ''}`}
-                style={{ backgroundColor: 'var(--c-brand-surface)' } as any}
-            >
-                <Text className="font-bold" style={{ color: 'var(--c-on-brand)' }}>{creating ? 'Se generează…' : 'Generează cod'}</Text>
-            </Pressable>
-
-            {error ? (
-                <View className="rounded-2xl border px-4 py-3 mt-4" style={{ backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-border)' } as any}>
-                    <Text className="font-medium" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text>
-                </View>
-            ) : null}
-
-            <View className="mt-6 gap-2.5">
-                {loading ? (
-                    <ActivityIndicator size="small" color="var(--c-brand-fg)" />
-                ) : codes.length === 0 ? (
-                    <Text className="text-[13px]" style={{ color: 'var(--c-faint)' }}>Niciun cod generat încă.</Text>
-                ) : (
-                    codes.map((item) => {
-                        const meta = STATUS_META[item.status];
-                        const isActive = item.status === 'active';
-                        return (
-                            <View
-                                key={item.id}
-                                className="rounded-xl border px-3.5 py-3"
-                                style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', opacity: isActive ? 1 : 0.7 } as any}
-                            >
-                                <View className="flex-row items-center gap-2">
-                                    <Text
-                                        className="text-[17px] font-black tracking-widest flex-1"
-                                        style={{ color: 'var(--c-ink-strong)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' } as any}
-                                        selectable
-                                    >
-                                        {item.code}
-                                    </Text>
-                                    <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: meta.bg }}>
-                                        <Text className="text-[11px] font-black uppercase" style={{ color: meta.fg }}>{meta.label}</Text>
-                                    </View>
-                                </View>
-                                <Text className="text-[12px] mt-1" style={{ color: 'var(--c-muted)' }}>
-                                    {ROLE_LABELS[item.role]} · {item.useCount}/{item.maxUses} folosite · expiră {formatExpiry(item.expiresAt)}
-                                </Text>
-                                {isActive ? (
-                                    <View className="flex-row gap-4 mt-2">
-                                        <Pressable onPress={() => void handleCopy(item)} accessibilityRole="button">
-                                            <Text className="text-[13px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>
-                                                {copiedId === item.id ? 'Copiat' : 'Copiază'}
-                                            </Text>
-                                        </Pressable>
-                                        <Pressable onPress={() => void handleRevoke(item.id)} accessibilityRole="button">
-                                            <Text className="text-[13px] font-bold" style={{ color: 'var(--c-danger-fg)' }}>Revocă</Text>
-                                        </Pressable>
-                                    </View>
-                                ) : null}
+                    <View className="flex-col sm:flex-row gap-4">
+                        <View className="sm:flex-1">
+                            <FieldLabel>Valabil</FieldLabel>
+                            <View className="flex-row flex-wrap gap-1.5">
+                                {VALIDITY_OPTIONS.map((option) => (
+                                    <OptionChip
+                                        key={option.hours}
+                                        label={option.label}
+                                        active={option.hours === validityHours}
+                                        onPress={() => setValidityHours(option.hours)}
+                                    />
+                                ))}
                             </View>
-                        );
-                    })
+                        </View>
+                        <View>
+                            <FieldLabel hint="1–500">Max. conturi</FieldLabel>
+                            <TextInput
+                                value={maxUsesInput}
+                                onChangeText={(value: string) => setMaxUsesInput(value.replace(/[^0-9]/g, '').slice(0, 3))}
+                                keyboardType="number-pad"
+                                accessibilityLabel="Număr maxim de conturi"
+                                className="w-full sm:w-28 h-8 rounded-[9px] border px-3 text-[13px] font-semibold outline-none t-num"
+                                style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}
+                            />
+                        </View>
+                    </View>
+
+                    <AccessButton
+                        label="Generează cod"
+                        icon="confirmation-number"
+                        loading={creating}
+                        onPress={() => void handleCreate()}
+                    />
+
+                    {error ? (
+                        <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text>
+                    ) : null}
+                </View>
+            </AccessCard>
+
+            <View>
+                <View className="flex-row items-center justify-between mb-2 px-0.5">
+                    <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>
+                        Coduri active{activeCodes.length ? ` · ${activeCodes.length}` : ''}
+                    </Text>
+                    {pastCodes.length > 0 ? (
+                        <Pressable
+                            onPress={() => setShowHistory((value) => !value)}
+                            accessibilityRole="button"
+                            accessibilityState={{ expanded: showHistory }}
+                            className="flex-row items-center gap-0.5 h-8 px-1"
+                        >
+                            <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
+                                Istoric ({pastCodes.length})
+                            </Text>
+                            <MaterialIcons name={showHistory ? 'expand-less' : 'expand-more'} size={18} color="var(--c-brand-fg)" />
+                        </Pressable>
+                    ) : null}
+                </View>
+
+                {loading ? (
+                    <SkeletonList count={2} />
+                ) : activeCodes.length === 0 ? (
+                    <View className="rounded-[12px] border border-dashed px-4 py-5 items-center" style={{ borderColor: 'var(--c-border)' } as any}>
+                        <Text className="text-[13px]" style={{ color: 'var(--c-muted)' }}>Niciun cod activ. Generează unul mai sus.</Text>
+                    </View>
+                ) : (
+                    <View className="gap-2 ui-stagger">{activeCodes.map(renderCode)}</View>
                 )}
+
+                {showHistory && pastCodes.length > 0 ? (
+                    <View className="gap-2 mt-3">{pastCodes.map(renderCode)}</View>
+                ) : null}
             </View>
-        </GlassCard>
+
+            <ConfirmDialog
+                visible={pendingRevoke != null}
+                destructive
+                icon="block"
+                // Non-breaking hyphen so the code never splits across lines.
+                title={pendingRevoke ? `Revoci codul ${pendingRevoke.code.replace(/-/g, '\u2011')}?` : ''}
+                message="Codul nu va mai putea fi folosit la înscriere. Conturile create deja cu el rămân active."
+                confirmLabel="Revocă"
+                cancelLabel="Anulează"
+                onConfirm={() => {
+                    if (pendingRevoke) void handleRevoke(pendingRevoke);
+                    setPendingRevoke(null);
+                }}
+                onCancel={() => setPendingRevoke(null)}
+            />
+        </View>
     );
 }

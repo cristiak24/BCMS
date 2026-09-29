@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import { Alert, Platform, Pressable, Share, Text, TextInput, View } from '@/src/web/reactNative';
-import GlassCard from '../ui/GlassCard';
+import { ActivityIndicator, Platform, Share, Text, TextInput, View } from '@/src/web/reactNative';
 import type { InviteLinkItem, InviteRole } from '../../types/manageAccess';
-import { buildInviteRegistrationUrl } from '../../utils/manageAccess';
-import RoleSelector from './RoleSelector';
-import RefreshIntervalSelector from './RefreshIntervalSelector';
+import {
+    buildInviteRegistrationUrl,
+    formatIntervalLabel,
+    MAX_REFRESH_INTERVAL_MINUTES,
+    MIN_REFRESH_INTERVAL_MINUTES,
+    PRESET_REFRESH_INTERVALS,
+} from '../../utils/manageAccess';
+import RoleSelector, { AccessButton, AccessCard, FieldLabel, OptionChip, ROLE_LABELS } from './RoleSelector';
 import CountdownTimer from './CountdownTimer';
 
 type Props = {
@@ -15,11 +19,12 @@ type Props = {
     error?: string | null;
     selectedRole: InviteRole;
     refreshIntervalMinutes: number;
-    customMinutes: string;
     onRoleChange: (role: InviteRole) => void;
     onRefreshIntervalChange: (minutes: number) => void;
-    onCustomMinutesChange: (value: string) => void;
-    onGenerate: () => void;
+    /** Called with a validated lifetime in minutes. */
+    onGenerate: (minutes: number) => void;
+    onCopied: () => void;
+    onInvalidMinutes: (message: string) => void;
 };
 
 async function copyInviteLink(url: string): Promise<boolean> {
@@ -29,17 +34,18 @@ async function copyInviteLink(url: string): Promise<boolean> {
 
     if (Platform.OS === 'web' && navigatorRef?.clipboard) {
         await navigatorRef.clipboard.writeText(url);
-        return true; // caller shows inline "Copied" feedback
+        return true;
     }
 
-    await Share.share({
-        message: url,
-        url,
-        title: 'Club invite link',
-    });
+    await Share.share({ message: url, url, title: 'Link de invitație' });
     return false;
 }
 
+/**
+ * Role-scoped registration link. One card: who it is for, how long it lives,
+ * and the live link itself with copy / regenerate. The custom-minutes field
+ * only appears when "Altă durată" is picked instead of sitting there always.
+ */
 export default function InviteLinkGenerator({
     inviteLink,
     loading,
@@ -47,116 +53,173 @@ export default function InviteLinkGenerator({
     error,
     selectedRole,
     refreshIntervalMinutes,
-    customMinutes,
     onRoleChange,
     onRefreshIntervalChange,
-    onCustomMinutesChange,
     onGenerate,
+    onCopied,
+    onInvalidMinutes,
 }: Props) {
     const currentUrl = inviteLink ? buildInviteRegistrationUrl(inviteLink) : '';
     const [copied, setCopied] = useState(false);
+    const [customOpen, setCustomOpen] = useState(() => !PRESET_REFRESH_INTERVALS.includes(refreshIntervalMinutes));
+    const [customMinutes, setCustomMinutes] = useState(() => (
+        PRESET_REFRESH_INTERVALS.includes(refreshIntervalMinutes) ? '' : String(refreshIntervalMinutes)
+    ));
+
+    // A stored link with a non-preset lifetime opens the custom field with it.
+    useEffect(() => {
+        if (!PRESET_REFRESH_INTERVALS.includes(refreshIntervalMinutes)) {
+            setCustomOpen(true);
+            setCustomMinutes(String(refreshIntervalMinutes));
+        }
+    }, [refreshIntervalMinutes]);
 
     const handleCopy = async () => {
-        if (!currentUrl) {
-            return;
-        }
+        if (!currentUrl) return;
         try {
-            const didCopy = await copyInviteLink(currentUrl);
-            if (didCopy) {
+            if (await copyInviteLink(currentUrl)) {
                 setCopied(true);
+                onCopied();
                 setTimeout(() => setCopied(false), 2000);
             }
         } catch {
-            Alert.alert('Copy Link', 'Could not copy the invite link. Please try again.');
+            onInvalidMinutes('Nu am putut copia linkul. Încearcă din nou.');
         }
     };
 
+    const handleGenerate = () => {
+        if (!customOpen) {
+            onGenerate(refreshIntervalMinutes);
+            return;
+        }
+        const minutes = Number(customMinutes);
+        if (!Number.isInteger(minutes) || minutes < MIN_REFRESH_INTERVAL_MINUTES || minutes > MAX_REFRESH_INTERVAL_MINUTES) {
+            onInvalidMinutes(`Durata trebuie să fie între ${MIN_REFRESH_INTERVAL_MINUTES} și ${MAX_REFRESH_INTERVAL_MINUTES} de minute.`);
+            return;
+        }
+        onRefreshIntervalChange(minutes);
+        onGenerate(minutes);
+    };
+
+    const busy = loading || regenerating;
+
     return (
-        <GlassCard className="p-6">
-            <View className="flex-row items-center justify-between mb-5">
-                <View className="flex-1 pr-4">
-                    <Text className="text-xl font-black text-slate-900">Club Invite Link</Text>
-                    <Text className="text-slate-500 mt-1">
-                        Generate a role-based registration link tied only to this club.
-                    </Text>
+        <AccessCard>
+            <View className="gap-4">
+                <View>
+                    <FieldLabel>Pentru</FieldLabel>
+                    <RoleSelector selectedRole={selectedRole} onSelectRole={onRoleChange} />
                 </View>
-                <MaterialIcons name="link" size={28} color="var(--c-blue-deep)" />
-            </View>
 
-            <Text className="text-sm font-bold uppercase tracking-wide text-slate-600 mb-3">Role</Text>
-            <RoleSelector selectedRole={selectedRole} onSelectRole={onRoleChange} />
-
-            <Text className="text-sm font-bold uppercase tracking-wide text-slate-600 mt-6 mb-1">Link Expiry</Text>
-            <Text className="text-xs text-slate-500 mb-3">How long the link stays valid. When it expires it stops working and must be regenerated.</Text>
-            <RefreshIntervalSelector
-                value={refreshIntervalMinutes}
-                customMinutes={customMinutes}
-                onChange={onRefreshIntervalChange}
-                onChangeCustomMinutes={onCustomMinutesChange}
-            />
-
-            <View className="flex-row gap-3 mt-2">
-                <Pressable
-                    onPress={onGenerate}
-                    disabled={loading || regenerating}
-                    className={`flex-1 rounded-2xl bg-[#1D4ED8] py-4 min-h-[44px] items-center justify-center ${loading || regenerating ? 'opacity-70' : ''}`}
-                >
-                    <Text className="text-white font-bold">
-                        {regenerating ? 'Working…' : inviteLink ? 'Regenerate Link' : 'Generate Link'}
-                    </Text>
-                </Pressable>
-
-                <Pressable
-                    onPress={handleCopy}
-                    disabled={!currentUrl || loading}
-                    className={`flex-1 rounded-2xl py-4 min-h-[44px] flex-row items-center justify-center gap-2 border ${copied ? 'border-emerald-300 bg-emerald-50' : currentUrl ? 'border-slate-300 bg-white' : 'border-slate-200 bg-slate-100'}`}
-                >
-                    {copied ? (
-                        <MaterialIcons name="check" size={18} color="var(--c-success-fg)" />
-                    ) : null}
-                    <Text className={`font-bold ${copied ? 'text-emerald-700' : currentUrl ? 'text-slate-700' : 'text-slate-400'}`}>
-                        {copied ? 'Copied' : 'Copy Link'}
-                    </Text>
-                </Pressable>
-            </View>
-
-            {error ? (
-                <View className="rounded-2xl bg-red-50 border border-red-200 px-4 py-3 mt-4">
-                    <Text className="text-red-600 font-medium">{error}</Text>
-                </View>
-            ) : null}
-
-            {inviteLink ? (
-                <View className="mt-6">
-                    <Text className="text-sm font-bold uppercase tracking-wide text-slate-600 mb-3">Current Active Link</Text>
-                    <View className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <TextInput
-                            editable={false}
-                            multiline
-                            value={currentUrl}
-                            className="text-slate-700"
+                <View>
+                    <FieldLabel hint="după expirare linkul nu mai funcționează">Valabil</FieldLabel>
+                    <View className="flex-row flex-wrap items-center gap-1.5">
+                        {PRESET_REFRESH_INTERVALS.map((minutes) => (
+                            <OptionChip
+                                key={minutes}
+                                label={formatIntervalLabel(minutes)}
+                                active={!customOpen && refreshIntervalMinutes === minutes}
+                                onPress={() => {
+                                    setCustomOpen(false);
+                                    onRefreshIntervalChange(minutes);
+                                }}
+                            />
+                        ))}
+                        <OptionChip
+                            label="Altă durată"
+                            active={customOpen}
+                            onPress={() => {
+                                if (!customOpen) setCustomMinutes('');
+                                setCustomOpen(true);
+                            }}
                         />
-                        <View className="flex-row flex-wrap gap-x-6 gap-y-2 mt-4">
-                            <View>
-                                <Text className="text-xs uppercase tracking-wide text-slate-500">Role</Text>
-                                <Text className="font-semibold capitalize text-slate-800">{inviteLink.role}</Text>
+                        {customOpen ? (
+                            <View
+                                className="ui-rise flex-row items-center h-8 rounded-[9px] border pl-2.5 pr-2"
+                                style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
+                            >
+                                <TextInput
+                                    value={customMinutes}
+                                    onChangeText={(value: string) => setCustomMinutes(value.replace(/[^0-9]/g, '').slice(0, 4))}
+                                    keyboardType="number-pad"
+                                    accessibilityLabel="Durată în minute"
+                                    placeholder="ex. 90"
+                                    className="w-12 text-[13px] font-semibold outline-none bg-transparent t-num"
+                                    style={{ color: 'var(--c-ink)' } as any}
+                                    autoFocus
+                                />
+                                <Text className="text-[12px]" style={{ color: 'var(--c-faint)' }}>min</Text>
                             </View>
-                            <View>
-                                <Text className="text-xs uppercase tracking-wide text-slate-500">Club</Text>
-                                <Text className="font-semibold text-slate-800">{inviteLink.clubName}</Text>
-                            </View>
-                            <View>
-                                <Text className="text-xs uppercase tracking-wide text-slate-500">Valid For</Text>
-                                <Text className="font-semibold text-slate-800">{inviteLink.refreshIntervalMinutes} min</Text>
-                            </View>
-                            <View>
-                                <Text className="text-xs uppercase tracking-wide text-slate-500">Expires In</Text>
-                                <CountdownTimer expiresAt={inviteLink.expiresAt} />
-                            </View>
-                        </View>
+                        ) : null}
                     </View>
                 </View>
-            ) : null}
-        </GlassCard>
+
+                <View
+                    className="rounded-[12px] border p-3.5"
+                    style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}
+                >
+                    {loading ? (
+                        <View className="h-[74px] items-center justify-center">
+                            <ActivityIndicator size="small" color="var(--c-brand-fg)" />
+                        </View>
+                    ) : inviteLink ? (
+                        <View className="gap-3">
+                            <View className="flex-row items-center gap-2">
+                                <View className="w-2 h-2 rounded-full ui-ping" style={{ backgroundColor: 'var(--c-success-fg)' }} />
+                                <Text className="text-[12.5px] font-semibold flex-1" style={{ color: 'var(--c-ink-soft)' }} numberOfLines={1}>
+                                    Link activ · {ROLE_LABELS[inviteLink.role]}
+                                </Text>
+                                <Text className="text-[12px]" style={{ color: 'var(--c-faint)' }}>expiră în</Text>
+                                <CountdownTimer expiresAt={inviteLink.expiresAt} />
+                            </View>
+                            <Text
+                                selectable
+                                numberOfLines={2}
+                                className="text-[12px] leading-[17px]"
+                                style={{ color: 'var(--c-muted)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-all' } as any}
+                            >
+                                {currentUrl}
+                            </Text>
+                            <View className="flex-row gap-2">
+                                <AccessButton
+                                    className="flex-1"
+                                    label={copied ? 'Copiat' : 'Copiază linkul'}
+                                    icon={copied ? 'check' : 'content-copy'}
+                                    onPress={() => void handleCopy()}
+                                />
+                                <AccessButton
+                                    variant="secondary"
+                                    label="Link nou"
+                                    icon="autorenew"
+                                    loading={regenerating}
+                                    disabled={busy}
+                                    onPress={handleGenerate}
+                                />
+                            </View>
+                        </View>
+                    ) : (
+                        <View className="gap-3">
+                            <View className="flex-row items-center gap-2.5">
+                                <MaterialIcons name="link-off" size={18} color="var(--c-faint)" />
+                                <Text className="text-[13px] flex-1" style={{ color: 'var(--c-muted)' }}>
+                                    Niciun link activ pentru {ROLE_LABELS[selectedRole].toLowerCase()}.
+                                </Text>
+                            </View>
+                            <AccessButton
+                                label="Generează link"
+                                icon="add-link"
+                                loading={regenerating}
+                                disabled={busy}
+                                onPress={handleGenerate}
+                            />
+                        </View>
+                    )}
+                </View>
+
+                {error ? (
+                    <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text>
+                ) : null}
+            </View>
+        </AccessCard>
     );
 }

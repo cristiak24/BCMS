@@ -92,6 +92,10 @@ import {
   Sun,
   UserMinus,
   UserSearch,
+  Link2Off,
+  Copy,
+  Ban,
+  SearchX,
 } from 'lucide-react';
 
 type IconProps = {
@@ -242,6 +246,13 @@ const iconMap: Record<string, typeof Circle> = {
   'person-search': UserSearch,
   'account-circle': UserCircle,
   security: ShieldCheck,
+  'how-to-reg': UserCheck,
+  'add-link': LinkIcon,
+  'link-off': Link2Off,
+  autorenew: RefreshCw,
+  'content-copy': Copy,
+  block: Ban,
+  'search-off': SearchX,
 };
 
 function Icon({ name = 'circle', size = 20, color = 'currentColor', style, className }: IconProps) {

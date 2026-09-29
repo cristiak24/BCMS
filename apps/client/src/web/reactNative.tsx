@@ -189,6 +189,14 @@ function omitNativeProps(props: AnyProps) {
     testID,
     textContentType,
     underlayColor,
+    // RN-only props with no DOM meaning (web text is selectable by default);
+    // forwarding them only produced React unknown-prop warnings.
+    adjustsFontSizeToFit,
+    allowFontScaling,
+    minimumFontScale,
+    onStartShouldSetResponder,
+    selectable,
+    textAlignVertical,
     ...rest
   } = props;
 
