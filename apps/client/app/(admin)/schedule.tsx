@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Pressable, useWindowDimensions } from '@/src/web/reactNative';
 import { useRouter, useLocalSearchParams } from '@/src/web/expoRouter';
+import { useSession } from '../../context/AuthContext';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
-import { LinearGradient } from '@/src/web/linearGradient';
 import {
-  Calendar as CalendarIcon, Plus, TrendingUp, Trophy, ShieldCheck, Receipt,
+  Calendar as CalendarIcon, Plus, ShieldCheck, Receipt,
 } from 'lucide-react';
 import { eventsApi, CalendarEvent, EventAttendance } from '../../services/eventsApi';
 import { AttendanceTab } from '../../components/schedule/AttendanceTab';
@@ -22,6 +22,7 @@ import { ScheduleEventCard } from '../../components/schedule/admin/ScheduleEvent
 import { ScheduleWeekView } from '../../components/schedule/admin/ScheduleWeekView';
 import { ScheduleAgendaList } from '../../components/schedule/admin/ScheduleAgendaList';
 import { AddEventModal } from '../../components/schedule/admin/AddEventModal';
+import StatCard from '../../components/ui/StatCard';
 import { DayScheduleModal } from '../../components/schedule/admin/DayScheduleModal';
 import { EventAttendanceModal } from '../../components/schedule/admin/EventAttendanceModal';
 import { FilterModal } from '../../components/schedule/admin/FilterModal';
@@ -42,6 +43,10 @@ const VIEW_LABELS: Record<ScheduleView, string> = {
   week: 'Săptămână',
   agenda: 'Agendă',
 };
+
+const FRB_SYNC_KEY = 'bcms.frb-sync-at';
+const FRB_STALE_KEY = 'bcms.frb-stale-shown';
+const FRB_SYNC_INTERVAL_MS = 3 * 60 * 60 * 1000;
 
 export default function ScheduleScreen() {
   const router = useRouter();
@@ -183,19 +188,79 @@ export default function ScheduleScreen() {
   // here re-rendered the whole calendar on every keystroke.
   const [addEventDate, setAddEventDate] = useState<Date | null>(null);
 
-  const handleSyncFRB = async () => {
-    if (syncing) return;
+  /**
+   * FRB fixtures reach the calendar through the server sync. `silent` is the
+   * automatic run on open: no toast unless something actually changed, and
+   * errors stay in the console (the manual button reports them).
+   */
+  // One sync at a time — also covers effects run twice (StrictMode in dev).
+  const frbSyncInFlight = useRef(false);
+  const runFrbSync = useCallback(async (silent: boolean) => {
+    if (frbSyncInFlight.current) return;
+    frbSyncInFlight.current = true;
     setSyncing(true);
     try {
       const res = await eventsApi.syncFRBMatches();
-      showToast({ variant: 'success', message: `Au fost sincronizate ${res.syncedCount} meciuri noi din FRB.` });
-      refetch();
-    } catch {
-      showToast({ variant: 'error', message: 'Eroare la sincronizarea meciurilor.' });
+      const changed = (res.syncedCount ?? 0) + (res.updatedCount ?? 0);
+      try { localStorage.setItem(FRB_SYNC_KEY, String(Date.now())); } catch { /* storage unavailable */ }
+      if (changed > 0) refetch();
+
+      if (!silent || changed > 0) {
+        const parts = [
+          res.syncedCount ? `${res.syncedCount} ${res.syncedCount === 1 ? 'meci nou' : 'meciuri noi'}` : null,
+          res.updatedCount ? `${res.updatedCount} ${res.updatedCount === 1 ? 'actualizat' : 'actualizate'}` : null,
+        ].filter(Boolean);
+        showToast({
+          variant: 'success',
+          message: parts.length
+            ? `Meciuri FRB: ${parts.join(', ')}.`
+            : res.teamsChecked === 0
+              ? 'Nicio echipă nu are ID-uri FRB configurate.'
+              : 'Calendarul FRB este deja la zi.',
+        });
+      }
+      // A team linked to a finished FRB season can never show current
+      // fixtures — say which ones, on a manual sync and once per session on
+      // the automatic one.
+      if (res.staleTeams?.length) {
+        let alreadyShown = false;
+        try { alreadyShown = sessionStorage.getItem(FRB_STALE_KEY) === res.staleTeams.join('|'); } catch { /* ignore */ }
+        if (!silent || !alreadyShown) {
+          showToast({
+            variant: 'info',
+            message: `Sezon FRB vechi (fără meciuri recente): ${res.staleTeams.join(', ')}. Actualizează sezonul din Clubul meu.`,
+          });
+          try { sessionStorage.setItem(FRB_STALE_KEY, res.staleTeams.join('|')); } catch { /* ignore */ }
+        }
+      }
+      if (!silent && res.failedTeams?.length) {
+        showToast({ variant: 'error', message: `FRB indisponibil pentru: ${res.failedTeams.join(', ')}.` });
+      }
+    } catch (error) {
+      if (silent) console.warn('[schedule] automatic FRB sync failed', error);
+      else showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Eroare la sincronizarea meciurilor.' });
     } finally {
+      frbSyncInFlight.current = false;
       setSyncing(false);
     }
+  }, [refetch, showToast]);
+
+  const handleSyncFRB = () => {
+    if (!syncing) runFrbSync(false);
   };
+
+  // Keep FRB fixtures current without anyone pressing "Sync": once per
+  // FRB_SYNC_INTERVAL per device, when the schedule opens.
+  // Only roles the server lets sync; accountants/staff would just get a 403.
+  const { session } = useSession();
+  const canSyncFrb = ['admin', 'superadmin', 'manager'].includes(String(session?.role ?? ''));
+  useEffect(() => {
+    if (!canSyncFrb) return;
+    let last = 0;
+    try { last = Number(localStorage.getItem(FRB_SYNC_KEY) || 0); } catch { /* storage unavailable */ }
+    if (Date.now() - last > FRB_SYNC_INTERVAL_MS) runFrbSync(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSyncFrb]);
 
   const navigateToEvent = (event: CalendarEvent) => router.push(`/admin/event/${event.id}` as any);
   const navigateToGrade = (event: CalendarEvent) => router.push(`/admin/attendance/${event.id}` as any);
@@ -438,45 +503,29 @@ export default function ScheduleScreen() {
               </View>
 
               {featuredUpcoming.length === 0 ? (
-                <View className="bg-white rounded-[28px] border border-[#DDE7F5] p-6 items-center">
-                  <CalendarIcon size={28} color="var(--c-faint)" />
-                  <Text className="text-slate-400 font-bold mt-3 text-center">Niciun eveniment viitor în această vedere.</Text>
+                <View className="rounded-[16px] border px-5 py-6 items-center" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
+                  <View className="w-11 h-11 rounded-[12px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+                    <CalendarIcon size={20} color="var(--c-muted)" />
+                  </View>
+                  <Text className="text-[14px] font-semibold mt-3 text-center" style={{ color: 'var(--c-ink)' }}>Niciun eveniment viitor</Text>
+                  <Text className="t-meta mt-1 text-center" style={{ color: 'var(--c-muted)' }}>Adaugă unul cu butonul „Eveniment” sau sincronizează meciurile FRB.</Text>
                 </View>
               ) : featuredUpcoming.map((event) => (
                 <ScheduleEventCard key={`featured-${event.id}`} item={event} compact isMobile={isMobile} isSmallPhone={isSmallPhone} onPress={() => navigateToEvent(event)} />
               ))}
 
-              <View className="flex-row gap-3">
-                <LinearGradient
-                  colors={['var(--c-brand-surface)', 'var(--c-brand-strong)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={{ borderRadius: 24, flex: 1, padding: 20, minHeight: 108, justifyContent: 'space-between' }}
-                >
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-[#BFD0FF] text-[10px] font-black uppercase tracking-widest">Viitoare</Text>
-                    <View className="w-7 h-7 rounded-full bg-white/15 items-center justify-center">
-                      <TrendingUp size={13} color="var(--c-surface-tint)" />
-                    </View>
-                  </View>
-                  <Text className="text-white text-[32px] font-black">{upcomingCount}</Text>
-                </LinearGradient>
-                <LinearGradient
-                  colors={['#046B85', '#0EA5C4']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={{ borderRadius: 24, flex: 1, padding: 20, minHeight: 108, justifyContent: 'space-between' }}
-                >
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-[#BFEFFF] text-[10px] font-black uppercase tracking-widest">Următorul meci</Text>
-                    <View className="w-7 h-7 rounded-full bg-white/15 items-center justify-center">
-                      <Trophy size={13} color="var(--c-surface-tint)" />
-                    </View>
-                  </View>
-                  <Text className="text-white text-[22px] font-black" numberOfLines={1}>
-                    {nextMatch ? new Date(nextMatch.startTime).toLocaleDateString('ro-RO', { month: 'short', day: 'numeric' }) : 'Niciunul programat'}
-                  </Text>
-                </LinearGradient>
+              {/* Plain surface cards with a tinted icon, like every other KPI in
+                  the app. The saturated indigo/teal gradient blocks fought the
+                  page (and "Niciunul programat" was truncated to "Niciunul …"). */}
+              <View className="grid grid-cols-2 gap-3">
+                <StatCard icon="event-available" tone="brand" label="Viitoare" value={upcomingCount} hint="în luna afișată" />
+                <StatCard
+                  icon="sports-basketball"
+                  tone="warning"
+                  label="Următorul meci"
+                  value={nextMatch ? new Date(nextMatch.startTime).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' }) : '—'}
+                  hint={nextMatch ? nextMatch.title : 'Niciun meci programat'}
+                />
               </View>
             </View>
           </View>

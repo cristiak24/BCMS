@@ -48,6 +48,10 @@ export interface UpdateTeamPayload {
     level?: TeamLevel;
     coachId?: number | null;
     isActive?: boolean;
+    /** Move an FRB-linked team to another season (same league). */
+    frbSeasonId?: string;
+    seasonName?: string;
+    frbTeamId?: string;
 }
 
 export interface Coach {

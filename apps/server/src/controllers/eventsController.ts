@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import axios from 'axios';
 import { toDate, toIso } from '../lib/dateUtils';
 import { db } from '../db';
 import { attendance, events, players, playersToTeams, teams, users } from '../db/schema';
@@ -8,9 +7,13 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { buildEventQueryPlan, type EventQueryParams } from '../lib/eventQuery';
 import { createFeedbackNotification } from '../lib/notifications';
 import { parseAttendancePayload, parseEventInput } from '../lib/eventValidation';
-import { FRB_HEADERS, getFrbApiKey } from '../lib/frbConfig';
+import { fetchFrbMatches, frbDateToUtc, type ParsedMatch } from '../lib/frbMatches';
 
-const HEADERS = FRB_HEADERS;
+
+/** FRB sync: only fixtures from this far back are inserted as new events. */
+const IMPORT_WINDOW_MS = 120 * 24 * 60 * 60 * 1000;
+/** FRB sync: a team whose newest fixture is older than this is flagged. */
+const STALE_AFTER_MS = 180 * 24 * 60 * 60 * 1000;
 
 type EventDoc = {
     id: number;
@@ -31,41 +34,9 @@ type EventDoc = {
 type PlayerDoc = { id: number; firstName?: string | null; lastName?: string | null; number?: number | null; };
 type AttendanceDoc = { id: number; eventId?: number | null; playerId: number; teamId: number; status: string; date?: Date | string | null; };
 
-function parseFRBDate(dateStr: string) {
-    const match = /(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2}))?/.exec(dateStr);
-    if (!match) {
-        return null;
-    }
 
-    const [, d, m, y, hh, mm] = match;
-    return new Date(Number(y), Number(m) - 1, Number(d), Number(hh ?? '0'), Number(mm ?? '0'));
-}
 
-function cleanText(text: string) {
-    return text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-}
 
-function parseScore(rawScore: string): { home: string; away: string } {
-    const clean = (rawScore || '').replace(/\s+/g, '').trim();
-    if (!clean || clean === '?' || clean === '-' || !/\d/.test(clean)) {
-        return { home: '', away: '' };
-    }
-
-    const parts = clean.split('-');
-    if (parts.length !== 2) return { home: '', away: '' };
-
-    const h = parts[0].trim();
-    const a = parts[1].trim();
-    if (!/^\d+$/.test(h) || !/^\d+$/.test(a)) {
-        return { home: '', away: '' };
-    }
-
-    return { home: h, away: a };
-}
-
-function determineStatus(homeScore: string, awayScore: string) {
-    return !homeScore || !awayScore ? 'scheduled' : 'finished';
-}
 
 function toEventPayload(event: EventDoc, teamName: string | null, coachName: string | null) {
     return {
@@ -702,91 +673,153 @@ export const eventsController = {
         }
     },
 
+    /**
+     * Import the club's FRB fixtures into the calendar (and keep them current).
+     *
+     * Previously: superadmin-only (a club admin's "Sync" button got a 403, so
+     * FRB matches never reached a club's calendar), synced EVERY club, stored
+     * Romanian kick-off times as UTC (2–3h off), wrote "Auto-Synced Location",
+     * and never updated a fixture once inserted — final scores never arrived.
+     *
+     * Now: admins/managers sync their own club's teams (superadmin: all), times
+     * are resolved in Europe/Bucharest, and previously-synced fixtures get their
+     * score, status, kick-off time and location refreshed. A fixture is matched
+     * on team + title + Romanian calendar day; only rows this sync created
+     * (description mentions FRB) are ever modified.
+     */
     async syncFRBMatches(req: AuthenticatedRequest, res: Response) {
         try {
-            if (!isSuperadmin(req)) {
-                return res.status(403).json({ error: 'Only superadmin can sync FRB matches manually here.' });
+            const role = req.user?.role;
+            if (!isSuperadmin(req) && role !== 'admin' && role !== 'manager') {
+                return res.status(403).json({ error: 'Only club administrators can sync FRB matches.' });
             }
 
-            const allTeams = await db.select().from(teams);
-            const existingEvents = (await db.select().from(events)).map((event) => event as EventDoc);
+            const clubId = getRequestClubId(req);
+            if (!isSuperadmin(req) && clubId == null) {
+                return res.status(403).json({ error: 'Your account is not assigned to a club.' });
+            }
+
+            const teamRows = (isSuperadmin(req)
+                ? await db.select().from(teams)
+                : await db.select().from(teams).where(eq(teams.clubId, clubId as number)))
+                .filter((team) => team.isActive !== false && team.frbTeamId?.trim() && team.frbSeasonId?.trim() && team.frbLeagueId?.trim());
+
+            if (!teamRows.length) {
+                return res.json({ success: true, syncedCount: 0, updatedCount: 0, teamsChecked: 0, failedTeams: [], staleTeams: [] });
+            }
+
+            const teamIds = teamRows.map((team) => team.id);
+            const existingRows = await db.select().from(events)
+                .where(and(inArray(events.teamId, teamIds), eq(events.type, 'match')));
+
+            const bucharestDay = (value: Date) => new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Europe/Bucharest', year: 'numeric', month: '2-digit', day: '2-digit',
+            }).format(value);
+            const keyOf = (teamId: number, title: string, day: string) => `${teamId}|${title.trim().toLowerCase()}|${day}`;
+
+            const existingByKey = new Map<string, typeof existingRows[number]>();
+            for (const row of existingRows) {
+                const start = toDate(row.startTime);
+                if (!start || row.teamId == null) continue;
+                existingByKey.set(keyOf(row.teamId, row.title, bucharestDay(start)), row);
+            }
+
             let syncedCount = 0;
+            let updatedCount = 0;
+            const failedTeams: string[] = [];
+            // Teams whose FRB season has no fixture in the last STALE_AFTER_MS —
+            // almost always a team still linked to a finished season.
+            const staleTeams: string[] = [];
+            const nowIso = new Date().toISOString();
+            // Don't back-fill ancient seasons into the calendar: new rows only for
+            // fixtures from the last few months onward. Existing rows still update.
+            const importFrom = Date.now() - IMPORT_WINDOW_MS;
 
-            for (const team of allTeams) {
-                if (!team.frbTeamId || !team.frbSeasonId || !team.frbLeagueId) continue;
+            for (const team of teamRows) {
+                let fixtures: ParsedMatch[] = [];
+                try {
+                    // The widget pages by calendar month; a season spans all 12.
+                    const months = await Promise.all(
+                        Array.from({ length: 12 }, (_, index) => fetchFrbMatches({
+                            leagueId: team.frbLeagueId,
+                            seasonId: team.frbSeasonId,
+                            teamId: team.frbTeamId,
+                            month: index + 1,
+                        }).catch(() => [] as ParsedMatch[])),
+                    );
+                    const seen = new Set<string>();
+                    fixtures = months.flat().filter((match) => {
+                        const id = `${match.date}|${match.homeTeam}|${match.awayTeam}`;
+                        if (seen.has(id)) return false;
+                        seen.add(id);
+                        return true;
+                    });
+                } catch (error) {
+                    console.error(`[sync-frb] team ${team.id} fetch failed:`, error);
+                    failedTeams.push(team.name);
+                    continue;
+                }
 
-                const responses: Array<{ data?: string } | null> = await Promise.all(Array.from({ length: 12 }, (_, idx) => idx + 1).map((month) => {
-                    const url = `https://widgets.baskethotel.com/widget-service/show?&api=${getFrbApiKey()}&lang=ro&request[0][widget]=200&request[0][part]=schedule_and_results&request[0][param][team_id]=${team.frbTeamId}&request[0][param][league_id]=${team.frbLeagueId}&request[0][param][season_id]=${team.frbSeasonId}&request[0][param][month]=${month}`;
-                    return axios.get(url, { headers: HEADERS }).catch(() => null);
-                }));
+                const newest = fixtures.reduce((max, match) => Math.max(max, frbDateToUtc(match.date, match.time)?.getTime() ?? 0), 0);
+                if (newest < Date.now() - STALE_AFTER_MS) staleTeams.push(team.name);
 
-                for (const response of responses) {
-                    if (!response || !response.data) continue;
+                for (const match of fixtures) {
+                    const start = frbDateToUtc(match.date, match.time);
+                    if (!start) continue;
+                    const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+                    const title = `${match.homeTeam} vs ${match.awayTeam}`;
+                    const finished = match.status === 'finished';
+                    // "score: H-A" is the format the player/coach screens parse.
+                    const description = finished
+                        ? `score: ${match.homeScore}-${match.awayScore} · sincronizat din FRB`
+                        : 'Sincronizat din FRB';
+                    const location = match.league || team.leagueName || null;
+                    const status = finished ? 'finished' : 'scheduled';
+                    const key = keyOf(team.id, title, bucharestDay(start));
+                    const existing = existingByKey.get(key);
 
-                    const htmlMatch = (response.data as string).match(/MBT\.API\.update\('.*?',\s*'([\s\S]*?)'\);/);
-                    if (!htmlMatch) continue;
+                    if (!existing) {
+                        if (start.getTime() < importFrom) continue;
+                        const [created] = await db.insert(events).values({
+                            type: 'match',
+                            title,
+                            description,
+                            location,
+                            startTime: start.toISOString(),
+                            endTime: end.toISOString(),
+                            teamId: team.id,
+                            coachId: team.coachId ?? null,
+                            status,
+                            createdAt: nowIso,
+                        }).returning();
+                        existingByKey.set(key, created);
+                        syncedCount += 1;
+                        continue;
+                    }
 
-                    const html = htmlMatch[1].replace(/\\n/g, '').replace(/\\"/g, '"').replace(/\\\//g, '/');
-                    const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-                    let rowMatch: RegExpExecArray | null;
-                    while ((rowMatch = rowRegex.exec(html)) !== null) {
-                        const rowHtml = rowMatch[1];
-                        const cells: string[] = [];
-                        const cellReg = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-                        let cellMatch: RegExpExecArray | null;
-                        while ((cellMatch = cellReg.exec(rowHtml)) !== null) {
-                            cells.push(cleanText(cellMatch[1]));
-                        }
+                    // Never touch a match someone created or edited by hand.
+                    if (!/FRB/i.test(existing.description ?? '')) continue;
+                    // A cancelled fixture stays cancelled until an admin says otherwise.
+                    if (existing.status === 'cancelled') continue;
 
-                        if (cells.length >= 4 && cells[0] !== '') {
-                            const dateStr = cells[0];
-                            const homeTeam = cells[1] || '';
-                            const score = parseScore(cells[2] || '');
-                            const awayTeam = cells[3] || '';
-                            if (!homeTeam && !awayTeam) continue;
+                    const existingStart = toDate(existing.startTime);
+                    const patch: Partial<typeof events.$inferInsert> = {};
+                    if (existing.description !== description) patch.description = description;
+                    if (existing.status !== status) patch.status = status;
+                    if (!existingStart || Math.abs(existingStart.getTime() - start.getTime()) > 60_000) {
+                        patch.startTime = start.toISOString();
+                        patch.endTime = end.toISOString();
+                    }
+                    if (!existing.location || existing.location === 'Auto-Synced Location') patch.location = location;
 
-                            const title = `${homeTeam} vs ${awayTeam}`;
-                            const startTime = parseFRBDate(dateStr);
-                            if (!startTime) continue;
-
-                            const endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000);
-                            const startDateOnly = new Date(startTime.getFullYear(), startTime.getMonth(), startTime.getDate());
-                            const exists = existingEvents.some((event) => {
-                                if (event.teamId !== team.id || event.title !== title) {
-                                    return false;
-                                }
-                                const d = toDate(event.startTime);
-                                return d
-                                    && d.getFullYear() === startDateOnly.getFullYear()
-                                    && d.getMonth() === startDateOnly.getMonth()
-                                    && d.getDate() === startDateOnly.getDate();
-                            });
-
-                            if (!exists) {
-                                const status = determineStatus(score.home, score.away);
-                                const description = status === 'finished'
-                                    ? `Synced from FRB. Score: ${score.home} - ${score.away}`
-                                    : 'Synced from FRB';
-                                const [created] = await db.insert(events).values({
-                                    type: 'match',
-                                    title,
-                                    description,
-                                    location: 'Auto-Synced Location',
-                                    startTime: startTime.toISOString(),
-                                    endTime: endTime.toISOString(),
-                                    teamId: team.id,
-                                    status,
-                                    createdAt: new Date().toISOString(),
-                                }).returning();
-                                existingEvents.push(created as EventDoc);
-                                syncedCount++;
-                            }
-                        }
+                    if (Object.keys(patch).length) {
+                        await db.update(events).set(patch).where(eq(events.id, existing.id));
+                        updatedCount += 1;
                     }
                 }
             }
 
-            res.json({ success: true, syncedCount });
+            res.json({ success: true, syncedCount, updatedCount, teamsChecked: teamRows.length, failedTeams, staleTeams });
         } catch (error) {
             console.error('Sync FRB matches error:', error);
             res.status(500).json({ error: 'Internal server error while syncing matches' });

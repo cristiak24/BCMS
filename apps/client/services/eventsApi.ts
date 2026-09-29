@@ -115,8 +115,9 @@ export const eventsApi = {
         return response.data;
     },
 
-    async syncFRBMatches(): Promise<{ success: boolean; syncedCount: number }> {
-        const response = await apiClient.post<{ success: boolean; syncedCount: number }>('/events/sync-frb');
+    /** Import/refresh the club's FRB fixtures (new ones + updated scores/times). */
+    async syncFRBMatches(): Promise<{ success: boolean; syncedCount: number; updatedCount?: number; teamsChecked?: number; failedTeams?: string[]; staleTeams?: string[] }> {
+        const response = await apiClient.post<{ success: boolean; syncedCount: number; updatedCount?: number; teamsChecked?: number; failedTeams?: string[]; staleTeams?: string[] }>('/events/sync-frb');
         return response.data;
     }
 };

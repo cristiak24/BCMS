@@ -2,6 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, TextInput, ActivityIndicator, Modal } from '@/src/web/reactNative';
 import { X } from 'lucide-react';
 import { teamsApi, Team, Coach, TeamGender, TeamLevel } from '../../services/teamsApi';
+import { basketballApi, type Season, type Team as FrbTeam } from '../../services/basketballApi';
+import { eventsApi } from '../../services/eventsApi';
+
+const normalizeName = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+/** Best guess for "the same club" in another season's FRB team list. */
+function findSameTeam(teams: FrbTeam[], name: string) {
+    const target = normalizeName(name);
+    return teams.find((team) => normalizeName(team.name) === target)
+        ?? teams.find((team) => {
+            const candidate = normalizeName(team.name);
+            return candidate.length >= 4 && (candidate.includes(target) || target.includes(candidate));
+        })
+        ?? null;
+}
 
 export default function EditTeamModal({
     team,
@@ -22,6 +37,47 @@ export default function EditTeamModal({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // FRB season. A team used to be locked to the season it was created in, so
+    // its calendar could never show the current season's fixtures.
+    const isFrbTeam = Boolean(team.frbLeagueId?.trim());
+    const [seasons, setSeasons] = useState<Season[]>([]);
+    const [seasonId, setSeasonId] = useState(team.frbSeasonId ?? '');
+    const [seasonTeams, setSeasonTeams] = useState<FrbTeam[]>([]);
+    const [frbTeamId, setFrbTeamId] = useState(team.frbTeamId ?? '');
+    const [loadingSeasonTeams, setLoadingSeasonTeams] = useState(false);
+
+    useEffect(() => {
+        if (!isFrbTeam) return;
+        let active = true;
+        basketballApi.getSeasons(team.frbLeagueId)
+            .then((rows) => { if (active) setSeasons(rows); })
+            .catch(() => { if (active) setSeasons([]); });
+        return () => { active = false; };
+    }, [isFrbTeam, team.frbLeagueId]);
+
+    const changeSeason = async (nextSeasonId: string) => {
+        setSeasonId(nextSeasonId);
+        if (!nextSeasonId || nextSeasonId === team.frbSeasonId) {
+            setFrbTeamId(team.frbTeamId ?? '');
+            setSeasonTeams([]);
+            return;
+        }
+        setLoadingSeasonTeams(true);
+        try {
+            const rows = await basketballApi.getTeams(team.frbLeagueId, nextSeasonId);
+            setSeasonTeams(rows);
+            // FRB team ids can change between seasons — pre-pick the same club.
+            setFrbTeamId(findSameTeam(rows, team.name)?.id ?? '');
+        } catch {
+            setSeasonTeams([]);
+            setFrbTeamId('');
+        } finally {
+            setLoadingSeasonTeams(false);
+        }
+    };
+
+    const seasonChanged = isFrbTeam && seasonId !== '' && seasonId !== team.frbSeasonId;
+
     useEffect(() => {
         setName(team.name);
         setGender(team.gender ?? 'M');
@@ -35,6 +91,10 @@ export default function EditTeamModal({
             setError('Numele echipei este obligatoriu.');
             return;
         }
+        if (seasonChanged && !frbTeamId) {
+            setError('Alege echipa corespunzătoare din noul sezon FRB.');
+            return;
+        }
         try {
             setSaving(true);
             setError(null);
@@ -44,7 +104,18 @@ export default function EditTeamModal({
                 level: level || undefined,
                 coachId: coachId === '' ? null : Number(coachId),
                 isActive,
+                ...(seasonChanged ? {
+                    frbSeasonId: seasonId,
+                    seasonName: seasons.find((season) => season.id === seasonId)?.text ?? seasonId,
+                    frbTeamId,
+                } : {}),
             });
+            if (seasonChanged) {
+                // Pull the new season's fixtures now instead of waiting for the
+                // schedule's periodic sync; clear its timestamp either way.
+                try { localStorage.removeItem('bcms.frb-sync-at'); } catch { /* storage unavailable */ }
+                void eventsApi.syncFRBMatches().catch(() => undefined);
+            }
             onSaved(updated);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Nu s-a putut salva echipa.');
@@ -117,6 +188,55 @@ export default function EditTeamModal({
                             ))}
                         </select>
                     </View>
+
+                    {isFrbTeam ? (
+                        <View className="rounded-[14px] border p-3.5 gap-3" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
+                            <View>
+                                <Text className="text-[13px] font-bold" style={{ color: 'var(--c-ink)' }}>Sezon FRB</Text>
+                                <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }}>
+                                    Meciurile din calendar vin din sezonul ales aici. Acum: {team.seasonName || '—'}.
+                                </Text>
+                            </View>
+                            <select
+                                value={seasonId}
+                                onChange={(e) => changeSeason(e.target.value)}
+                                aria-label="Sezon FRB"
+                                className="native-field h-11 w-full rounded-[11px] border px-3 text-[14px] font-medium"
+                                style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' }}
+                            >
+                                {!seasons.some((season) => season.id === seasonId) && seasonId ? (
+                                    <option value={seasonId}>{team.seasonName || seasonId}</option>
+                                ) : null}
+                                {seasons.map((season) => (
+                                    <option key={season.id} value={season.id}>{season.text}</option>
+                                ))}
+                            </select>
+                            {seasonChanged ? (
+                                loadingSeasonTeams ? (
+                                    <View className="flex-row items-center gap-2">
+                                        <ActivityIndicator size="small" color="var(--c-brand-fg)" />
+                                        <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-muted)' }}>Se încarcă echipele sezonului…</Text>
+                                    </View>
+                                ) : (
+                                    <View>
+                                        <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Echipa în noul sezon</Text>
+                                        <select
+                                            value={frbTeamId}
+                                            onChange={(e) => setFrbTeamId(e.target.value)}
+                                            aria-label="Echipa FRB în noul sezon"
+                                            className="native-field h-11 w-full rounded-[11px] border px-3 text-[14px] font-medium"
+                                            style={{ backgroundColor: 'var(--c-surface)', borderColor: frbTeamId ? 'var(--c-border)' : 'var(--c-warning)', color: 'var(--c-ink)' }}
+                                        >
+                                            <option value="">Alege echipa</option>
+                                            {seasonTeams.map((frbTeam) => (
+                                                <option key={frbTeam.id} value={frbTeam.id}>{frbTeam.name}</option>
+                                            ))}
+                                        </select>
+                                    </View>
+                                )
+                            ) : null}
+                        </View>
+                    ) : null}
 
                     <Pressable onPress={() => setIsActive((v) => !v)} className="flex-row items-center gap-2.5">
                         <View className={`w-5 h-5 rounded-[6px] border-2 items-center justify-center ${isActive ? 'bg-[#1D3E90] border-[#1D3E90]' : 'border-gray-300'}`}>

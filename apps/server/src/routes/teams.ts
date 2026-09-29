@@ -3,11 +3,16 @@ import { and, asc, eq, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
 import { db } from '../db';
 import { attendance, clubs, events, l12Documents, playerPayments, players, playersToTeams, teams, users } from '../db/schema';
-import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
+import { requireRoles, authenticate, type AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
 
 router.use(authenticate);
+
+// Every mutation below only checked that the caller was in the same CLUB as
+// the team — so a player or parent could rename, deactivate or delete a team,
+// reassign its coach, or edit its roster. Only club administrators may.
+const requireTeamManager = requireRoles(['admin', 'manager']);
 
 const TEAM_GENDERS = ['M', 'F'] as const;
 const TEAM_LEVELS = ['national', 'municipal', 'initiere'] as const;
@@ -231,7 +236,7 @@ router.get('/coaches', async (req: AuthenticatedRequest, res) => {
     }
 });
 
-router.post('/', async (req: AuthenticatedRequest, res) => {
+router.post('/', requireTeamManager, async (req: AuthenticatedRequest, res) => {
     try {
         if (!req.user) {
             res.status(401).json({ error: 'Authentication is required.' });
@@ -465,7 +470,7 @@ router.get('/:id/stats', async (req: AuthenticatedRequest, res) => {
     }
 });
 
-router.delete('/:id', async (req: AuthenticatedRequest, res) => {
+router.delete('/:id', requireTeamManager, async (req: AuthenticatedRequest, res) => {
     try {
         const id = parseRouteId(req.params.id);
         if (Number.isNaN(id)) {
@@ -504,7 +509,7 @@ router.delete('/:id', async (req: AuthenticatedRequest, res) => {
     }
 });
 
-router.patch('/:id', async (req: AuthenticatedRequest, res) => {
+router.patch('/:id', requireTeamManager, async (req: AuthenticatedRequest, res) => {
     try {
         const id = parseRouteId(req.params.id);
         if (Number.isNaN(id)) {
@@ -532,6 +537,29 @@ router.patch('/:id', async (req: AuthenticatedRequest, res) => {
         }
         if (typeof body.isActive === 'boolean') {
             updates.isActive = body.isActive;
+        }
+
+        // Move an FRB-linked team to another season of the same league. Teams
+        // were stuck on the season they were created in — a squad created for
+        // 2023–24 could never show a 2026–27 fixture. The FRB team id may change
+        // between seasons, so it can be sent along with the season.
+        const hasSeasonChange = body.frbSeasonId !== undefined || body.seasonName !== undefined || body.frbTeamId !== undefined;
+        if (hasSeasonChange) {
+            if (!access.team.frbLeagueId?.trim()) {
+                res.status(400).json({ error: 'This team is not linked to an FRB league.' });
+                return;
+            }
+            const text = (value: unknown, max: number) => (typeof value === 'string' && value.trim() && value.trim().length <= max ? value.trim() : null);
+            const frbSeasonId = text(body.frbSeasonId, 50);
+            const seasonName = text(body.seasonName, 255);
+            const frbTeamId = body.frbTeamId === undefined ? undefined : text(body.frbTeamId, 50);
+            if (!frbSeasonId || !seasonName || frbTeamId === null) {
+                res.status(400).json({ error: 'frbSeasonId and seasonName are required (and frbTeamId, if sent, must be valid).' });
+                return;
+            }
+            updates.frbSeasonId = frbSeasonId;
+            updates.seasonName = seasonName;
+            if (frbTeamId) updates.frbTeamId = frbTeamId;
         }
         if ('coachId' in body) {
             const nextCoachId = body.coachId == null || body.coachId === '' ? null : Number(body.coachId);
@@ -589,7 +617,7 @@ router.get('/:id/players', async (req: AuthenticatedRequest, res) => {
     }
 });
 
-router.post('/:id/players', async (req: AuthenticatedRequest, res) => {
+router.post('/:id/players', requireTeamManager, async (req: AuthenticatedRequest, res) => {
     try {
         const teamId = parseRouteId(req.params.id);
         if (Number.isNaN(teamId)) {
@@ -643,7 +671,7 @@ router.post('/:id/players', async (req: AuthenticatedRequest, res) => {
     }
 });
 
-router.delete('/:id/players/:playerId', async (req: AuthenticatedRequest, res) => {
+router.delete('/:id/players/:playerId', requireTeamManager, async (req: AuthenticatedRequest, res) => {
     try {
         const teamId = parseRouteId(req.params.id);
         const playerId = parseRouteId(req.params.playerId);
