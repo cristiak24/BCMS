@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, useWindowDimensions } from '@/src/web/reactNative';
+import { View, Text, ScrollView, TouchableOpacity, Pressable, useWindowDimensions } from '@/src/web/reactNative';
 import { useRouter, useLocalSearchParams } from '@/src/web/expoRouter';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
@@ -13,7 +13,6 @@ import { GradeTab } from '../../components/schedule/GradeTab';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../components/HeaderContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import { useAdminScheduleData } from '../../hooks/useAdminScheduleData';
-import { useAddEventForm } from '../../hooks/useAddEventForm';
 import {
   eventMatchesSearch, isCancelledEvent, buildICSCalendar, triggerFileDownload, toDateKey,
 } from '../../components/schedule/scheduleShared';
@@ -131,44 +130,58 @@ export default function ScheduleScreen() {
           ))}
         </View>
 
-        <TouchableOpacity
-          onPress={() => setShowAddModal(true)}
+        <Pressable
+          onPress={() => { setAddEventDate(null); setShowAddModal(true); }}
+          accessibilityRole="button"
+          accessibilityLabel="Adaugă eveniment"
+          className="ui-press"
           style={{
-            flexDirection: 'row', alignItems: 'center', backgroundColor: 'var(--c-brand-surface)', paddingHorizontal: 16, paddingVertical: 8,
-            borderRadius: 20, gap: 6, shadowColor: 'var(--c-brand-fg)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
-          }}
+            flexDirection: 'row', alignItems: 'center', backgroundColor: 'var(--c-brand-surface)', height: 36, paddingHorizontal: 14,
+            borderRadius: 10, gap: 6, boxShadow: 'var(--e-brand)',
+          } as any}
         >
-          <Plus color="#fff" size={14} />
-          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.8, whiteSpace: 'nowrap' } as any}>Adaugă eveniment</Text>
-        </TouchableOpacity>
+          <Plus color="#FFFFFF" size={16} strokeWidth={2.4} />
+          <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700', whiteSpace: 'nowrap' } as any}>Adaugă eveniment</Text>
+        </Pressable>
       </View>
     );
 
+    // Extended FAB ("+ Eveniment"): fixed to the viewport above the bottom
+    // nav. It was `position: absolute` inside the page flow and carried a
+    // brand-fg shadow — in dark mode that lilac glow read as a white halo.
     setMobileFab(
-      <TouchableOpacity
-        onPress={() => setShowAddModal(true)}
+      <Pressable
+        onPress={() => { setAddEventDate(null); setShowAddModal(true); }}
+        accessibilityRole="button"
+        accessibilityLabel="Adaugă eveniment"
+        className="ui-press"
         style={{
-          position: 'absolute', bottom: 96, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: 'var(--c-brand-surface)',
-          alignItems: 'center', justifyContent: 'center', shadowColor: 'var(--c-brand-fg)', shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.45, shadowRadius: 12, elevation: 10, zIndex: 30,
-        }}
+          position: 'fixed',
+          right: 16,
+          bottom: 'calc(88px + env(safe-area-inset-bottom, 0px))',
+          height: 48,
+          paddingLeft: 16,
+          paddingRight: 18,
+          borderRadius: 999,
+          backgroundColor: 'var(--c-brand-surface)',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          boxShadow: '0 10px 24px -8px rgba(49, 46, 129, 0.7), 0 2px 6px rgba(0, 0, 0, 0.25)',
+          zIndex: 30,
+        } as any}
       >
-        <Plus color="#fff" size={22} />
-      </TouchableOpacity>
+        <Plus color="#FFFFFF" size={18} strokeWidth={2.6} />
+        <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' } as any}>Eveniment</Text>
+      </Pressable>
     );
   }, [activeTab, setHeaderActions, setMobileFab]);
   // ─────────────────────────────────────────────────────────────────
 
-  const form = useAddEventForm(refetch);
-  useEffect(() => { form.loadRecentLocations(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Pre-select the team in the "Add event" form when scoped to a team, so a new
-  // event defaults to that team without the admin re-picking it. Re-applied each
-  // time the modal opens because the form resets its team after each create.
-  const { setNewTeamId } = form;
-  useEffect(() => {
-    if (showAddModal && paramTeamId != null) setNewTeamId(paramTeamId);
-  }, [showAddModal, paramTeamId, setNewTeamId]);
+  // Day to pre-fill when the form is opened from a calendar day ("+" on the
+  // day sheet). The form itself lives inside AddEventModal — keeping its state
+  // here re-rendered the whole calendar on every keystroke.
+  const [addEventDate, setAddEventDate] = useState<Date | null>(null);
 
   const handleSyncFRB = async () => {
     if (syncing) return;
@@ -190,7 +203,7 @@ export default function ScheduleScreen() {
   const openDaySchedule = (dayData: { date: Date; events: CalendarEvent[] }) => setSelectedDay(dayData);
 
   const handleQuickAdd = (date: Date) => {
-    form.prefillDate(date);
+    setAddEventDate(date);
     setSelectedDay(null);
     setShowAddModal(true);
   };
@@ -492,12 +505,18 @@ export default function ScheduleScreen() {
 
       <AddEventModal
         visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        form={form}
+        onClose={() => { setShowAddModal(false); setAddEventDate(null); }}
+        onCreated={(count) => {
+          refetch();
+          showToast({
+            variant: 'success',
+            message: count > 1 ? `Au fost create ${count} antrenamente.` : 'Evenimentul a fost salvat.',
+          });
+        }}
         teams={teams}
         isMobile={isMobile}
-        currentDate={currentDate}
-        onNavigateMonth={navigateMonth}
+        initialDate={addEventDate}
+        initialTeamId={paramTeamId ?? null}
       />
 
       <DayScheduleModal

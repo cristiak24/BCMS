@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react';
-import { Alert } from '@/src/web/reactNative';
 import AsyncStorage from '@/src/web/asyncStorage';
 import { eventsApi } from '../services/eventsApi';
 
@@ -91,7 +90,8 @@ function keepEndAfterStart(startTime: string, endTime: string) {
  * modal (including the recurring-training scheduler). Extracted out of the
  * admin schedule screen so that screen only has to wire up UI.
  */
-export function useAddEventForm(onCreated: () => void) {
+/** `onCreated` receives how many events were created (a recurring series creates several). */
+export function useAddEventForm(onCreated: (createdCount: number) => void) {
   const [newEventType, setNewEventType] = useState<AddEventType>('training');
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -108,6 +108,9 @@ export function useAddEventForm(onCreated: () => void) {
   const [recurringWeeks, setRecurringWeeks] = useState(4);
   const [recentLocations, setRecentLocations] = useState<string[]>([]);
   const [addingEvent, setAddingEvent] = useState(false);
+  // Shown inside the form. It used to be window.alert('Error', …) — a blocking
+  // browser dialog, in English, on top of a Romanian form.
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const loadRecentLocations = useCallback(async () => {
     try {
@@ -261,6 +264,8 @@ export function useAddEventForm(onCreated: () => void) {
     }
 
     setAddingEvent(true);
+    setSubmitError(null);
+    let createdCount = 1;
     try {
       if (newEventType === 'training' && isRecurring && recurringDays.length > 0) {
         // For each selected weekday (0=Mon, 1=Tue, ..., 6=Sun in our UI)
@@ -300,7 +305,7 @@ export function useAddEventForm(onCreated: () => void) {
             amount: null,
           });
         }));
-        Alert.alert('Done', `Created ${unique.length} recurring training sessions.`);
+        createdCount = unique.length;
       } else {
         const localBaseDateStr = toLocalDateStr(newStartDate);
 
@@ -317,13 +322,13 @@ export function useAddEventForm(onCreated: () => void) {
       }
 
       if (newLocation.trim()) await saveLocation(newLocation.trim());
-      onCreated();
+      onCreated(createdCount);
       resetForm();
       return true;
     } catch (error) {
       const maybeAxiosError = error as { response?: { data?: { error?: string } }; message?: string };
-      const message = maybeAxiosError.response?.data?.error || maybeAxiosError.message || 'Failed to create event';
-      Alert.alert('Error', message);
+      const message = maybeAxiosError.response?.data?.error || maybeAxiosError.message || 'Evenimentul nu a putut fi salvat.';
+      setSubmitError(message);
       return false;
     } finally {
       setAddingEvent(false);
@@ -349,7 +354,7 @@ export function useAddEventForm(onCreated: () => void) {
     recurringDays, setRecurringDays,
     recurringWeeks, setRecurringWeeks,
     recentLocations, loadRecentLocations,
-    addingEvent,
+    addingEvent, submitError, setSubmitError,
     handleTimeInputChange, handleTimeInputBlur, updatePickerTime,
     resetForm, prefillDate, submit,
   };

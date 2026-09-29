@@ -444,3 +444,29 @@
 @media (prefers-reduced-motion: reduce) {
   .ui-backdrop, .ui-sheet { animation: none; }
 }
+
+/* ── Native form controls (date / time / select) ───────────────────────────
+   Used where the phone's own picker beats a custom one (event form). Colours
+   come from inline tokens; html's color-scheme makes the pickers themselves
+   follow light/dark. */
+.native-field {
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+.native-field:focus {
+  border-color: var(--c-brand-border) !important;
+}
+.native-field::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
+.native-field::-webkit-calendar-picker-indicator {
+  opacity: 0.55;
+  cursor: pointer;
+}

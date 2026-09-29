@@ -1,710 +1,497 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Modal, Pressable, FlatList, ActivityIndicator } from '@/src/web/reactNative';
-import { LinearGradient } from '@/src/web/linearGradient';
-import {
-  Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Check, Clock, MapPin, Users, X,
-  Dumbbell, Info, Send,
-} from 'lucide-react';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Switch, Text, View, type ScrollViewHandle } from '@/src/web/reactNative';
+import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { Team } from '../../../services/teamsApi';
-import { AddEventFormState } from '../../../hooks/useAddEventForm';
+import { useAddEventForm, type AddEventType } from '../../../hooks/useAddEventForm';
+import { FormField } from '../../ui/FormField';
+import { EVENT_TYPE_META } from '../scheduleShared';
 
-type SelectSheet = 'type' | 'location' | 'team';
+/**
+ * "Eveniment nou" — bottom sheet on phones, centred dialog on desktop.
+ *
+ * Rebuilt for mobile. The previous version:
+ *   • kept the form state in the SCHEDULE screen, so every keystroke re-rendered
+ *     the whole calendar behind the modal — the typing lag;
+ *   • drew custom scroll-wheel time pickers and a flat 1–31 day grid, whose
+ *     month arrows navigated (and refetched) the schedule behind it;
+ *   • ran at poster scale: 36px corners, 56px fields, 11px black uppercase
+ *     labels, stacked 2xl shadows.
+ *
+ * Now the form lives here, dates / times / team use the phone's NATIVE pickers
+ * (the iOS wheel / Android dialog — fast, familiar, accessible), and the
+ * geometry matches the rest of the app (44px fields, 12–16px radii).
+ */
 
-const EVENT_TYPE_OPTIONS = [
-  { value: 'training', label: 'Antrenament' },
-  { value: 'match', label: 'Meci' },
-  { value: 'camp', label: 'Cantonament' },
-  { value: 'medical', label: 'Vizită medicală' },
-  { value: 'admin', label: 'Administrativ' },
-] as const;
+const TYPE_ORDER: AddEventType[] = ['training', 'match', 'camp', 'medical', 'admin'];
+const TYPE_ICON: Record<AddEventType, string> = {
+  training: 'fitness-center',
+  match: 'sports-basketball',
+  camp: 'terrain',
+  medical: 'medical-services',
+  admin: 'badge',
+};
 const REPEAT_DAY_LABELS = ['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'];
+const REPEAT_WEEKS = [2, 4, 6, 8, 12];
+const DEFAULT_LOCATIONS = ['Sală principală', 'Sala Polivalentă', 'Teren de antrenament'];
 
-const InlineSpinner = ({ color = 'var(--c-surface)' }: { color?: string }) => (
-  <View
-    className="w-7 h-7 rounded-full items-center justify-center"
-    style={{ backgroundColor: color === 'var(--c-surface)' ? 'rgba(255,255,255,0.18)' : 'rgba(29,62,144,0.1)' }}
-  >
-    <ActivityIndicator size="small" color={color} />
-  </View>
-);
+function toDateInput(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
 
-const FieldError = ({ message }: { message?: string }) => {
+function fromDateInput(value: string) {
+  const [y, m, d] = value.split('-').map(Number);
+  return y && m && d ? new Date(y, m - 1, d) : null;
+}
+
+const nativeInputClass = 'native-field h-11 w-full rounded-[11px] border px-3 text-[14px] font-medium';
+
+function Label({ children }: { children: ReactNode }) {
+  return <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>{children}</Text>;
+}
+
+function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return (
-    <View className="mt-2 flex-row items-start rounded-2xl border border-red-100 bg-red-50 px-3 py-2">
-      <Info color="var(--c-danger)" size={14} />
-      <Text className="ml-2 flex-1 text-xs font-bold leading-5 text-red-700">{message}</Text>
-    </View>
+    <Text className="text-[12px] font-semibold mt-1.5" style={{ color: 'var(--c-danger-fg)' }} data-field-error>
+      {message}
+    </Text>
   );
-};
+}
 
-const TimeSpinner = React.memo(({ value, onSelect, range }: { value: string; onSelect: (v: string) => void; range: string[] }) => {
-  const listRef = React.useRef<any>(null);
-  const ITEM_HEIGHT = 36;
-
-  React.useEffect(() => {
-    const idx = range.indexOf(value);
-    if (idx >= 0 && listRef.current) {
-      setTimeout(() => {
-        listRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5, animated: false });
-      }, 80);
-    }
-  }, [value, range]);
-
+function Section({ title, trailing, children }: { title: string; trailing?: ReactNode; children: ReactNode }) {
   return (
-    <View className="relative w-20 h-36 rounded-[22px] bg-slate-50 border border-slate-100 overflow-hidden">
-      <View
-        pointerEvents="none"
-        style={{ top: 54 }}
-        className="absolute left-2.5 right-2.5 h-9 rounded-2xl bg-white border border-blue-100 shadow-sm"
-      />
-      <FlatList
-        ref={listRef}
-        data={range}
-        keyExtractor={(item) => item}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_HEIGHT}
-        decelerationRate="fast"
-        style={{ height: 144 }}
-        contentContainerStyle={{ paddingVertical: 54 }}
-        getItemLayout={(_: any, index: number) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
-        onScrollToIndexFailed={(info: any) => {
-          listRef.current?.scrollToOffset({ offset: info.index * ITEM_HEIGHT, animated: false });
-        }}
-        renderItem={({ item }: { item: string }) => {
-          const isSelected = item === value;
-          return (
-            <TouchableOpacity
-              onPress={() => onSelect(item)}
-              activeOpacity={0.75}
-              style={{ height: ITEM_HEIGHT, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Text style={{ fontSize: isSelected ? 25 : 17, lineHeight: isSelected ? 29 : 21, fontWeight: '900', color: isSelected ? 'var(--c-brand-fg)' : 'var(--c-border-strong)' }}>
-                {item}
-              </Text>
-            </TouchableOpacity>
-          );
-        }}
-      />
-      <LinearGradient pointerEvents="none" colors={['var(--c-surface-2)', 'rgba(248,250,252,0)']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 44 }} />
-      <LinearGradient pointerEvents="none" colors={['rgba(248,250,252,0)', 'var(--c-surface-2)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 44 }} />
+    <View className="gap-3">
+      <View className="flex-row items-center justify-between gap-3">
+        <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{title}</Text>
+        {trailing}
+      </View>
+      {children}
     </View>
   );
-});
-TimeSpinner.displayName = 'TimeSpinner';
-
-const daysInMonth = (m: number, y: number) => new Date(y, m + 1, 0).getDate();
+}
 
 export function AddEventModal({
   visible,
   onClose,
-  form,
+  onCreated,
   teams,
   isMobile,
-  currentDate,
-  onNavigateMonth,
+  initialDate,
+  initialTeamId,
 }: {
   visible: boolean;
   onClose: () => void;
-  form: AddEventFormState;
+  onCreated: (createdCount: number) => void;
   teams: Team[];
   isMobile: boolean;
-  currentDate: Date;
-  onNavigateMonth: (deltaMonths: number) => void;
+  /** Pre-filled day (from "add on this day"); null keeps the last one. */
+  initialDate?: Date | null;
+  /** Team scope of the schedule, if any. */
+  initialTeamId?: number | null;
 }) {
-  const [showDatePicker, setShowDatePicker] = useState<'start' | 'end' | null>(null);
-  const [showTimePicker, setShowTimePicker] = useState<'start' | 'end' | null>(null);
-  const [selectSheet, setSelectSheet] = useState<SelectSheet | null>(null);
-
+  const form = useAddEventForm(onCreated);
   const {
     newEventType, setNewEventType, newTitle, setNewTitle, newDescription, setNewDescription,
     newStartTime, newEndTime, newLocation, setNewLocation, newTeamId, setNewTeamId, newAmount, setNewAmount,
     addEventErrors, clearError, newStartDate, setNewStartDate, newEndDate, setNewEndDate,
     isRecurring, setIsRecurring, recurringDays, setRecurringDays, recurringWeeks, setRecurringWeeks,
-    recentLocations, addingEvent, handleTimeInputChange, handleTimeInputBlur, updatePickerTime, submit,
+    recentLocations, loadRecentLocations, addingEvent, submitError, updatePickerTime, prefillDate, submit,
   } = form;
+
+  const scrollRef = useRef<ScrollViewHandle | null>(null);
+
+  // Apply the opening context once per open.
+  const wasVisible = useRef(false);
+  useEffect(() => {
+    if (visible && !wasVisible.current) {
+      loadRecentLocations();
+      if (initialDate) prefillDate(initialDate);
+      if (initialTeamId != null) setNewTeamId(initialTeamId);
+    }
+    wasVisible.current = visible;
+  }, [visible, initialDate, initialTeamId, loadRecentLocations, prefillDate, setNewTeamId]);
 
   if (!visible) return null;
 
+  const close = () => { if (!addingEvent) onClose(); };
   const handleSubmit = async () => {
     const ok = await submit();
-    if (ok) onClose();
+    if (ok) {
+      onClose();
+      return;
+    }
+    // Validation errors sit in the fields above the fold on a phone; bring the
+    // first one into view instead of leaving the user staring at the footer.
+    requestAnimationFrame(() => {
+      const target = document.querySelector('.rn-modal [data-field-error]') as HTMLElement | null;
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      else scrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
   };
 
-  const monthName = currentDate.toLocaleString('ro-RO', { month: 'long' });
-  const viewYear = currentDate.getFullYear();
-  const selectedTeam = teams.find((team) => team.id === newTeamId);
-  const selectedEventTypeLabel = EVENT_TYPE_OPTIONS.find((option) => option.value === newEventType)?.label ?? 'Antrenament';
-  const locationOptions = Array.from(
-    new Set([newLocation.trim(), ...recentLocations, 'Sală principală', 'Sala Polivalenta', 'Teren de antrenament'].filter(Boolean))
-  );
-  const formattedStartDate = newStartDate.toLocaleDateString('ro-RO', { month: 'short', day: 'numeric', year: 'numeric' });
-  const formattedEndDate = newEndDate.toLocaleDateString('ro-RO', { month: 'short', day: 'numeric', year: 'numeric' });
+  const isTraining = newEventType === 'training';
+  const locationSuggestions = Array.from(new Set([...recentLocations, ...DEFAULT_LOCATIONS]))
+    .filter((location) => location && location !== newLocation.trim())
+    .slice(0, 5);
 
   return (
-    <>
-      <Modal visible={visible} transparent animationType="slide">
-        <View className={`flex-1 bg-black/40 ${isMobile ? 'justify-end' : 'justify-center items-center'} ${isMobile ? '' : 'p-8'}`}>
-          <View
-            className={`bg-[#F4F7FC] shadow-2xl overflow-hidden ${isMobile ? 'rounded-t-[36px] max-h-[94%] w-full' : 'rounded-[36px] max-h-[92%] w-full'}`}
-            style={isMobile ? undefined : { maxWidth: 1180 }}
-          >
-            <View className={`${isMobile ? 'px-5 pt-4 pb-3' : 'px-10 pt-8 pb-5'} border-b`} style={{ borderColor: 'var(--c-border)' } as any}>
-              <View className="flex-row justify-between items-start gap-4">
-                <View className="flex-1">
-                  <Text className="text-[11px] font-semibold mb-1" style={{ color: 'var(--c-faint)' }}>
-                    Program › <Text style={{ color: 'var(--c-brand-fg)' }}>Eveniment nou ({selectedEventTypeLabel.toLowerCase()})</Text>
-                  </Text>
-                  <Text className={`${isMobile ? 'text-[22px]' : 'text-[32px]'} font-bold`} style={{ color: 'var(--c-ink-strong)' }}>Programează eveniment</Text>
-                  {!isMobile && (
-                    <Text className="text-lg font-medium mt-2" style={{ color: 'var(--c-muted)' }}>
-                      Creează un antrenament, meci, cantonament sau eveniment intern de club.
-                    </Text>
-                  )}
-                </View>
-                <TouchableOpacity
-                  onPress={() => { if (!addingEvent) onClose(); }}
-                  disabled={addingEvent}
-                  className={`w-10 h-10 rounded-[12px] items-center justify-center border ${addingEvent ? 'opacity-60' : ''}`}
-                  style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
-                >
-                  <X color="var(--c-ink-soft)" size={20} />
-                </TouchableOpacity>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
+      <Pressable
+        className="ui-backdrop flex-1 items-center justify-end lg:justify-center lg:p-6"
+        style={{ backgroundColor: 'rgba(10,15,28,0.55)' }}
+        onPress={close}
+      >
+        <Pressable
+          onPress={(event: any) => event.stopPropagation()}
+          className="ui-sheet w-full lg:max-w-[620px] rounded-t-[20px] lg:rounded-[18px] border flex-col overflow-hidden"
+          style={{
+            backgroundColor: 'var(--c-surface)',
+            borderColor: 'var(--c-border)',
+            maxHeight: isMobile ? '92vh' : '88vh',
+            boxShadow: 'var(--e-lg)',
+          } as any}
+        >
+          {/* Header */}
+          <View className="px-5 pt-3 lg:pt-5 pb-3.5 border-b" style={{ borderColor: 'var(--c-border-soft)' } as any}>
+            {isMobile ? (
+              <View className="self-center w-10 h-1 rounded-full mb-3" style={{ backgroundColor: 'var(--c-border-strong)' }} />
+            ) : null}
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="flex-1 min-w-0">
+                <Text className="text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>Eveniment nou</Text>
+                <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Apare imediat în programul echipei.</Text>
               </View>
+              <Pressable
+                onPress={close}
+                disabled={addingEvent}
+                accessibilityRole="button"
+                accessibilityLabel="Închide"
+                className="ui-press w-9 h-9 rounded-full items-center justify-center"
+                style={{ backgroundColor: 'var(--c-surface-2)' }}
+              >
+                <MaterialIcons name="close" size={18} color="var(--c-ink-soft)" />
+              </Pressable>
             </View>
+          </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: isMobile ? 20 : 40, paddingTop: 24, paddingBottom: 28 }}>
-              <View className={`${isMobile ? 'gap-6' : 'flex-row gap-8'}`}>
-                {/* Decorative live-preview + tips column. On mobile it pushed the
-                    actual form ~350px down the sheet, so it's desktop-only —
-                    the form is what a phone user came to fill in. */}
-                {!isMobile && (
-                <View style={{ width: 360 }} className="gap-5">
-                  <LinearGradient
-                    colors={['#111C3F', 'var(--c-brand-fg)', 'var(--c-sky)']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={{ borderRadius: 32, overflow: 'hidden', borderWidth: 4, borderColor: 'var(--c-border)', shadowColor: 'var(--c-brand-fg)', shadowOffset: { width: 0, height: 18 }, shadowOpacity: 0.22, shadowRadius: 28, elevation: 10 }}
-                  >
-                    <View style={{ height: isMobile ? 256 : 420 }} className="relative p-7 justify-between">
-                      <View className="flex-row justify-between items-start">
-                        <View className="w-14 h-14 rounded-2xl bg-white/15 border border-white/20 items-center justify-center">
-                          <Dumbbell color="var(--c-surface)" size={24} />
-                        </View>
-                        <View className="bg-white/15 border border-white/20 px-4 py-2 rounded-full">
-                          <Text className="text-white font-black text-[10px] uppercase tracking-widest">{selectedEventTypeLabel}</Text>
-                        </View>
-                      </View>
-
-                      <View className="absolute left-8 right-8 top-28 bottom-24 border border-white/20 rounded-[28px]" />
-                      <View style={{ left: '45%', top: 128 }} className="absolute w-16 h-16 rounded-full border border-white/20" />
-                      <View style={{ top: '52%' }} className="absolute left-8 right-8 h-px bg-white/20" />
-
-                      <View>
-                        <Text className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-black text-white mb-3`}>
-                          {newTitle.trim() || 'Previzualizare eveniment'}
+          {/* Body */}
+          <ScrollView ref={scrollRef} className="flex-1" contentContainerStyle={{ padding: 20, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+            <View className="gap-6">
+              <Section title="Tip">
+                {/* Wraps instead of scrolling so all five are visible at once. */}
+                <View className="flex-row flex-wrap gap-2" accessibilityRole="radiogroup" accessibilityLabel="Tip eveniment">
+                  {TYPE_ORDER.map((type) => {
+                    const meta = EVENT_TYPE_META[type];
+                    const selected = newEventType === type;
+                    return (
+                      <Pressable
+                        key={type}
+                        onPress={() => {
+                          setNewEventType(type);
+                          if (type !== 'training') clearError('recurringDays');
+                        }}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                        accessibilityLabel={meta.label}
+                        className="ui-press h-10 rounded-full border px-3.5 flex-row items-center gap-1.5"
+                        style={{
+                          backgroundColor: selected ? meta.soft : 'var(--c-surface)',
+                          borderColor: selected ? meta.solid : 'var(--c-border)',
+                          boxShadow: selected ? `inset 0 0 0 1px ${meta.solid}` : 'none',
+                        } as any}
+                      >
+                        <MaterialIcons name={TYPE_ICON[type]} size={15} color={selected ? meta.onSoft : 'var(--c-muted)'} />
+                        <Text className="text-[13px] font-semibold" style={{ color: selected ? meta.onSoft : 'var(--c-ink-soft)' }}>
+                          {meta.label}
                         </Text>
-                        <Text className="text-blue-100 font-semibold leading-6">
-                          {selectedTeam ? selectedTeam.name : 'Alege o echipă'} · {newLocation.trim() || 'Alege locația'}
-                        </Text>
-                        {newDescription.trim() ? (
-                          <Text className="text-blue-100 font-medium leading-5 mt-3" numberOfLines={2}>
-                            {newDescription.trim()}
-                          </Text>
-                        ) : null}
-                        <View className="flex-row flex-wrap gap-2 mt-5">
-                          <View className="bg-white/15 border border-white/20 px-3 py-2 rounded-full flex-row items-center">
-                            <CalendarIcon color="var(--c-tint-fg)" size={14} />
-                            <Text className="text-white font-bold text-[11px] ml-2">{formattedStartDate}</Text>
-                          </View>
-                          <View className="bg-white/15 border border-white/20 px-3 py-2 rounded-full flex-row items-center">
-                            <Clock color="var(--c-tint-fg)" size={14} />
-                            <Text className="text-white font-bold text-[11px] ml-2">{newStartTime} - {newEndTime}</Text>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                  </LinearGradient>
-
-                  <View className="bg-white rounded-[28px] p-6 border border-slate-100 shadow-sm">
-                    <View className="flex-row items-center mb-4">
-                      <Info color="var(--c-brand-fg)" size={17} />
-                      <Text className="text-[#1D3E90] font-black text-base ml-2">Sfaturi de programare</Text>
-                    </View>
-                    <View className="gap-3">
-                      <View className="flex-row">
-                        <Text className="text-[#38BAF8] font-black mr-3">•</Text>
-                        <Text className="flex-1 text-slate-500 font-medium leading-5">Orele de vârf pentru sală sunt de obicei după-amiaza târziu și seara devreme.</Text>
-                      </View>
-                      <View className="flex-row">
-                        <Text className="text-[#38BAF8] font-black mr-3">•</Text>
-                        <Text className="flex-1 text-slate-500 font-medium leading-5">Antrenamentele recurente creează câte o sesiune pentru fiecare zi selectată.</Text>
-                      </View>
-                    </View>
-                  </View>
+                      </Pressable>
+                    );
+                  })}
                 </View>
-                )}
+              </Section>
 
-                <View className="flex-1 gap-6">
-                  <View className="bg-white rounded-[32px] p-6 border border-white shadow-sm">
-                    <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">Tip eveniment</Text>
-                    <TouchableOpacity
-                      onPress={() => setSelectSheet('type')}
-                      activeOpacity={0.82}
-                      className="bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 mb-6 flex-row items-center justify-between shadow-sm"
+              <Section title="Detalii">
+                <FormField
+                  label="Titlu"
+                  value={newTitle}
+                  onChangeText={(value: string) => { setNewTitle(value); clearError('title'); }}
+                  placeholder={isTraining ? 'ex. Antrenament aruncări U16' : 'ex. CSM Focșani vs CSU Brașov'}
+                  error={addEventErrors.title}
+                  maxLength={255}
+                />
+
+                <View>
+                  <Label>Echipă</Label>
+                  <View className="relative">
+                    {/* Native select: the phone's own picker, no custom sheet. */}
+                    <select
+                      className={nativeInputClass}
+                      style={{
+                        backgroundColor: 'var(--c-surface-2)',
+                        borderColor: addEventErrors.team ? 'var(--c-danger)' : 'var(--c-border)',
+                        color: newTeamId == null ? 'var(--c-faint)' : 'var(--c-ink)',
+                        appearance: 'none',
+                        paddingRight: 36,
+                      }}
+                      value={newTeamId ?? ''}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setNewTeamId(value ? Number(value) : null);
+                        clearError('team');
+                      }}
+                      aria-label="Echipă"
                     >
-                      <View className="flex-row items-center">
-                        <View className="w-9 h-9 rounded-xl bg-blue-50 items-center justify-center mr-3">
-                          <Dumbbell size={17} color="var(--c-brand-fg)" />
-                        </View>
-                        <View>
-                          <Text className="font-black text-slate-800">{selectedEventTypeLabel}</Text>
-                          <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Categorie eveniment</Text>
-                        </View>
-                      </View>
-                      <ChevronDown size={18} color="var(--c-faint)" />
-                    </TouchableOpacity>
-
-                    <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Titlu eveniment *</Text>
-                    <TextInput
-                      className={`bg-white border rounded-2xl px-5 py-4 font-bold text-slate-800 text-base shadow-sm ${addEventErrors.title ? 'border-red-300 bg-red-50/40' : 'border-slate-100'}`}
-                      placeholder="ex. Antrenament aruncări U16"
-                      placeholderTextColor="var(--c-faint)"
-                      value={newTitle}
-                      onChangeText={(value: string) => { setNewTitle(value); clearError('title'); }}
-                    />
-                    <FieldError message={addEventErrors.title} />
-
-                    <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mt-5 mb-3">Descriere <Text className="text-slate-300 normal-case">(opțional)</Text></Text>
-                    <TextInput
-                      className={`bg-white border rounded-2xl px-5 py-4 font-bold text-slate-800 text-base shadow-sm min-h-[118px] ${addEventErrors.description ? 'border-red-300 bg-red-50/40' : 'border-slate-100'}`}
-                      placeholder="Adaugă obiective, logistică, echipament sau detalii de prezentare."
-                      placeholderTextColor="var(--c-faint)"
-                      value={newDescription}
-                      onChangeText={(value: string) => { setNewDescription(value); clearError('description'); }}
-                      multiline
-                      textAlignVertical="top"
-                    />
-                    <FieldError message={addEventErrors.description} />
-
-                    <View className={`${isMobile ? 'gap-5' : 'flex-row gap-5'} mt-5`}>
-                      <View className="flex-1">
-                        <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Locație sau link *</Text>
-                        <View className={`bg-white border rounded-2xl px-5 py-3 flex-row items-center shadow-sm ${addEventErrors.location ? 'border-red-300 bg-red-50/40' : 'border-slate-100'}`}>
-                          <TextInput
-                            className="flex-1 font-bold text-slate-800 text-base"
-                            placeholder="Sală principală sau https://meet..."
-                            placeholderTextColor="var(--c-faint)"
-                            value={newLocation}
-                            onChangeText={(value: string) => { setNewLocation(value); clearError('location'); }}
-                          />
-                          <TouchableOpacity onPress={() => setSelectSheet('location')} className="w-9 h-9 rounded-xl bg-slate-50 items-center justify-center ml-3" activeOpacity={0.82}>
-                            <ChevronDown size={18} color="var(--c-faint)" />
-                          </TouchableOpacity>
-                        </View>
-                        <FieldError message={addEventErrors.location} />
-                      </View>
-
-                      <View className="flex-1">
-                        <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Echipă *</Text>
-                        <TouchableOpacity
-                          onPress={() => setSelectSheet('team')}
-                          activeOpacity={0.82}
-                          className={`bg-white border rounded-2xl px-5 py-4 flex-row items-center justify-between shadow-sm ${addEventErrors.team ? 'border-red-300 bg-red-50/40' : 'border-slate-100'}`}
-                        >
-                          <View className="flex-row items-center flex-1">
-                            <View className="w-9 h-9 rounded-xl bg-blue-50 items-center justify-center mr-3">
-                              <Users size={17} color="var(--c-brand-fg)" />
-                            </View>
-                            <View className="flex-1">
-                              <Text numberOfLines={1} className={`font-black ${selectedTeam ? 'text-slate-800' : 'text-slate-400'}`}>
-                                {selectedTeam ? selectedTeam.name : 'Alege echipa'}
-                              </Text>
-                              <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{teams.length} disponibile</Text>
-                            </View>
-                          </View>
-                          <ChevronDown size={18} color="var(--c-faint)" />
-                        </TouchableOpacity>
-                        <FieldError message={addEventErrors.team} />
-                      </View>
+                      <option value="">Alege echipa</option>
+                      {teams.map((team) => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
+                    <View className="absolute right-3 top-0 bottom-0 justify-center" style={{ pointerEvents: 'none' } as any}>
+                      <MaterialIcons name="expand-more" size={18} color="var(--c-faint)" />
                     </View>
                   </View>
+                  <FieldError message={addEventErrors.team} />
+                </View>
 
-                  <View className="bg-white rounded-[32px] p-6 border border-white shadow-sm">
-                    <View className="flex-row items-center justify-between mb-7">
-                      <Text className="text-xl font-black text-[#1D3E90]">Oră și frecvență</Text>
-                      {newEventType === 'training' && (
-                        <TouchableOpacity
-                          onPress={() => { setIsRecurring((r) => !r); clearError('recurringDays'); }}
-                          className={`h-9 rounded-full flex-row items-center px-2 ${isRecurring ? 'bg-blue-50' : 'bg-slate-100'}`}
+                <View>
+                  <FormField
+                    label="Locație"
+                    icon="place"
+                    value={newLocation}
+                    onChangeText={(value: string) => { setNewLocation(value); clearError('location'); }}
+                    placeholder="Sală, teren sau link"
+                    error={addEventErrors.location}
+                    maxLength={255}
+                  />
+                  {locationSuggestions.length ? (
+                    <View className="flex-row flex-wrap gap-1.5 mt-2">
+                      {locationSuggestions.map((location) => (
+                        <Pressable
+                          key={location}
+                          onPress={() => { setNewLocation(location); clearError('location'); }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Folosește locația ${location}`}
+                          className="ui-press h-8 rounded-full px-3 justify-center border"
+                          style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}
                         >
-                          <Text className={`text-[11px] font-black mr-2 ${isRecurring ? 'text-[#1D3E90]' : 'text-slate-500'}`}>Recurent</Text>
-                          <View className={`w-11 h-6 rounded-full px-1 flex-row items-center ${isRecurring ? 'bg-[#38BAF8] justify-end' : 'bg-slate-300 justify-start'}`}>
-                            <View className="w-4 h-4 rounded-full bg-white shadow-sm" />
-                          </View>
-                        </TouchableOpacity>
-                      )}
+                          <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-ink-soft)' }} numberOfLines={1}>{location}</Text>
+                        </Pressable>
+                      ))}
                     </View>
+                  ) : null}
+                </View>
+              </Section>
 
-                    <View className={`${isMobile ? 'gap-5' : 'flex-row gap-5'} mb-5`}>
-                      <TouchableOpacity onPress={() => setShowDatePicker('start')} className="flex-1">
-                        <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Data de început *</Text>
-                        <View className="bg-white border border-slate-100 rounded-2xl px-5 py-4 flex-row items-center justify-between shadow-sm">
-                          <Text className="font-bold text-slate-800">{formattedStartDate}</Text>
-                          <CalendarIcon size={18} color="var(--c-ink-strong)" />
-                        </View>
-                      </TouchableOpacity>
-
-                      {newEventType !== 'training' && (
-                        <TouchableOpacity onPress={() => setShowDatePicker('end')} className="flex-1">
-                          <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Data de sfârșit *</Text>
-                          <View className="bg-white border border-slate-100 rounded-2xl px-5 py-4 flex-row items-center justify-between shadow-sm">
-                            <Text className="font-bold text-slate-800">{formattedEndDate}</Text>
-                            <CalendarIcon size={18} color="var(--c-ink-strong)" />
-                          </View>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-
-                    <View className={`${isMobile ? 'gap-5' : 'flex-row gap-5'} mb-6`}>
-                      <View className="flex-1">
-                        <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Ora de început *</Text>
-                        <View className={`bg-white border rounded-2xl px-5 py-4 flex-row items-center justify-between shadow-sm ${addEventErrors.startTime ? 'border-red-300 bg-red-50/40' : 'border-slate-100'}`}>
-                          <TextInput
-                            value={newStartTime}
-                            onChangeText={(value: string) => handleTimeInputChange('start', value)}
-                            onBlur={() => handleTimeInputBlur('start')}
-                            keyboardType="number-pad"
-                            maxLength={5}
-                            placeholder="09:00"
-                            placeholderTextColor="var(--c-faint)"
-                            className="flex-1 font-bold text-slate-800"
-                          />
-                          <TouchableOpacity onPress={() => setShowTimePicker('start')} className="w-9 h-9 rounded-xl bg-slate-50 items-center justify-center ml-3" activeOpacity={0.82}>
-                            <Clock size={18} color="var(--c-ink-strong)" />
-                          </TouchableOpacity>
-                        </View>
-                        <FieldError message={addEventErrors.startTime} />
-                      </View>
-
-                      <View className="flex-1">
-                        <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Ora de sfârșit *</Text>
-                        <View className={`bg-white border rounded-2xl px-5 py-4 flex-row items-center justify-between shadow-sm ${addEventErrors.endTime ? 'border-red-300 bg-red-50/40' : 'border-slate-100'}`}>
-                          <TextInput
-                            value={newEndTime}
-                            onChangeText={(value: string) => handleTimeInputChange('end', value)}
-                            onBlur={() => handleTimeInputBlur('end')}
-                            keyboardType="number-pad"
-                            maxLength={5}
-                            placeholder="10:00"
-                            placeholderTextColor="var(--c-faint)"
-                            className="flex-1 font-bold text-slate-800"
-                          />
-                          <TouchableOpacity onPress={() => setShowTimePicker('end')} className="w-9 h-9 rounded-xl bg-slate-50 items-center justify-center ml-3" activeOpacity={0.82}>
-                            <Clock size={18} color="var(--c-ink-strong)" />
-                          </TouchableOpacity>
-                        </View>
-                        <FieldError message={addEventErrors.endTime} />
-                      </View>
-                    </View>
-
-                    {newEventType === 'training' && isRecurring && (
-                      <View>
-                        <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Repetă în zilele</Text>
-                        <View className="flex-row flex-wrap gap-3 mb-5">
-                          {REPEAT_DAY_LABELS.map((day, i) => (
-                            <TouchableOpacity
-                              key={`${day}-${i}`}
-                              onPress={() => setRecurringDays((prev) => (prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i]))}
-                              onPressIn={() => clearError('recurringDays')}
-                              className={`w-12 h-12 rounded-full items-center justify-center border ${recurringDays.includes(i) ? 'bg-[#38BAF8] border-[#38BAF8] shadow-sm' : 'bg-slate-50 border-slate-200'}`}
-                            >
-                              <Text className={`font-black text-[12px] ${recurringDays.includes(i) ? 'text-white' : 'text-slate-500'}`}>{day}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                        <FieldError message={addEventErrors.recurringDays} />
-
-                        <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Repetă timp de</Text>
-                        <View className="flex-row flex-wrap gap-2">
-                          {[2, 4, 6, 8, 12].map((w) => (
-                            <TouchableOpacity
-                              key={w}
-                              onPress={() => setRecurringWeeks(w)}
-                              className={`px-4 py-3 rounded-2xl border ${recurringWeeks === w ? 'bg-[#1D3E90] border-[#1D3E90]' : 'bg-slate-50 border-slate-100'}`}
-                            >
-                              <Text className={`font-black text-[11px] ${recurringWeeks === w ? 'text-white' : 'text-slate-500'}`}>{w} săptămâni</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </View>
-                    )}
+              <Section
+                title="Când"
+                trailing={isTraining ? (
+                  <View className="flex-row items-center gap-2">
+                    <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Se repetă</Text>
+                    <Switch
+                      value={isRecurring}
+                      onValueChange={(value: boolean) => { setIsRecurring(value); clearError('recurringDays'); }}
+                      accessibilityLabel="Antrenament recurent"
+                    />
                   </View>
-
-                  {newEventType === 'camp' && (
-                    <View className="bg-white rounded-[32px] p-6 border border-white shadow-sm">
-                      <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Taxă de înscriere (€)</Text>
-                      <TextInput
-                        className="bg-white border border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-800 shadow-sm"
-                        placeholder="0.00"
-                        placeholderTextColor="var(--c-faint)"
-                        keyboardType="numeric"
-                        value={newAmount}
-                        onChangeText={setNewAmount}
+                ) : null}
+              >
+                <View className={`grid gap-3 ${isTraining ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  <View className="min-w-0">
+                    <Label>{isTraining ? 'Data' : 'Început'}</Label>
+                    <input
+                      type="date"
+                      className={nativeInputClass}
+                      style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' }}
+                      value={toDateInput(newStartDate)}
+                      onChange={(event) => {
+                        const date = fromDateInput(event.target.value);
+                        if (!date) return;
+                        setNewStartDate(date);
+                        if (newEndDate < date) setNewEndDate(date);
+                      }}
+                      aria-label="Data de început"
+                    />
+                  </View>
+                  {!isTraining ? (
+                    <View className="min-w-0">
+                      <Label>Sfârșit</Label>
+                      <input
+                        type="date"
+                        className={nativeInputClass}
+                        style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' }}
+                        value={toDateInput(newEndDate)}
+                        min={toDateInput(newStartDate)}
+                        onChange={(event) => {
+                          const date = fromDateInput(event.target.value);
+                          if (date) setNewEndDate(date);
+                        }}
+                        aria-label="Data de sfârșit"
                       />
                     </View>
-                  )}
-                </View>
-              </View>
-            </ScrollView>
-
-            <View className={`${isMobile ? 'px-5 py-4 gap-3' : 'px-10 py-6 flex-row justify-end items-center gap-5'} bg-[#F4F7FC] border-t border-white/80`}>
-              <TouchableOpacity
-                onPress={() => { if (!addingEvent) onClose(); }}
-                disabled={addingEvent}
-                className={`${isMobile ? 'h-12 items-center justify-center' : 'px-6 py-4'} ${addingEvent ? 'opacity-60' : ''}`}
-              >
-                <Text className="text-slate-500 font-black text-sm">Anulează</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSubmit}
-                disabled={addingEvent}
-                className={`bg-[#1D3E90] h-14 rounded-[28px] items-center justify-center shadow-xl shadow-blue-900/30 ${isMobile ? 'w-full' : 'px-9 min-w-[240px]'} ${addingEvent ? 'opacity-80' : ''}`}
-              >
-                {addingEvent ? (
-                  <View className="flex-row items-center gap-3">
-                    <InlineSpinner />
-                    <Text className="text-white font-black text-base">Se publică...</Text>
-                  </View>
-                ) : (
-                  <View className="flex-row items-center">
-                    <Send color="var(--c-surface)" size={18} />
-                    <Text className="text-white font-black text-base ml-3">Publică evenimentul</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Date Picker Modal */}
-      <Modal visible={showDatePicker !== null} transparent animationType="fade">
-        <Pressable className="flex-1 bg-black/45 items-center justify-center p-5" onPress={() => setShowDatePicker(null)}>
-          <View className="bg-white rounded-[34px] p-6 shadow-2xl border border-slate-100 w-full" style={{ maxWidth: 560 }} onStartShouldSetResponder={() => true}>
-            <View className="flex-row justify-between items-start mb-5">
-              <View>
-                <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                  {showDatePicker === 'start' ? 'Data de început' : 'Data de sfârșit'}
-                </Text>
-                <Text className="text-2xl font-black text-[#1E293B]">Alege data</Text>
-              </View>
-              <View className="flex-row gap-2">
-                <TouchableOpacity onPress={() => onNavigateMonth(-1)} className="p-3 bg-slate-50 rounded-xl">
-                  <ChevronLeft size={20} color="var(--c-brand-fg)" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => onNavigateMonth(1)} className="p-3 bg-slate-50 rounded-xl">
-                  <ChevronRight size={20} color="var(--c-brand-fg)" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <Text className="text-[12px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">{monthName} {viewYear}</Text>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 280 }}>
-              <View className="flex-row flex-wrap gap-2.5">
-                {Array.from({ length: daysInMonth(currentDate.getMonth(), viewYear) }, (_, i) => i + 1).map((d) => {
-                  const date = new Date(viewYear, currentDate.getMonth(), d);
-                  const activeDate = showDatePicker === 'start' ? newStartDate : newEndDate;
-                  const isSelected = activeDate.getDate() === d && activeDate.getMonth() === currentDate.getMonth();
-                  return (
-                    <TouchableOpacity
-                      key={d}
-                      onPress={() => {
-                        if (showDatePicker === 'start') setNewStartDate(date);
-                        else setNewEndDate(date);
-                        setShowDatePicker(null);
-                      }}
-                      className={`w-11 h-11 rounded-xl items-center justify-center border ${isSelected ? 'bg-[#1D3E90] border-[#1D3E90]' : 'bg-slate-50 border-slate-100'}`}
-                    >
-                      <Text className={`font-bold ${isSelected ? 'text-white' : 'text-slate-600'}`}>{d}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          </View>
-        </Pressable>
-      </Modal>
-
-      {/* Time Picker Modal */}
-      <Modal visible={showTimePicker !== null} transparent animationType="fade">
-        <Pressable className="flex-1 bg-black/35 items-center justify-center p-5" onPress={() => setShowTimePicker(null)}>
-          <View className="bg-white rounded-[30px] px-5 pt-5 pb-5 shadow-2xl border border-slate-100 w-full" style={{ maxWidth: 360 }} onStartShouldSetResponder={() => true}>
-            <View className="flex-row items-center justify-between mb-4">
-              <View>
-                <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                  {showTimePicker === 'start' ? 'Ora de început' : 'Ora de sfârșit'}
-                </Text>
-                <Text className="text-xl font-black text-[#1E293B]">Alege ora</Text>
-              </View>
-              <View className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-2">
-                <Text className="text-[#1D3E90] font-black text-lg">{(showTimePicker === 'start' ? newStartTime : newEndTime) || '09:00'}</Text>
-              </View>
-            </View>
-
-            <View className="items-center">
-              <View className="flex-row justify-center items-center">
-                <View className="items-center">
-                  <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Oră</Text>
-                  <TimeSpinner
-                    value={((showTimePicker === 'start' ? newStartTime : newEndTime) || '09:00').split(':')[0]}
-                    range={Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'))}
-                    onSelect={(h) => {
-                      const m = ((showTimePicker === 'start' ? newStartTime : newEndTime) || '09:00').split(':')[1];
-                      const val = `${h}:${m}`;
-                      if (showTimePicker) updatePickerTime(showTimePicker, val);
-                    }}
-                  />
+                  ) : null}
                 </View>
 
-                <View className="mx-3 mt-7 w-9 h-9 rounded-2xl bg-[#1D3E90] items-center justify-center shadow-lg shadow-blue-900/30">
-                  <Text className="text-white text-xl font-black">:</Text>
-                </View>
-
-                <View className="items-center">
-                  <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Minut</Text>
-                  <TimeSpinner
-                    value={((showTimePicker === 'start' ? newStartTime : newEndTime) || '00:00').split(':')[1]}
-                    range={Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'))}
-                    onSelect={(m) => {
-                      const h = ((showTimePicker === 'start' ? newStartTime : newEndTime) || '00').split(':')[0];
-                      const val = `${h.padStart(2, '0')}:${m}`;
-                      if (showTimePicker) updatePickerTime(showTimePicker, val);
-                    }}
-                  />
-                </View>
-              </View>
-            </View>
-
-            <View className="flex-row justify-end items-center gap-3 mt-5">
-              <TouchableOpacity onPress={() => setShowTimePicker(null)} className="px-5 h-12 items-center justify-center">
-                <Text className="text-slate-500 font-black">Anulează</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowTimePicker(null)} className="bg-[#1D3E90] h-12 rounded-2xl px-7 items-center justify-center shadow-xl shadow-blue-900/30">
-                <Text className="text-white font-black">Confirmă</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Pressable>
-      </Modal>
-
-      {/* Type / Location / Team select sheets */}
-      <Modal visible={selectSheet !== null} transparent animationType="fade">
-        <Pressable className="flex-1 bg-black/45 items-center justify-center p-5" onPress={() => setSelectSheet(null)}>
-          <View
-            className={`bg-white rounded-[32px] ${isMobile ? 'px-5 pt-5 pb-6' : 'px-6 pt-5 pb-6'} shadow-2xl border border-slate-100 w-full`}
-            style={{ maxWidth: selectSheet === 'team' ? 560 : 480, maxHeight: '78%' }}
-            onStartShouldSetResponder={() => true}
-          >
-            <View className="flex-row items-center justify-between mb-5">
-              <View>
-                <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                  {selectSheet === 'type' ? 'Categorie eveniment' : selectSheet === 'location' ? 'Locație presetată' : 'Echipă'}
-                </Text>
-                <Text className="text-2xl font-black text-[#1E293B]">
-                  {selectSheet === 'type' ? 'Alege tipul' : selectSheet === 'location' ? 'Alege locația' : 'Alege echipa'}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setSelectSheet(null)} className="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-100 items-center justify-center">
-                <X color="var(--c-ink-soft)" size={20} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 360 }}>
-              {selectSheet === 'type' && (
-                <View className="gap-3">
-                  {EVENT_TYPE_OPTIONS.map((option) => {
-                    const selected = newEventType === option.value;
+                <View className="grid grid-cols-2 gap-3">
+                  {(['start', 'end'] as const).map((field) => {
+                    const error = field === 'start' ? addEventErrors.startTime : addEventErrors.endTime;
                     return (
-                      <TouchableOpacity
-                        key={option.value}
-                        onPress={() => {
-                          setNewEventType(option.value);
-                          if (option.value !== 'training') clearError('recurringDays');
-                          setSelectSheet(null);
-                        }}
-                        className={`rounded-2xl border p-3 flex-row items-center justify-between ${selected ? 'bg-blue-50 border-blue-100' : 'bg-white border-slate-100'}`}
-                      >
-                        <View className="flex-row items-center">
-                          <View className={`w-10 h-10 rounded-2xl items-center justify-center mr-3 ${selected ? 'bg-[#1D3E90]' : 'bg-slate-50'}`}>
-                            <Dumbbell size={18} color={selected ? 'var(--c-surface)' : 'var(--c-faint)'} />
-                          </View>
-                          <Text className={`font-black text-base ${selected ? 'text-[#1D3E90]' : 'text-slate-700'}`}>{option.label}</Text>
-                        </View>
-                        {selected && <Check color="var(--c-brand-fg)" size={20} />}
-                      </TouchableOpacity>
+                      <View key={field} className="min-w-0">
+                        <Label>{field === 'start' ? 'Ora de început' : 'Ora de sfârșit'}</Label>
+                        <input
+                          type="time"
+                          step={300}
+                          className={nativeInputClass}
+                          style={{
+                            backgroundColor: 'var(--c-surface-2)',
+                            borderColor: error ? 'var(--c-danger)' : 'var(--c-border)',
+                            color: 'var(--c-ink)',
+                          }}
+                          value={field === 'start' ? newStartTime : newEndTime}
+                          onChange={(event) => {
+                            if (event.target.value) updatePickerTime(field, event.target.value);
+                          }}
+                          aria-label={field === 'start' ? 'Ora de început' : 'Ora de sfârșit'}
+                        />
+                        <FieldError message={error} />
+                      </View>
                     );
                   })}
                 </View>
-              )}
 
-              {selectSheet === 'location' && (
-                <View className="gap-3">
-                  {locationOptions.map((location) => {
-                    const selected = newLocation.trim() === location;
-                    return (
-                      <TouchableOpacity
-                        key={location}
-                        onPress={() => { setNewLocation(location); clearError('location'); setSelectSheet(null); }}
-                        className={`rounded-2xl border p-3 flex-row items-center justify-between ${selected ? 'bg-blue-50 border-blue-100' : 'bg-white border-slate-100'}`}
-                      >
-                        <View className="flex-row items-center flex-1">
-                          <View className={`w-10 h-10 rounded-2xl items-center justify-center mr-3 ${selected ? 'bg-[#1D3E90]' : 'bg-slate-50'}`}>
-                            <MapPin size={18} color={selected ? 'var(--c-surface)' : 'var(--c-faint)'} />
-                          </View>
-                          <Text numberOfLines={1} className={`font-black text-base flex-1 ${selected ? 'text-[#1D3E90]' : 'text-slate-700'}`}>{location}</Text>
-                        </View>
-                        {selected && <Check color="var(--c-brand-fg)" size={20} />}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-
-              {selectSheet === 'team' && (
-                <View className="gap-3">
-                  {teams.length === 0 ? (
-                    <View className="rounded-3xl border border-slate-100 bg-slate-50 p-6 items-center">
-                      <Users color="var(--c-faint)" size={24} />
-                      <Text className="font-black text-slate-500 mt-3">Nicio echipă încărcată</Text>
+                {isTraining && isRecurring ? (
+                  <View className="gap-3 rounded-[14px] border p-3.5" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}>
+                    <View>
+                      <Label>Zilele săptămânii</Label>
+                      <View className="flex-row justify-between gap-1">
+                        {REPEAT_DAY_LABELS.map((day, index) => {
+                          const selected = recurringDays.includes(index);
+                          return (
+                            <Pressable
+                              key={day}
+                              onPress={() => {
+                                setRecurringDays((prev) => (prev.includes(index) ? prev.filter((d) => d !== index) : [...prev, index]));
+                                clearError('recurringDays');
+                              }}
+                              accessibilityRole="checkbox"
+                              accessibilityState={{ checked: selected }}
+                              accessibilityLabel={day}
+                              className="ui-press w-10 h-10 rounded-full items-center justify-center border"
+                              style={{
+                                backgroundColor: selected ? 'var(--c-brand-surface)' : 'var(--c-surface)',
+                                borderColor: selected ? 'var(--c-brand-surface)' : 'var(--c-border)',
+                              } as any}
+                            >
+                              <Text className="text-[12.5px] font-bold" style={{ color: selected ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>{day}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      <FieldError message={addEventErrors.recurringDays} />
                     </View>
-                  ) : (
-                    teams.map((team) => {
-                      const selected = newTeamId === team.id;
-                      return (
-                        <TouchableOpacity
-                          key={team.id}
-                          onPress={() => { setNewTeamId(team.id); clearError('team'); setSelectSheet(null); }}
-                          className={`rounded-2xl border p-3 flex-row items-center justify-between ${selected ? 'bg-blue-50 border-blue-100' : 'bg-white border-slate-100'}`}
-                        >
-                          <View className="flex-row items-center flex-1">
-                            <View className={`w-10 h-10 rounded-2xl items-center justify-center mr-3 ${selected ? 'bg-[#1D3E90]' : 'bg-slate-50'}`}>
-                              <Users size={18} color={selected ? 'var(--c-surface)' : 'var(--c-faint)'} />
-                            </View>
-                            <Text numberOfLines={1} className={`font-black text-base flex-1 ${selected ? 'text-[#1D3E90]' : 'text-slate-700'}`}>{team.name}</Text>
-                          </View>
-                          {selected && <Check color="var(--c-brand-fg)" size={20} />}
-                        </TouchableOpacity>
-                      );
-                    })
-                  )}
-                </View>
+                    <View>
+                      <Label>Timp de</Label>
+                      <View className="flex-row rounded-[11px] p-1 gap-1" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+                        {REPEAT_WEEKS.map((weeks) => {
+                          const selected = recurringWeeks === weeks;
+                          return (
+                            <Pressable
+                              key={weeks}
+                              onPress={() => setRecurringWeeks(weeks)}
+                              accessibilityRole="radio"
+                              accessibilityState={{ selected }}
+                              accessibilityLabel={`${weeks} săptămâni`}
+                              className="flex-1 h-9 rounded-[8px] items-center justify-center"
+                              style={{ backgroundColor: selected ? 'var(--c-surface)' : 'transparent', boxShadow: selected ? 'var(--e-xs)' : 'none' } as any}
+                            >
+                              <Text className="text-[12.5px] font-semibold" style={{ color: selected ? 'var(--c-ink)' : 'var(--c-muted)' }}>{weeks} săpt.</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </View>
+                ) : null}
+              </Section>
+
+              {newEventType === 'camp' ? (
+                <Section title="Cost">
+                  <FormField
+                    label="Taxă de participare (RON)"
+                    icon="payments"
+                    value={newAmount}
+                    onChangeText={setNewAmount}
+                    keyboardType="numeric"
+                    inputMode="decimal"
+                    placeholder="0"
+                  />
+                </Section>
+              ) : null}
+
+              <Section title="Note">
+                <FormField
+                  label="Descriere (opțional)"
+                  value={newDescription}
+                  onChangeText={(value: string) => { setNewDescription(value); clearError('description'); }}
+                  placeholder="Obiective, echipament, detalii de logistică…"
+                  multiline
+                  error={addEventErrors.description}
+                  maxLength={5000}
+                />
+              </Section>
+            </View>
+          </ScrollView>
+
+          {submitError ? (
+            <View
+              className="mx-5 mb-1 flex-row items-center gap-2.5 rounded-[12px] border px-3.5 py-2.5"
+              style={{ backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-border)' } as any}
+              accessibilityRole="alert"
+            >
+              <MaterialIcons name="error-outline" size={17} color="var(--c-danger-fg)" />
+              <Text className="text-[13px] font-semibold flex-1" style={{ color: 'var(--c-danger-fg)' }}>{submitError}</Text>
+            </View>
+          ) : null}
+
+          {/* Footer — always visible, clears the home indicator. */}
+          <View
+            className="flex-row gap-2.5 px-5 pt-3 border-t"
+            style={{
+              borderColor: 'var(--c-border-soft)',
+              backgroundColor: 'var(--c-surface)',
+              paddingBottom: isMobile ? 'max(14px, env(safe-area-inset-bottom))' : 16,
+            } as any}
+          >
+            <Pressable
+              onPress={close}
+              disabled={addingEvent}
+              accessibilityRole="button"
+              accessibilityLabel="Anulează"
+              className="ui-press h-11 px-5 rounded-[11px] items-center justify-center border"
+              style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', opacity: addingEvent ? 0.6 : 1 } as any}
+            >
+              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Anulează</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleSubmit}
+              disabled={addingEvent}
+              accessibilityRole="button"
+              accessibilityLabel="Salvează evenimentul"
+              className="ui-press flex-1 h-11 rounded-[11px] flex-row items-center justify-center gap-2"
+              style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)', opacity: addingEvent ? 0.8 : 1 } as any}
+            >
+              {addingEvent ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <MaterialIcons name="check" size={18} color="#FFFFFF" />
               )}
-            </ScrollView>
+              <Text className="text-[14px] font-bold" style={{ color: '#FFFFFF' }}>
+                {addingEvent ? 'Se salvează…' : isTraining && isRecurring ? 'Creează seria' : 'Salvează'}
+              </Text>
+            </Pressable>
           </View>
         </Pressable>
-      </Modal>
-    </>
+      </Pressable>
+    </Modal>
   );
 }
