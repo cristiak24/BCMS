@@ -15,14 +15,14 @@ import { useResponsive } from '../../hooks/useResponsive';
 import { useAdminScheduleData } from '../../hooks/useAdminScheduleData';
 import {
   eventMatchesSearch, isCancelledEvent, buildICSCalendar, triggerFileDownload, toDateKey,
+  startOfWeek, addDays, RO_LOCALE,
 } from '../../components/schedule/scheduleShared';
 import { MonthlyCalendarGrid } from '../../components/schedule/admin/ScheduleCalendarGrid';
-import { ScheduleToolbar } from '../../components/schedule/admin/ScheduleToolbar';
-import { ScheduleEventCard } from '../../components/schedule/admin/ScheduleEventCard';
+import { ScheduleToolbar, ScheduleViewSwitcher } from '../../components/schedule/admin/ScheduleToolbar';
+import { ScheduleEventRow, EventGroupCard } from '../../components/schedule/admin/ScheduleEventRow';
 import { ScheduleWeekView } from '../../components/schedule/admin/ScheduleWeekView';
 import { ScheduleAgendaList } from '../../components/schedule/admin/ScheduleAgendaList';
 import { AddEventModal } from '../../components/schedule/admin/AddEventModal';
-import StatCard from '../../components/ui/StatCard';
 import { DayScheduleModal } from '../../components/schedule/admin/DayScheduleModal';
 import { EventAttendanceModal } from '../../components/schedule/admin/EventAttendanceModal';
 import { FilterModal } from '../../components/schedule/admin/FilterModal';
@@ -36,12 +36,6 @@ const TOP_TAB_LABELS: Record<TopTab, string> = {
   Monthly: 'Lunar',
   Attendance: 'Prezență',
   Grade: 'Notare',
-};
-
-const VIEW_LABELS: Record<ScheduleView, string> = {
-  month: 'Lună',
-  week: 'Săptămână',
-  agenda: 'Agendă',
 };
 
 const FRB_SYNC_KEY = 'bcms.frb-sync-at';
@@ -69,6 +63,9 @@ export default function ScheduleScreen() {
     routeParams.tab === 'attendance' ? 'Attendance' : routeParams.tab === 'grade' ? 'Grade' : 'Monthly'
   );
   const [scheduleView, setScheduleView] = useState<ScheduleView>('month');
+  // The week view's week lives here so the toolbar's ‹ › can step it.
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [weekCount, setWeekCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
 
   // Modals
@@ -346,6 +343,40 @@ export default function ScheduleScreen() {
     setCurrentDate((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
   };
 
+  // ‹ › and "azi" step whatever the active view shows: weeks in the week view,
+  // months otherwise.
+  const navigatePeriod = (delta: number) => {
+    if (scheduleView === 'week') setWeekStart((current) => addDays(current, delta * 7));
+    else navigateMonth(delta);
+  };
+  const goToToday = () => {
+    if (scheduleView === 'week') setWeekStart(startOfWeek(new Date()));
+    else setCurrentDate(new Date());
+  };
+
+  // Switching views keeps you in the same period: month → week opens this
+  // week when the current month is shown (else the month's first week), and
+  // week → month opens the month the week mostly falls in.
+  const changeView = (next: ScheduleView) => {
+    if (next === scheduleView) return;
+    if (next === 'week') {
+      const now = new Date();
+      const showingThisMonth = currentDate.getFullYear() === now.getFullYear() && currentDate.getMonth() === now.getMonth();
+      setWeekStart(startOfWeek(showingThisMonth ? now : new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)));
+    } else if (scheduleView === 'week') {
+      const mid = addDays(weekStart, 3);
+      setCurrentDate(new Date(mid.getFullYear(), mid.getMonth(), 1));
+    }
+    setScheduleView(next);
+  };
+
+  const weekTitle = useMemo(() => {
+    const end = addDays(weekStart, 6);
+    const sameMonth = end.getMonth() === weekStart.getMonth();
+    const startLabel = weekStart.toLocaleDateString(RO_LOCALE, sameMonth ? { day: 'numeric' } : { day: 'numeric', month: 'short' });
+    return `${startLabel} – ${end.toLocaleDateString(RO_LOCALE, { day: 'numeric', month: 'short' })}`;
+  }, [weekStart]);
+
   const visibleEvents = useMemo(
     () => events.filter((event) => (showCancelled || !isCancelledEvent(event)) && eventMatchesSearch(event, searchValue)),
     [events, showCancelled, searchValue]
@@ -391,45 +422,27 @@ export default function ScheduleScreen() {
 
   const resetKey = `${toDateKey(currentDate).slice(0, 7)}|${filterType}|${filterCoachId}|${filterTeamId}|${showCancelled}|${searchValue}`;
 
-  const MonthlyBody = () => (
+  // A render function, not a nested component: `const MonthlyBody = () => …`
+  // was a new component type every render, so React remounted the whole
+  // calendar (and reset its scroll) on each state change.
+  const renderMonthlyBody = () => (
     <View className={`${isMobile ? 'px-4 pt-3' : 'px-6 xl:px-8 pt-4'} w-full`}>
       <View className="w-full">
-        {/* Mobile-only sub-tab switcher — on desktop these live in the app header. */}
-        {!isDesktop && (
-          <View
-            className="flex-row items-center rounded-[10px] p-[3px] gap-[2px] mb-3 self-start"
-            style={{ backgroundColor: 'var(--c-surface-3)' }}
-          >
-            {(['Monthly', 'Attendance', 'Grade'] as const).map((tab) => (
-              <TouchableOpacity
-                key={tab}
-                onPress={() => setActiveTab(tab)}
-                className="px-3 h-7 rounded-[8px] justify-center"
-                style={activeTab === tab ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
-              >
-                <Text
-                  className="text-[12px] font-semibold"
-                  style={{ color: activeTab === tab ? 'var(--c-ink)' : 'var(--c-muted)' }}
-                >
-                  {TOP_TAB_LABELS[tab]}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
         <View className="mb-4">
           <ScheduleToolbar
             monthLabel={monthName}
             year={viewYear}
-            eventCount={visibleEvents.length}
-            onNavigateMonth={navigateMonth}
-            onToday={() => setCurrentDate(new Date())}
+            eventCount={scheduleView === 'week' ? weekCount : visibleEvents.length}
+            onNavigateMonth={navigatePeriod}
+            onToday={goToToday}
+            periodTitle={scheduleView === 'week' ? weekTitle : undefined}
+            periodUnit={scheduleView === 'week' ? 'week' : 'month'}
             view={scheduleView}
-            onViewChange={setScheduleView}
+            onViewChange={changeView}
             filterType={filterType}
             onFilterTypeChange={setFilterType}
-            typeCounts={typeCounts}
+            // Counts are for the loaded month — meaningless against a week.
+            typeCounts={scheduleView === 'week' ? {} : typeCounts}
             activeFilterCount={advancedFilterCount}
             onOpenFilters={() => setShowFilterModal(true)}
             onExport={handleExport}
@@ -465,6 +478,8 @@ export default function ScheduleScreen() {
 
         {scheduleView === 'week' ? (
           <ScheduleWeekView
+            weekStart={weekStart}
+            onCountChange={setWeekCount}
             filters={filters}
             searchQuery={searchValue}
             showCancelled={showCancelled}
@@ -494,39 +509,47 @@ export default function ScheduleScreen() {
               <MonthlyCalendarGrid currentDate={currentDate} events={visibleEvents} onSelectEvent={navigateToEvent} onSelectDay={openDaySchedule} />
             </View>
 
-            <View className={`${isDesktop ? 'shrink-0' : 'w-full'} gap-4`} style={isDesktop ? { width: isWideDesktop ? 380 : 340 } : undefined}>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Evenimente viitoare</Text>
-                <TouchableOpacity onPress={() => setScheduleView('agenda')}>
-                  <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Vezi tot</Text>
+            <View className={`${isDesktop ? 'shrink-0' : 'w-full'} gap-3`} style={isDesktop ? { width: isWideDesktop ? 380 : 340 } : undefined}>
+              <View className="flex-row items-center justify-between px-0.5">
+                <Text className="text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>
+                  Evenimente viitoare{upcomingCount ? <Text style={{ color: 'var(--c-faint)' }}>{` · ${upcomingCount}`}</Text> : null}
+                </Text>
+                <TouchableOpacity onPress={() => changeView('agenda')} className="h-8 justify-center px-1">
+                  <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Vezi tot</Text>
                 </TouchableOpacity>
               </View>
 
+              {/* One grouped card: event rows + the next match as its footer.
+                  Replaces a stand-alone striped event card and two KPI tiles
+                  ("Viitoare", "Următorul meci") that restated the same data. */}
               {featuredUpcoming.length === 0 ? (
-                <View className="rounded-[16px] border px-5 py-6 items-center" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
-                  <View className="w-11 h-11 rounded-[12px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-2)' }}>
-                    <CalendarIcon size={20} color="var(--c-muted)" />
+                <View className="rounded-[16px] border border-dashed px-5 py-6 items-center" style={{ borderColor: 'var(--c-border)' } as any}>
+                  <View className="w-10 h-10 rounded-[12px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+                    <CalendarIcon size={18} color="var(--c-brand-fg)" />
                   </View>
                   <Text className="text-[14px] font-semibold mt-3 text-center" style={{ color: 'var(--c-ink)' }}>Niciun eveniment viitor</Text>
-                  <Text className="t-meta mt-1 text-center" style={{ color: 'var(--c-muted)' }}>Adaugă unul cu butonul „Eveniment” sau sincronizează meciurile FRB.</Text>
+                  <Text className="t-meta mt-1 text-center" style={{ color: 'var(--c-muted)' }}>Adaugă unul cu „Eveniment” sau sincronizează meciurile FRB.</Text>
                 </View>
-              ) : featuredUpcoming.map((event) => (
-                <ScheduleEventCard key={`featured-${event.id}`} item={event} compact isMobile={isMobile} isSmallPhone={isSmallPhone} onPress={() => navigateToEvent(event)} />
-              ))}
-
-              {/* Plain surface cards with a tinted icon, like every other KPI in
-                  the app. The saturated indigo/teal gradient blocks fought the
-                  page (and "Niciunul programat" was truncated to "Niciunul …"). */}
-              <View className="grid grid-cols-2 gap-3">
-                <StatCard icon="event-available" tone="brand" label="Viitoare" value={upcomingCount} hint="în luna afișată" />
-                <StatCard
-                  icon="sports-basketball"
-                  tone="warning"
-                  label="Următorul meci"
-                  value={nextMatch ? new Date(nextMatch.startTime).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' }) : '—'}
-                  hint={nextMatch ? nextMatch.title : 'Niciun meci programat'}
-                />
-              </View>
+              ) : (
+                <EventGroupCard>
+                  {featuredUpcoming.map((event) => (
+                    <ScheduleEventRow key={`featured-${event.id}`} item={event} onPress={() => navigateToEvent(event)} />
+                  ))}
+                  {nextMatch && !featuredUpcoming.some((event) => event.id === nextMatch.id) ? (
+                    <TouchableOpacity
+                      key="next-match"
+                      onPress={() => navigateToEvent(nextMatch)}
+                      className="flex-row items-center gap-2 px-3.5 py-2.5"
+                      style={{ backgroundColor: 'var(--c-surface-2)' } as any}
+                    >
+                      <Text className="t-eyebrow shrink-0" style={{ color: 'var(--c-faint)' }}>Următorul meci</Text>
+                      <Text className="t-meta flex-1 min-w-0" numberOfLines={1} style={{ color: 'var(--c-ink-soft)' }}>
+                        {new Date(nextMatch.startTime).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })} · {nextMatch.title}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </EventGroupCard>
+              )}
             </View>
           </View>
         )}
@@ -535,10 +558,44 @@ export default function ScheduleScreen() {
   );
 
   return (
-    <View className="flex-1 bg-[#EDF4FB]">
+    <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
+      {/* Phones: Lunar / Prezență / Notare and the calendar view icons share
+          one row (they were two rows, and the tabs only rendered on "Lunar" —
+          from Prezență there was no way back). Desktop keeps them in the header. */}
+      {!isDesktop && (
+        <View className="flex-row items-center justify-between gap-2 px-4 pt-3">
+          <View
+            className="flex-row items-center rounded-[10px] p-[3px] gap-[2px] shrink min-w-0"
+            style={{ backgroundColor: 'var(--c-surface-3)' }}
+            accessibilityRole={'tablist' as any}
+          >
+            {(['Monthly', 'Attendance', 'Grade'] as const).map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                onPress={() => setActiveTab(tab)}
+                accessibilityRole={'tab' as any}
+                accessibilityState={{ selected: activeTab === tab }}
+                className="px-2.5 h-8 rounded-[8px] justify-center"
+                style={activeTab === tab ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
+              >
+                <Text
+                  numberOfLines={1}
+                  className="text-[12.5px] font-semibold"
+                  style={{ color: activeTab === tab ? 'var(--c-ink)' : 'var(--c-muted)' }}
+                >
+                  {TOP_TAB_LABELS[tab]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {activeTab === 'Monthly' ? (
+            <ScheduleViewSwitcher view={scheduleView} onViewChange={changeView} iconOnly />
+          ) : null}
+        </View>
+      )}
       {activeTab === 'Monthly' && (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 132 }}>
-          <MonthlyBody />
+          {renderMonthlyBody()}
         </ScrollView>
       )}
       {activeTab === 'Attendance' && (

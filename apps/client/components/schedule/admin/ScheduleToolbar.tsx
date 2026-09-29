@@ -41,8 +41,9 @@ const TYPE_ORDER: EventType[] = ['match', 'training', 'camp', 'medical', 'admin'
 
 /** Compact icon button used for the secondary actions (export / sync / filters). */
 function IconButton({
-  onPress, label, disabled, badge, active, children,
+  onPress, label, disabled, badge, active, compact, children,
 }: {
+  compact?: boolean;
   onPress: () => void;
   label: string;
   disabled?: boolean;
@@ -55,7 +56,7 @@ function IconButton({
       onPress={onPress}
       disabled={disabled}
       accessibilityLabel={label}
-      className={`relative w-9 h-9 rounded-[10px] items-center justify-center border ${
+      className={`relative ${compact ? 'w-8 h-8 rounded-[9px]' : 'w-9 h-9 rounded-[10px]'} items-center justify-center border shrink-0 ${
         active
           ? 'bg-[var(--c-surface-tint)] border-[var(--c-brand-border)]'
           : 'bg-[var(--c-surface)] border-[var(--c-border)]'
@@ -71,6 +72,52 @@ function IconButton({
         </View>
       ) : null}
     </TouchableOpacity>
+  );
+}
+
+/**
+ * Lună / Săptămână / Agendă. Exported so the phone layout can put it on the
+ * same row as the Lunar / Prezență / Notare tabs instead of a row of its own.
+ */
+export function ScheduleViewSwitcher({
+  view, onViewChange, iconOnly,
+}: {
+  view: ScheduleView;
+  onViewChange: (view: ScheduleView) => void;
+  iconOnly?: boolean;
+}) {
+  return (
+    <View
+      className="flex-row items-center rounded-[10px] p-[3px] gap-[2px] shrink-0"
+      style={{ backgroundColor: 'var(--c-surface-3)' }}
+      accessibilityRole={'tablist' as any}
+      accessibilityLabel="Vedere calendar"
+    >
+      {VIEW_OPTIONS.map(({ key, icon: Icon, label }) => {
+        const active = view === key;
+        return (
+          <TouchableOpacity
+            key={key}
+            onPress={() => onViewChange(key)}
+            accessibilityLabel={label}
+            accessibilityRole={'tab' as any}
+            accessibilityState={{ selected: active }}
+            className={`flex-row items-center gap-1.5 ${iconOnly ? 'h-8 w-9' : 'h-[28px] px-2.5'} rounded-[8px] justify-center`}
+            style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
+          >
+            <Icon size={iconOnly ? 15 : 14} color={active ? 'var(--c-brand-fg)' : 'var(--c-muted)'} />
+            {!iconOnly && (
+              <Text
+                className="text-[12px] font-semibold"
+                style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}
+              >
+                {label}
+              </Text>
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
 }
 
@@ -95,7 +142,12 @@ export function ScheduleToolbar({
   onClearTeam,
   searchValue,
   onClearSearch,
+  periodTitle,
+  periodUnit = 'month',
 }: {
+  /** Overrides "Septembrie 2026" (the week view passes its date range). */
+  periodTitle?: string;
+  periodUnit?: 'month' | 'week';
   monthLabel: string;
   year: number;
   eventCount: number;
@@ -117,21 +169,24 @@ export function ScheduleToolbar({
   searchValue: string;
   onClearSearch: () => void;
 }) {
-  const monthTitle = `${monthLabel.charAt(0).toUpperCase()}${monthLabel.slice(1)} ${year}`;
+  const monthTitle = periodTitle ?? `${monthLabel.charAt(0).toUpperCase()}${monthLabel.slice(1)} ${year}`;
+  const prevLabel = periodUnit === 'week' ? 'Săptămâna anterioară' : 'Luna anterioară';
+  const nextLabel = periodUnit === 'week' ? 'Săptămâna următoare' : 'Luna următoare';
+  const todayLabel = periodUnit === 'week' ? 'Mergi la săptămâna curentă' : 'Mergi la luna curentă';
 
   // ── Month stepper ──────────────────────────────────────────────────────
   const monthNav = (
     <View className="flex-row items-center gap-1">
       <TouchableOpacity
         onPress={() => onNavigateMonth(-1)}
-        accessibilityLabel="Luna anterioară"
+        accessibilityLabel={prevLabel}
         className="w-8 h-8 rounded-[9px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
       >
         <ChevronLeft size={16} color="var(--c-ink-soft)" />
       </TouchableOpacity>
       <TouchableOpacity
         onPress={onToday}
-        accessibilityLabel="Mergi la luna curentă"
+        accessibilityLabel={todayLabel}
         className="px-2.5 h-8 justify-center"
       >
         {/* min-width keeps the arrows from shifting as the month name changes
@@ -146,7 +201,7 @@ export function ScheduleToolbar({
       </TouchableOpacity>
       <TouchableOpacity
         onPress={() => onNavigateMonth(1)}
-        accessibilityLabel="Luna următoare"
+        accessibilityLabel={nextLabel}
         className="w-8 h-8 rounded-[9px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
       >
         <ChevronRight size={16} color="var(--c-ink-soft)" />
@@ -154,38 +209,7 @@ export function ScheduleToolbar({
     </View>
   );
 
-  // ── View switcher — icon-only on mobile, icon+label on desktop ─────────
-  const viewSwitcher = (
-    <View
-      className="flex-row items-center rounded-[10px] p-[3px] gap-[2px]"
-      style={{ backgroundColor: 'var(--c-surface-3)' }}
-    >
-      {VIEW_OPTIONS.map(({ key, icon: Icon, label }) => {
-        const active = view === key;
-        return (
-          <TouchableOpacity
-            key={key}
-            onPress={() => onViewChange(key)}
-            accessibilityLabel={label}
-            className={`flex-row items-center gap-1.5 h-[28px] rounded-[8px] justify-center ${
-              isMobile ? 'w-9' : 'px-2.5'
-            }`}
-            style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
-          >
-            <Icon size={14} color={active ? 'var(--c-brand-fg)' : 'var(--c-muted)'} />
-            {!isMobile && (
-              <Text
-                className="text-[12px] font-semibold"
-                style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}
-              >
-                {label}
-              </Text>
-            )}
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
+  const viewSwitcher = <ScheduleViewSwitcher view={view} onViewChange={onViewChange} iconOnly={isMobile} />;
 
   // ── Type filters, doubling as the calendar's colour key ────────────────
   const typeChips = (
@@ -306,47 +330,31 @@ export function ScheduleToolbar({
   ) : null;
 
   if (isMobile) {
-    // Month gets its own full-width row: sharing it with the view switcher
-    // and filter button squeezed "Septembrie 2026" to "Septembrie …".
+    // Two rows: the period stepper, then filters. The view switcher sits on
+    // the page's tab row (Lunar / Prezență / Notare) and the advanced-filter
+    // button leads the chip row, so neither needs a row of its own.
+    const countLabel = `${eventCount} ${eventCount === 1 ? 'eveniment' : 'evenimente'}`;
     return (
       <View>
         <View className="flex-row items-center gap-2">
           <TouchableOpacity
             onPress={() => onNavigateMonth(-1)}
-            accessibilityLabel="Luna anterioară"
-            className="ui-press w-10 h-10 rounded-[11px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
+            accessibilityLabel={prevLabel}
+            className="ui-press w-9 h-9 rounded-[10px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
           >
-            <ChevronLeft size={18} color="var(--c-ink-soft)" />
+            <ChevronLeft size={17} color="var(--c-ink-soft)" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={onToday} accessibilityLabel="Mergi la luna curentă" className="flex-1 items-center justify-center h-10">
-            <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{monthTitle}</Text>
-            <Text className="text-[11.5px] font-medium" style={{ color: 'var(--c-faint)' }}>
-              {eventCount} {eventCount === 1 ? 'eveniment' : 'evenimente'}
-            </Text>
+          <TouchableOpacity onPress={onToday} accessibilityLabel={todayLabel} className="flex-1 min-w-0 items-center justify-center h-9">
+            <Text className="text-[16px] font-bold leading-tight" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{monthTitle}</Text>
+            <Text className="text-[11.5px] font-medium" style={{ color: 'var(--c-faint)' }}>{countLabel}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => onNavigateMonth(1)}
-            accessibilityLabel="Luna următoare"
-            className="ui-press w-10 h-10 rounded-[11px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
+            accessibilityLabel={nextLabel}
+            className="ui-press w-9 h-9 rounded-[10px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
           >
-            <ChevronRight size={18} color="var(--c-ink-soft)" />
+            <ChevronRight size={17} color="var(--c-ink-soft)" />
           </TouchableOpacity>
-        </View>
-        <View className="flex-row items-center justify-between gap-2 mt-2.5">
-          <View className="flex-row items-center gap-1.5">
-            {viewSwitcher}
-            <IconButton
-              onPress={onOpenFilters}
-              label="Filtre"
-              badge={activeFilterCount || undefined}
-              active={activeFilterCount > 0}
-            >
-              <SlidersHorizontal
-                size={15}
-                color={activeFilterCount > 0 ? 'var(--c-brand-fg)' : 'var(--c-muted)'}
-              />
-            </IconButton>
-          </View>
         </View>
 
         {/* Horizontal scroll rather than wrap: five chips wrapped onto three
@@ -355,10 +363,25 @@ export function ScheduleToolbar({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          className="mt-2.5 -mx-4"
+          className="mt-3 -mx-4"
           contentContainerStyle={{ paddingHorizontal: 16 }}
         >
-          {typeChips}
+          <View className="flex-row items-center gap-1.5">
+            <IconButton
+              onPress={onOpenFilters}
+              label="Filtre"
+              badge={activeFilterCount || undefined}
+              active={activeFilterCount > 0}
+              compact
+            >
+              <SlidersHorizontal
+                size={14}
+                color={activeFilterCount > 0 ? 'var(--c-brand-fg)' : 'var(--c-muted)'}
+              />
+            </IconButton>
+            <View className="w-px h-5 mx-0.5" style={{ backgroundColor: 'var(--c-border)' }} />
+            {typeChips}
+          </View>
         </ScrollView>
 
         {activePills}
