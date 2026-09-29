@@ -151,7 +151,7 @@ export default function AttendanceScreen() {
     return (
       <View style={styles.centeredFull}>
         <Text style={styles.notFoundText}>Evenimentul nu a fost găsit</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.goBackBtn}>
+        <TouchableOpacity onPress={() => router.back('/admin/schedule')} style={styles.goBackBtn}>
           <Text style={styles.goBackText}>Înapoi</Text>
         </TouchableOpacity>
       </View>
@@ -164,7 +164,7 @@ export default function AttendanceScreen() {
     <View style={styles.root}>
       {/* Header */}
       <View style={[styles.header, { paddingHorizontal: px, paddingTop: isMobile ? 16 : 40, paddingBottom: isMobile ? 12 : 24 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back('/admin/schedule')} style={styles.backBtn}>
           <ChevronLeft size={20} color="var(--c-ink-soft)" />
         </TouchableOpacity>
         <View style={styles.headerText}>

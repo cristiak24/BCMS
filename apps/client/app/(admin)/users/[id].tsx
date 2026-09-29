@@ -48,7 +48,7 @@ export default function UserDetail() {
         try {
             await usersApi.updateUser(String(id), { name, role });
             showToast({ variant: 'success', message: 'Utilizatorul a fost actualizat.' });
-            router.back();
+            router.back('/admin/users');
         } catch (error) {
             showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Salvarea a eșuat.' });
         } finally {
@@ -76,7 +76,7 @@ export default function UserDetail() {
         <View className="max-w-3xl mx-auto w-full pt-6 px-4 pb-16">
             <View className={`mb-6 ${isMobile ? 'gap-3' : 'flex-row items-center'}`}>
                 <Pressable
-                    onPress={() => router.back()}
+                    onPress={() => router.back('/admin/users')}
                     className="mr-4 min-h-[44px] px-4 py-2 rounded-2xl border flex-row items-center self-start"
                     style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
                 >
@@ -142,7 +142,7 @@ export default function UserDetail() {
 
                 <View className={`pt-8 mt-6 border-t gap-3 ${isMobile ? '' : 'flex-row justify-end'}`} style={{ borderColor: 'var(--c-border-soft)' } as any}>
                     <Pressable
-                        onPress={() => router.back()}
+                        onPress={() => router.back('/admin/users')}
                         className="min-h-[48px] px-6 py-3 rounded-2xl border items-center justify-center"
                         style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
                     >

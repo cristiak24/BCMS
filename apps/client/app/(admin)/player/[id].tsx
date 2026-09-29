@@ -54,7 +54,7 @@ export default function PlayerProfile() {
 
   const handleGoBack = useCallback(() => {
     if (router.canGoBack()) {
-      router.back();
+      router.back('/admin/roster');
       return;
     }
 

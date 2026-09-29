@@ -1,323 +1,137 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
-  Alert,
-  useWindowDimensions,
-} from '@/src/web/reactNative';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from '@/src/web/reactNative';
+import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
-import {
-  ArrowLeft,
-  Calendar,
-  Clock,
-  Users,
-  MapPin,
-  Zap,
-  Trophy,
-  Dumbbell,
-  ShieldCheck,
-  Settings,
-  CheckCircle2,
-  Trash2,
-  MessageSquare,
-} from 'lucide-react';
 import { eventsApi, CalendarEvent } from '../../../services/eventsApi';
 import { teamsApi, Team } from '../../../services/teamsApi';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../../components/HeaderContext';
+import PageContainer from '../../../components/ui/PageContainer';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
+import { Skeleton } from '../../../components/ui/Skeleton';
+import { ErrorState } from '../../../components/ui/ScreenState';
+import { EVENT_TYPE_META, buildICSCalendar, triggerFileDownload } from '../../../components/schedule/scheduleShared';
 
-// ─── Colour helpers ──────────────────────────────────────────────────────────
+/**
+ * Admin event detail.
+ *
+ * Rebuilt: the previous page was English-only, drew a fake "map" out of
+ * absolutely positioned 1px lines whose container wasn't positioned — so the
+ * grid spread across the whole page as a faint background — gave its back
+ * button a shadow in the ink colour (a white halo in dark mode), and its back
+ * button did nothing when the page was opened directly (no in-app history).
+ * Now: token surfaces, Romanian copy, a real "open in Maps" link, a
+ * scoreboard for finished matches, and back-with-fallback to the schedule.
+ */
 
-const TYPE_META: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  training: {
-    label: 'Training',
-    color: 'var(--c-brand-fg)',
-    bg: 'var(--c-surface-tint)',
-    icon: <Dumbbell size={14} color="var(--c-brand-fg)" />,
-  },
-  match: {
-    label: 'Match',
-    color: 'var(--c-purple)',
-    bg: 'var(--c-surface-tint)',
-    icon: <Trophy size={14} color="var(--c-purple)" />,
-  },
-  camp: {
-    label: 'Camp',
-    color: 'var(--c-sky)',
-    bg: 'var(--c-surface-tint)',
-    icon: <Zap size={14} color="var(--c-sky)" />,
-  },
-  admin: {
-    label: 'Admin',
-    color: 'var(--c-success-fg)',
-    bg: 'var(--c-success-bg)',
-    icon: <Settings size={14} color="var(--c-success-fg)" />,
-  },
+const SCHEDULE_PATH = '/admin/schedule';
+const SCORE_RE = /score:\s*(\d{1,3})\s*[-:]\s*(\d{1,3})/i;
+
+const TYPE_ICON: Record<string, string> = {
+  training: 'fitness-center',
+  match: 'sports-basketball',
+  camp: 'terrain',
+  medical: 'medical-services',
+  admin: 'badge',
 };
 
-function getTypeMeta(type: string) {
-  return TYPE_META[type] ?? TYPE_META.training;
-}
-
-// ─── Duration helper ──────────────────────────────────────────────────────────
-
-function durationLabel(startIso: string, endIso: string): string {
-  const diffMs = new Date(endIso).getTime() - new Date(startIso).getTime();
-  const mins = Math.round(diffMs / 60000);
+function formatDuration(startIso: string, endIso: string) {
+  const mins = Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000);
+  if (!Number.isFinite(mins) || mins <= 0) return '';
   if (mins < 60) return `${mins} min`;
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+function cleanDescription(description: string | null | undefined) {
+  if (!description) return '';
+  return description
+    .replace(SCORE_RE, '')
+    .replace(/(?:·\s*)?sincronizat din FRB\.?/gi, '')
+    .replace(/Synced from FRB\.?\s*(Score:\s*\d+\s*-\s*\d+)?/gi, '')
+    .replace(/^[\s·.-]+|[\s·.-]+$/g, '')
+    .trim();
+}
 
-const InfoRow = ({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) => (
-  <View style={{ marginBottom: 20 }}>
-    <Text
-      style={{
-        fontSize: 10,
-        fontWeight: '900',
-        color: 'var(--c-faint)',
-        textTransform: 'uppercase',
-        letterSpacing: 1.2,
-        marginBottom: 6,
-        marginLeft: 2,
-      }}
-    >
-      {label}
-    </Text>
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-      <View
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 12,
-          backgroundColor: 'var(--c-surface-3)',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {icon}
-      </View>
-      <Text
-        style={{
-          fontSize: 16,
-          fontWeight: '800',
-          color: 'var(--c-ink-soft)',
-          flexShrink: 1,
-        }}
-      >
-        {value}
-      </Text>
-    </View>
-  </View>
-);
-
-const SectionCard = ({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) => (
-  <View
-    style={{
-      backgroundColor: 'var(--c-surface)',
-      borderRadius: 16,
-      padding: 18,
-      marginBottom: 12,
-      borderWidth: 1,
-      borderColor: 'var(--c-border)',
-      boxShadow: 'var(--e-sm)',
-    } as any}
-  >
-    <Text
-      style={{
-        fontSize: 12,
-        fontWeight: '700',
-        color: 'var(--c-faint)',
-        textTransform: 'uppercase',
-        letterSpacing: 0.6,
-        marginBottom: 14,
-      }}
-    >
-      {title}
-    </Text>
-    {children}
-  </View>
-);
-
-// Team card in Target Audience
-const TeamCard = ({
-  team,
-  playerCount,
-}: {
-  team: Team;
-  playerCount: number;
-}) => (
-  <View
-    style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: 'var(--c-surface-2)',
-      borderRadius: 18,
-      padding: 16,
-      marginBottom: 10,
-      borderWidth: 1,
-      borderColor: 'var(--c-border)',
-    }}
-  >
-    {/* Team avatar */}
+function Card({ title, children, trailing }: { title: string; children: ReactNode; trailing?: ReactNode }) {
+  return (
     <View
-      style={{
-        width: 44,
-        height: 44,
-        borderRadius: 14,
-        backgroundColor: 'var(--c-surface-tint)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 14,
-      }}
+      className="ui-rise rounded-[16px] border p-4 md:p-5"
+      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
-      <ShieldCheck size={20} color="var(--c-brand-fg)" />
+      <View className="flex-row items-center justify-between gap-3 mb-3.5">
+        <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{title}</Text>
+        {trailing}
+      </View>
+      {children}
     </View>
-    <View style={{ flex: 1 }}>
-      <Text style={{ fontSize: 15, fontWeight: '800', color: 'var(--c-ink-soft)', marginBottom: 2 }}>
-        {team.name}
-      </Text>
-      <Text
-        style={{
-          fontSize: 11,
-          fontWeight: '700',
-          color: 'var(--c-muted)',
-          textTransform: 'uppercase',
-          letterSpacing: 0.8,
-        }}
-      >
-        {team.leagueName}
-      </Text>
-    </View>
-    <View style={{ alignItems: 'flex-end' }}>
-      <Text style={{ fontSize: 20, fontWeight: '900', color: 'var(--c-brand-fg)' }}>
-        {playerCount}
-      </Text>
-      <Text
-        style={{
-          fontSize: 9,
-          fontWeight: '800',
-          color: 'var(--c-faint)',
-          textTransform: 'uppercase',
-          letterSpacing: 0.8,
-        }}
-      >
-        Players
-      </Text>
-    </View>
-  </View>
-);
+  );
+}
 
-// Editable note from the coach, shown to every player on this event
-// (post-session feedback, focus points, MVP shoutout). Saves on demand rather
-// than on every keystroke — matches the delete action's explicit-intent pattern.
-const CoachNoteCard = ({
-  value,
-  onChange,
-  onSave,
-  saving,
-  dirty,
+function InfoRow({ icon, label, value, sub }: { icon: string; label: string; value: string; sub?: string }) {
+  return (
+    <View className="flex-row items-center gap-3">
+      <View className="w-10 h-10 rounded-[11px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+        <MaterialIcons name={icon} size={18} color="var(--c-brand-fg)" />
+      </View>
+      <View className="flex-1 min-w-0">
+        <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>{label}</Text>
+        <Text className="text-[15px] font-semibold mt-0.5" style={{ color: 'var(--c-ink)' }}>{value}</Text>
+        {sub ? <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>{sub}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+function ActionButton({
+  icon, label, onPress, tone = 'neutral', disabled, loading,
 }: {
-  value: string;
-  onChange: (value: string) => void;
-  onSave: () => void;
-  saving: boolean;
-  dirty: boolean;
-}) => (
-  <SectionCard title="Notă pentru jucători">
-    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
-      <MessageSquare size={16} color="var(--c-brand-fg)" style={{ marginTop: 2 } as any} />
-      <Text style={{ flex: 1, fontSize: 12, fontWeight: '600', color: 'var(--c-faint)', lineHeight: 17 }}>
-        Vizibilă tuturor jucătorilor de pe acest eveniment — feedback după sesiune, puncte de focus sau un shoutout.
-      </Text>
-    </View>
-    <TextInput
-      value={value}
-      onChangeText={onChange}
-      placeholder="ex. Ritm foarte bun azi, continuăm cu blocajele pick-and-roll."
-      placeholderTextColor="var(--c-faint)"
-      multiline
-      textAlignVertical="top"
-      style={{
-        minHeight: 88,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: 'var(--c-border)',
-        backgroundColor: 'var(--c-surface-2)',
-        color: 'var(--c-ink)',
-        padding: 12,
-        fontSize: 14,
-        fontWeight: '500',
-      } as any}
-    />
-    <TouchableOpacity
-      onPress={onSave}
-      disabled={saving || !dirty}
-      activeOpacity={0.85}
-      style={{
-        alignSelf: 'flex-end',
-        marginTop: 10,
-        paddingHorizontal: 16,
-        height: 36,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: dirty ? 'var(--c-brand-surface)' : 'var(--c-surface-3)',
-        opacity: saving ? 0.7 : 1,
-      }}
+  icon: string;
+  label: string;
+  onPress: () => void;
+  tone?: 'neutral' | 'danger' | 'brand';
+  disabled?: boolean;
+  loading?: boolean;
+}) {
+  const colors = tone === 'danger'
+    ? { bg: 'var(--c-danger-bg)', border: 'var(--c-danger-border)', fg: 'var(--c-danger-fg)' }
+    : tone === 'brand'
+      ? { bg: 'var(--c-brand-surface)', border: 'var(--c-brand-surface)', fg: 'var(--c-on-brand)' }
+      : { bg: 'var(--c-surface)', border: 'var(--c-border)', fg: 'var(--c-ink)' };
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      className="ui-press h-11 rounded-[11px] border px-4 flex-row items-center justify-center gap-2"
+      style={{ backgroundColor: colors.bg, borderColor: colors.border, opacity: disabled ? 0.55 : 1 } as any}
     >
-      {saving ? (
-        <ActivityIndicator size="small" color="#fff" />
-      ) : (
-        <Text style={{ fontSize: 12, fontWeight: '800', color: dirty ? '#fff' : 'var(--c-faint)' }}>
-          {dirty ? 'Salvează' : 'Salvat'}
-        </Text>
-      )}
-    </TouchableOpacity>
-  </SectionCard>
-);
-
-// ─── Main screen ───────────────────────────────────────────────────────────────
+      {loading ? <ActivityIndicator size="small" color={colors.fg} /> : <MaterialIcons name={icon} size={17} color={colors.fg} />}
+      <Text className="text-[13.5px] font-semibold" style={{ color: colors.fg }}>{label}</Text>
+    </Pressable>
+  );
+}
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const isDesktop = width >= 768;
 
   const [event, setEvent] = useState<CalendarEvent | null>(null);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [teamPlayers, setTeamPlayers] = useState<Record<number, number>>({});
+  const [team, setTeam] = useState<Team | null>(null);
+  const [playerCount, setPlayerCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const [savingNote, setSavingNote] = useState(false);
+  const [noteError, setNoteError] = useState<string | null>(null);
 
   const { setSearchPlaceholder, setHeaderActions, setMobileFab } = useHeader();
 
-  // Clear header actions on mount and unmount
   useEffect(() => {
-    setSearchPlaceholder('Event details...');
+    setSearchPlaceholder('Caută…');
     setHeaderActions(null);
     setMobileFab(null);
     return () => {
@@ -328,26 +142,31 @@ export default function EventDetailScreen() {
   }, [setHeaderActions, setMobileFab, setSearchPlaceholder]);
 
   const loadData = useCallback(async () => {
-    if (!id) return;
+    const eventId = Number(id);
+    if (!Number.isInteger(eventId) || eventId <= 0) {
+      setError('Evenimentul nu există.');
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const eventId = Number(id);
-      const [eventData, allTeams] = await Promise.all([
-        eventsApi.getEventById(eventId),
-        teamsApi.getTeams(),
-      ]);
+      setError(null);
+      const eventData = await eventsApi.getEventById(eventId);
       setEvent(eventData);
       setNoteDraft(eventData.coachNote ?? '');
-      setTeams(allTeams);
 
-      // If there is a team attached, load its player count
       if (eventData.teamId) {
-        const players = await teamsApi.getTeamPlayers(eventData.teamId);
-        setTeamPlayers({ [eventData.teamId]: players.length });
+        // Team + squad size in parallel; neither blocks the page.
+        const [teams, players] = await Promise.all([
+          teamsApi.getTeams().catch(() => [] as Team[]),
+          teamsApi.getTeamPlayers(eventData.teamId).catch(() => null),
+        ]);
+        setTeam(teams.find((row) => row.id === eventData.teamId) ?? null);
+        setPlayerCount(players ? players.length : null);
       }
-    } catch (e) {
-      console.error('Event detail load error:', e);
-      Alert.alert('Error', 'Could not load event details.');
+    } catch (err) {
+      console.error('Event detail load error:', err);
+      setError(err instanceof Error ? err.message : 'Evenimentul nu a putut fi încărcat.');
     } finally {
       setLoading(false);
     }
@@ -357,620 +176,273 @@ export default function EventDetailScreen() {
     loadData();
   }, [loadData]);
 
-  const navigateAfterDelete = useCallback(() => {
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-    router.replace('/admin/schedule' as any);
-  }, [router]);
+  const goBack = () => router.back(SCHEDULE_PATH);
 
-  const confirmDeleteEvent = useCallback(async () => {
+  const deleteEvent = async () => {
     if (!event || deleting) return;
-
     try {
       setDeleting(true);
       await eventsApi.deleteEvent(event.id);
-
-      Alert.alert(
-        'Success',
-        'Event deleted successfully.',
-        [{ text: 'OK', onPress: navigateAfterDelete }],
-        { cancelable: false }
-      );
-    } catch (error) {
-      console.error('Delete event error:', error);
-      Alert.alert('Delete failed', 'Could not delete this event. Please try again.');
+      setConfirmDelete(false);
+      router.replace(SCHEDULE_PATH as any);
+    } catch (err) {
+      console.error('Delete event error:', err);
+      setConfirmDelete(false);
+      setError(err instanceof Error ? err.message : 'Evenimentul nu a putut fi șters.');
     } finally {
       setDeleting(false);
     }
-  }, [event, deleting, navigateAfterDelete]);
+  };
 
-  const saveCoachNote = useCallback(async () => {
+  const saveNote = async () => {
     if (!event || savingNote) return;
-
-    const nextNote = noteDraft.trim() || null;
     try {
       setSavingNote(true);
-      const updated = await eventsApi.updateEvent(event.id, { coachNote: nextNote });
+      setNoteError(null);
+      const updated = await eventsApi.updateEvent(event.id, { coachNote: noteDraft.trim() || null });
       setEvent(updated);
       setNoteDraft(updated.coachNote ?? '');
-    } catch (error) {
-      console.error('Save coach note error:', error);
-      Alert.alert('Eroare', 'Nota nu a putut fi salvată. Încearcă din nou.');
+    } catch (err) {
+      setNoteError(err instanceof Error ? err.message : 'Nota nu a putut fi salvată.');
     } finally {
       setSavingNote(false);
     }
-  }, [event, noteDraft, savingNote]);
+  };
 
-  const handleDeleteEventPress = useCallback(() => {
-    if (deleting) return;
-
-    Alert.alert(
-      'Delete Event',
-      'Are you sure you want to delete this event?\n\nThis action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete Event', style: 'destructive', onPress: () => void confirmDeleteEvent() },
-      ]
-    );
-  }, [deleting, confirmDeleteEvent]);
-
-  // ── Derived values ──────────────────────────────────────────────────────────
-
-  const isUpcoming = event ? new Date(event.startTime) > new Date() : false;
-  const typeMeta = event ? getTypeMeta(event.type) : getTypeMeta('training');
-
-  const startDate = event
-    ? new Date(event.startTime).toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-    : '';
-
-  const startTime = event
-    ? new Date(event.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : '';
-
-  const endTime = event
-    ? new Date(event.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : '';
-
-  const duration = event ? durationLabel(event.startTime, event.endTime) : '';
-
-  const teamForEvent = event?.teamId
-    ? teams.find((t) => t.id === event.teamId) ?? null
-    : null;
-
-  // ── Loading skeleton ────────────────────────────────────────────────────────
+  const backButton = (
+    <Pressable
+      onPress={goBack}
+      accessibilityRole="button"
+      accessibilityLabel="Înapoi la program"
+      className="ui-press self-start h-9 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5 mb-4"
+      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+    >
+      <MaterialIcons name="chevron-left" size={18} color="var(--c-ink-soft)" />
+      <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Program</Text>
+    </Pressable>
+  );
 
   if (loading) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'var(--c-surface-2)',
-        }}
-      >
-        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
-        <Text
-          style={{
-            marginTop: 14,
-            color: 'var(--c-faint)',
-            fontWeight: '700',
-            fontSize: 13,
-            textTransform: 'uppercase',
-            letterSpacing: 1,
-          }}
-        >
-          Loading event...
-        </Text>
-      </View>
+      <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
+        <PageContainer>
+          <View className="max-w-[920px] w-full self-center gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă evenimentul">
+            <Skeleton className="h-9 w-28 rounded-[10px]" />
+            <Skeleton className="h-8 w-3/4 rounded-[10px]" />
+            <Skeleton className="h-[180px] w-full rounded-[16px]" />
+            <Skeleton className="h-[140px] w-full rounded-[16px]" />
+          </View>
+        </PageContainer>
+      </ScrollView>
     );
   }
 
   if (!event) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'var(--c-surface-2)',
-          padding: 32,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: '800',
-            color: 'var(--c-ink-soft)',
-            marginBottom: 12,
-            textAlign: 'center',
-          }}
-        >
-          Event not found
-        </Text>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={{
-            backgroundColor: 'var(--c-brand-surface)',
-            paddingHorizontal: 24,
-            paddingVertical: 12,
-            borderRadius: 20,
-          }}
-        >
-          <Text style={{ color: '#fff', fontWeight: '800' }}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
+        <PageContainer>
+          <View className="max-w-[920px] w-full self-center">
+            {backButton}
+            <ErrorState
+              title="Evenimentul nu a putut fi afișat"
+              message={error ?? 'Evenimentul nu există sau a fost șters.'}
+              actionLabel="Reîncearcă"
+              onAction={loadData}
+            />
+          </View>
+        </PageContainer>
+      </ScrollView>
     );
   }
 
-  // ── Main render ─────────────────────────────────────────────────────────────
+  const meta = EVENT_TYPE_META[event.type as keyof typeof EVENT_TYPE_META] ?? EVENT_TYPE_META.admin;
+  const start = new Date(event.startTime);
+  const now = Date.now();
+  const isUpcoming = start.getTime() > now;
+  const cancelled = String(event.status ?? '').toLowerCase() === 'cancelled';
+  const scoreMatch = (event.description ?? '').match(SCORE_RE);
+  const sides = event.type === 'match' ? event.title.split(/\s+vs\s+/i) : [];
+  const description = cleanDescription(event.description);
+  const fromFrb = /FRB/i.test(event.description ?? '');
+  const dateLabel = start.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const timeLabel = `${start.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })} – ${new Date(event.endTime).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}`;
+  const duration = formatDuration(event.startTime, event.endTime);
+  const noteDirty = noteDraft.trim() !== (event.coachNote ?? '').trim();
+
+  const statusChip = cancelled
+    ? { label: 'Anulat', fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)', icon: 'cancel' }
+    : isUpcoming
+      ? { label: 'Programat', fg: 'var(--c-brand-fg)', bg: 'var(--c-surface-tint)', icon: 'schedule' }
+      : { label: 'Încheiat', fg: 'var(--c-muted)', bg: 'var(--c-surface-3)', icon: 'check-circle' };
+
+  const openMaps = () => {
+    if (!event.location) return;
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`, '_blank', 'noopener');
+  };
+
+  const exportIcs = () => {
+    const safe = event.title.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 40) || 'eveniment';
+    triggerFileDownload(`${safe}.ics`, buildICSCalendar([event], 'BCMS'), 'text/calendar;charset=utf-8');
+  };
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: 'var(--c-surface-2)' }}
-      contentContainerStyle={{
-        padding: isDesktop ? 32 : 20,
-        paddingBottom: 120,
-        maxWidth: 900,
-        alignSelf: 'center',
-        width: '100%',
-      }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* ── Back Button ──────────────────────────────────────────────────── */}
-      <TouchableOpacity
-        onPress={() => router.back()}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 24,
-          alignSelf: 'flex-start',
-        }}
-        activeOpacity={0.7}
-      >
-        <View
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 19,
-            backgroundColor: 'var(--c-surface)',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 1,
-            borderColor: 'var(--c-border)',
-            shadowColor: 'var(--c-ink-strong)',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.06,
-            shadowRadius: 4,
-          }}
-        >
-          <ArrowLeft size={18} color="var(--c-ink-soft)" />
-        </View>
-        <Text
-          style={{
-            fontSize: 13,
-            fontWeight: '700',
-            color: 'var(--c-muted)',
-            textTransform: 'uppercase',
-            letterSpacing: 0.8,
-          }}
-        >
-          Schedule
-        </Text>
-      </TouchableOpacity>
+    <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
+      <PageContainer>
+        <View className="max-w-[920px] w-full self-center">
+          {backButton}
 
-      {/* ── Page Header ──────────────────────────────────────────────────── */}
-      <View style={{ marginBottom: 28 }}>
-        {/* Tags row */}
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-          {/* Status badge */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 6,
-              paddingHorizontal: 14,
-              paddingVertical: 6,
-              borderRadius: 20,
-              backgroundColor: isUpcoming ? 'var(--c-brand-surface)' : 'var(--c-surface-3)',
-            }}
-          >
-            {isUpcoming ? (
-              <Clock size={12} color="#fff" />
-            ) : (
-              <CheckCircle2 size={12} color="var(--c-muted)" />
-            )}
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: '900',
-                color: isUpcoming ? '#fff' : 'var(--c-muted)',
-                textTransform: 'uppercase',
-                letterSpacing: 0.8,
-              }}
-            >
-              {isUpcoming ? 'Upcoming' : 'Completed'}
-            </Text>
-          </View>
-
-          {/* Type badge */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 6,
-              paddingHorizontal: 14,
-              paddingVertical: 6,
-              borderRadius: 20,
-              backgroundColor: typeMeta.bg,
-            }}
-          >
-            {typeMeta.icon}
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: '900',
-                color: typeMeta.color,
-                textTransform: 'uppercase',
-                letterSpacing: 0.8,
-              }}
-            >
-              {typeMeta.label}
-            </Text>
-          </View>
-        </View>
-
-        {/* Title */}
-        <Text
-          style={{
-            fontSize: isDesktop ? 28 : 23,
-            fontWeight: '800',
-            color: 'var(--c-ink-strong)',
-            lineHeight: isDesktop ? 34 : 29,
-            letterSpacing: -0.4,
-          }}
-        >
-          {event.title}
-        </Text>
-
-        {/* Optional description */}
-        {event.description ? (
-          <Text
-            style={{
-              fontSize: 15,
-              color: 'var(--c-muted)',
-              fontWeight: '500',
-              marginTop: 10,
-              lineHeight: 22,
-            }}
-          >
-            {event.description}
-          </Text>
-        ) : null}
-      </View>
-
-      {/* ── Cards grid (desktop: 2 columns, mobile: stacked) ─────────────── */}
-      <View
-        style={
-          isDesktop
-            ? { flexDirection: 'row', gap: 16, alignItems: 'flex-start' }
-            : {}
-        }
-      >
-        {/* LEFT column */}
-        <View style={isDesktop ? { flex: 1 } : {}}>
-
-          {/* Event Summary Card */}
-          <SectionCard title="Event Summary">
-            <InfoRow
-              icon={<Calendar size={18} color="var(--c-brand-fg)" />}
-              label="Date"
-              value={startDate}
-            />
-            <InfoRow
-              icon={<Clock size={18} color="var(--c-brand-fg)" />}
-              label="Time & Duration"
-              value={`${startTime} – ${endTime}  (${duration})`}
-            />
-            {/* Number of players, sourced from team players if available */}
-            <InfoRow
-              icon={<Users size={18} color="var(--c-brand-fg)" />}
-              label="Expected Players"
-              value={
-                event.teamId && teamPlayers[event.teamId] !== undefined
-                  ? `${teamPlayers[event.teamId]} Players`
-                  : 'All Teams'
-              }
-            />
-          </SectionCard>
-
-          {/* Location Card */}
-          <SectionCard title="Location">
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-              <View
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 14,
-                  backgroundColor: 'var(--c-surface-tint)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginTop: 2,
-                }}
-              >
-                <MapPin size={20} color="var(--c-brand-fg)" />
+          {/* Header */}
+          <View className="mb-5">
+            <View className="flex-row flex-wrap items-center gap-2 mb-3">
+              <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: meta.soft }}>
+                <MaterialIcons name={TYPE_ICON[event.type] ?? 'event'} size={13} color={meta.onSoft} />
+                <Text className="text-[12px] font-bold" style={{ color: meta.onSoft }}>{meta.label}</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: 17,
-                    fontWeight: '800',
-                    color: 'var(--c-ink-soft)',
-                    marginBottom: 4,
-                  }}
-                >
-                  {event.location || 'Main Arena'}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '600',
-                    color: 'var(--c-faint)',
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.6,
-                  }}
-                >
-                  {event.teamName ? `${event.teamName} home venue` : 'Club venue'}
-                </Text>
+              <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: statusChip.bg }}>
+                <MaterialIcons name={statusChip.icon} size={13} color={statusChip.fg} />
+                <Text className="text-[12px] font-bold" style={{ color: statusChip.fg }}>{statusChip.label}</Text>
               </View>
-            </View>
-
-            {/* Map placeholder strip */}
-            <View
-              style={{
-                marginTop: 16,
-                height: 110,
-                borderRadius: 18,
-                backgroundColor: 'var(--c-surface-3)',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                borderWidth: 1,
-                borderColor: 'var(--c-border)',
-              }}
-            >
-              {/* Simple placeholder that feels like a map */}
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  opacity: 0.08,
-                }}
-              >
-                {/* Grid lines */}
-                {[...Array(6)].map((_, i) => (
-                  <View
-                    key={`h${i}`}
-                    style={{
-                      position: 'absolute',
-                      top: `${i * 20}%`,
-                      left: 0,
-                      right: 0,
-                      height: 1,
-                      backgroundColor: 'var(--c-brand-surface)',
-                    }}
-                  />
-                ))}
-                {[...Array(10)].map((_, i) => (
-                  <View
-                    key={`v${i}`}
-                    style={{
-                      position: 'absolute',
-                      left: `${i * 12}%`,
-                      top: 0,
-                      bottom: 0,
-                      width: 1,
-                      backgroundColor: 'var(--c-brand-surface)',
-                    }}
-                  />
-                ))}
-              </View>
-              <View
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: 'var(--c-brand-surface)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  shadowColor: 'var(--c-brand-fg)',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.4,
-                  shadowRadius: 8,
-                }}
-              >
-                <MapPin size={18} color="#fff" />
-              </View>
-            </View>
-          </SectionCard>
-
-          <CoachNoteCard
-            value={noteDraft}
-            onChange={setNoteDraft}
-            onSave={() => void saveCoachNote()}
-            saving={savingNote}
-            dirty={noteDraft.trim() !== (event.coachNote ?? '').trim()}
-          />
-        </View>
-
-        {/* RIGHT column */}
-        <View style={isDesktop ? { flex: 1 } : {}}>
-
-          {/* Target Audience Card */}
-          <SectionCard title="Target Audience">
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: '600',
-                color: 'var(--c-faint)',
-                marginBottom: 16,
-                marginTop: -10,
-              }}
-            >
-              Eligible teams and player groups for this session
-            </Text>
-
-            {teamForEvent ? (
-              <TeamCard
-                team={teamForEvent}
-                playerCount={
-                  event.teamId && teamPlayers[event.teamId] !== undefined
-                    ? teamPlayers[event.teamId]
-                    : 0
-                }
-              />
-            ) : (
-              /* No team assigned — show all teams */
-              teams.length > 0 ? (
-                teams.map((t) => (
-                  <TeamCard
-                    key={t.id}
-                    team={t}
-                    playerCount={teamPlayers[t.id] ?? 0}
-                  />
-                ))
-              ) : (
-                <View
-                  style={{
-                    padding: 24,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Users size={36} color="var(--c-border-strong)" />
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: '700',
-                      color: 'var(--c-faint)',
-                      marginTop: 10,
-                      textTransform: 'uppercase',
-                      letterSpacing: 0.6,
-                    }}
-                  >
-                    Open to all
-                  </Text>
+              {fromFrb ? (
+                <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+                  <MaterialIcons name="refresh" size={13} color="var(--c-muted)" />
+                  <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>Sincronizat FRB</Text>
                 </View>
-              )
-            )}
-          </SectionCard>
+              ) : null}
+            </View>
 
-          {/* Coach Info (subtle) */}
-          {event.coachName ? (
-            <View
-              style={{
-                backgroundColor: 'var(--c-surface)',
-                borderRadius: 20,
-                padding: 18,
-                borderWidth: 1,
-                borderColor: 'var(--c-surface-3)',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 14,
-                shadowColor: 'var(--c-ink-strong)',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.04,
-                shadowRadius: 6,
-              }}
-            >
+            {scoreMatch && sides.length === 2 ? (
               <View
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 21,
-                  backgroundColor: 'var(--c-brand-surface)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
+                className="rounded-[16px] border p-4 flex-row items-center gap-3"
+                style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
               >
-                <Text
-                  style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}
-                >
-                  {event.coachName.charAt(0).toUpperCase()}
-                </Text>
+                <Text className="flex-1 text-[15px] md:text-[17px] font-bold text-right leading-tight" style={{ color: 'var(--c-ink)' }}>{sides[0]}</Text>
+                <View className="rounded-[12px] px-4 py-2 items-center" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+                  <Text className="t-num text-[28px] font-bold leading-none" style={{ color: 'var(--c-ink-strong)' }}>
+                    {scoreMatch[1]}<Text style={{ color: 'var(--c-faint)' }}> : </Text>{scoreMatch[2]}
+                  </Text>
+                  <Text className="text-[10.5px] font-semibold mt-1 uppercase tracking-[0.06em]" style={{ color: 'var(--c-faint)' }}>Final</Text>
+                </View>
+                <Text className="flex-1 text-[15px] md:text-[17px] font-bold leading-tight" style={{ color: 'var(--c-ink)' }}>{sides[1]}</Text>
               </View>
-              <View>
-                <Text
-                  style={{
-                    fontSize: 9,
-                    fontWeight: '900',
-                    color: 'var(--c-faint)',
-                    textTransform: 'uppercase',
-                    letterSpacing: 1,
-                    marginBottom: 3,
-                  }}
-                >
-                  Assigned Coach
-                </Text>
-                <Text
-                  style={{ fontSize: 15, fontWeight: '800', color: 'var(--c-ink-soft)' }}
-                >
-                  {event.coachName}
-                </Text>
-              </View>
+            ) : (
+              <Text className="text-[24px] md:text-[28px] font-bold leading-tight" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.5px' } as any}>
+                {event.title}
+              </Text>
+            )}
+
+            {description ? (
+              <Text className="text-[14px] font-medium mt-2.5 leading-5" style={{ color: 'var(--c-muted)' }}>{description}</Text>
+            ) : null}
+          </View>
+
+          {error ? (
+            <View className="mb-4 rounded-[12px] border px-4 py-3 flex-row items-center gap-2.5" style={{ backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-border)' } as any}>
+              <MaterialIcons name="error-outline" size={17} color="var(--c-danger-fg)" />
+              <Text className="text-[13px] font-semibold flex-1" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text>
             </View>
           ) : null}
 
-          {/* Destructive action */}
-          <TouchableOpacity
-            onPress={handleDeleteEventPress}
-            disabled={deleting}
-            activeOpacity={0.85}
-            style={{
-              marginTop: 16,
-              backgroundColor: deleting ? 'var(--c-danger-bg)' : 'var(--c-danger-bg)',
-              borderWidth: 1,
-              borderColor: 'var(--c-danger-bg)',
-              borderRadius: 20,
-              paddingVertical: 14,
-              paddingHorizontal: 16,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: deleting ? 0.7 : 1,
-              gap: 8,
-            }}
-          >
-            {deleting ? (
-              <ActivityIndicator size="small" color="var(--c-danger)" />
-            ) : (
-              <Trash2 size={16} color="var(--c-danger)" />
-            )}
-            <Text
-              style={{
-                color: 'var(--c-danger)',
-                fontWeight: '900',
-                fontSize: 13,
-                textTransform: 'uppercase',
-                letterSpacing: 0.8,
-              }}
-            >
-              {deleting ? 'Deleting...' : 'Delete Event'}
-            </Text>
-          </TouchableOpacity>
+          <View className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <View className="gap-4 min-w-0">
+              <Card title="Când">
+                <View className="gap-3.5">
+                  <InfoRow icon="calendar-today" label="Data" value={dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)} />
+                  <InfoRow icon="schedule" label="Ora" value={timeLabel} sub={duration ? `Durată: ${duration}` : undefined} />
+                </View>
+              </Card>
+
+              <Card
+                title="Unde"
+                trailing={event.location ? (
+                  <Pressable onPress={openMaps} accessibilityRole="link" accessibilityLabel="Deschide în Hărți" className="ui-press flex-row items-center gap-1">
+                    <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Deschide în Hărți</Text>
+                    <MaterialIcons name="chevron-right" size={16} color="var(--c-brand-fg)" />
+                  </Pressable>
+                ) : null}
+              >
+                <InfoRow icon="place" label="Locație" value={event.location || 'Nespecificată'} />
+              </Card>
+
+              <Card title="Notă pentru jucători">
+                <Text className="t-meta mb-2.5" style={{ color: 'var(--c-muted)' }}>
+                  Vizibilă tuturor jucătorilor de pe acest eveniment — feedback, puncte de focus sau un shoutout.
+                </Text>
+                <TextInput
+                  value={noteDraft}
+                  onChangeText={setNoteDraft}
+                  placeholder="ex. Ritm foarte bun azi, continuăm cu pick-and-roll."
+                  placeholderTextColor="var(--c-faint)"
+                  multiline
+                  maxLength={2000}
+                  className="rounded-[11px] border px-3 py-2.5 text-[14px] font-medium min-h-[88px] resize-none leading-5"
+                  style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)', color: 'var(--c-ink)' } as any}
+                />
+                {noteError ? <Text className="text-[12px] font-semibold mt-1.5" style={{ color: 'var(--c-danger-fg)' }}>{noteError}</Text> : null}
+                <View className="flex-row justify-end mt-2.5">
+                  <ActionButton
+                    icon={noteDirty ? 'save' : 'check'}
+                    label={noteDirty ? 'Salvează nota' : 'Salvat'}
+                    onPress={saveNote}
+                    tone={noteDirty ? 'brand' : 'neutral'}
+                    disabled={!noteDirty}
+                    loading={savingNote}
+                  />
+                </View>
+              </Card>
+            </View>
+
+            <View className="gap-4 min-w-0">
+              <Card title="Echipă">
+                {event.teamId ? (
+                  <View className="gap-3.5">
+                    <InfoRow
+                      icon="shield"
+                      label={team?.leagueName || 'Echipă'}
+                      value={team?.name ?? event.teamName ?? 'Echipă'}
+                      sub={playerCount != null ? `${playerCount} ${playerCount === 1 ? 'jucător' : 'jucători'} în lot` : undefined}
+                    />
+                    {event.coachName && event.coachName !== 'FRB' ? (
+                      <InfoRow icon="person" label="Antrenor" value={event.coachName} />
+                    ) : null}
+                  </View>
+                ) : (
+                  <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Eveniment la nivel de club, fără o echipă anume.</Text>
+                )}
+              </Card>
+
+              <Card title="Acțiuni">
+                <View className="gap-2.5">
+                  {event.teamId && !cancelled ? (
+                    <ActionButton
+                      icon="fact-check"
+                      label={isUpcoming ? 'Lista de prezență' : 'Marchează prezența'}
+                      tone="brand"
+                      onPress={() => router.push(`/admin/attendance/${event.id}` as any)}
+                    />
+                  ) : null}
+                  {isUpcoming && !cancelled ? (
+                    <ActionButton icon="event" label="Adaugă în calendar (.ics)" onPress={exportIcs} />
+                  ) : null}
+                  <ActionButton icon="delete" label="Șterge evenimentul" tone="danger" onPress={() => setConfirmDelete(true)} />
+                </View>
+              </Card>
+            </View>
+          </View>
         </View>
-      </View>
+      </PageContainer>
+
+      <ConfirmDialog
+        visible={confirmDelete}
+        destructive
+        icon="delete"
+        title="Ștergi evenimentul?"
+        message={`„${event.title}” și lista lui de prezență vor fi șterse definitiv.`}
+        confirmLabel="Șterge"
+        cancelLabel="Anulează"
+        loading={deleting}
+        onConfirm={deleteEvent}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </ScrollView>
   );
 }

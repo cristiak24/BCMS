@@ -25,17 +25,38 @@ function normalizeHref(href: any): To {
   return href || '/';
 }
 
+/**
+ * Whether there is an in-app page to go back to. react-router keeps its own
+ * entry index in history.state; the old `history.length > 1` was true for any
+ * tab that had visited ANY page before (another site, the login redirect), so
+ * "Înapoi" on a page opened directly — a shared link, a refresh, a
+ * notification — left the app or did nothing at all.
+ */
+function canGoBackInApp() {
+  const idx = (window.history.state as { idx?: number } | null)?.idx;
+  return typeof idx === 'number' && idx > 0;
+}
+
 export function useRouter() {
   const navigate = useNavigate();
   return useMemo(
-    () => ({
-      push: (href: any) => navigate(normalizeHref(href)),
-      replace: (href: any) => navigate(normalizeHref(href), { replace: true }),
-      back: () => navigate(-1),
-      canGoBack: () => window.history.length > 1,
-      navigate: (href: any) => navigate(normalizeHref(href)),
-      dismiss: () => navigate(-1),
-    }),
+    () => {
+      // Back with a fallback: with no in-app history, go to `fallback`
+      // (default "/", which redirects to the role's home) instead of doing
+      // nothing.
+      const back = (fallback: any = '/') => {
+        if (canGoBackInApp()) navigate(-1);
+        else navigate(normalizeHref(fallback), { replace: true });
+      };
+      return {
+        push: (href: any) => navigate(normalizeHref(href)),
+        replace: (href: any) => navigate(normalizeHref(href), { replace: true }),
+        back,
+        canGoBack: canGoBackInApp,
+        navigate: (href: any) => navigate(normalizeHref(href)),
+        dismiss: () => back(),
+      };
+    },
     [navigate],
   );
 }

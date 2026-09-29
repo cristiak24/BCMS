@@ -186,7 +186,7 @@ export default function TeamDetailsScreen() {
         return (
             <View className="flex-1 items-center justify-center bg-[#EDF4FB]">
                 <Text className="text-[#0E2041] font-bold">Echipa nu a fost găsită.</Text>
-                <Pressable onPress={() => router.back()} className="mt-4 bg-[#1D3E90] px-6 py-2.5 rounded-xl">
+                <Pressable onPress={() => router.back('/admin/my-club-admin')} className="mt-4 bg-[#1D3E90] px-6 py-2.5 rounded-xl">
                     <Text className="text-white font-bold">Înapoi</Text>
                 </Pressable>
             </View>
