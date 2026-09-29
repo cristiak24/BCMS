@@ -10,7 +10,7 @@ import { eventsApi, CalendarEvent } from '../../../services/eventsApi';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { resolveDocumentUrl } from '../../../config/serverUrl';
 import AdminHero from '../../../components/admin/AdminHero';
-import StatCard from '../../../components/dashboard/StatCard';
+import StatCard from '../../../components/ui/StatCard';
 import { EmptyState, SkeletonBlock } from '../../../components/dashboard/ScreenStates';
 import { dash } from '../../../components/dashboard/dashboardTheme';
 
@@ -195,13 +195,13 @@ function SectionHeader({ icon, iconBg, iconFg, title, subtitle }: {
     subtitle: string;
 }) {
     return (
-        <View className="flex-row items-center mb-6">
-            <View className="w-11 h-11 rounded-[14px] items-center justify-center mr-3.5" style={{ backgroundColor: iconBg }}>
-                <MaterialIcons name={icon} size={20} color={iconFg} />
+        <View className="flex-row items-center gap-3 mb-4 min-w-0">
+            <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: iconBg }}>
+                <MaterialIcons name={icon} size={18} color={iconFg} />
             </View>
-            <View className="flex-1">
-                <Text className="text-[18px] font-bold" style={{ color: dash.ink }}>{title}</Text>
-                <Text className="text-[12px] font-medium mt-0.5" style={{ color: dash.muted }}>{subtitle}</Text>
+            <View className="flex-1 min-w-0">
+                <Text className="text-[16px] font-bold" style={{ color: dash.ink }}>{title}</Text>
+                <Text className="t-meta mt-0.5" style={{ color: dash.muted }}>{subtitle}</Text>
             </View>
         </View>
     );
@@ -221,7 +221,7 @@ function ModalShell({ visible, onClose, children, maxWidth = 420 }: {
                 onPress={onClose}
             >
                 <Pressable
-                    className="w-full rounded-[24px] p-6 border dash-fade-in"
+                    className="w-full rounded-[16px] p-5 border dash-fade-in"
                     style={{ maxWidth, maxHeight: '90vh', overflowY: 'auto', backgroundColor: dash.surface, borderColor: dash.hairline, ...dash.shadow.lift } as any}
                     onPress={(event: any) => event.stopPropagation()}
                 >
@@ -537,7 +537,7 @@ export default function FinancialSettingsPage() {
             if (result.canceled) return;
 
             const file = result.assets[0];
-            const typeLabel = docType === 'expense' ? 'Expense' : 'Invoice';
+            const typeLabel = docType === 'expense' ? 'Cheltuială' : 'Factură';
             setUploadModal({
                 visible: true,
                 docType,
@@ -667,35 +667,29 @@ export default function FinancialSettingsPage() {
                 <View className="mb-20">
 
                     {/* ── L12 GENERATOR CARD ───────────────────────── */}
-                    <View className={`rounded-[24px] ${isMobile ? 'p-5' : 'p-7'} border dash-fade-in mb-6 relative overflow-hidden`} style={cardStyle}>
-                        <View pointerEvents="none" className="absolute top-0 left-0 right-0 h-[3px]" style={{ backgroundImage: 'linear-gradient(90deg, #635BFF, #2563EB)' } as any} />
-                        <View className="flex-row justify-between items-start mb-6">
+                    <View className={`rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in mb-6 relative overflow-hidden`} style={cardStyle}>
+                        <View className="flex-row justify-between items-start">
                             <SectionHeader
                                 icon="sports-basketball"
                                 iconBg="rgba(99,91,255,0.1)"
                                 iconFg={dash.accent}
-                                title="L12 Player List"
-                                subtitle="Generation & validation module"
+                                title="Lista L12"
+                                subtitle="Foaia oficială de joc: echipă, meci și maxim 12 jucători"
                             />
-                            {!isMobile && (
-                                <View pointerEvents="none" className="absolute right-0 top-0">
-                                    <Text className="text-[56px] font-black italic" style={{ color: dash.lineSoft }}>L.12</Text>
-                                </View>
-                            )}
                         </View>
 
                         {/* Team & Match selectors */}
-                        <View className={`gap-4 mb-6 ${isMobile ? '' : 'flex-row'}`}>
+                        <View className={`gap-4 mb-4 ${isMobile ? '' : 'flex-row'}`}>
                             <View className="flex-1">
-                                <Text className="font-bold text-[11px] uppercase tracking-wide mb-2 ml-1" style={{ color: dash.muted }}>Team Selection</Text>
+                                <Text className="font-bold text-[11px] uppercase tracking-wide mb-2 ml-1" style={{ color: dash.muted }}>Echipă</Text>
                                 <Pressable
                                     onPress={() => setTeamModalVisible(true)}
                                     disabled={loadingTeams}
-                                    className="flex-row h-[50px] items-center px-4 rounded-[14px] border"
+                                    className="flex-row h-11 items-center px-4 rounded-[11px] border"
                                     style={{ backgroundColor: dash.lineSoft, borderColor: dash.hairline }}
                                 >
-                                    <Text className="font-bold flex-1" style={{ color: selectedTeam ? dash.ink : dash.faint }} numberOfLines={1}>
-                                        {loadingTeams ? 'Loading teams...' : selectedTeam ? selectedTeam.name : 'Select a team...'}
+                                    <Text className="text-[14px] font-semibold flex-1" style={{ color: selectedTeam ? dash.ink : dash.faint }} numberOfLines={1}>
+                                        {loadingTeams ? 'Se încarcă echipele…' : selectedTeam ? selectedTeam.name : 'Alege echipa'}
                                     </Text>
                                     {loadingTeams ? <ActivityIndicator size="small" color={dash.accent} style={{ marginLeft: 10 }} /> : (
                                         <MaterialIcons name="chevron-right" size={18} color={dash.faint} />
@@ -703,17 +697,17 @@ export default function FinancialSettingsPage() {
                                 </Pressable>
                             </View>
                             <View className="flex-1">
-                                <Text className="font-bold text-[11px] uppercase tracking-wide mb-2 ml-1" style={{ color: dash.muted }}>Match Selection</Text>
+                                <Text className="font-bold text-[11px] uppercase tracking-wide mb-2 ml-1" style={{ color: dash.muted }}>Meci</Text>
                                 <Pressable
                                     onPress={() => {
                                         if (!selectedTeam) Alert.alert('Atenție', 'Selectează echipa mai întâi.');
                                         else setMatchModalVisible(true);
                                     }}
-                                    className="flex-row h-[50px] items-center px-4 rounded-[14px] border"
+                                    className="flex-row h-11 items-center px-4 rounded-[11px] border"
                                     style={{ backgroundColor: dash.lineSoft, borderColor: dash.hairline }}
                                 >
-                                    <Text className="font-bold flex-1" style={{ color: selectedMatch ? dash.ink : dash.faint }} numberOfLines={1}>
-                                        {selectedMatch ? selectedMatch.label : 'Select a match...'}
+                                    <Text className="text-[14px] font-semibold flex-1" style={{ color: selectedMatch ? dash.ink : dash.faint }} numberOfLines={1}>
+                                        {selectedMatch ? selectedMatch.label : 'Alege meciul'}
                                     </Text>
                                     <MaterialIcons name="chevron-right" size={18} color={dash.faint} />
                                 </Pressable>
@@ -721,9 +715,9 @@ export default function FinancialSettingsPage() {
                         </View>
 
                         {/* Player Selection Area */}
-                        <View className="rounded-[18px] p-5 border" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
-                            <Text className="font-black text-[11px] tracking-widest uppercase mb-4" style={{ color: dash.muted }}>
-                                Active Selection ({selectedPlayers.length}/12)
+                        <View className="rounded-[12px] p-4 border" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
+                            <Text className="t-eyebrow mb-4" style={{ color: dash.muted }}>
+                                Jucători selectați · {selectedPlayers.length}/12
                             </Text>
                             <View className="flex-row flex-wrap gap-2">
                                 {players.filter(p => selectedPlayers.includes(p.id)).map(p => (
@@ -740,7 +734,7 @@ export default function FinancialSettingsPage() {
                                         style={{ borderColor: dash.line, backgroundColor: dash.lineSoft }}
                                     >
                                         <MaterialIcons name="add" size={14} color={dash.muted} style={{ marginRight: 4 }} />
-                                        <Text className="font-bold text-sm" style={{ color: dash.muted }}>Configure All Players</Text>
+                                        <Text className="font-bold text-sm" style={{ color: dash.muted }}>Alege jucătorii</Text>
                                     </Pressable>
                                 )}
                             </View>
@@ -750,26 +744,26 @@ export default function FinancialSettingsPage() {
                             <Pressable
                                 onPress={handleGenerateL12}
                                 disabled={generatingL12}
-                                className={`mt-6 h-[50px] items-center justify-center rounded-full ${isMobile ? 'w-full' : 'w-[220px]'}`}
-                                style={{ backgroundColor: dash.ink, ...dash.shadow.sm }}
+                                className={`mt-5 h-11 items-center justify-center rounded-[11px] ${isMobile ? 'w-full' : 'w-[220px]'}`}
+                                style={{ backgroundColor: 'var(--c-brand-surface)', ...dash.shadow.sm }}
                             >
                                 {generatingL12
                                     ? <ActivityIndicator color="white" />
-                                    : <Text className="text-white font-bold tracking-wide">Generate List</Text>
+                                    : <Text className="text-white font-bold tracking-wide">Generează lista</Text>
                                 }
                             </Pressable>
                         )}
                     </View>
 
                     {/* ── L12 ARCHIVE CARD ──────────────────────────── */}
-                    <View className={`rounded-[24px] ${isMobile ? 'p-5' : 'p-7'} border dash-fade-in`} style={cardStyle}>
-                        <View className="flex-row justify-between items-start mb-6">
+                    <View className={`rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in`} style={cardStyle}>
+                        <View className="flex-row justify-between items-start">
                             <SectionHeader
                                 icon="receipt-long"
                                 iconBg="rgba(37,99,235,0.1)"
                                 iconFg={dash.accentBlue}
-                                title="Generated L12 Archive"
-                                subtitle="History of official lists"
+                                title="Arhivă L12"
+                                subtitle="Listele generate anterior"
                             />
                         </View>
                         <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
@@ -788,7 +782,7 @@ export default function FinancialSettingsPage() {
                                         <View key={idx} className={`p-4 rounded-[16px] border ${isMobile ? 'gap-3' : 'flex-row justify-between items-center'}`} style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
                                             <View className="flex-1">
                                                 <Text className="font-bold mb-1" style={{ color: dash.ink }} numberOfLines={1}>{doc.matchTitle}</Text>
-                                                <Text className="text-[11px] font-medium" style={{ color: dash.muted }}>{new Date(doc.createdAt).toLocaleString()}</Text>
+                                                <Text className="text-[11px] font-medium" style={{ color: dash.muted }}>{new Date(doc.createdAt).toLocaleString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</Text>
                                             </View>
                                             <Pressable
                                                 onPress={() => openDocumentUrl(doc.documentUrl)}
@@ -796,7 +790,7 @@ export default function FinancialSettingsPage() {
                                                 style={{ backgroundColor: 'rgba(37,99,235,0.08)' }}
                                             >
                                                 <MaterialIcons name="file-download" size={14} color={dash.accentBlue} />
-                                                <Text className="text-[12px] font-black uppercase tracking-wide" style={{ color: dash.accentBlue }}>Download</Text>
+                                                <Text className="text-[12.5px] font-semibold" style={{ color: dash.accentBlue }}>Descarcă</Text>
                                             </Pressable>
                                         </View>
                                     ))
@@ -813,56 +807,52 @@ export default function FinancialSettingsPage() {
             {activeTab === 'Finances' && (
                 <View className="mb-20">
 
-                    {/* ── Overview KPI row ─────────────────────────── */}
-                    <View className="flex-row flex-wrap gap-3 mb-6">
+                    {/* ── Overview KPIs: 2×2 on phones, one row on desktop ── */}
+                    <View className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
                         <StatCard
                             icon="account-balance-wallet"
-                            label="Cotizație lunară"
-                            value={loadingSettings ? '—' : `${settings?.monthlyPlayerFee ?? 0} RON`}
-                            detail="per jucător / lună"
                             tone="purple"
-                            loading={loadingSettings}
+                            label="Cotizație"
+                            value={loadingSettings ? '—' : `${settings?.monthlyPlayerFee ?? 0} RON`}
+                            hint="per jucător / lună"
                         />
                         <StatCard
                             icon="payment"
-                            label="Încasări recente"
+                            tone="success"
+                            label="Încasări"
                             value={loadingRecentPayments ? '—' : formatCurrency(financeStats.collectedAmount)}
-                            detail={`${recentPayments.length} plăți încasate`}
-                            tone="green"
-                            loading={loadingRecentPayments}
+                            hint={`${recentPayments.length} plăți recente`}
                         />
                         <StatCard
                             icon="schedule"
-                            label="Documente în așteptare"
-                            value={loadingDocuments ? '—' : String(financeStats.pendingCount)}
-                            detail={loadingDocuments ? undefined : formatCurrency(financeStats.pendingAmount)}
-                            tone="orange"
-                            loading={loadingDocuments}
+                            tone="warning"
+                            label="De verificat"
+                            value={loadingDocuments ? '—' : financeStats.pendingCount}
+                            hint={loadingDocuments ? undefined : formatCurrency(financeStats.pendingAmount)}
                         />
                         <StatCard
                             icon="receipt-long"
-                            label="Total documente"
-                            value={loadingDocuments ? '—' : String(uploads.length)}
-                            detail={loadingDocuments ? undefined : `${formatCurrency(financeStats.approvedAmount)} aprobat`}
-                            tone="blue"
-                            loading={loadingDocuments}
+                            tone="sky"
+                            label="Documente"
+                            value={loadingDocuments ? '—' : uploads.length}
+                            hint={loadingDocuments ? undefined : `${formatCurrency(financeStats.approvedAmount)} aprobat`}
                         />
                     </View>
 
                     {/* ── Row: Monthly Fee + Upload ─────────────────── */}
-                    <View className={`gap-6 mb-6 ${isMobile ? '' : 'flex-row'}`}>
+                    <View className={`gap-4 mb-5 ${isMobile ? '' : 'flex-row'}`}>
 
                         {/* Monthly Fee Card */}
-                        <View className={`flex-1 rounded-[24px] ${isMobile ? 'p-5' : 'p-7'} border dash-fade-in`} style={cardStyle}>
+                        <View className={`flex-1 rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in`} style={cardStyle}>
                             <SectionHeader
                                 icon="account-balance-wallet"
                                 iconBg="rgba(99,91,255,0.1)"
                                 iconFg={dash.accent}
-                                title="Cotizație Lunară"
+                                title="Cotizație lunară"
                                 subtitle="Gestionează taxa lunară per jucător"
                             />
 
-                            <View className="rounded-[18px] p-5 border mb-4" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
+                            <View className="rounded-[12px] p-4 border mb-4" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
                                 <View className="flex-row justify-between items-center mb-4">
                                     <Text className="font-bold text-[11px] uppercase tracking-wider" style={{ color: dash.muted }}>Taxa curentă</Text>
                                     {!editingFee && (
@@ -880,7 +870,7 @@ export default function FinancialSettingsPage() {
                                                 value={monthlyFeeInput}
                                                 onChangeText={setMonthlyFeeInput}
                                                 keyboardType="numeric"
-                                                className="flex-1 rounded-[14px] h-[50px] px-4 text-[20px] font-black mr-3 border"
+                                                className="flex-1 rounded-[11px] h-11 px-4 text-[18px] font-bold mr-3 border"
                                                 style={{ backgroundColor: dash.surface, borderColor: dash.hairlineStrong, color: dash.ink }}
                                                 placeholder="0"
                                                 placeholderTextColor={dash.faint}
@@ -891,8 +881,8 @@ export default function FinancialSettingsPage() {
                                             <Pressable
                                                 onPress={handleSaveMonthlyFee}
                                                 disabled={savingFee}
-                                                className="flex-1 h-[46px] rounded-[14px] items-center justify-center flex-row gap-1.5"
-                                                style={{ backgroundColor: dash.ink }}
+                                                className="flex-1 h-10 rounded-[11px] items-center justify-center flex-row gap-1.5"
+                                                style={{ backgroundColor: 'var(--c-brand-surface)' }}
                                             >
                                                 {savingFee
                                                     ? <ActivityIndicator color="white" size="small" />
@@ -904,7 +894,7 @@ export default function FinancialSettingsPage() {
                                                     setEditingFee(false);
                                                     setMonthlyFeeInput(String(settings?.monthlyPlayerFee || 0));
                                                 }}
-                                                className="flex-1 h-[46px] rounded-[14px] items-center justify-center"
+                                                className="flex-1 h-10 rounded-[11px] items-center justify-center"
                                                 style={{ backgroundColor: dash.lineSoft }}
                                             >
                                                 <Text className="font-bold" style={{ color: dash.muted }}>Anulează</Text>
@@ -918,7 +908,7 @@ export default function FinancialSettingsPage() {
                                         </View>
                                     ) : (
                                         <View className="flex-row items-end">
-                                            <Text className="text-[40px] font-black leading-none" style={{ color: dash.ink }}>{settings?.monthlyPlayerFee || 0}</Text>
+                                            <Text className="t-num text-[32px] font-bold leading-none" style={{ color: dash.ink }}>{settings?.monthlyPlayerFee || 0}</Text>
                                             <Text className="text-[18px] font-bold ml-2 mb-1" style={{ color: dash.faint }}>RON / lună</Text>
                                         </View>
                                     )
@@ -926,7 +916,7 @@ export default function FinancialSettingsPage() {
                             </View>
 
                             {/* Payment due day */}
-                            <View className="rounded-[18px] p-5 border mb-4" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
+                            <View className="rounded-[12px] p-4 border mb-4" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
                                 <View className="flex-row justify-between items-center mb-3">
                                     <Text className="font-bold text-[11px] uppercase tracking-wider" style={{ color: dash.muted }}>Zi limită de plată</Text>
                                     {!editingDueDay && (
@@ -946,7 +936,7 @@ export default function FinancialSettingsPage() {
                                                 onChangeText={setDueDayInput}
                                                 keyboardType="numeric"
                                                 maxLength={2}
-                                                className="w-[80px] rounded-[14px] h-[50px] px-4 text-[20px] font-black border text-center"
+                                                className="w-[80px] rounded-[11px] h-11 px-4 text-[18px] font-bold border text-center"
                                                 style={{ backgroundColor: dash.surface, borderColor: dash.hairlineStrong, color: dash.ink }}
                                                 placeholder="25"
                                                 placeholderTextColor={dash.faint}
@@ -957,8 +947,8 @@ export default function FinancialSettingsPage() {
                                             <Pressable
                                                 onPress={handleSaveDueDay}
                                                 disabled={savingDueDay}
-                                                className="flex-1 h-[46px] rounded-[14px] items-center justify-center flex-row gap-1.5"
-                                                style={{ backgroundColor: dash.ink }}
+                                                className="flex-1 h-10 rounded-[11px] items-center justify-center flex-row gap-1.5"
+                                                style={{ backgroundColor: 'var(--c-brand-surface)' }}
                                             >
                                                 {savingDueDay
                                                     ? <ActivityIndicator color="white" size="small" />
@@ -970,7 +960,7 @@ export default function FinancialSettingsPage() {
                                                     setEditingDueDay(false);
                                                     setDueDayInput(String(settings?.paymentDueDay || 25));
                                                 }}
-                                                className="flex-1 h-[46px] rounded-[14px] items-center justify-center"
+                                                className="flex-1 h-10 rounded-[11px] items-center justify-center"
                                                 style={{ backgroundColor: dash.lineSoft }}
                                             >
                                                 <Text className="font-bold" style={{ color: dash.muted }}>Anulează</Text>
@@ -982,14 +972,14 @@ export default function FinancialSettingsPage() {
                                         <SkeletonBlock width={120} height={32} />
                                     ) : (
                                         <View className="flex-row items-end">
-                                            <Text className="text-[32px] font-black leading-none" style={{ color: dash.ink }}>{settings?.paymentDueDay || 25}</Text>
+                                            <Text className="t-num text-[28px] font-bold leading-none" style={{ color: dash.ink }}>{settings?.paymentDueDay || 25}</Text>
                                             <Text className="text-[15px] font-bold ml-2 mb-1" style={{ color: dash.faint }}>a lunii următoare</Text>
                                         </View>
                                     )
                                 )}
                             </View>
 
-                            <View className="flex-row items-center p-3 rounded-[14px]" style={{ backgroundColor: 'rgba(37,99,235,0.06)' }}>
+                            <View className="flex-row items-center p-3 rounded-[11px]" style={{ backgroundColor: 'rgba(37,99,235,0.06)' }}>
                                 <MaterialIcons name="info-outline" size={16} color={dash.accentBlue} style={{ marginRight: 8 }} />
                                 <Text className="text-[12px] font-medium flex-1" style={{ color: dash.accentBlue }}>
                                     Ex: ziua 25 înseamnă că, până pe 25 august, jucătorii pot plăti cotizația pe luna iulie.
@@ -998,30 +988,30 @@ export default function FinancialSettingsPage() {
                         </View>
 
                         {/* Upload Actions Card */}
-                        <View className={`flex-1 rounded-[24px] ${isMobile ? 'p-5' : 'p-7'} border dash-fade-in`} style={cardStyle}>
+                        <View className={`flex-1 rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in`} style={cardStyle}>
                             <SectionHeader
                                 icon="receipt-long"
                                 iconBg="rgba(245,158,11,0.12)"
                                 iconFg={dash.warningDeep}
-                                title="Încărcare Documente"
+                                title="Încărcare documente"
                                 subtitle="Cheltuieli și facturi"
                             />
 
-                            <View className={`gap-4 ${isMobile ? '' : 'flex-row'}`}>
+                            <View className="flex-row gap-3">
                                 <Pressable
                                     onPress={() => handleStartUpload('expense')}
                                     disabled={pickingFile === 'expense'}
-                                    className="flex-1 rounded-[20px] border-2 border-dashed items-center justify-center py-8 px-4"
+                                    className="flex-1 ui-press rounded-[14px] border-2 border-dashed items-center justify-center py-5 px-3"
                                     style={{ backgroundColor: 'rgba(245,158,11,0.05)', borderColor: 'rgba(245,158,11,0.3)' }}
                                 >
                                     {pickingFile === 'expense' ? (
                                         <ActivityIndicator size="small" color={dash.warningDeep} />
                                     ) : (
                                         <>
-                                            <View className="w-14 h-14 rounded-[18px] items-center justify-center mb-3" style={{ backgroundColor: 'rgba(245,158,11,0.12)' }}>
-                                                <MaterialIcons name="receipt-long" size={26} color={dash.warningDeep} />
+                                            <View className="w-10 h-10 rounded-[11px] items-center justify-center mb-2" style={{ backgroundColor: 'rgba(245,158,11,0.12)' }}>
+                                                <MaterialIcons name="receipt-long" size={20} color={dash.warningDeep} />
                                             </View>
-                                            <Text className="text-[15px] font-black mb-1" style={{ color: dash.ink }}>Cheltuieli</Text>
+                                            <Text className="text-[14px] font-bold mb-0.5" style={{ color: dash.ink }}>Cheltuieli</Text>
                                             <Text className="text-[12px] font-medium text-center" style={{ color: dash.faint }}>Încarcă bonuri sau chitanțe</Text>
                                         </>
                                     )}
@@ -1030,17 +1020,17 @@ export default function FinancialSettingsPage() {
                                 <Pressable
                                     onPress={() => handleStartUpload('invoice')}
                                     disabled={pickingFile === 'invoice'}
-                                    className="flex-1 rounded-[20px] border-2 border-dashed items-center justify-center py-8 px-4"
+                                    className="flex-1 ui-press rounded-[14px] border-2 border-dashed items-center justify-center py-5 px-3"
                                     style={{ backgroundColor: 'rgba(37,99,235,0.05)', borderColor: 'rgba(37,99,235,0.25)' }}
                                 >
                                     {pickingFile === 'invoice' ? (
                                         <ActivityIndicator size="small" color={dash.accentBlue} />
                                     ) : (
                                         <>
-                                            <View className="w-14 h-14 rounded-[18px] items-center justify-center mb-3" style={{ backgroundColor: 'rgba(37,99,235,0.1)' }}>
-                                                <MaterialIcons name="payment" size={26} color={dash.accentBlue} />
+                                            <View className="w-10 h-10 rounded-[11px] items-center justify-center mb-2" style={{ backgroundColor: 'rgba(37,99,235,0.1)' }}>
+                                                <MaterialIcons name="payment" size={20} color={dash.accentBlue} />
                                             </View>
-                                            <Text className="text-[15px] font-black mb-1" style={{ color: dash.ink }}>Facturi</Text>
+                                            <Text className="text-[14px] font-bold mb-0.5" style={{ color: dash.ink }}>Facturi</Text>
                                             <Text className="text-[12px] font-medium text-center" style={{ color: dash.faint }}>Încarcă facturi fiscale</Text>
                                         </>
                                     )}
@@ -1053,7 +1043,7 @@ export default function FinancialSettingsPage() {
                     <View className={`gap-6 items-start ${isMobile ? '' : 'flex-row'}`}>
 
                         {/* Documents Ledger */}
-                        <View className={`w-full rounded-[24px] ${isMobile ? 'p-5' : 'p-7'} border dash-fade-in ${isMobile ? '' : 'xl:flex-[3]'}`} style={cardStyle}>
+                        <View className={`w-full rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in ${isMobile ? '' : 'xl:flex-[3]'}`} style={cardStyle}>
                             <View className="flex-row items-start justify-between mb-5 flex-wrap gap-3">
                                 <SectionHeader
                                     icon="receipt-long"
@@ -1200,7 +1190,7 @@ export default function FinancialSettingsPage() {
                         </View>
 
                         {/* Recent Payments */}
-                        <View className={`w-full rounded-[24px] ${isMobile ? 'p-5' : 'p-7'} border dash-fade-in ${isMobile ? '' : 'xl:flex-[2]'}`} style={cardStyle}>
+                        <View className={`w-full rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in ${isMobile ? '' : 'xl:flex-[2]'}`} style={cardStyle}>
                             <SectionHeader
                                 icon="payment"
                                 iconBg="rgba(16,185,129,0.1)"
@@ -1261,7 +1251,7 @@ export default function FinancialSettingsPage() {
 
             {activeTab === 'Payment Gateways' && (
                 <View className="mb-20">
-                    <View className={`rounded-[24px] ${isMobile ? 'p-5' : 'p-7'} border dash-fade-in`} style={cardStyle}>
+                    <View className={`rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in`} style={cardStyle}>
                         <View className={`gap-6 ${isMobile ? '' : 'flex-row items-start justify-between'}`}>
                             <View className="flex-1">
                                 <SectionHeader
@@ -1287,9 +1277,9 @@ export default function FinancialSettingsPage() {
                                 {[
                                     { label: 'Mediu', value: loadingStripeConfig ? '...' : stripeConfig?.mode === 'live' ? 'Live' : 'Test' },
                                     { label: 'Monedă', value: loadingStripeConfig ? '...' : (stripeConfig?.currency || 'ron').toUpperCase() },
-                                    { label: 'Secret key', value: loadingStripeConfig ? '...' : stripeConfig?.secretKeyConfigured ? 'Configurat' : 'Lipsește' },
-                                    { label: 'Publishable key', value: loadingStripeConfig ? '...' : stripeConfig?.publishableKeyConfigured ? 'Configurat în env' : 'Fallback test' },
-                                    { label: 'Webhook secret', value: loadingStripeConfig ? '...' : stripeConfig?.webhookSecretConfigured ? 'Configurat' : 'Lipsește' },
+                                    { label: 'Cheie secretă', value: loadingStripeConfig ? '...' : stripeConfig?.secretKeyConfigured ? 'Configurat' : 'Lipsește' },
+                                    { label: 'Cheie publică', value: loadingStripeConfig ? '...' : stripeConfig?.publishableKeyConfigured ? 'Configurat în env' : 'Cheie de test' },
+                                    { label: 'Secret webhook', value: loadingStripeConfig ? '...' : stripeConfig?.webhookSecretConfigured ? 'Configurat' : 'Lipsește' },
                                 ].map((row, idx, arr) => (
                                     <View key={row.label} className={`flex-row justify-between items-center py-2.5 ${idx < arr.length - 1 ? 'border-b' : ''}`} style={{ borderColor: dash.hairline }}>
                                         <Text className="font-bold text-[12px] uppercase tracking-wide" style={{ color: dash.muted }}>{row.label}</Text>
@@ -1300,7 +1290,7 @@ export default function FinancialSettingsPage() {
                         </View>
 
                         <View className="mt-6 rounded-[18px] p-4" style={{ backgroundColor: 'rgba(37,99,235,0.06)' }}>
-                            <Text className="font-black text-[12px] uppercase tracking-wide mb-2" style={{ color: dash.accentBlue }}>Webhook URL</Text>
+                            <Text className="font-black text-[12px] uppercase tracking-wide mb-2" style={{ color: dash.accentBlue }}>URL webhook</Text>
                             <Text className="font-bold text-[13px]" style={{ color: dash.ink }} selectable>{stripeConfig?.webhookUrl || 'Se încarcă...'}</Text>
                             <Text className="text-[12px] font-medium mt-3" style={{ color: dash.accentBlue }}>
                                 Evenimente recomandate în Stripe: checkout.session.completed, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed și checkout.session.expired.
@@ -1316,7 +1306,7 @@ export default function FinancialSettingsPage() {
 
             {/* Teams Modal */}
             <ModalShell visible={teamModalVisible} onClose={() => setTeamModalVisible(false)} maxWidth={400}>
-                <Text className="text-[18px] font-black mb-5" style={{ color: dash.ink }}>Selectează Echipa</Text>
+                <Text className="text-[17px] font-bold mb-5" style={{ color: dash.ink }}>Alege echipa</Text>
                 <ScrollView style={{ maxHeight: 380 }}>
                     {teams.map(t => (
                         <Pressable
@@ -1334,7 +1324,7 @@ export default function FinancialSettingsPage() {
 
             {/* Match Modal */}
             <ModalShell visible={matchModalVisible} onClose={() => setMatchModalVisible(false)} maxWidth={400}>
-                <Text className="text-[18px] font-black mb-5" style={{ color: dash.ink }}>Selectează Meciul</Text>
+                <Text className="text-[17px] font-bold mb-5" style={{ color: dash.ink }}>Alege meciul</Text>
                 <ScrollView style={{ maxHeight: 380 }}>
                     {matches.length === 0 ? (
                         <View className="py-6 items-center">
@@ -1368,7 +1358,7 @@ export default function FinancialSettingsPage() {
             {/* Players Modal */}
             <ModalShell visible={playerModalVisible} onClose={() => setPlayerModalVisible(false)} maxWidth={500}>
                 <View className="flex-row justify-between items-center mb-5">
-                    <Text className="text-[18px] font-black" style={{ color: dash.ink }}>Selectează Jucători ({selectedPlayers.length}/12)</Text>
+                    <Text className="text-[17px] font-bold" style={{ color: dash.ink }}>Jucători · {selectedPlayers.length}/12</Text>
                     <Pressable onPress={() => setPlayerModalVisible(false)} className="w-8 h-8 rounded-full items-center justify-center" style={{ backgroundColor: dash.lineSoft }}>
                         <MaterialIcons name="close" size={15} color={dash.faint} />
                     </Pressable>
@@ -1408,7 +1398,7 @@ export default function FinancialSettingsPage() {
                 </View>
 
                 {uploadModal.file ? (
-                    <View className="flex-row items-center gap-3 p-3 rounded-[14px] mb-4" style={{ backgroundColor: dash.lineSoft }}>
+                    <View className="flex-row items-center gap-3 p-3 rounded-[11px] mb-4" style={{ backgroundColor: dash.lineSoft }}>
                         <MaterialIcons name="receipt-long" size={18} color={dash.accent} />
                         <Text className="text-[12px] font-semibold flex-1" style={{ color: dash.inkSoft }} numberOfLines={1}>{uploadModal.file.name}</Text>
                     </View>
@@ -1439,7 +1429,7 @@ export default function FinancialSettingsPage() {
                     <Pressable onPress={closeUploadModal} disabled={uploadModal.submitting} className="flex-1 h-[48px] rounded-[12px] items-center justify-center" style={{ backgroundColor: dash.lineSoft }}>
                         <Text className="font-bold" style={{ color: dash.muted }}>Anulează</Text>
                     </Pressable>
-                    <Pressable onPress={handleConfirmUpload} disabled={uploadModal.submitting} className="flex-1 h-[48px] rounded-[12px] items-center justify-center" style={{ backgroundColor: dash.ink }}>
+                    <Pressable onPress={handleConfirmUpload} disabled={uploadModal.submitting} className="flex-1 h-[48px] rounded-[12px] items-center justify-center" style={{ backgroundColor: 'var(--c-brand-surface)' }}>
                         {uploadModal.submitting ? <ActivityIndicator color="#fff" size="small" /> : <Text className="font-bold text-white">Încarcă documentul</Text>}
                     </Pressable>
                 </View>

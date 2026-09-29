@@ -22,7 +22,7 @@
 
 import React, { createContext, useContext, useMemo, useState, ReactNode } from 'react';
 
-export const DEFAULT_SEARCH_PLACEHOLDER = 'Search athletes, games, or reports...';
+export const DEFAULT_SEARCH_PLACEHOLDER = 'Caută jucători, meciuri sau rapoarte…';
 
 interface HeaderContextValue {
   /** Placeholder shown in the global search bar */
