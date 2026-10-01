@@ -21,6 +21,8 @@ export interface ParsedMatch {
     result: 'W' | 'L' | 'D' | 'N/A';
     status: MatchStatus;
     league: string;
+    /** FRB's internal game id (widget 303's `game_id`), needed to load the match sheet (widget 400). Empty if the row didn't carry one. */
+    gameId: string;
 }
 
 /**
@@ -149,7 +151,9 @@ export function parseMatchesWidget(raw: string, teamId: string): ParsedMatch[] {
 
         if (rawCells.length < 4 || !stripTags(rawCells[0]).trim()) continue;
 
-        // Coloana 0: dată (și opțional ora)
+        // Coloana 0: dată (și opțional ora), învelită într-un <a game_id="...">
+        // care leagă rândul de fișa meciului (widget 400 — vezi frbGameDetail.ts).
+        const gameId = rawCells[0].match(/game_id="(\d+)"/)?.[1] ?? '';
         const rawDate = stripTags(rawCells[0]).trim();
         // Data poate fi "15.03.2025" sau "15.03.2025 19:00"
         const dateParts = rawDate.split(/\s+/);
@@ -198,6 +202,7 @@ export function parseMatchesWidget(raw: string, teamId: string): ParsedMatch[] {
             result,
             status,
             league,
+            gameId,
         });
     }
 
@@ -215,7 +220,15 @@ export async function fetchFrbMatches(params: { leagueId: string; seasonId: stri
     const month = params.month == null ? '' : String(params.month);
     const key = `frb:matches:${params.leagueId}:${params.seasonId}:${params.teamId}:${month}`;
     return getOrCompute(key, CACHE_TTL_MS, async () => {
-        const url = `https://widgets.baskethotel.com/widget-service/show?&api=${getFrbApiKey()}&lang=ro&request[0][widget]=200&request[0][part]=schedule_and_results&request[0][param][team_id]=${encodeURIComponent(params.teamId)}&request[0][param][league_id]=${encodeURIComponent(params.leagueId)}&request[0][param][season_id]=${encodeURIComponent(params.seasonId)}&request[0][param][month]=${encodeURIComponent(month)}`;
+        // Widget 303 (SEASON_SCHEDULE_LONG_WIDGET) renders the exact same rows as
+        // the old widget 200, just with each row's date cell wrapped in a
+        // `<a game_id="...">` — that id is what unlocks the match sheet (widget
+        // 400: quarters, referees, arena — see frbGameDetail.ts). Widget 200 never
+        // exposes a game id at all, so it can't be patched in; this had to switch.
+        // Unlike widget 200, its month filter lives under `filter[month]` (a
+        // nested object, matching its own front-end's `filter.month = ...`) — a
+        // bare `param[month]` is silently ignored and returns the whole season.
+        const url = `https://widgets.baskethotel.com/widget-service/show?&api=${getFrbApiKey()}&lang=ro&request[0][widget]=303&request[0][part]=schedule_and_results&request[0][param][team_id]=${encodeURIComponent(params.teamId)}&request[0][param][league_id]=${encodeURIComponent(params.leagueId)}&request[0][param][season_id]=${encodeURIComponent(params.seasonId)}&request[0][param][filter][month]=${encodeURIComponent(month)}&request[0][param][game_link_visible]=1&request[0][param][game_link_type]=3`;
         const response = await axios.get(url, { headers: FRB_HEADERS, timeout: 15_000 });
         return parseMatchesWidget(String(response.data ?? ''), params.teamId);
     });

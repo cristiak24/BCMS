@@ -28,6 +28,7 @@ const ADMIN_SECTION_TITLES: { prefix: string; label: string }[] = [
     { prefix: '/admin/team/', label: 'Echipă' },
     { prefix: '/admin/player/', label: 'Jucător' },
     { prefix: '/admin/event/', label: 'Eveniment' },
+    { prefix: '/admin/match/', label: 'Fișă meci' },
     { prefix: '/admin/attendance/', label: 'Prezență' },
     { prefix: '/admin/users/', label: 'Utilizator' },
 ];

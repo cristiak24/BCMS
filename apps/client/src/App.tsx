@@ -89,6 +89,8 @@ const loadAdminEventDetails = () => import('../app/(admin)/event/[id]');
 const AdminEventDetails = lazyRoute(loadAdminEventDetails);
 const loadAdminAttendanceDetails = () => import('../app/(admin)/attendance/[id]');
 const AdminAttendanceDetails = lazyRoute(loadAdminAttendanceDetails);
+const loadAdminMatchDetails = () => import('../app/(admin)/match/[id]');
+const AdminMatchDetails = lazyRoute(loadAdminMatchDetails);
 const loadAdminPlayerDetails = () => import('../app/(admin)/player/[id]');
 const AdminPlayerDetails = lazyRoute(loadAdminPlayerDetails);
 const loadAdminUsers = () => import('../app/(admin)/users');
@@ -204,6 +206,7 @@ export default function App() {
                   <Route path="attendance/:id" element={<AdminAttendanceDetails />} />
                   <Route path="player/:id" element={<AdminPlayerDetails />} />
                   <Route path="users" element={<AdminUsers />} />
+                  <Route path="match/:id" element={<AdminMatchDetails />} />
                   <Route path="users/:id" element={<AdminUserDetails />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>

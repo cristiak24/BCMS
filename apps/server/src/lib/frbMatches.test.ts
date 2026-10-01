@@ -24,7 +24,7 @@ test('parseMatchesWidget: reads fixtures and results from the widget payload', (
     const html = [
         '<table><tbody>',
         '<tr><td>04.10.2025 18:00</td><td><a href="?team_id=77">CS Dinamo</a></td><td>-</td><td><a href="?team_id=12">CSM Oradea</a></td><td>LNBM</td></tr>',
-        '<tr><td>27.09.2025 17:30</td><td><a href="?team_id=12">CSM Oradea</a></td><td>70 - 82</td><td><a href="?team_id=77">CS Dinamo</a></td><td>LNBM</td></tr>',
+        '<tr><td><a game_id="6145895">27.09.2025 17:30</a></td><td><a href="?team_id=12">CSM Oradea</a></td><td>70 - 82</td><td><a href="?team_id=77">CS Dinamo</a></td><td>LNBM</td></tr>',
         '<tr><td>Data</td><td>Gazde</td><td>Scor</td><td>Oaspeți</td></tr>',
         '</tbody></table>',
     ].join('');
@@ -39,8 +39,10 @@ test('parseMatchesWidget: reads fixtures and results from the widget payload', (
     assert.equal(result.status, 'finished');
     assert.equal(result.homeScore, '70');
     assert.equal(result.result, 'W'); // team 77 won away
+    assert.equal(result.gameId, '6145895');
 
     assert.equal(fixture.homeTeam, 'CS Dinamo');
     assert.equal(fixture.status, 'scheduled');
     assert.equal(fixture.league, 'LNBM');
+    assert.equal(fixture.gameId, ''); // no game_id in this row's markup
 });

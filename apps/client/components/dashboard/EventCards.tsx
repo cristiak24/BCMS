@@ -133,15 +133,19 @@ export function NextEventCard({
             ) : null}
           </View>
         </View>
-        <View className="md:pl-2">
-          <View
-            className="rounded-[12px] px-4 py-2.5 flex-row items-center justify-center dash-btn-hover"
-            style={{ backgroundImage: dash.gradients.heroInk, backgroundColor: dash.ink } as any}
-          >
-            <Text className="text-white text-[12px] font-semibold mr-1.5">{ctaLabel}</Text>
-            <MaterialIcons name="arrow-forward" size={15} color="var(--c-surface)" />
+        {/* The CTA only renders when the card actually goes somewhere — an FRB
+            fixture without a game id used to show "Fișă Meci" and do nothing. */}
+        {onPress ? (
+          <View className="md:pl-2">
+            <View
+              className="rounded-[12px] px-4 py-2.5 flex-row items-center justify-center dash-btn-hover"
+              style={{ backgroundImage: dash.gradients.heroInk, backgroundColor: dash.ink } as any}
+            >
+              <Text className="text-white text-[12px] font-semibold mr-1.5">{ctaLabel}</Text>
+              <MaterialIcons name="arrow-forward" size={15} color="var(--c-surface)" />
+            </View>
           </View>
-        </View>
+        ) : null}
       </View>
     </EventShell>
   );

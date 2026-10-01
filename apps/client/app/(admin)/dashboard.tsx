@@ -507,7 +507,7 @@ const DropdownPicker = ({ visible, items, onSelect, onClose, title, icon = 'apps
 // Match Cards
 // ─────────────────────────────────────────────────────────────
 
-const ScheduledMatchCard = ({ game, leagueName }: { game: Match; leagueName: string }) => {
+const ScheduledMatchCard = ({ game, leagueName, onPress }: { game: Match; leagueName: string; onPress?: () => void }) => {
     const { month, day } = splitDate(game.date);
     const categoryLabel = leagueName || game.league || 'Categorie';
     return (
@@ -519,6 +519,7 @@ const ScheduledMatchCard = ({ game, leagueName }: { game: Match; leagueName: str
             time={game.time}
             meta={categoryLabel}
             location={game.league}
+            onPress={onPress}
         />
     );
 };
@@ -1764,6 +1765,9 @@ export default function Dashboard() {
                                             key={`scheduled-${game.date}-${game.homeTeam}-${i}`}
                                             game={game}
                                             leagueName={selectedLeague?.name ?? ''}
+                                            onPress={game.gameId && selectedSeason
+                                                ? () => navigate(`/admin/match/${game.gameId}?seasonId=${selectedSeason.id}`)
+                                                : undefined}
                                         />
                                     ))}
                                 </View>

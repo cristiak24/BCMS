@@ -30,6 +30,7 @@ interface MatchRaw {
     result: string;
     status: MatchStatus;
     league: string;
+    gameId?: string;
 }
 
 // Match = modelul folosit în UI
@@ -43,6 +44,29 @@ export interface Match {
     result: MatchResult;
     status: MatchStatus;
     league: string;
+    /** FRB's game id — empty when the row has none (opens no match sheet). */
+    gameId: string;
+}
+
+export interface GameQuarter {
+    home: string;
+    away: string;
+}
+
+export interface GameDetail {
+    homeTeam: string;
+    awayTeam: string;
+    homeScore: string;
+    awayScore: string;
+    quarters: GameQuarter[];
+    date: string;
+    time: string;
+    broadcast: string;
+    gameNumber: string;
+    arena: string;
+    attendance: string;
+    referees: string[];
+    commissioner: string;
 }
 
 export interface StandingRow {
@@ -83,6 +107,7 @@ export function normalizeMatch(raw: MatchRaw): Match {
         result,
         status,
         league: raw.league?.trim() || '',
+        gameId: raw.gameId?.trim() || '',
     };
 }
 
@@ -115,4 +140,7 @@ export const basketballApi = {
 
     getStandings: (leagueId: string, seasonId: string): Promise<StandingRow[]> =>
         basketballFetch<StandingRow[]>(`/standings?leagueId=${leagueId}&seasonId=${seasonId}`),
+
+    getGameDetail: (gameId: string, seasonId: string): Promise<GameDetail> =>
+        basketballFetch<GameDetail>(`/game?gameId=${gameId}&seasonId=${seasonId}`),
 };

@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
 import { FRB_HEADERS, getFrbApiKey } from '../lib/frbConfig';
 import { fetchFrbMatches, stripTags } from '../lib/frbMatches';
+import { fetchFrbGameDetail } from '../lib/frbGameDetail';
 
 const router = Router();
 
@@ -181,6 +182,29 @@ router.get('/matches', basketballProxyRateLimit, async (req, res) => {
     } catch (e) {
         console.error('[basketball/matches] error:', e);
         res.status(500).json({ error: 'Failed to fetch matches' });
+    }
+});
+
+// ---------- GET /api/basketball/game?gameId=&seasonId= ----------
+// "Fișă meci" — the per-game detail (quarters, referees, arena) that the
+// /matches rows now carry a gameId for.
+router.get('/game', basketballProxyRateLimit, async (req, res) => {
+    const { gameId, seasonId } = req.query as Record<string, string>;
+    if (!gameId || !seasonId) {
+        res.status(400).json({ error: 'gameId and seasonId required' });
+        return;
+    }
+
+    try {
+        const detail = await fetchFrbGameDetail({ gameId, seasonId });
+        if (!detail) {
+            res.status(404).json({ error: 'Game not found' });
+            return;
+        }
+        res.json(detail);
+    } catch (e) {
+        console.error('[basketball/game] error:', e);
+        res.status(500).json({ error: 'Failed to fetch game detail' });
     }
 });
 
