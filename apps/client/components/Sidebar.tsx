@@ -15,6 +15,9 @@ export const ADMIN_MENU_ITEMS: { label: string; icon: AdminMenuIconName; href: s
     { label: 'Conturi', icon: 'groups', href: '/admin/manage-accounts' },
     { label: 'Lot', icon: 'people', href: '/admin/roster' },
     { label: 'Program', icon: 'calendar-today', href: '/admin/schedule' },
+    { label: 'L12', icon: 'assignment', href: '/admin/l12' },
+    { label: 'Documente', icon: 'folder', href: '/admin/documents' },
+    { label: 'Agendă', icon: 'contacts', href: '/admin/contacts' },
     { label: 'Admin club nou', icon: 'admin-panel-settings', href: '/admin/create-club-admin', superadminOnly: true },
     { label: 'Finanțe', icon: 'payments', href: '/admin/finance' },
     // Compliance and Users were reachable only by typing the URL: with no menu

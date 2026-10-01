@@ -9,6 +9,7 @@ import PageContainer from '../../../components/ui/PageContainer';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import { ErrorState } from '../../../components/ui/ScreenState';
+import { L12MatchLink } from '../../../components/l12/L12MatchLink';
 import { EVENT_TYPE_META, buildICSCalendar, triggerFileDownload } from '../../../components/schedule/scheduleShared';
 
 /**
@@ -392,6 +393,10 @@ export default function EventDetailScreen() {
             </View>
 
             <View className="gap-4 min-w-0">
+              {event.type === 'match' && event.teamId && !cancelled ? (
+                <L12MatchLink eventId={event.id} onOpen={(path) => router.push(path as any)} />
+              ) : null}
+
               <Card title="Echipă">
                 {event.teamId ? (
                   <View className="gap-3.5">

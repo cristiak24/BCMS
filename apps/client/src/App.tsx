@@ -58,6 +58,11 @@ const loadCoachAttendance = () => import('../app/(coach)/attendance');
 const CoachAttendance = lazyRoute(loadCoachAttendance);
 const loadCoachTeamDetail = () => import('../app/(coach)/team/[id]');
 const CoachTeamDetail = lazyRoute(loadCoachTeamDetail);
+const CoachL12 = lazyRoute(() => import('../app/(coach)/l12/index'));
+const MemberDocuments = lazyRoute(() => import('../app/(tabs)/documents'));
+const MemberContacts = lazyRoute(() => import('../app/(tabs)/contacts'));
+const CoachL12Match = lazyRoute(() => import('../app/(coach)/l12/match/[id]'));
+const CoachL12Team = lazyRoute(() => import('../app/(coach)/l12/team/[id]'));
 
 const loadAdminLayout = () => import('../app/(admin)/_layout');
 const AdminLayout = lazyRoute(loadAdminLayout);
@@ -91,6 +96,11 @@ const loadAdminEventDetails = () => import('../app/(admin)/event/[id]');
 const AdminEventDetails = lazyRoute(loadAdminEventDetails);
 const loadAdminMatchDetails = () => import('../app/(admin)/match/[id]');
 const AdminMatchDetails = lazyRoute(loadAdminMatchDetails);
+const AdminL12 = lazyRoute(() => import('../app/(admin)/l12/index'));
+const AdminDocuments = lazyRoute(() => import('../app/(admin)/documents'));
+const AdminContacts = lazyRoute(() => import('../app/(admin)/contacts'));
+const AdminL12Match = lazyRoute(() => import('../app/(admin)/l12/match/[id]'));
+const AdminL12Team = lazyRoute(() => import('../app/(admin)/l12/team/[id]'));
 const loadAdminAttendanceDetails = () => import('../app/(admin)/attendance/[id]');
 const AdminAttendanceDetails = lazyRoute(loadAdminAttendanceDetails);
 const loadAdminPlayerDetails = () => import('../app/(admin)/player/[id]');
@@ -167,6 +177,8 @@ export default function App() {
                   <Route path="/myclub" element={<PlayerHome />} />
                   <Route path="/account" element={<PlayerAccount />} />
                   <Route path="/attendance" element={<PlayerAttendance />} />
+                  <Route path="/documents" element={<MemberDocuments />} />
+                  <Route path="/contacts" element={<MemberContacts />} />
                   <Route path="/payments" element={<PlayerPayments />} />
                   <Route path="/schedule" element={<PlayerSchedule />} />
                   {PLAYER_FEATURE_FLAGS.teammatesView ? (
@@ -186,6 +198,9 @@ export default function App() {
                   <Route path="teams" element={<CoachTeams />} />
                   <Route path="team/:id" element={<CoachTeamDetail />} />
                   <Route path="attendance" element={<CoachAttendance />} />
+                  <Route path="l12" element={<CoachL12 />} />
+                  <Route path="l12/match/:id" element={<CoachL12Match />} />
+                  <Route path="l12/team/:id" element={<CoachL12Team />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
 
@@ -207,6 +222,11 @@ export default function App() {
                   <Route path="team/:id" element={<AdminTeamDetails />} />
                   <Route path="event/:id" element={<AdminEventDetails />} />
                   <Route path="match/:id" element={<AdminMatchDetails />} />
+                  <Route path="l12" element={<AdminL12 />} />
+                  <Route path="documents" element={<AdminDocuments />} />
+                  <Route path="contacts" element={<AdminContacts />} />
+                  <Route path="l12/match/:id" element={<AdminL12Match />} />
+                  <Route path="l12/team/:id" element={<AdminL12Team />} />
                   <Route path="attendance/:id" element={<AdminAttendanceDetails />} />
                   <Route path="player/:id" element={<AdminPlayerDetails />} />
                   <Route path="users" element={<AdminUsers />} />

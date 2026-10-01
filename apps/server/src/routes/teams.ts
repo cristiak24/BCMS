@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
 import { db } from '../db';
-import { attendance, clubs, events, l12Documents, playerPayments, players, playersToTeams, teams, users } from '../db/schema';
+import { attendance, clubs, events, l12Documents, playerPayments, players, playersToTeams, teams, users, l12Lineups } from '../db/schema';
 import { requireRoles, authenticate, type AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
@@ -495,6 +495,7 @@ router.delete('/:id', requireTeamManager, async (req: AuthenticatedRequest, res)
             if (eventIds.length > 0) {
                 await tx.delete(attendance).where(inArray(attendance.eventId, eventIds));
             }
+            await tx.delete(l12Lineups).where(eq(l12Lineups.teamId, id));
             await tx.delete(events).where(eq(events.teamId, id));
             await tx.delete(l12Documents).where(eq(l12Documents.teamId, id));
             await tx.delete(playersToTeams).where(eq(playersToTeams.teamId, id));

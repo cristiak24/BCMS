@@ -3,10 +3,6 @@ import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert,
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import * as DocumentPicker from '@/src/web/documentPicker';
 import { financeApi, FinancialSettings, FinancialDocument, StripeAdminConfig, AdminRecentPayment } from '../../../services/financeApi';
-import { documentsApi } from '../../../services/documentsApi';
-import { teamsApi, Team } from '../../../services/teamsApi';
-import { basketballApi, Match } from '../../../services/basketballApi';
-import { eventsApi, CalendarEvent } from '../../../services/eventsApi';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { resolveDocumentUrl } from '../../../config/serverUrl';
 import AdminHero from '../../../components/admin/AdminHero';
@@ -109,81 +105,6 @@ function formatPaymentDate(value: string) {
     }).format(date);
 }
 
-function normalizeTeamName(name: string) {
-    return name.toLowerCase().replace(/\s+/g, ' ').trim();
-}
-
-function parseMatchDateTime(match: Match): Date | null {
-    if (!match.date) return null;
-    const parts = match.date.split('.');
-    if (parts.length !== 3) return null;
-    const [day, month, year] = parts.map(Number);
-    if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(year)) return null;
-
-    const date = new Date(year, month - 1, day);
-    if (match.time && /^\d{1,2}:\d{2}$/.test(match.time)) {
-        const [hours, minutes] = match.time.split(':').map(Number);
-        date.setHours(hours, minutes, 0, 0);
-    } else {
-        date.setHours(23, 59, 59, 999);
-    }
-
-    return date;
-}
-
-function getMatchOpponent(match: Match, teamName: string) {
-    const normalizedTeamName = normalizeTeamName(teamName);
-    if (normalizeTeamName(match.homeTeam) === normalizedTeamName) {
-        return match.awayTeam;
-    }
-
-    if (normalizeTeamName(match.awayTeam) === normalizedTeamName) {
-        return match.homeTeam;
-    }
-
-    return match.awayTeam || match.homeTeam || 'Adversar necunoscut';
-}
-
-function parseInternalMatchDate(event: CalendarEvent): Date | null {
-    const date = new Date(event.startTime);
-    return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function getInternalMatchOpponent(event: CalendarEvent, teamName: string) {
-    const normalizedTeamName = normalizeTeamName(teamName);
-    const parts = event.title.split(/\s+vs\.?\s+|\s+@\s+|\s+-\s+/i).map((part) => part.trim()).filter(Boolean);
-
-    if (parts.length >= 2) {
-        if (normalizeTeamName(parts[0]) === normalizedTeamName) {
-            return parts.slice(1).join(' vs ');
-        }
-
-        if (normalizeTeamName(parts[1]) === normalizedTeamName) {
-            return parts[0];
-        }
-    }
-
-    return event.description?.trim() || event.title || 'Adversar necunoscut';
-}
-
-type MatchSelectionItem = {
-    id: string;
-    source: 'frb' | 'internal';
-    label: string;
-    opponent: string;
-    dateLabel: string;
-    sortTimestamp: number;
-    matchTitle: string;
-    frbMatch?: Match;
-    internalMatch?: CalendarEvent;
-};
-
-function getMatchSelectionTitle(item: MatchSelectionItem) {
-    return item.source === 'frb' && item.frbMatch
-        ? `${item.frbMatch.homeTeam} vs ${item.frbMatch.awayTeam}`
-        : item.matchTitle;
-}
-
 /* ─── Shared visual primitives ──────────────────────────────────── */
 const cardStyle = { backgroundColor: dash.surface, borderColor: dash.hairline, ...dash.shadow.card };
 
@@ -234,28 +155,12 @@ function ModalShell({ visible, onClose, children, maxWidth = 420 }: {
 
 export default function FinancialSettingsPage() {
     const { isMobile } = useResponsive();
-    const [activeTab, setActiveTab] = useState('Configuration');
+    const [activeTab, setActiveTab] = useState('Finances');
 
     /* ─── Settings state ───────────────────────────────────────── */
     const [settings, setSettings] = useState<FinancialSettings | null>(null);
     const [loadingSettings, setLoadingSettings] = useState(true);
     const [loadingDocuments, setLoadingDocuments] = useState(true);
-    const [loadingTeams, setLoadingTeams] = useState(true);
-    const [loadingL12Archive, setLoadingL12Archive] = useState(true);
-
-    /* ─── L12 state ────────────────────────────────────────────── */
-    const [teams, setTeams] = useState<Team[]>([]);
-    const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-    const [teamModalVisible, setTeamModalVisible] = useState(false);
-    const [matches, setMatches] = useState<MatchSelectionItem[]>([]);
-    const [selectedMatch, setSelectedMatch] = useState<MatchSelectionItem | null>(null);
-    const [matchModalVisible, setMatchModalVisible] = useState(false);
-    const [players, setPlayers] = useState<any[]>([]);
-    const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
-    const [playerModalVisible, setPlayerModalVisible] = useState(false);
-    const [generatingL12, setGeneratingL12] = useState(false);
-    const [l12Archive, setL12Archive] = useState<any[]>([]);
-
     /* ─── Finances tab state ───────────────────────────────────── */
     const [monthlyFeeInput, setMonthlyFeeInput] = useState('');
     const [editingFee, setEditingFee] = useState(false);
@@ -286,8 +191,6 @@ export default function FinancialSettingsPage() {
 
     const loadData = useCallback(() => {
         setLoadingSettings(true);
-        setLoadingTeams(true);
-        setLoadingL12Archive(true);
 
         void loadDocuments();
 
@@ -300,18 +203,6 @@ export default function FinancialSettingsPage() {
             .catch((error) => console.error('Failed to load financial settings:', error))
             .finally(() => setLoadingSettings(false));
 
-        void teamsApi.getTeams()
-            .then(setTeams)
-            .catch((error) => console.error('Failed to load finance teams:', error))
-            .finally(() => setLoadingTeams(false));
-
-        void documentsApi.getL12Archive()
-            .then(setL12Archive)
-            .catch((error) => {
-                console.error('Failed to load L12 archive:', error);
-                setL12Archive([]);
-            })
-            .finally(() => setLoadingL12Archive(false));
     }, [loadDocuments]);
 
     useEffect(() => { loadData(); }, [loadData]);
@@ -376,117 +267,6 @@ export default function FinancialSettingsPage() {
             return true;
         });
     }, [uploads, documentFilter, documentSearch]);
-
-    /* ─── Team / Match / Player handlers (L12) ─────────────────── */
-    const handleTeamSelect = async (t: Team) => {
-        setSelectedTeam(t);
-        setTeamModalVisible(false);
-        setSelectedMatch(null);
-        try {
-            const now = new Date();
-            const monthsToFetch = [0, 1, 2].map((offset) => ((now.getMonth() + offset) % 12) + 1);
-
-            const [pls, frbMonthMatches, internalMatches, ...extraFrbMonths] = await Promise.all([
-                teamsApi.getTeamPlayers(t.id),
-                basketballApi.getMatches(t.frbLeagueId, t.frbSeasonId, t.frbTeamId, monthsToFetch[0]),
-                eventsApi.getEvents({ teamId: t.id, type: 'match' })
-                ,
-                ...monthsToFetch.slice(1).map((month) =>
-                    basketballApi.getMatches(t.frbLeagueId, t.frbSeasonId, t.frbTeamId, month)
-                ),
-            ]);
-            setPlayers(pls);
-            setSelectedPlayers(pls.slice(0, 12).map((p: any) => p.id));
-
-            const frbMatches = [frbMonthMatches, ...extraFrbMonths].flat();
-            const nowTs = now.getTime();
-            const frbItems: MatchSelectionItem[] = frbMatches.flatMap((match) => {
-                const dateTime = parseMatchDateTime(match);
-                if (!dateTime || dateTime.getTime() < nowTs) return [];
-
-                const opponent = getMatchOpponent(match, t.name);
-                return [{
-                    id: `frb-${match.date}-${match.time}-${match.homeTeam}-${match.awayTeam}`,
-                    source: 'frb' as const,
-                    label: `FRB • ${dateTime.toLocaleDateString('ro-RO')} - ${opponent}`,
-                    opponent,
-                    dateLabel: dateTime.toLocaleString('ro-RO'),
-                    sortTimestamp: dateTime.getTime(),
-                    matchTitle: `${match.homeTeam} vs ${match.awayTeam}`,
-                    frbMatch: match,
-                }];
-            });
-
-            const internalItems: MatchSelectionItem[] = internalMatches.flatMap((event) => {
-                const dateTime = parseInternalMatchDate(event);
-                if (!dateTime || dateTime.getTime() < nowTs) return [];
-
-                const opponent = getInternalMatchOpponent(event, t.name);
-                return [{
-                    id: `internal-${event.id}`,
-                    source: 'internal' as const,
-                    label: `Site • ${dateTime.toLocaleDateString('ro-RO')} - ${opponent}`,
-                    opponent,
-                    dateLabel: dateTime.toLocaleString('ro-RO'),
-                    sortTimestamp: dateTime.getTime(),
-                    matchTitle: event.title,
-                    internalMatch: event,
-                }];
-            });
-
-            const combined = [...frbItems, ...internalItems]
-                .sort((a, b) => a.sortTimestamp - b.sortTimestamp || a.label.localeCompare(b.label));
-
-            const deduped = Array.from(new Map(
-                combined.map((item) => [
-                    `${Math.floor(item.sortTimestamp / 1000)}|${normalizeTeamName(item.opponent)}`,
-                    item,
-                ])
-            ).values());
-
-            setMatches(deduped);
-        } catch {
-            Alert.alert('Eroare', 'Nu s-au putut încărca datele echipei.');
-        }
-    };
-
-    const togglePlayer = (pId: number) => {
-        if (selectedPlayers.includes(pId)) {
-            setSelectedPlayers(selectedPlayers.filter(id => id !== pId));
-        } else {
-            if (selectedPlayers.length >= 12) {
-                Alert.alert('Limită', 'Poți selecta maxim 12 jucători pentru foaia de meci.');
-                return;
-            }
-            setSelectedPlayers([...selectedPlayers, pId]);
-        }
-    };
-
-    const handleGenerateL12 = async () => {
-        if (!selectedTeam) { Alert.alert('Eroare', 'Te rugăm să selectezi o echipă.'); return; }
-        if (!selectedMatch) { Alert.alert('Eroare', 'Te rugăm să selectezi un meci.'); return; }
-        if (selectedPlayers.length === 0) { Alert.alert('Eroare', 'Te rugăm să selectezi cel puțin un jucător (max 12).'); return; }
-
-        const finalPlayers = players.filter(p => selectedPlayers.includes(p.id));
-        try {
-            setGeneratingL12(true);
-            await documentsApi.generateL12AndShare(
-                selectedTeam.id.toString(),
-                {
-                    opponent: selectedMatch.opponent,
-                    date: selectedMatch.dateLabel,
-                    competition: selectedTeam.leagueName
-                },
-                finalPlayers
-            );
-            const newArchive = await documentsApi.getL12Archive().catch(() => []);
-            setL12Archive(newArchive);
-        } catch {
-            Alert.alert('Eroare', 'A apărut o eroare la generarea PDF-ului.');
-        } finally {
-            setGeneratingL12(false);
-        }
-    };
 
     /* ─── Finances handlers ────────────────────────────────────── */
     const handleSaveMonthlyFee = async () => {
@@ -621,8 +401,8 @@ export default function FinancialSettingsPage() {
     /* ═══════════════════════════════════════════════════════════════
        RENDER
        ═══════════════════════════════════════════════════════════════ */
-    const TABS = ['Configuration', 'Finances', 'Payment Gateways'];
-    const TAB_LABELS: Record<string, string> = { Configuration: 'Configurare', Finances: 'Situație', 'Payment Gateways': 'Plăți online' };
+    const TABS = ['Finances', 'Payment Gateways'];
+    const TAB_LABELS: Record<string, string> = { Finances: 'Situație', 'Payment Gateways': 'Plăți online' };
 
     return (
         <ScrollView
@@ -635,7 +415,7 @@ export default function FinancialSettingsPage() {
             {/* ──────────── HEADER + TABS ──────────── */}
             <AdminHero
                 title="Finanțe"
-                subtitle="Facturare, plăți, documente și exporturi L12."
+                subtitle="Facturare, plăți și documente contabile."
                 className={`${isMobile ? 'gap-5' : 'flex-row items-end justify-between'} mb-6`}
             >
                 {/* Segmented control on the page surface (was a white-on-navy
@@ -659,147 +439,6 @@ export default function FinancialSettingsPage() {
                     })}
                 </View>
             </AdminHero>
-
-            {/* ═══════════════════════════════════════════════════════
-               TAB: Configuration – Only L12 Player List card
-               ═══════════════════════════════════════════════════════ */}
-            {activeTab === 'Configuration' && (
-                <View className="mb-20">
-
-                    {/* ── L12 GENERATOR CARD ───────────────────────── */}
-                    <View className={`rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in mb-6 relative overflow-hidden`} style={cardStyle}>
-                        <View className="flex-row justify-between items-start">
-                            <SectionHeader
-                                icon="sports-basketball"
-                                iconBg="rgba(99,91,255,0.1)"
-                                iconFg={dash.accent}
-                                title="Lista L12"
-                                subtitle="Foaia oficială de joc: echipă, meci și maxim 12 jucători"
-                            />
-                        </View>
-
-                        {/* Team & Match selectors */}
-                        <View className={`gap-4 mb-4 ${isMobile ? '' : 'flex-row'}`}>
-                            <View className="flex-1">
-                                <Text className="font-bold text-[11px] uppercase tracking-wide mb-2 ml-1" style={{ color: dash.muted }}>Echipă</Text>
-                                <Pressable
-                                    onPress={() => setTeamModalVisible(true)}
-                                    disabled={loadingTeams}
-                                    className="flex-row h-11 items-center px-4 rounded-[11px] border"
-                                    style={{ backgroundColor: dash.lineSoft, borderColor: dash.hairline }}
-                                >
-                                    <Text className="text-[14px] font-semibold flex-1" style={{ color: selectedTeam ? dash.ink : dash.faint }} numberOfLines={1}>
-                                        {loadingTeams ? 'Se încarcă echipele…' : selectedTeam ? selectedTeam.name : 'Alege echipa'}
-                                    </Text>
-                                    {loadingTeams ? <ActivityIndicator size="small" color={dash.accent} style={{ marginLeft: 10 }} /> : (
-                                        <MaterialIcons name="chevron-right" size={18} color={dash.faint} />
-                                    )}
-                                </Pressable>
-                            </View>
-                            <View className="flex-1">
-                                <Text className="font-bold text-[11px] uppercase tracking-wide mb-2 ml-1" style={{ color: dash.muted }}>Meci</Text>
-                                <Pressable
-                                    onPress={() => {
-                                        if (!selectedTeam) Alert.alert('Atenție', 'Selectează echipa mai întâi.');
-                                        else setMatchModalVisible(true);
-                                    }}
-                                    className="flex-row h-11 items-center px-4 rounded-[11px] border"
-                                    style={{ backgroundColor: dash.lineSoft, borderColor: dash.hairline }}
-                                >
-                                    <Text className="text-[14px] font-semibold flex-1" style={{ color: selectedMatch ? dash.ink : dash.faint }} numberOfLines={1}>
-                                        {selectedMatch ? selectedMatch.label : 'Alege meciul'}
-                                    </Text>
-                                    <MaterialIcons name="chevron-right" size={18} color={dash.faint} />
-                                </Pressable>
-                            </View>
-                        </View>
-
-                        {/* Player Selection Area */}
-                        <View className="rounded-[12px] p-4 border" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
-                            <Text className="t-eyebrow mb-4" style={{ color: dash.muted }}>
-                                Jucători selectați · {selectedPlayers.length}/12
-                            </Text>
-                            <View className="flex-row flex-wrap gap-2">
-                                {players.filter(p => selectedPlayers.includes(p.id)).map(p => (
-                                    <View key={p.id} className="px-4 py-2 rounded-full border flex-row items-center" style={{ backgroundColor: dash.surface, borderColor: dash.hairline, ...dash.shadow.sm }}>
-                                        <View className="w-5 h-5 rounded-full mr-2" style={{ backgroundColor: dash.line }} />
-                                        <Text className="font-bold text-sm" style={{ color: dash.ink }}>{p.firstName} {p.lastName}</Text>
-                                        {p.number && <Text className="font-black text-xs ml-2" style={{ color: dash.accent }}>#{p.number}</Text>}
-                                    </View>
-                                ))}
-                                {selectedTeam && (
-                                    <Pressable
-                                        onPress={() => setPlayerModalVisible(true)}
-                                        className="px-4 py-2 rounded-full border border-dashed flex-row items-center"
-                                        style={{ borderColor: dash.line, backgroundColor: dash.lineSoft }}
-                                    >
-                                        <MaterialIcons name="add" size={14} color={dash.muted} style={{ marginRight: 4 }} />
-                                        <Text className="font-bold text-sm" style={{ color: dash.muted }}>Alege jucătorii</Text>
-                                    </Pressable>
-                                )}
-                            </View>
-                        </View>
-
-                        {selectedTeam && (
-                            <Pressable
-                                onPress={handleGenerateL12}
-                                disabled={generatingL12}
-                                className={`mt-5 h-11 items-center justify-center rounded-[11px] ${isMobile ? 'w-full' : 'w-[220px]'}`}
-                                style={{ backgroundColor: 'var(--c-brand-surface)', ...dash.shadow.sm }}
-                            >
-                                {generatingL12
-                                    ? <ActivityIndicator color="white" />
-                                    : <Text className="text-white font-bold tracking-wide">Generează lista</Text>
-                                }
-                            </Pressable>
-                        )}
-                    </View>
-
-                    {/* ── L12 ARCHIVE CARD ──────────────────────────── */}
-                    <View className={`rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in`} style={cardStyle}>
-                        <View className="flex-row justify-between items-start">
-                            <SectionHeader
-                                icon="receipt-long"
-                                iconBg="rgba(37,99,235,0.1)"
-                                iconFg={dash.accentBlue}
-                                title="Arhivă L12"
-                                subtitle="Listele generate anterior"
-                            />
-                        </View>
-                        <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-                            <View className="gap-3">
-                                {loadingL12Archive ? (
-                                    [0, 1, 2].map((i) => (
-                                        <View key={i} className="p-4 rounded-[16px] border" style={{ borderColor: dash.hairline }}>
-                                            <SkeletonBlock width="45%" height={12} className="mb-2" />
-                                            <SkeletonBlock width="70%" height={16} />
-                                        </View>
-                                    ))
-                                ) : l12Archive.length === 0 ? (
-                                    <EmptyState title="Niciun document L12 generat" message="Documentele generate vor apărea aici." icon="event-busy" />
-                                ) : (
-                                    l12Archive.map((doc: any, idx: number) => (
-                                        <View key={idx} className={`p-4 rounded-[16px] border ${isMobile ? 'gap-3' : 'flex-row justify-between items-center'}`} style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
-                                            <View className="flex-1">
-                                                <Text className="font-bold mb-1" style={{ color: dash.ink }} numberOfLines={1}>{doc.matchTitle}</Text>
-                                                <Text className="text-[11px] font-medium" style={{ color: dash.muted }}>{new Date(doc.createdAt).toLocaleString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</Text>
-                                            </View>
-                                            <Pressable
-                                                onPress={() => openDocumentUrl(doc.documentUrl)}
-                                                className={`flex-row items-center gap-1.5 px-4 py-2 rounded-[12px] ${isMobile ? 'self-start' : ''}`}
-                                                style={{ backgroundColor: 'rgba(37,99,235,0.08)' }}
-                                            >
-                                                <MaterialIcons name="file-download" size={14} color={dash.accentBlue} />
-                                                <Text className="text-[12.5px] font-semibold" style={{ color: dash.accentBlue }}>Descarcă</Text>
-                                            </Pressable>
-                                        </View>
-                                    ))
-                                )}
-                            </View>
-                        </ScrollView>
-                    </View>
-                </View>
-            )}
 
             {/* ═══════════════════════════════════════════════════════
                TAB: Finances
@@ -1303,88 +942,6 @@ export default function FinancialSettingsPage() {
             {/* ═══════════════════════════════════════════════════════
                MODALS
                ═══════════════════════════════════════════════════════ */}
-
-            {/* Teams Modal */}
-            <ModalShell visible={teamModalVisible} onClose={() => setTeamModalVisible(false)} maxWidth={400}>
-                <Text className="text-[17px] font-bold mb-5" style={{ color: dash.ink }}>Alege echipa</Text>
-                <ScrollView style={{ maxHeight: 380 }}>
-                    {teams.map(t => (
-                        <Pressable
-                            key={t.id}
-                            onPress={() => handleTeamSelect(t)}
-                            className="p-4 border-b flex-row justify-between items-center"
-                            style={{ borderColor: dash.hairline }}
-                        >
-                            <Text className="font-bold" style={{ color: dash.ink }}>{t.name}</Text>
-                            <Text className="text-xs" style={{ color: dash.faint }}>{t.leagueName}</Text>
-                        </Pressable>
-                    ))}
-                </ScrollView>
-            </ModalShell>
-
-            {/* Match Modal */}
-            <ModalShell visible={matchModalVisible} onClose={() => setMatchModalVisible(false)} maxWidth={400}>
-                <Text className="text-[17px] font-bold mb-5" style={{ color: dash.ink }}>Alege meciul</Text>
-                <ScrollView style={{ maxHeight: 380 }}>
-                    {matches.length === 0 ? (
-                        <View className="py-6 items-center">
-                            <Text className="font-semibold text-center" style={{ color: dash.muted }}>
-                                Nu există meciuri viitoare pentru echipa selectată.
-                            </Text>
-                        </View>
-                    ) : (
-                        matches.map(m => (
-                            <Pressable
-                                key={m.id}
-                                onPress={() => { setSelectedMatch(m); setMatchModalVisible(false); }}
-                                className="p-4 border-b flex-col"
-                                style={{ borderColor: dash.hairline }}
-                            >
-                                <View className="flex-row items-center justify-between gap-3 mb-1">
-                                    <Text className="font-bold flex-1" style={{ color: dash.ink }} numberOfLines={1}>{getMatchSelectionTitle(m)}</Text>
-                                    <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: m.source === 'frb' ? 'rgba(37,99,235,0.08)' : 'rgba(16,185,129,0.1)' }}>
-                                        <Text className="text-[10px] font-black uppercase" style={{ color: m.source === 'frb' ? dash.accentBlue : dash.successDeep }}>
-                                            {m.source === 'frb' ? 'FRB' : 'Site'}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <Text className="text-xs" style={{ color: dash.faint }}>{m.dateLabel}</Text>
-                            </Pressable>
-                        ))
-                    )}
-                </ScrollView>
-            </ModalShell>
-
-            {/* Players Modal */}
-            <ModalShell visible={playerModalVisible} onClose={() => setPlayerModalVisible(false)} maxWidth={500}>
-                <View className="flex-row justify-between items-center mb-5">
-                    <Text className="text-[17px] font-bold" style={{ color: dash.ink }}>Jucători · {selectedPlayers.length}/12</Text>
-                    <Pressable onPress={() => setPlayerModalVisible(false)} className="w-8 h-8 rounded-full items-center justify-center" style={{ backgroundColor: dash.lineSoft }}>
-                        <MaterialIcons name="close" size={15} color={dash.faint} />
-                    </Pressable>
-                </View>
-                <ScrollView style={{ maxHeight: 480 }}>
-                    {players.map(p => {
-                        const isSelected = selectedPlayers.includes(p.id);
-                        return (
-                            <Pressable
-                                key={p.id}
-                                onPress={() => togglePlayer(p.id)}
-                                className="p-4 border-b flex-row justify-between items-center"
-                                style={{ borderColor: dash.hairline, backgroundColor: isSelected ? 'rgba(99,91,255,0.05)' : 'transparent' }}
-                            >
-                                <View className="flex-row items-center">
-                                    <View className="w-5 h-5 rounded border items-center justify-center mr-3" style={{ backgroundColor: isSelected ? dash.accent : 'transparent', borderColor: isSelected ? dash.accent : dash.line }}>
-                                        {isSelected && <MaterialIcons name="check" size={14} color="white" />}
-                                    </View>
-                                    <Text className="font-bold" style={{ color: dash.ink }}>{p.firstName} {p.lastName}</Text>
-                                </View>
-                                {p.number && <Text className="font-black" style={{ color: dash.faint }}>#{p.number}</Text>}
-                            </Pressable>
-                        );
-                    })}
-                </ScrollView>
-            </ModalShell>
 
             {/* Upload Details Modal */}
             <ModalShell visible={uploadModal.visible} onClose={closeUploadModal} maxWidth={420}>

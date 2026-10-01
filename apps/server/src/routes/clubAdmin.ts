@@ -1,7 +1,7 @@
 import { Response, Router } from 'express';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
-import { accessRequests, attendance, auditLogs, clubInviteCodes, clubs, events, inviteLinks, invites, notifications, playerPayments, players, playersToTeams, teams, users } from '../db/schema';
+import { accessRequests, attendance, auditLogs, clubDocuments, clubInviteCodes, clubs, events, inviteLinks, invites, notifications, playerPayments, players, playersToTeams, teams, users } from '../db/schema';
 import { db } from '../db';
 import { createSuperAdminInvitation, isVisiblePendingInvite, resendClubInvitation, syncInvitationStatuses } from '../services/invitationsService';
 import { writeAuditLog } from '../services/auditService';
@@ -533,6 +533,7 @@ router.delete('/accounts/:id', rateLimit({ bucket: 'club-admin:mutate', limit: 3
             await tx.update(clubInviteCodes).set({ createdBy: null }).where(eq(clubInviteCodes.createdBy, id));
             await tx.update(accessRequests).set({ reviewedBy: null }).where(eq(accessRequests.reviewedBy, id));
             await tx.update(auditLogs).set({ actorUserId: null }).where(eq(auditLogs.actorUserId, id));
+            await tx.update(clubDocuments).set({ uploadedBy: null }).where(eq(clubDocuments.uploadedBy, id));
             await tx.delete(notifications).where(eq(notifications.userId, id));
             await tx.delete(accessRequests).where(eq(accessRequests.userId, id));
             await tx.delete(users).where(eq(users.id, id));

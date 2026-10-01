@@ -1,5 +1,11 @@
-import { pgTable, serial, varchar, integer, text, timestamp, unique, foreignKey, pgEnum, boolean } from "drizzle-orm/pg-core"
+import { pgTable, serial, varchar, integer, text, timestamp, unique, foreignKey, pgEnum, boolean, jsonb, customType, index } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+	dataType() {
+		return "bytea";
+	},
+});
 
 export const role = pgEnum("role", ['admin', 'coach', 'accountant', 'player', 'parent', 'staff', 'superadmin'])
 export const status = pgEnum("status", ['pending', 'processed', 'rejected'])
@@ -64,6 +70,13 @@ export const players = pgTable("players", {
 	medicalCheckExpiry: timestamp("medical_check_expiry", { mode: 'string' }),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	email: varchar({ length: 255 }),
+	// Contact book (routes/contacts.ts): the player's own number and up to two
+	// parents/guardians, so staff can reach a family fast. Staff-only data.
+	phone: varchar({ length: 32 }),
+	guardianName: varchar("guardian_name", { length: 120 }),
+	guardianPhone: varchar("guardian_phone", { length: 32 }),
+	guardian2Name: varchar("guardian2_name", { length: 120 }),
+	guardian2Phone: varchar("guardian2_phone", { length: 32 }),
 }, (table) => [
 	foreignKey({
 			columns: [table.teamId],
@@ -241,6 +254,67 @@ export const l12Documents = pgTable("l12_documents", {
 			columns: [table.teamId],
 			foreignColumns: [teams.id],
 			name: "l12_documents_team_id_teams_id_fk"
+		}),
+]);
+
+// Formular L-12 ("Lista oficială a echipei pentru joc"). One row per match
+// (event_id set) plus at most one per team with event_id NULL: the team's
+// "L12 constant", the default every new match sheet starts from. Players and
+// staff are snapshots (JSON), not references — a filed sheet must not change
+// when a player's shirt number is edited later. Shapes: see routes/l12.ts.
+export const l12Lineups = pgTable("l12_lineups", {
+	id: serial().primaryKey().notNull(),
+	teamId: integer("team_id").notNull(),
+	eventId: integer("event_id"),
+	competition: varchar({ length: 255 }),
+	gender: varchar({ length: 1 }),
+	players: jsonb().default([]).notNull(),
+	staff: jsonb().default({}).notNull(),
+	captainPlayerId: integer("captain_player_id"),
+	updatedBy: integer("updated_by"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("l12_lineups_event_id_unique").on(table.eventId),
+	foreignKey({
+			columns: [table.teamId],
+			foreignColumns: [teams.id],
+			name: "l12_lineups_team_id_teams_id_fk"
+		}),
+	foreignKey({
+			columns: [table.eventId],
+			foreignColumns: [events.id],
+			name: "l12_lineups_event_id_events_id_fk"
+		}).onDelete('cascade'),
+]);
+
+// Club document library (small PDFs: regulations, forms, schedules). The file
+// bytes live in Postgres on purpose — the API host has no persistent disk, so
+// anything written to ./uploads disappears on the next deploy. Size limits are
+// enforced in routes/clubDocuments.ts. Never select `data` in a listing.
+export const clubDocuments = pgTable("club_documents", {
+	id: serial().primaryKey().notNull(),
+	clubId: integer("club_id").notNull(),
+	title: varchar({ length: 200 }).notNull(),
+	fileName: varchar("file_name", { length: 255 }).notNull(),
+	mimeType: varchar("mime_type", { length: 100 }).notNull(),
+	sizeBytes: integer("size_bytes").notNull(),
+	data: bytea().notNull(),
+	// 'all' = every member of the club; 'staff' = admins and coaches only.
+	visibility: varchar({ length: 10 }).default('all').notNull(),
+	uploadedBy: integer("uploaded_by"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("club_documents_club_id_idx").on(table.clubId),
+	foreignKey({
+			columns: [table.clubId],
+			foreignColumns: [clubs.id],
+			name: "club_documents_club_id_clubs_id_fk"
+		}),
+	foreignKey({
+			columns: [table.uploadedBy],
+			foreignColumns: [users.id],
+			name: "club_documents_uploaded_by_users_id_fk"
 		}),
 ]);
 

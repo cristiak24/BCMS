@@ -25,7 +25,12 @@ function isPlayerFacingRole(req: AuthenticatedRequest) {
 // the full row — that matters for TypeScript (buildRosterRows stays a single
 // consistent return type instead of widening to `unknown` for every caller)
 // and for any downstream code that reads a field it doesn't recognize as safe.
-const SENSITIVE_ROSTER_FIELDS = ['email', 'medicalCheckExpiry', 'attendanceRate', 'paymentStatus'] as const;
+// Keep this in sync with every personal column on `players` — a new contact
+// column missing here is sent to the whole team.
+const SENSITIVE_ROSTER_FIELDS = [
+    'email', 'medicalCheckExpiry', 'attendanceRate', 'paymentStatus',
+    'phone', 'guardianName', 'guardianPhone', 'guardian2Name', 'guardian2Phone',
+] as const;
 
 function toSafeRosterRow<T extends Record<string, unknown>>(row: T): T {
     const safe = { ...row };

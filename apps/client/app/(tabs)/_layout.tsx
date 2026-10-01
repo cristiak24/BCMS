@@ -13,6 +13,8 @@ const PLAYER_MENU_ITEMS = [
     { href: '/schedule' as const, label: 'Program', icon: 'calendar-today' as const, match: 'schedule' },
     { href: '/attendance' as const, label: 'Prezență', icon: 'fact-check' as const, match: 'attendance' },
     { href: '/payments' as const, label: 'Plăți', icon: 'payments' as const, match: 'payments' },
+    { href: '/documents' as const, label: 'Documente', icon: 'folder' as const, match: 'documents' },
+    { href: '/contacts' as const, label: 'Contacte', icon: 'contacts' as const, match: 'contacts' },
     ...(PLAYER_FEATURE_FLAGS.teammatesView
         ? [{ href: '/team' as const, label: 'Echipa mea', icon: 'groups' as const, match: 'team' }]
         : []),
@@ -32,6 +34,9 @@ const COACH_MENU_ITEMS = [
     { href: '/schedule' as const, label: 'Program', icon: 'calendar-today' as const, match: 'schedule' },
     { href: '/coach/attendance' as const, label: 'Prezență', icon: 'fact-check' as const, match: 'coach/attendance' },
     { href: '/coach/teams' as const, label: 'Echipe', icon: 'groups' as const, match: 'coach/teams' },
+    { href: '/coach/l12' as const, label: 'L12', icon: 'assignment' as const, match: 'coach/l12' },
+    { href: '/documents' as const, label: 'Documente', icon: 'folder' as const, match: 'documents' },
+    { href: '/contacts' as const, label: 'Agendă', icon: 'contacts' as const, match: 'contacts' },
     { href: '/account' as const, label: 'Profil', icon: 'person' as const, match: 'account' },
 ];
 
