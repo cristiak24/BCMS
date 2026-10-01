@@ -5,9 +5,12 @@ import { ArrowLeft, Save, User, Mail, Hash, Calendar, Shield, CreditCard, Activi
 import { LinearGradient } from '@/src/web/linearGradient';
 import { teamsApi, Player } from '../../../services/teamsApi';
 import { ErrorState } from '../../../components/ui/ScreenState';
+import GuardiansPanel from '../../../components/family/GuardiansPanel';
+import { ToastHost, useToasts } from '../../../components/ui/Toast';
 
 export default function PlayerProfile() {
   const { id, returnTo } = useLocalSearchParams();
+  const { toasts, showToast, dismissToast } = useToasts();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isCompact = width < 900;
@@ -438,6 +441,10 @@ export default function PlayerProfile() {
               </TouchableOpacity>
             </View>
 
+            {Number(id) > 0 ? (
+              <GuardiansPanel playerId={Number(id)} playerName={`${firstName} ${lastName}`.trim() || 'jucător'} onNotify={showToast} />
+            ) : null}
+
             <View className="rounded-[30px] border border-[#E1EAF5] bg-[#0E2041] p-5 shadow-sm">
               <View className="mb-4 flex-row items-center gap-3">
                 <View className="h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
@@ -568,6 +575,7 @@ export default function PlayerProfile() {
         </Pressable>
       </Modal>
 
+      <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </ScrollView>
   );
 }

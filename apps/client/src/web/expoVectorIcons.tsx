@@ -107,6 +107,8 @@ import {
   FileUp,
   CircleMinus,
   ArrowUpDown,
+  Share2,
+  ListPlus,
 } from 'lucide-react';
 
 type IconProps = {
@@ -226,6 +228,9 @@ const iconMap: Record<string, typeof Circle> = {
   chat: MessageSquareText,
   'done-all': CheckCheck,
   sort: ArrowUpDown,
+  'vpn-key': KeyRound,
+  share: Share2,
+  'group-add': ListPlus,
   info: Info,
   assignment: ClipboardList,
   star: Star,

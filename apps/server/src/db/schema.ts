@@ -124,6 +124,10 @@ export const playerPayments = pgTable("player_payments", {
 	status: varchar({ length: 50 }).notNull(),
 	date: timestamp({ mode: 'string' }),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	// Account that paid online (the player or a linked parent). Null for
+	// payments the club recorded by hand. No FK: a deleted account must not
+	// block or erase the payment history.
+	paidByUserId: integer("paid_by_user_id"),
 }, (table) => [
 	foreignKey({
 			columns: [table.playerId],
@@ -286,6 +290,90 @@ export const l12Lineups = pgTable("l12_lineups", {
 			foreignColumns: [events.id],
 			name: "l12_lineups_event_id_events_id_fk"
 		}).onDelete('cascade'),
+]);
+
+// Parent/guardian accounts linked to a player record. Created when a club
+// admin or the team's coach approves a family_join_request (or links a parent
+// by hand). A player can have several guardians; a parent several children.
+export const playerGuardians = pgTable("player_guardians", {
+	id: serial().primaryKey().notNull(),
+	playerId: integer("player_id").notNull(),
+	userId: integer("user_id").notNull(),
+	createdBy: integer("created_by"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("player_guardians_player_user_unique").on(table.playerId, table.userId),
+	index("player_guardians_user_id_idx").on(table.userId),
+	foreignKey({
+			columns: [table.playerId],
+			foreignColumns: [players.id],
+			name: "player_guardians_player_id_players_id_fk"
+		}).onDelete('cascade'),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "player_guardians_user_id_users_id_fk"
+		}).onDelete('cascade'),
+]);
+
+// Personal, single-use invite for one parent of one player, made by a club
+// admin or the player's coach from the player's page. Accepting it links the
+// new (or signed-in) parent account to that child without a further approval.
+// Only the SHA-256 of the token is stored.
+export const guardianInvites = pgTable("guardian_invites", {
+	id: serial().primaryKey().notNull(),
+	clubId: integer("club_id").notNull(),
+	playerId: integer("player_id").notNull(),
+	tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+	createdBy: integer("created_by"),
+	expiresAt: timestamp("expires_at", { mode: 'string' }).notNull(),
+	usedAt: timestamp("used_at", { mode: 'string' }),
+	usedBy: integer("used_by"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("guardian_invites_token_hash_unique").on(table.tokenHash),
+	foreignKey({
+			columns: [table.playerId],
+			foreignColumns: [players.id],
+			name: "guardian_invites_player_id_players_id_fk"
+		}).onDelete('cascade'),
+]);
+
+// Signups made with a team's join code (teams.invite_code). One row per child
+// a parent registers (kind 'parent') or per player registering themselves
+// (kind 'player'). Nothing touches the roster until a club admin or that
+// team's coach approves — approval links to an existing player or creates one.
+export const familyJoinRequests = pgTable("family_join_requests", {
+	id: serial().primaryKey().notNull(),
+	clubId: integer("club_id").notNull(),
+	teamId: integer("team_id").notNull(),
+	userId: integer("user_id").notNull(),
+	kind: varchar({ length: 10 }).notNull(),
+	childFirstName: varchar("child_first_name", { length: 120 }).notNull(),
+	childLastName: varchar("child_last_name", { length: 120 }).notNull(),
+	childBirthDate: varchar("child_birth_date", { length: 10 }),
+	status: varchar({ length: 10 }).default('pending').notNull(),
+	playerId: integer("player_id"),
+	reviewedBy: integer("reviewed_by"),
+	reviewedAt: timestamp("reviewed_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("family_join_requests_team_status_idx").on(table.teamId, table.status),
+	foreignKey({
+			columns: [table.teamId],
+			foreignColumns: [teams.id],
+			name: "family_join_requests_team_id_teams_id_fk"
+		}).onDelete('cascade'),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "family_join_requests_user_id_users_id_fk"
+		}).onDelete('cascade'),
+	foreignKey({
+			columns: [table.playerId],
+			foreignColumns: [players.id],
+			name: "family_join_requests_player_id_players_id_fk"
+		}).onDelete('set null'),
 ]);
 
 // Club document library (small PDFs: regulations, forms, schedules). The file

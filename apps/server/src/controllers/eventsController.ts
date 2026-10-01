@@ -8,6 +8,7 @@ import { buildEventQueryPlan, type EventQueryParams } from '../lib/eventQuery';
 import { createFeedbackNotification } from '../lib/notifications';
 import { parseAttendancePayload, parseEventInput } from '../lib/eventValidation';
 import { fetchFrbMatches, frbDateToUtc, type ParsedMatch } from '../lib/frbMatches';
+import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
 
 
 /** FRB sync: only fixtures from this far back are inserted as new events. */
@@ -176,16 +177,9 @@ async function getSelfTeamIds(req: AuthenticatedRequest) {
     return Array.from(ids);
 }
 
-/** The caller's own players row, resolved server-side from their account email. */
+/** The caller's own players row — for a parent, their selected child (lib/selfPlayer.ts). */
 async function getSelfPlayerId(req: AuthenticatedRequest) {
-    const email = req.user?.email;
-    if (!email) return null;
-    const rows = await db
-        .select({ id: players.id })
-        .from(players)
-        .where(eq(players.email, String(email).trim().toLowerCase()))
-        .limit(1);
-    return rows[0]?.id ?? null;
+    return (await resolveSelfPlayerForRequest(req))?.id ?? null;
 }
 
 /**

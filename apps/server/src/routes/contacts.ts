@@ -3,9 +3,10 @@ import { and, eq, inArray, ne, or } from 'drizzle-orm';
 import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
 import { db } from '../db';
-import { players, playersToTeams, teams, users } from '../db/schema';
+import { playerGuardians, players, playersToTeams, teams, users } from '../db/schema';
 import { resolveRequestClubId } from '../lib/tenantScope';
 import { isContactStaff, parsePlayerContact } from '../lib/contacts';
+import { guardianChildren, resolveSelfPlayer, teamIdsOfPlayers } from '../lib/selfPlayer';
 
 /**
  * Club contact book.
@@ -55,15 +56,11 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
         const teamIds = teamRows.map((team) => team.id);
 
         if (!isContactStaff(req.user?.role)) {
-            // Which of the club's teams is the caller on (players.email ↔ account email)?
-            const email = String(req.user?.email ?? '').trim().toLowerCase();
-            const self = email ? (await db.select({ id: players.id, teamId: players.teamId }).from(players).where(eq(players.email, email)).limit(1))[0] : undefined;
-            const myTeamIds = new Set<number>();
-            if (self) {
-                if (self.teamId != null) myTeamIds.add(self.teamId);
-                (await db.select({ teamId: playersToTeams.teamId }).from(playersToTeams).where(eq(playersToTeams.playerId, self.id)))
-                    .forEach((row) => myTeamIds.add(row.teamId));
-            }
+            // The caller's teams: a player's own; a parent's — every linked child's.
+            const selfIds = req.user?.role === 'parent'
+                ? (await guardianChildren(Number(req.user.id))).map((child) => child.id)
+                : [(await resolveSelfPlayer(req.user))?.id].filter((id): id is number => id != null);
+            const myTeamIds = new Set<number>(await teamIdsOfPlayers(selfIds));
             const visible = staff
                 .filter((person) => person.phone)
                 .map((person) => ({ ...person, ownTeam: person.teams.some((team) => myTeamIds.has(team.id)) }))
@@ -99,6 +96,13 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
             : [];
         const accountPhone = new Map(accounts.map((a) => [a.email.trim().toLowerCase(), a.phone?.trim() || null]));
 
+        // Parents with their own account (player_guardians) bring their profile number.
+        const guardianRows = byId.size
+            ? await db.select({ playerId: playerGuardians.playerId, userId: users.id, name: users.name, phone: users.phone })
+                .from(playerGuardians).innerJoin(users, eq(users.id, playerGuardians.userId))
+                .where(inArray(playerGuardians.playerId, Array.from(byId.keys())))
+            : [];
+
         const list = Array.from(byId.values())
             .filter(({ row }) => (row.status ?? 'active') !== 'inactive')
             .map(({ row, teamIds: memberOf }) => ({
@@ -113,6 +117,9 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
                 guardianPhone: row.guardianPhone ?? null,
                 guardian2Name: row.guardian2Name ?? null,
                 guardian2Phone: row.guardian2Phone ?? null,
+                guardianAccounts: guardianRows
+                    .filter((g) => g.playerId === row.id)
+                    .map((g) => ({ userId: g.userId, name: g.name, phone: g.phone?.trim() || null })),
             }))
             .sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`));
 

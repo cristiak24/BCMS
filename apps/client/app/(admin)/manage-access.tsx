@@ -7,6 +7,7 @@ import PageContainer from '../../components/ui/PageContainer';
 import FilterChips from '../../components/ui/FilterChips';
 import InviteLinkGenerator from '../../components/manage-access/InviteLinkGenerator';
 import InviteCodesPanel from '../../components/manage-access/InviteCodesPanel';
+import FamilyRequestsPanel from '../../components/family/FamilyRequestsPanel';
 import PendingAccessRequestList from '../../components/manage-access/PendingAccessRequestList';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
@@ -56,6 +57,8 @@ export default function ManageAccessScreen() {
     const { toasts, showToast, dismissToast } = useToasts();
     const [tab, setTabState] = useState<AccessTab>(readStoredTab);
     const [pendingDeny, setPendingDeny] = useState<AccessRequestItem | null>(null);
+    // Team-code signups (parents/players) — counted into the Cereri badge.
+    const [familyCount, setFamilyCount] = useState(0);
     // Default to "pending" so the list stays focused on what needs action — resolved
     // requests are still reachable via the Approved/Denied/All tabs but no longer
     // grow the working list unbounded.
@@ -213,7 +216,7 @@ export default function ManageAccessScreen() {
                     >
                         {TABS.map((item) => {
                             const active = item.key === tab;
-                            const badge = item.key === 'requests' ? pendingCount : 0;
+                            const badge = item.key === 'requests' ? pendingCount + familyCount : 0;
                             return (
                                 <Pressable
                                     key={item.key}
@@ -244,6 +247,9 @@ export default function ManageAccessScreen() {
                     <View key={tab} className={`ui-rise mt-2 ${tab === 'link' ? 'w-full max-w-[640px]' : 'w-full'}`}>
                         {tab === 'requests' ? (
                             <View className="gap-3">
+                                <FamilyRequestsPanel onNotify={showToast} onCountChange={setFamilyCount} />
+
+                                <Text className="text-[14px] font-bold mt-3" style={{ color: 'var(--c-ink)' }}>Cereri de acces (link / cont)</Text>
                                 <View className="flex-row items-center gap-2">
                                     <View className="flex-1 min-w-0">
                                         <FilterChips

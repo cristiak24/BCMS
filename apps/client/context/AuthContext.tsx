@@ -19,7 +19,7 @@ import {
   type AuthUser,
   type UserRole,
 } from '../utils/authSession';
-import { ApiError, apiFetch, setSessionTokenGetter, setUnauthorizedHandler } from '../services/apiClient';
+import { ApiError, apiFetch, setActiveChildId, setSessionTokenGetter, setUnauthorizedHandler } from '../services/apiClient';
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Types
@@ -292,6 +292,8 @@ function AuthBridge({ children }: PropsWithChildren) {
 
   const signOut = useCallback(async () => {
     await clerk.signOut();
+    // A parent's child selection must not leak into the next account on this device.
+    setActiveChildId(null);
     setCachedAuthSession(null);
     setSession(null);
     await clearAuthSession();

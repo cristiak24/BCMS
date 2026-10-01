@@ -7,7 +7,8 @@ import { requireRequestUser } from '../lib/requestContext';
 import { authenticate } from '../middleware/auth';
 import { toIso } from '../lib/dateUtils';
 import { db } from '../db';
-import { clubs, players, playersToTeams, teams, users } from '../db/schema';
+import { clubs, playersToTeams, teams, users } from '../db/schema';
+import { requestedChildId, resolveSelfPlayer } from '../lib/selfPlayer';
 
 type NotificationPreferences = {
     email?: boolean;
@@ -59,7 +60,7 @@ async function findUserByNumericId(userId: number) {
     return rows[0] ?? null;
 }
 
-async function resolveProfileRecord(userId: number) {
+async function resolveProfileRecord(userId: number, childId: number | null = null) {
     const user = await findUserByNumericId(userId);
     if (!user) {
         return null;
@@ -71,10 +72,8 @@ async function resolveProfileRecord(userId: number) {
         : await db.select({ name: clubs.name }).from(clubs).where(eq(clubs.id, clubId)).limit(1);
     const clubName = clubRows[0]?.name ?? null;
 
-    const playerRows = user.email
-        ? await db.select().from(players).where(eq(players.email, user.email)).limit(1)
-        : [];
-    const player = playerRows[0];
+    // A parent's profile shows their selected child's team (lib/selfPlayer.ts).
+    const player = await resolveSelfPlayer(user, childId);
 
     let teamName: string | null = null;
     const teamIds = new Set<number>();
@@ -132,7 +131,7 @@ router.get('/me', async (req, res) => {
             return;
         }
 
-        const profile = await resolveProfileRecord(requestUser.id);
+        const profile = await resolveProfileRecord(requestUser.id, requestedChildId(req));
 
         if (!profile) {
             return res.status(404).json({ error: 'Profile not found' });
@@ -201,7 +200,7 @@ router.patch('/me', async (req, res) => {
             updatedAt: new Date().toISOString(),
         }).where(eq(users.id, requestUser.id));
 
-        const profile = await resolveProfileRecord(requestUser.id);
+        const profile = await resolveProfileRecord(requestUser.id, requestedChildId(req));
         return res.json(profile);
     } catch (error) {
         console.error('[PATCH /api/profile/me] error:', error);

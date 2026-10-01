@@ -5,6 +5,7 @@ import { and, desc, eq, inArray, lte, or, sql } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { buildPlayerUpdate } from '../lib/playerUpdate';
 import { toIso } from '../lib/dateUtils';
+import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
 
 const DEFAULT_PAYMENT_CURRENCY = (process.env.STRIPE_CURRENCY || 'ron').trim().toLowerCase();
 
@@ -40,11 +41,9 @@ function toSafeRosterRow<T extends Record<string, unknown>>(row: T): T {
     return safe;
 }
 
+// For a parent this is their selected child (lib/selfPlayer.ts).
 async function getSelfPlayerRecord(req: AuthenticatedRequest) {
-    const email = req.user?.email;
-    if (!email) return null;
-    const rows = await db.select().from(players).where(eq(players.email, String(email).trim().toLowerCase())).limit(1);
-    return rows[0] ?? null;
+    return resolveSelfPlayerForRequest(req);
 }
 
 // A player belongs to a team either through the join table or through the

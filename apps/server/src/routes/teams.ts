@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import crypto from 'crypto';
 import { db } from '../db';
 import { attendance, clubs, events, l12Documents, playerPayments, players, playersToTeams, teams, users, l12Lineups } from '../db/schema';
 import { requireRoles, authenticate, type AuthenticatedRequest } from '../middleware/auth';
+import { foldName, generateTeamCode } from '../lib/familyJoin';
 
 const router = Router();
 
@@ -27,9 +27,15 @@ function isPaidStatus(status?: string | null) {
     return normalized === 'paid' || normalized === 'processed' || normalized === 'succeeded' || normalized === 'success';
 }
 
-function mapTeam(team: typeof teams.$inferSelect) {
+// The invite code lets families sign up to the team (approval follows), so
+// only staff get it — players and parents could otherwise pass it around.
+const TEAM_CODE_ROLES = new Set(['admin', 'coach', 'manager', 'superadmin']);
+
+function mapTeam(team: typeof teams.$inferSelect, req?: AuthenticatedRequest) {
+    const { inviteCode, ...rest } = team;
     return {
-        ...team,
+        ...rest,
+        ...(req && !TEAM_CODE_ROLES.has(String(req.user?.role ?? '')) ? {} : { inviteCode }),
         createdAt: team.createdAt ?? new Date().toISOString(),
         updatedAt: team.updatedAt ?? team.createdAt ?? new Date().toISOString(),
     };
@@ -107,7 +113,7 @@ function mapPlayer(player: typeof players.$inferSelect) {
 
 async function generateInviteCode() {
     for (let attempt = 0; attempt < 5; attempt += 1) {
-        const inviteCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+        const inviteCode = generateTeamCode();
         const existing = await db.select({ id: teams.id }).from(teams).where(eq(teams.inviteCode, inviteCode)).limit(1);
         if (!existing[0]) {
             return inviteCode;
@@ -202,7 +208,7 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
         res.json(rows.map((team) => {
             const stats = statsByTeam.get(team.id);
             return {
-                ...mapTeam(team),
+                ...mapTeam(team, req),
                 coachName: team.coachId != null ? coachMap.get(team.coachId) ?? null : null,
                 playerCount: stats ? stats.playerIds.size : 0,
                 staleMedicalChecks: stats ? stats.staleMedicalChecks.size : 0,
@@ -362,7 +368,7 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
         const staleMedicalChecks = teamPlayers.filter((player) => !player.medicalCheckExpiry || new Date(player.medicalCheckExpiry).getTime() < now).length;
 
         res.json({
-            ...mapTeam(access.team),
+            ...mapTeam(access.team, req),
             coachName: coachRow[0]?.name ?? null,
             playerCount: teamPlayers.length,
             staleMedicalChecks,
@@ -669,6 +675,90 @@ router.post('/:id/players', requireTeamManager, async (req: AuthenticatedRequest
     } catch (e) {
         console.error(`[POST /api/teams/${req.params.id}/players] error:`, e);
         res.status(500).json({ error: 'Failed to create player' });
+    }
+});
+
+// Bulk add: the roster pasted as a list ("Popescu Matei 2016", one per line,
+// parsed on the client). Club admins, or the coach of this team. Names already
+// on the team (same name, and same birth year when both are known) are
+// skipped rather than duplicated.
+router.post('/:id/players/bulk', async (req: AuthenticatedRequest, res) => {
+    try {
+        const teamId = parseRouteId(req.params.id);
+        if (Number.isNaN(teamId)) {
+            res.status(400).json({ error: 'Invalid ID' });
+            return;
+        }
+        const access = await ensureTeamAccess(req, teamId);
+        if (access.status !== 200) {
+            res.status(access.status).json({ error: access.error });
+            return;
+        }
+        const role = String(req.user?.role ?? '');
+        const isTeamCoach = role === 'coach' && access.team.coachId === Number(req.user?.id);
+        if (!['admin', 'manager', 'superadmin'].includes(role) && !isTeamCoach) {
+            res.status(403).json({ error: 'Doar adminii sau antrenorul echipei pot adăuga jucători.' });
+            return;
+        }
+
+        const raw: unknown[] = Array.isArray(req.body?.players) ? req.body.players : [];
+        if (!raw.length || raw.length > 60) {
+            res.status(400).json({ error: 'Trimite între 1 și 60 de jucători.' });
+            return;
+        }
+        const thisYear = new Date().getUTCFullYear();
+        const clean = (value: unknown) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
+        const rows = raw.map((entry) => {
+            const item = (entry ?? {}) as Record<string, unknown>;
+            const year = Number(item.birthYear);
+            return {
+                firstName: clean(item.firstName),
+                lastName: clean(item.lastName),
+                birthYear: Number.isInteger(year) && year > thisYear - 40 && year <= thisYear - 3 ? year : null,
+            };
+        });
+        if (rows.some((row) => !row.firstName || !row.lastName)) {
+            res.status(400).json({ error: 'Fiecare rând are nevoie de nume și prenume.' });
+            return;
+        }
+
+        const existing = await getTeamPlayersById(teamId);
+        const known = new Set(existing.map((p) => `${foldName(p.firstName)}|${foldName(p.lastName)}`));
+        const knownYear = new Map(existing.map((p) => [`${foldName(p.firstName)}|${foldName(p.lastName)}`, p.birthYear ?? null]));
+        const toAdd: typeof rows = [];
+        const skipped: string[] = [];
+        for (const row of rows) {
+            const key = `${foldName(row.firstName)}|${foldName(row.lastName)}`;
+            const swapped = `${foldName(row.lastName)}|${foldName(row.firstName)}`;
+            const hit = known.has(key) ? key : known.has(swapped) ? swapped : null;
+            const year = hit ? knownYear.get(hit) : null;
+            if (hit && (year == null || row.birthYear == null || year === row.birthYear)) {
+                skipped.push(`${row.lastName} ${row.firstName}`);
+                continue;
+            }
+            known.add(key);
+            toAdd.push(row);
+        }
+
+        const created = toAdd.length
+            ? await db.transaction(async (tx) => {
+                const inserted = await tx.insert(players).values(toAdd.map((row) => ({
+                    name: `${row.firstName} ${row.lastName}`,
+                    firstName: row.firstName,
+                    lastName: row.lastName,
+                    birthYear: row.birthYear,
+                    status: 'active',
+                    teamId,
+                }))).returning();
+                await tx.insert(playersToTeams).values(inserted.map((player) => ({ playerId: player.id, teamId })));
+                return inserted;
+            })
+            : [];
+
+        res.status(201).json({ created: created.map(mapPlayer), skipped });
+    } catch (e) {
+        console.error(`[POST /api/teams/${req.params.id}/players/bulk] error:`, e);
+        res.status(500).json({ error: 'Nu am putut adăuga jucătorii.' });
     }
 });
 

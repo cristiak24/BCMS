@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertCircle, Loader2, Lock, Eye, EyeOff, Ticket, ArrowRight } from 'lucide-react';
+import { AlertCircle, Loader2, Lock, Eye, EyeOff, Ticket, ArrowRight, Phone, Plus, X, Users, UserRound } from 'lucide-react';
 import { authApi, type InviteDetails } from '../services/authApi';
+import { familyApi } from '../services/familyApi';
+import { setActiveChildId } from '../services/apiClient';
 import { getHomeRouteForRole } from '../utils/authSession';
 import { useSession } from '../context/AuthContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
@@ -45,6 +47,17 @@ export function extractInviteToken(raw: string) {
     return value;
 }
 
+type ChildDraft = { firstName: string; lastName: string; birthDate: string };
+const EMPTY_CHILD: ChildDraft = { firstName: '', lastName: '', birthDate: '' };
+const MAX_CHILDREN = 5;
+
+/** Same rule as the server (lib/contacts.ts normalizePhone). */
+function isValidPhone(value: string) {
+    const text = value.trim();
+    const digits = text.replace(/\D/g, '').length;
+    return /^\+?[0-9 ().-]{6,32}$/.test(text) && digits >= 6 && digits <= 15;
+}
+
 export default function Signup() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -60,15 +73,30 @@ export default function Signup() {
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [phone, setPhone] = useState('');
+    // Team-code signups: who is registering, and for whom.
+    const [joinAs, setJoinAs] = useState<'parent' | 'player' | null>(null);
+    const [children, setChildren] = useState<ChildDraft[]>([{ ...EMPTY_CHILD }]);
+    const [birthDate, setBirthDate] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // A signed-in parent opening a personal invite link ("fam_…") just gets the
+    // child linked to the account they already have.
+    const [linkingInvite, setLinkingInvite] = useState(false);
     useEffect(() => {
-        if (!initializing && session) {
-            navigate(getHomeRouteForRole(session.role), { replace: true });
+        if (initializing || !session) return;
+        if (session.role === 'parent' && urlToken.startsWith('fam_')) {
+            setLinkingInvite(true);
+            void familyApi.acceptInvite(urlToken)
+                .then(({ playerId }) => setActiveChildId(playerId))
+                .catch(() => undefined)
+                .finally(() => navigate(getHomeRouteForRole(session.role), { replace: true }));
+            return;
         }
-    }, [initializing, navigate, session]);
+        navigate(getHomeRouteForRole(session.role), { replace: true });
+    }, [initializing, navigate, session, urlToken]);
 
     const validateCode = useCallback(async (raw: string) => {
         const token = extractInviteToken(raw);
@@ -103,18 +131,42 @@ export default function Signup() {
         setInviteToken('');
         setCodeInput('');
         setEmail('');
+        setJoinAs(null);
+        setChildren([{ ...EMPTY_CHILD }]);
+        setBirthDate('');
         setError(null);
     };
+
+    const isTeamCode = invite?.source === 'team';
+    const isGuardianInvite = invite?.source === 'guardian';
+    const updateChild = (index: number, patch: Partial<ChildDraft>) =>
+        setChildren((list) => list.map((child, i) => (i === index ? { ...child, ...patch } : child)));
 
     const handleSignup = async () => {
         if (!invite || !inviteToken) return;
 
+        if (isTeamCode && !joinAs) {
+            setError('Alege dacă îți faci cont ca părinte sau ca jucător.');
+            return;
+        }
         if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) {
             setError('Completează prenumele, numele, emailul și parola.');
             return;
         }
+        if (!isValidPhone(phone)) {
+            setError('Introdu un număr de telefon valid — clubul te poate contacta pe el.');
+            return;
+        }
         if (password.length < 8) {
             setError('Parola trebuie să aibă cel puțin 8 caractere.');
+            return;
+        }
+        if (isTeamCode && joinAs === 'parent' && children.some((child) => !child.firstName.trim() || !child.lastName.trim() || !child.birthDate)) {
+            setError('Completează numele, prenumele și data nașterii pentru fiecare copil.');
+            return;
+        }
+        if (isTeamCode && joinAs === 'player' && !birthDate) {
+            setError('Completează data nașterii.');
             return;
         }
 
@@ -127,6 +179,11 @@ export default function Signup() {
                 email: email.trim().toLowerCase(),
                 password,
                 inviteToken,
+                phone: phone.trim(),
+                ...(isTeamCode && joinAs === 'parent'
+                    ? { joinAs, children: children.map((child) => ({ firstName: child.firstName.trim(), lastName: child.lastName.trim(), birthDate: child.birthDate })) }
+                    : {}),
+                ...(isTeamCode && joinAs === 'player' ? { joinAs, birthDate } : {}),
             });
 
             if (!result.success) {
@@ -142,12 +199,12 @@ export default function Signup() {
         }
     };
 
-    if (initializing) {
+    if (initializing || linkingInvite) {
         return <LoadingScreen message="Verificăm sesiunea..." backgroundColor="var(--c-surface)" color="var(--c-blue)" />;
     }
 
     const emailLocked = Boolean(invite?.email);
-    const roleLabel = invite ? (ROLE_LABELS[invite.role] ?? invite.role) : '';
+    const roleLabel = invite?.role ? (ROLE_LABELS[invite.role] ?? invite.role) : '';
 
     return (
         <main className="relative isolate min-h-screen overflow-hidden text-slate-950">
@@ -158,9 +215,11 @@ export default function Signup() {
                 <AuthCard>
                     <AuthHeading
                         title="Creează cont"
-                        subtitle={invite
-                            ? 'Completează datele tale pentru a intra în club.'
-                            : 'Conturile se creează pe baza invitației primite de la administratorul clubului.'}
+                        subtitle={isTeamCode
+                            ? 'Înscriere în echipă. Antrenorul sau clubul aprobă cererea, apoi intri în aplicație.'
+                            : invite
+                                ? 'Completează datele tale pentru a intra în club.'
+                                : 'Introdu codul primit de la club sau de la antrenorul echipei.'}
                     />
 
                     {error ? (
@@ -184,7 +243,7 @@ export default function Signup() {
                                     <Ticket size={18} className="shrink-0 text-blue-700" />
                                     <input
                                         className={`ml-2.5 ${authInputClass}`}
-                                        placeholder="Ex: K7M4-QX2P sau linkul primit"
+                                        placeholder="Ex: 4KQ7-2M (echipă), K7M4-QX2P sau linkul"
                                         value={codeInput}
                                         onChange={(e) => setCodeInput(e.target.value)}
                                         autoCapitalize="none"
@@ -208,14 +267,25 @@ export default function Signup() {
                                 void handleSignup();
                             }}
                         >
-                            {/* Role and club come from the invite; the admin chose them. */}
+                            {/* Role and club come from the invite; the admin chose them. A
+                                team code only fixes the team — the person says who they are. */}
                             <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
                                 <Lock size={16} className="shrink-0 text-blue-700" />
                                 <div className="min-w-0 flex-1">
                                     <p className="m-0 truncate text-[13px] font-black text-blue-950">
-                                        {roleLabel}{invite.clubName ? ` · ${invite.clubName}` : ''}
+                                        {isTeamCode
+                                            ? `${invite.teamName ?? 'Echipă'}${invite.clubName ? ` · ${invite.clubName}` : ''}`
+                                            : isGuardianInvite
+                                                ? `Părinte · ${invite.childName ?? ''}`
+                                                : `${roleLabel}${invite.clubName ? ` · ${invite.clubName}` : ''}`}
                                     </p>
-                                    <p className="m-0 text-[11px] font-bold text-blue-700">Rol stabilit de administrator</p>
+                                    <p className="m-0 text-[11px] font-bold text-blue-700">
+                                        {isTeamCode
+                                            ? 'Cod de echipă'
+                                            : isGuardianInvite
+                                                ? `Invitație de la ${invite.clubName ?? 'club'} · contul se leagă de copil`
+                                                : 'Rol stabilit de administrator'}
+                                    </p>
                                 </div>
                                 {!urlToken ? (
                                     <button
@@ -228,80 +298,208 @@ export default function Signup() {
                                 ) : null}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2.5">
-                                <label className="block min-w-0">
-                                    <span className={authLabelClass}>Prenume</span>
-                                    <span className={`${authFieldClass} border-slate-200`}>
-                                        <input
-                                            className={authInputClass}
-                                            placeholder="Maria"
-                                            value={firstName}
-                                            onChange={(e) => setFirstName(e.target.value)}
-                                            autoComplete="given-name"
-                                            disabled={submitting}
-                                        />
-                                    </span>
-                                </label>
-                                <label className="block min-w-0">
-                                    <span className={authLabelClass}>Nume</span>
-                                    <span className={`${authFieldClass} border-slate-200`}>
-                                        <input
-                                            className={authInputClass}
-                                            placeholder="Popescu"
-                                            value={lastName}
-                                            onChange={(e) => setLastName(e.target.value)}
-                                            autoComplete="family-name"
-                                            disabled={submitting}
-                                        />
-                                    </span>
-                                </label>
-                            </div>
+                            {isTeamCode ? (
+                                <div>
+                                    <span className={authLabelClass}>Îmi fac cont ca</span>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {([
+                                            { key: 'parent', label: 'Părinte', hint: 'Îmi înscriu copilul', Icon: Users },
+                                            { key: 'player', label: 'Jucător', hint: '14 ani sau mai mult', Icon: UserRound },
+                                        ] as const).map(({ key, label, hint, Icon }) => {
+                                            const active = joinAs === key;
+                                            return (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    aria-pressed={active}
+                                                    onClick={() => setJoinAs(key)}
+                                                    disabled={submitting}
+                                                    className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors ${active ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                                                >
+                                                    <Icon size={18} className={active ? 'shrink-0 text-blue-700' : 'shrink-0 text-slate-400'} />
+                                                    <span className="min-w-0">
+                                                        <span className={`block text-[13.5px] font-black ${active ? 'text-blue-950' : 'text-slate-800'}`}>{label}</span>
+                                                        <span className="block text-[11px] font-bold text-slate-500">{hint}</span>
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ) : null}
 
-                            <label className="block">
-                                <span className={authLabelClass}>Email</span>
-                                <span className={`${authFieldClass} border-slate-200 ${emailLocked ? 'bg-slate-100' : ''}`}>
-                                    <input
-                                        className={authInputClass}
-                                        placeholder="nume@club.ro"
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        autoCapitalize="none"
-                                        autoComplete="email"
-                                        readOnly={emailLocked}
-                                        disabled={submitting}
-                                    />
-                                    {emailLocked ? <Lock size={15} className="shrink-0 text-slate-400" /> : null}
-                                </span>
-                            </label>
+                            {isTeamCode && !joinAs ? null : (
+                                <>
+                                    {isTeamCode ? (
+                                        <p className="m-0 -mb-1 text-[12px] font-black uppercase tracking-wide text-slate-500">
+                                            {joinAs === 'parent' ? 'Datele tale (părinte)' : 'Datele tale'}
+                                        </p>
+                                    ) : null}
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <label className="block min-w-0">
+                                            <span className={authLabelClass}>Prenume</span>
+                                            <span className={`${authFieldClass} border-slate-200`}>
+                                                <input
+                                                    className={authInputClass}
+                                                    placeholder="Maria"
+                                                    value={firstName}
+                                                    onChange={(e) => setFirstName(e.target.value)}
+                                                    autoComplete="given-name"
+                                                    disabled={submitting}
+                                                />
+                                            </span>
+                                        </label>
+                                        <label className="block min-w-0">
+                                            <span className={authLabelClass}>Nume</span>
+                                            <span className={`${authFieldClass} border-slate-200`}>
+                                                <input
+                                                    className={authInputClass}
+                                                    placeholder="Popescu"
+                                                    value={lastName}
+                                                    onChange={(e) => setLastName(e.target.value)}
+                                                    autoComplete="family-name"
+                                                    disabled={submitting}
+                                                />
+                                            </span>
+                                        </label>
+                                    </div>
 
-                            <label className="block">
-                                <span className={authLabelClass}>Parolă</span>
-                                <span className={`${authFieldClass} border-slate-200`}>
-                                    <input
-                                        className={authInputClass}
-                                        placeholder="Minim 8 caractere"
-                                        type={showPassword ? 'text' : 'password'}
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        autoComplete="new-password"
-                                        disabled={submitting}
-                                    />
-                                    <button
-                                        type="button"
-                                        aria-label={showPassword ? 'Ascunde parola' : 'Arată parola'}
-                                        onClick={() => setShowPassword((value) => !value)}
-                                        className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-0 bg-transparent text-slate-500 hover:bg-slate-100"
-                                    >
-                                        {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                                    <label className="block">
+                                        <span className={authLabelClass}>Telefon</span>
+                                        <span className={`${authFieldClass} ${phone && !isValidPhone(phone) ? 'border-red-300' : 'border-slate-200'}`}>
+                                            <Phone size={16} className="shrink-0 text-slate-400" />
+                                            <input
+                                                className={`ml-2.5 ${authInputClass}`}
+                                                placeholder="07xx xxx xxx"
+                                                type="tel"
+                                                inputMode="tel"
+                                                value={phone}
+                                                onChange={(e) => setPhone(e.target.value)}
+                                                autoComplete="tel"
+                                                disabled={submitting}
+                                            />
+                                        </span>
+                                    </label>
+
+                                    {isTeamCode && joinAs === 'player' ? (
+                                        <label className="block">
+                                            <span className={authLabelClass}>Data nașterii</span>
+                                            <span className={`${authFieldClass} border-slate-200`}>
+                                                <input
+                                                    className={authInputClass}
+                                                    type="date"
+                                                    value={birthDate}
+                                                    max={new Date().toISOString().slice(0, 10)}
+                                                    onChange={(e) => setBirthDate(e.target.value)}
+                                                    disabled={submitting}
+                                                />
+                                            </span>
+                                        </label>
+                                    ) : null}
+
+                                    {isTeamCode && joinAs === 'parent' ? (
+                                        <div className="flex flex-col gap-2.5">
+                                            {children.map((child, index) => (
+                                                <div key={index} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                                    <div className="mb-2 flex items-center justify-between">
+                                                        <span className="text-[12px] font-black uppercase tracking-wide text-slate-500">
+                                                            {children.length > 1 ? `Copilul ${index + 1}` : 'Copilul tău'}
+                                                        </span>
+                                                        {children.length > 1 ? (
+                                                            <button
+                                                                type="button"
+                                                                aria-label={`Scoate copilul ${index + 1}`}
+                                                                onClick={() => setChildren((list) => list.filter((_, i) => i !== index))}
+                                                                className="flex h-7 w-7 items-center justify-center rounded-md border-0 bg-transparent text-slate-400 hover:bg-slate-200"
+                                                            >
+                                                                <X size={15} />
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <span className={`${authFieldClass} border-slate-200 bg-white`}>
+                                                            <input className={authInputClass} placeholder="Prenume" aria-label={`Prenume copil ${index + 1}`} value={child.firstName} onChange={(e) => updateChild(index, { firstName: e.target.value })} disabled={submitting} />
+                                                        </span>
+                                                        <span className={`${authFieldClass} border-slate-200 bg-white`}>
+                                                            <input className={authInputClass} placeholder="Nume" aria-label={`Nume copil ${index + 1}`} value={child.lastName} onChange={(e) => updateChild(index, { lastName: e.target.value })} disabled={submitting} />
+                                                        </span>
+                                                    </div>
+                                                    <label className="mt-2 block">
+                                                        <span className="mb-1 block text-[11.5px] font-bold text-slate-500">Data nașterii</span>
+                                                        <span className={`${authFieldClass} border-slate-200 bg-white`}>
+                                                            <input
+                                                                className={authInputClass}
+                                                                type="date"
+                                                                aria-label={`Data nașterii copil ${index + 1}`}
+                                                                value={child.birthDate}
+                                                                max={new Date().toISOString().slice(0, 10)}
+                                                                onChange={(e) => updateChild(index, { birthDate: e.target.value })}
+                                                                disabled={submitting}
+                                                            />
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                            ))}
+                                            {children.length < MAX_CHILDREN ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setChildren((list) => [...list, { ...EMPTY_CHILD, lastName: list[0]?.lastName ?? '' }])}
+                                                    disabled={submitting}
+                                                    className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-transparent px-3 py-2.5 text-[13px] font-black text-blue-700 hover:bg-blue-50"
+                                                >
+                                                    <Plus size={15} /> Mai am un copil în club
+                                                </button>
+                                            ) : null}
+                                        </div>
+                                    ) : null}
+
+                                    <label className="block">
+                                        <span className={authLabelClass}>Email</span>
+                                        <span className={`${authFieldClass} border-slate-200 ${emailLocked ? 'bg-slate-100' : ''}`}>
+                                            <input
+                                                className={authInputClass}
+                                                placeholder="nume@club.ro"
+                                                type="email"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                autoCapitalize="none"
+                                                autoComplete="email"
+                                                readOnly={emailLocked}
+                                                disabled={submitting}
+                                            />
+                                            {emailLocked ? <Lock size={15} className="shrink-0 text-slate-400" /> : null}
+                                        </span>
+                                    </label>
+
+                                    <label className="block">
+                                        <span className={authLabelClass}>Parolă</span>
+                                        <span className={`${authFieldClass} border-slate-200`}>
+                                            <input
+                                                className={authInputClass}
+                                                placeholder="Minim 8 caractere"
+                                                type={showPassword ? 'text' : 'password'}
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                autoComplete="new-password"
+                                                disabled={submitting}
+                                            />
+                                            <button
+                                                type="button"
+                                                aria-label={showPassword ? 'Ascunde parola' : 'Arată parola'}
+                                                onClick={() => setShowPassword((value) => !value)}
+                                                className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-0 bg-transparent text-slate-500 hover:bg-slate-100"
+                                            >
+                                                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                                            </button>
+                                        </span>
+                                    </label>
+
+                                    <button type="submit" disabled={submitting} className={`mt-1 ${authPrimaryButtonClass}`}>
+                                        {submitting ? <Loader2 className="animate-spin" size={18} /> : null}
+                                        <span>{submitting ? 'Se creează contul...' : isTeamCode ? 'Trimite cererea' : 'Creează cont'}</span>
                                     </button>
-                                </span>
-                            </label>
-
-                            <button type="submit" disabled={submitting} className={`mt-1 ${authPrimaryButtonClass}`}>
-                                {submitting ? <Loader2 className="animate-spin" size={18} /> : null}
-                                <span>{submitting ? 'Se creează contul...' : 'Creează cont'}</span>
-                            </button>
+                                </>
+                            )}
                         </form>
                     )}
 

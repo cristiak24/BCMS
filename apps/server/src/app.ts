@@ -19,6 +19,8 @@ import documentRoutes from './routes/documents';
 import l12Routes from './routes/l12';
 import clubDocumentRoutes from './routes/clubDocuments';
 import contactRoutes from './routes/contacts';
+import familyRequestRoutes from './routes/familyRequests';
+import familyRoutes from './routes/family';
 import notificationRoutes from './routes/notificationRoutes';
 import { loadServerEnv } from './lib/loadEnv';
 import { createAllowedOrigins, isOriginAllowed } from './lib/corsOrigins';
@@ -48,7 +50,9 @@ export function createServerApp() {
         // Identity is proven by the Firebase ID token in `Authorization` only.
         // The old `X-User-*` headers are no longer read by the server and are
         // deliberately not allowed through CORS either.
-        allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+        // X-BCMS-Child: a parent's selected child (lib/selfPlayer.ts) — a selection
+        // checked against their own links, never an identity claim.
+        allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-BCMS-Child'],
         exposedHeaders: ['Content-Length', 'Content-Type'],
     }));
     app.post('/api/finance/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);
@@ -79,6 +83,8 @@ export function createServerApp() {
     app.use('/api/l12', l12Routes);
     app.use('/api/club-documents', clubDocumentRoutes);
     app.use('/api/contacts', contactRoutes);
+    app.use('/api/family-requests', familyRequestRoutes);
+    app.use('/api/family', familyRoutes);
     app.use('/api/notifications', notificationRoutes);
 
     app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

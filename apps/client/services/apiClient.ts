@@ -163,6 +163,27 @@ async function fetchWithTimeout(url: string, init?: RequestInit) {
   }
 }
 
+const ACTIVE_CHILD_KEY = 'bcms.child-id';
+
+/** The child a parent account is looking at, if they picked one. */
+export function getActiveChildId(): number | null {
+  try {
+    const value = Number(localStorage.getItem(ACTIVE_CHILD_KEY));
+    return Number.isInteger(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setActiveChildId(id: number | null) {
+  try {
+    if (id == null) localStorage.removeItem(ACTIVE_CHILD_KEY);
+    else localStorage.setItem(ACTIVE_CHILD_KEY, String(id));
+  } catch {
+    // Storage blocked: the server falls back to the first child.
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
@@ -178,6 +199,13 @@ export async function apiFetch<T>(
 
   if (!headers.has('Content-Type') && !isFormDataBody(init?.body)) {
     headers.set('Content-Type', 'application/json');
+  }
+
+  // A parent's selected child. Only a selection — the server checks it
+  // against the parent's own links (apps/server/src/lib/selfPlayer.ts).
+  const childId = getActiveChildId();
+  if (childId != null && !headers.has('X-BCMS-Child')) {
+    headers.set('X-BCMS-Child', String(childId));
   }
 
   const response = await fetchWithTimeout(buildApiUrl(path), {

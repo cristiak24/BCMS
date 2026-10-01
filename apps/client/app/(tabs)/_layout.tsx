@@ -7,6 +7,7 @@ import { normalizeRole } from '../../utils/authSession';
 import AppHeader from '../../components/AppHeader';
 import { MobileBottomNavigation, MobileNavigationSheet } from '../../components/MobileNavigation';
 import { PLAYER_FEATURE_FLAGS } from '../../config/playerFeatureFlags';
+import ChildSwitcher from '../../components/family/ChildSwitcher';
 
 const PLAYER_MENU_ITEMS = [
     { href: '/myclub' as const, label: 'Acasă', icon: 'grid-view' as const, match: 'myclub' },
@@ -34,6 +35,7 @@ const COACH_MENU_ITEMS = [
     { href: '/schedule' as const, label: 'Program', icon: 'calendar-today' as const, match: 'schedule' },
     { href: '/coach/attendance' as const, label: 'Prezență', icon: 'fact-check' as const, match: 'coach/attendance' },
     { href: '/coach/teams' as const, label: 'Echipe', icon: 'groups' as const, match: 'coach/teams' },
+    { href: '/coach/requests' as const, label: 'Cereri', icon: 'how-to-reg' as const, match: 'coach/requests' },
     { href: '/coach/l12' as const, label: 'L12', icon: 'assignment' as const, match: 'coach/l12' },
     { href: '/documents' as const, label: 'Documente', icon: 'folder' as const, match: 'documents' },
     { href: '/contacts' as const, label: 'Agendă', icon: 'contacts' as const, match: 'contacts' },
@@ -73,6 +75,7 @@ function PlayerTabsLayoutContent() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const isCoach = normalizeRole(session?.role) === 'coach';
+    const isParent = normalizeRole(session?.role) === 'parent';
     // Annotated so the two lists collapse into one element type — without it
     // the ternary is `PlayerItem[] | CoachItem[]`, which nothing downstream
     // (filter, the nav components) can take as a single array.
@@ -126,6 +129,7 @@ function PlayerTabsLayoutContent() {
                 {/* ── Main Content ────────────────────────────────── */}
                 <div className="flex-1 min-w-0 overflow-auto overflow-x-hidden flex flex-col relative h-full">
                     <div className="flex-1 min-w-0 pb-24 lg:pb-0 relative w-full flex flex-col">
+                        {isParent ? <ChildSwitcher /> : null}
                         <Outlet />
                     </div>
                 </div>

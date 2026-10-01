@@ -12,6 +12,7 @@ import { GENDER_LABELS, LEVEL_LABELS } from '../../../components/myclub/teamDisp
 import { AttendanceRate, Chip, CoachPlayerRow, SessionRow, StatTile } from '../../../components/coach/CoachPrimitives';
 import { attendanceRateColor, getPlayerBadge } from '../../../components/coach/coachDisplay';
 import { formatCoachDate, getEventTimestamp, isUpcoming } from '../../../components/coach/coachUtils';
+import BulkAddPlayersDialog from '../../../components/family/BulkAddPlayersDialog';
 
 /**
  * A coach's own squad in full — the roster TeamCard on /coach/teams only
@@ -42,6 +43,8 @@ export default function CoachTeamDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showBulk, setShowBulk] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const loadData = useCallback(async (showSpinner = false) => {
     if (showSpinner) setRefreshing(true); else setLoading(true);
@@ -174,7 +177,19 @@ export default function CoachTeamDetailScreen() {
             </View>
 
             <View className="gap-2.5">
-              <Text className="text-[11px] font-bold uppercase tracking-[0.09em]" style={{ color: 'var(--c-faint)' }}>Lot complet</Text>
+              <View className="flex-row items-center gap-2">
+                <Text className="flex-1 text-[11px] font-bold uppercase tracking-[0.09em]" style={{ color: 'var(--c-faint)' }}>Lot complet</Text>
+                <Pressable
+                  onPress={() => setShowBulk(true)}
+                  accessibilityRole="button"
+                  className="ui-press h-9 px-3 rounded-[10px] border flex-row items-center gap-1.5"
+                  style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
+                >
+                  <MaterialIcons name="group-add" size={15} color="var(--c-brand-fg)" />
+                  <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Adaugă din listă</Text>
+                </Pressable>
+              </View>
+              {notice ? <Text className="t-meta" style={{ color: 'var(--c-success-fg)' }}>{notice}</Text> : null}
               {sortedPlayers.length === 0 ? (
                 <EmptyState icon="groups" compact title="Lotul este gol" message="Niciun jucător nu este alocat acestei echipe deocamdată." />
               ) : (
@@ -205,6 +220,19 @@ export default function CoachTeamDetailScreen() {
           </View>
         )}
       </PageContainer>
+      {team ? (
+        <BulkAddPlayersDialog
+          visible={showBulk}
+          teamId={team.id}
+          teamName={team.name}
+          onClose={() => setShowBulk(false)}
+          onDone={({ created, skipped }) => {
+            setShowBulk(false);
+            setNotice(`${created} ${created === 1 ? 'jucător adăugat' : 'jucători adăugați'}${skipped.length ? `, ${skipped.length} ${skipped.length === 1 ? 'era' : 'erau'} deja în lot` : ''}.`);
+            void loadData(true);
+          }}
+        />
+      ) : null}
     </ScrollView>
   );
 }

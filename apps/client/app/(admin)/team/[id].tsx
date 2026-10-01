@@ -16,6 +16,8 @@ import TeamPaymentsReportModal from '../../../components/schedule/admin/TeamPaym
 import TeamFrbPanel from '../../../components/myclub/team-detail/TeamFrbPanel';
 import TeamEventsPanel from '../../../components/myclub/team-detail/TeamEventsPanel';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
+import BulkAddPlayersDialog from '../../../components/family/BulkAddPlayersDialog';
+import { MaterialIcons } from '@/src/web/expoVectorIcons';
 
 type TabKey = 'roster' | 'events' | 'history' | 'frb';
 type RosterView = 'grid' | 'list';
@@ -42,6 +44,7 @@ export default function TeamDetailsScreen() {
     const [rosterView, setRosterView] = useState<RosterView>('grid');
     const [rosterQuery, setRosterQuery] = useState('');
     const [showAdd, setShowAdd] = useState(false);
+    const [showBulk, setShowBulk] = useState(false);
     const [copied, setCopied] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [medicalVisaOpen, setMedicalVisaOpen] = useState(false);
@@ -355,6 +358,15 @@ export default function TeamDetailsScreen() {
                             {/* Add panel */}
                             {showAdd && (
                                 <View className="rounded-[16px] bg-[#F7F9FC] border border-[#E3E9F2] p-4 mb-4">
+                                    <Pressable
+                                        onPress={() => setShowBulk(true)}
+                                        accessibilityRole="button"
+                                        className="ui-press flex-row items-center gap-2 h-10 px-3 mb-3 rounded-[12px] border self-start"
+                                        style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
+                                    >
+                                        <MaterialIcons name="group-add" size={16} color="var(--c-brand-fg)" />
+                                        <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Lipește o listă de jucători noi</Text>
+                                    </Pressable>
                                     <View className="relative mb-2">
                                         <View className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"><Search size={15} color="var(--c-faint)" /></View>
                                         <TextInput
@@ -481,6 +493,19 @@ export default function TeamDetailsScreen() {
                 loading={removingId != null}
                 onConfirm={() => void confirmRemovePlayer()}
                 onCancel={() => setPlayerPendingRemoval(null)}
+            />
+
+            <BulkAddPlayersDialog
+                visible={showBulk}
+                teamId={teamId}
+                teamName={team.name}
+                onClose={() => setShowBulk(false)}
+                onDone={({ created, skipped }) => {
+                    setShowBulk(false);
+                    setShowAdd(false);
+                    loadData();
+                    Alert.alert('Lot actualizat', `${created} ${created === 1 ? 'jucător adăugat' : 'jucători adăugați'}${skipped.length ? `, ${skipped.length} deja în lot (${skipped.slice(0, 5).join(', ')}${skipped.length > 5 ? '…' : ''})` : ''}.`);
+                }}
             />
         </View>
     );

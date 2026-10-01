@@ -25,6 +25,8 @@ export type PlayerContact = {
     guardianPhone: string | null;
     guardian2Name: string | null;
     guardian2Phone: string | null;
+    /** Parents with their own account, linked to this player — numbers from their profile. */
+    guardianAccounts: { userId: number; name: string; phone: string | null }[];
 };
 
 export type PlayerContactUpdate = Pick<PlayerContact, 'phone' | 'guardianName' | 'guardianPhone' | 'guardian2Name' | 'guardian2Phone'>;

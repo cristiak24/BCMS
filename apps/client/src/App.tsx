@@ -59,6 +59,7 @@ const CoachAttendance = lazyRoute(loadCoachAttendance);
 const loadCoachTeamDetail = () => import('../app/(coach)/team/[id]');
 const CoachTeamDetail = lazyRoute(loadCoachTeamDetail);
 const CoachL12 = lazyRoute(() => import('../app/(coach)/l12/index'));
+const CoachRequests = lazyRoute(() => import('../app/(coach)/requests'));
 const MemberDocuments = lazyRoute(() => import('../app/(tabs)/documents'));
 const MemberContacts = lazyRoute(() => import('../app/(tabs)/contacts'));
 const CoachL12Match = lazyRoute(() => import('../app/(coach)/l12/match/[id]'));
@@ -199,6 +200,7 @@ export default function App() {
                   <Route path="team/:id" element={<CoachTeamDetail />} />
                   <Route path="attendance" element={<CoachAttendance />} />
                   <Route path="l12" element={<CoachL12 />} />
+                  <Route path="requests" element={<CoachRequests />} />
                   <Route path="l12/match/:id" element={<CoachL12Match />} />
                   <Route path="l12/team/:id" element={<CoachL12Team />} />
                   <Route path="*" element={<NotFound />} />

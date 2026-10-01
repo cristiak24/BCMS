@@ -10,6 +10,7 @@ import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
 import { getInitials } from '../coach/coachDisplay';
+import GuardiansPanel from '../family/GuardiansPanel';
 
 /**
  * Club contact book. One screen, two shapes decided by the server:
@@ -98,18 +99,22 @@ function PlayerCard({
   player,
   teamNames,
   onSave,
+  onNotify,
 }: {
   player: PlayerContact;
   teamNames: string;
   onSave: (update: PlayerContactUpdate) => Promise<boolean>;
+  onNotify: (toast: { variant: 'success' | 'error'; message: string }) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [family, setFamily] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<PlayerContactUpdate>(player);
   const set = (key: keyof PlayerContactUpdate) => (value: string) => setDraft((d) => ({ ...d, [key]: value }));
   const name = `${player.lastName} ${player.firstName}`.trim();
   const ownPhone = player.phone || player.accountPhone;
-  const hasAny = Boolean(ownPhone || player.guardianPhone || player.guardian2Phone);
+  const accounts = player.guardianAccounts ?? [];
+  const hasAny = Boolean(ownPhone || player.guardianPhone || player.guardian2Phone || accounts.length);
   const invalid = ![draft.phone, draft.guardianPhone, draft.guardian2Phone].every(isValidPhone);
 
   const save = async () => {
@@ -141,6 +146,18 @@ function PlayerCard({
           <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{name}</Text>
           <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{teamNames || 'Fără echipă'}</Text>
         </View>
+        {!editing ? (
+          <Pressable
+            onPress={() => setFamily((v) => !v)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: family }}
+            accessibilityLabel={`Părinții cu cont ai lui ${name}`}
+            className="ui-press w-9 h-9 rounded-[10px] border items-center justify-center shrink-0"
+            style={{ borderColor: family ? 'var(--c-brand-fg)' : 'var(--c-border)', backgroundColor: family ? 'var(--c-surface-tint)' : 'var(--c-surface-2)' } as any}
+          >
+            <MaterialIcons name="family-restroom" size={15} color={family ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)'} />
+          </Pressable>
+        ) : null}
         {!editing ? (
           <Pressable
             onPress={() => { setDraft(player); setEditing(true); }}
@@ -184,6 +201,9 @@ function PlayerCard({
       ) : hasAny ? (
         <View className="gap-2.5 pt-3 border-t" style={{ borderColor: 'var(--c-border)' } as any}>
           <PhoneLine label="Jucător" phone={ownPhone} hint={!player.phone && player.accountPhone ? 'din profil' : undefined} />
+          {accounts.map((account) => (
+            <PhoneLine key={account.userId} label="Părinte" name={account.name} phone={account.phone} hint="cont" />
+          ))}
           {player.guardianPhone || player.guardianName ? <PhoneLine label="Părinte 1" name={player.guardianName} phone={player.guardianPhone} /> : null}
           {player.guardian2Phone || player.guardian2Name ? <PhoneLine label="Părinte 2" name={player.guardian2Name} phone={player.guardian2Phone} /> : null}
         </View>
@@ -193,6 +213,12 @@ function PlayerCard({
           <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Adaugă numere de telefon</Text>
         </Pressable>
       )}
+
+      {family && !editing ? (
+        <View className="pt-3 border-t" style={{ borderColor: 'var(--c-border)' } as any}>
+          <GuardiansPanel bare playerId={player.id} playerName={`${player.firstName} ${player.lastName}`.trim()} onNotify={onNotify} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -387,6 +413,7 @@ export default function ContactsScreen() {
                           player={p}
                           teamNames={p.teamIds.map((id) => teamName.get(id)).filter(Boolean).join(', ')}
                           onSave={(update) => savePlayer(p.id, update)}
+                          onNotify={showToast}
                         />
                       ))}
                     </View>

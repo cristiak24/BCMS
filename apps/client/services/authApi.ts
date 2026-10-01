@@ -19,14 +19,24 @@ export type SignupPayload = {
   lastName: string;
   /** Required: the role and club come from the invite, never from the client. */
   inviteToken: string;
+  phone: string;
+  /** Team-code signups only: who is registering, and for whom. */
+  joinAs?: 'parent' | 'player';
+  children?: { firstName: string; lastName: string; birthDate: string }[];
+  birthDate?: string;
 };
 
 export type InviteDetails = {
   email: string | null;
-  role: string;
+  /** null for a team code: the person picks parent or player on the form. */
+  role: string | null;
   clubId: number | null;
   clubName: string | null;
-  source?: 'invitation' | 'manage-access';
+  source?: 'invitation' | 'manage-access' | 'code' | 'team' | 'guardian';
+  teamId?: number | null;
+  teamName?: string | null;
+  /** Personal parent invite: the child it links to. */
+  childName?: string | null;
 };
 
 export type ForgotPasswordResponse = {
@@ -166,7 +176,14 @@ export const authApi = {
 
       await apiFetch('/auth/complete-invite-signup', {
         method: 'POST',
-        body: JSON.stringify({ name, inviteToken: payload.inviteToken }),
+        body: JSON.stringify({
+          name,
+          inviteToken: payload.inviteToken,
+          phone: payload.phone,
+          joinAs: payload.joinAs,
+          children: payload.children,
+          birthDate: payload.birthDate,
+        }),
       });
 
       return { success: true };
@@ -205,6 +222,9 @@ export const authApi = {
       clubId: data.clubId,
       clubName: data.clubName,
       source: data.source,
+      teamId: data.teamId ?? null,
+      teamName: data.teamName ?? null,
+      childName: data.childName ?? null,
     };
   },
 

@@ -10,6 +10,7 @@ import { normalizeRole } from '../lib/requestAuth';
 import { buildDefaultSettings, DEFAULT_PAYMENT_DUE_DAY, DEFAULT_SETTINGS_ROW_ID } from '../lib/financeDefaults';
 import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import { writeAuditLog, type AuditLogInput } from '../services/auditService';
+import { requestedChildId, resolveSelfPlayer } from '../lib/selfPlayer';
 import { db } from '../db';
 import {
     events as pgEvents,
@@ -143,6 +144,7 @@ type PlayerPaymentDoc = {
     stripePaymentIntentId?: string | null;
     receiptUrl?: string | null;
     feeIds?: string | string[] | null;
+    paidByUserId?: number | null;
 };
 
 type EventFeeDoc = {
@@ -300,18 +302,20 @@ async function getCurrentPlayer(req: Request): Promise<CurrentPlayer> {
         throw Object.assign(new Error('You must be signed in to load player payments.'), { statusCode: 401 });
     }
 
-    const playerRows = await db
-        .select()
-        .from(pgPlayers)
-        .where(sql`lower(${pgPlayers.email}) = ${email.trim().toLowerCase()}`)
-        .limit(1);
-    const player = playerRows[0];
     const userRows = await db
         .select()
         .from(pgUsers)
         .where(sql`lower(${pgUsers.email}) = ${email.trim().toLowerCase()}`)
         .limit(1);
     const user = userRows[0];
+    // A parent pays for their selected child; a player for themselves (lib/selfPlayer.ts).
+    const player = user?.role === 'parent'
+        ? await resolveSelfPlayer(user, requestedChildId(req))
+        : (await db
+            .select()
+            .from(pgPlayers)
+            .where(sql`lower(${pgPlayers.email}) = ${email.trim().toLowerCase()}`)
+            .limit(1))[0];
 
     if (!player && user?.role === 'player') {
         const inserted = await db
@@ -341,7 +345,9 @@ async function getCurrentPlayer(req: Request): Promise<CurrentPlayer> {
     }
 
     if (!player) {
-        throw Object.assign(new Error('No player profile was found for this account.'), { statusCode: 404 });
+        throw Object.assign(new Error(user?.role === 'parent'
+            ? 'Contul tău nu este încă legat de niciun copil.'
+            : 'No player profile was found for this account.'), { statusCode: 404 });
     }
 
     return {
@@ -550,6 +556,7 @@ async function getPlayerPaymentRows(playerId: number) {
             status: row.status,
             date: row.date,
             createdAt: row.createdAt,
+            paidByUserId: row.paidByUserId ?? null,
         } satisfies PlayerPaymentDoc,
     }));
 }
@@ -711,7 +718,7 @@ async function buildPlayerFees(player: PlayerDoc, paymentRows: Array<{ data: Pla
     return [...fees, ...(await buildEventFees(player, currency, paidFeeIds))];
 }
 
-function buildTransactions(paymentRows: Array<{ data: PlayerPaymentDoc }>, currency: string) {
+function buildTransactions(paymentRows: Array<{ data: PlayerPaymentDoc }>, currency: string, payerNames = new Map<number, string>()) {
     return paymentRows
         .filter(({ data }) => isPaidStatus(data.status) || isFailedStatus(data.status))
         .sort((a, b) => (toDate(b.data.date ?? b.data.createdAt)?.getTime() ?? 0) - (toDate(a.data.date ?? a.data.createdAt)?.getTime() ?? 0))
@@ -719,13 +726,24 @@ function buildTransactions(paymentRows: Array<{ data: PlayerPaymentDoc }>, curre
         .map(({ data }) => ({
             id: String(data.id ?? data.stripeCheckoutSessionId ?? `${data.month}-${data.year}`),
             label: data.description || monthName(data.month, data.year),
-            description: data.stripeCheckoutSessionId ? 'Stripe Checkout payment' : 'Club payment record',
+            description: data.paidByUserId != null && payerNames.has(data.paidByUserId)
+                ? `Plătit de ${payerNames.get(data.paidByUserId)}`
+                : data.stripeCheckoutSessionId ? 'Stripe Checkout payment' : 'Club payment record',
+            paidByName: data.paidByUserId != null ? payerNames.get(data.paidByUserId) ?? null : null,
             amount: asPositiveAmount(data.amount),
             currency: data.currency || currency,
             status: isPaidStatus(data.status) ? 'success' : 'error',
             date: toIso(data.date ?? data.createdAt) ?? new Date().toISOString(),
             receiptUrl: data.receiptUrl ?? null,
         }));
+}
+
+/** Who paid online, for "Plătit de …" — a player and their parents share one history. */
+async function payerNamesFor(paymentRows: Array<{ data: PlayerPaymentDoc }>) {
+    const ids = Array.from(new Set(paymentRows.map(({ data }) => data.paidByUserId).filter((id): id is number => id != null)));
+    if (!ids.length) return new Map<number, string>();
+    const rows = await db.select({ id: pgUsers.id, name: pgUsers.name }).from(pgUsers).where(inArray(pgUsers.id, ids));
+    return new Map(rows.map((row) => [row.id, row.name]));
 }
 
 async function buildAdminRecentPayments(clubId: number | null, limit = 12, teamId: number | null = null): Promise<AdminRecentPayment[]> {
@@ -927,12 +945,14 @@ async function markPaymentRowsPaid(params: {
     checkoutSessionId: string;
     paymentIntentId: string | null;
     receiptUrl: string | null;
+    paidByUserId: number | null;
 }) {
     const now = new Date();
     const inserted = await db
         .insert(pgPlayerPayments)
         .values({
             playerId: params.playerId,
+            paidByUserId: params.paidByUserId,
             amount: Math.round(params.amount),
             month: now.getMonth() + 1,
             year: now.getFullYear(),
@@ -1028,6 +1048,7 @@ async function fulfillPaidCheckoutSession(sessionId: string) {
         checkoutSessionId: session.id,
         paymentIntentId: paymentIntent?.id ?? null,
         receiptUrl: latestCharge?.receipt_url ?? null,
+        paidByUserId: Number(session.metadata?.payerUserId) || null,
     });
 
     return {
@@ -1289,7 +1310,7 @@ router.get('/player/summary', async (req, res) => {
             },
             fees,
             paymentMethods: await listPlayerPaymentMethods(currentPlayer.data),
-            transactions: buildTransactions(paymentRows, currency),
+            transactions: buildTransactions(paymentRows, currency, await payerNamesFor(paymentRows)),
         });
     } catch (error) {
         handleRouteError(res, error, '[GET /api/finance/player/summary]');
@@ -1436,6 +1457,7 @@ router.post('/player/checkout-session', async (req, res) => {
         const returnUrl = getPaymentsReturnUrl(req);
         const label = payableFees.length === 1 ? payableFees[0].label : 'Player balance payment';
         const feeIds = payableFees.map((fee) => fee.id);
+        const payerUserId = String((req as AuthenticatedRequest).user?.id ?? '');
         const session = await stripe.checkout.sessions.create({
             mode: 'payment',
             customer: customerId,
@@ -1459,6 +1481,7 @@ router.post('/player/checkout-session', async (req, res) => {
                     playerId: String(currentPlayer.data.id),
                     feeIds: feeIds.join(','),
                     label,
+                    payerUserId: payerUserId,
                 },
             },
             metadata: {
@@ -1466,6 +1489,8 @@ router.post('/player/checkout-session', async (req, res) => {
                 playerId: String(currentPlayer.data.id),
                 feeIds: feeIds.join(','),
                 label,
+                // The player or a linked parent — shown as "Plătit de …".
+                payerUserId: payerUserId,
             },
         });
 

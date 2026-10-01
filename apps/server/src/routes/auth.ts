@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { users, clubs, players, playersToTeams } from '../db/schema';
+import { users, clubs } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { splitDisplayName } from '../lib/password';
 import { authenticate, requireSuperadmin, AuthenticatedRequest } from '../middleware/auth';
@@ -10,6 +10,11 @@ import { loadServerEnv } from '../lib/loadEnv';
 import { consumeInviteCode, findUsableInviteCode, looksLikeInviteCode, releaseInviteCodeUse } from '../lib/clubInviteCodes';
 import { rateLimit } from '../middleware/rateLimit';
 import { writeAuditLog } from '../services/auditService';
+import { looksLikeTeamCode, parseTeamSignup } from '../lib/familyJoin';
+import { createJoinRequests, findTeamByJoinCode } from '../lib/familyJoinService';
+import { normalizePhone } from '../lib/contacts';
+import { resolveSelfPlayerForRequest, teamIdsOfPlayers } from '../lib/selfPlayer';
+import { findUsableGuardianInvite, looksLikeGuardianInvite, redeemGuardianInvite } from '../lib/guardianInvites';
 
 const router = Router();
 loadServerEnv();
@@ -25,29 +30,10 @@ async function findClubName(clubId?: number | null) {
     return clubRows[0]?.name ?? null;
 }
 
-async function findPlayerTeamIdsByEmail(email?: string | null) {
-    if (!email) {
-        return [];
-    }
-
-    const playerRows = await db.select().from(players).where(eq(players.email, email)).limit(1);
-    const player = playerRows[0];
-    if (!player) {
-        return [];
-    }
-
-    const ids = new Set<number>();
-    if (player.teamId != null) {
-        ids.add(player.teamId);
-    }
-
-    const relationRows = await db
-        .select({ teamId: playersToTeams.teamId })
-        .from(playersToTeams)
-        .where(eq(playersToTeams.playerId, player.id));
-
-    relationRows.forEach((row) => ids.add(row.teamId));
-    return Array.from(ids).map(String);
+/** Teams of the caller's player record — for a parent, their selected child's. */
+async function findSelfTeamIds(req: AuthenticatedRequest) {
+    const player = await resolveSelfPlayerForRequest(req);
+    return player ? (await teamIdsOfPlayers([player.id])).map(String) : [];
 }
 
 function buildAuthUser(user: typeof users.$inferSelect, clubName: string | null, teamIds: string[]) {
@@ -81,7 +67,7 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res: any) => {
 
         const user = req.user;
         const clubName = await findClubName(user.clubId);
-        const teamIds = await findPlayerTeamIdsByEmail(user.email);
+        const teamIds = await findSelfTeamIds(req);
 
         res.json({
             success: true,
@@ -134,6 +120,48 @@ router.get('/invites/validate', inviteValidateLimiter as any, async (req: any, r
         if (!token) return res.status(400).json({ error: 'Token is required' });
 
         const rawToken = String(token);
+
+        // Personal parent invite for one child, made from the player's page.
+        if (looksLikeGuardianInvite(rawToken)) {
+            const invite = await findUsableGuardianInvite(rawToken);
+            if (!invite) {
+                return res.status(404).json({ error: 'Invitația a expirat sau a fost folosită. Cere una nouă clubului.' });
+            }
+            return res.json({
+                success: true,
+                source: 'guardian',
+                email: null,
+                status: 'pending',
+                canAccept: true,
+                message: null,
+                clubId: invite.clubId,
+                clubName: invite.clubName,
+                childName: invite.childName,
+                role: 'parent',
+            });
+        }
+
+        // Team join code (6 chars): parents register their children, teenage
+        // players themselves; the role is picked on the form, approval follows.
+        if (looksLikeTeamCode(rawToken)) {
+            const hit = await findTeamByJoinCode(rawToken);
+            if (!hit) {
+                return res.status(404).json({ error: 'Codul echipei nu este valid. Cere-l antrenorului.' });
+            }
+            return res.json({
+                success: true,
+                source: 'team',
+                email: null,
+                status: 'pending',
+                canAccept: true,
+                message: null,
+                clubId: hit.team.clubId,
+                clubName: hit.clubName,
+                teamId: hit.team.id,
+                teamName: hit.team.name,
+                role: null,
+            });
+        }
 
         if (looksLikeInviteCode(rawToken)) {
             const code = await findUsableInviteCode(rawToken);
@@ -196,6 +224,118 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
         const { firstName, lastName } = splitDisplayName(name);
         let result;
 
+        // Phone is collected on every signup form; optional here only so an
+        // older client build keeps working until it is redeployed.
+        const phoneCheck = normalizePhone(req.body?.phone, 'Telefon');
+        if (!phoneCheck.ok) {
+            return res.status(400).json({ error: phoneCheck.error });
+        }
+        const phone = phoneCheck.value;
+
+        // Personal parent invite: the club already chose the child, so the
+        // account is active and linked right away.
+        if (looksLikeGuardianInvite(String(inviteToken))) {
+            if (!phone) {
+                return res.status(400).json({ error: 'Numărul de telefon este obligatoriu.' });
+            }
+            const invite = await findUsableGuardianInvite(String(inviteToken));
+            if (!invite) {
+                return res.status(400).json({ error: 'Invitația a expirat sau a fost folosită. Cere una nouă clubului.' });
+            }
+            if (req.user && req.user.status === 'active') {
+                return res.status(409).json({ error: 'Există deja un cont activ cu acest email. Autentifică-te și deschide din nou linkul.' });
+            }
+            const values = {
+                firebaseUid: firebaseUser.uid,
+                email: (firebaseUser.email || '').trim().toLowerCase(),
+                name,
+                firstName,
+                lastName,
+                phone,
+                role: 'parent' as const,
+                status: 'active' as const,
+                clubId: invite.clubId,
+            };
+            const saved = req.user
+                ? await db.update(users).set({ ...values, updatedAt: new Date().toISOString() }).where(eq(users.id, req.user.id)).returning()
+                : await db.insert(users).values(values).returning();
+            const userRecord = saved[0];
+            const redeemed = await redeemGuardianInvite(String(inviteToken), userRecord.id);
+            if (!redeemed) {
+                // Lost a race for the last use: don't leave an active, child-less account behind.
+                await db.update(users).set({ status: 'pending' }).where(eq(users.id, userRecord.id));
+                return res.status(400).json({ error: 'Invitația a fost deja folosită. Cere una nouă clubului.' });
+            }
+            await writeAuditLog({
+                action: 'auth.signup_with_guardian_invite',
+                entityType: 'player',
+                entityId: redeemed.playerId,
+                actorUserId: userRecord.id,
+                actorUid: firebaseUser.uid,
+                actorRole: 'parent',
+                clubId: invite.clubId,
+                metadata: null,
+                ipAddress: req.ip ?? null,
+                userAgent: req.get('user-agent') ?? null,
+            });
+            return res.status(201).json({
+                success: true,
+                user: { userId: userRecord.id, clubId: invite.clubId, role: 'parent', status: 'active' },
+            });
+        }
+
+        if (looksLikeTeamCode(String(inviteToken))) {
+            const parsed = parseTeamSignup(req.body);
+            if (!parsed.ok) {
+                return res.status(400).json({ error: parsed.error });
+            }
+            const hit = await findTeamByJoinCode(String(inviteToken));
+            if (!hit) {
+                return res.status(400).json({ error: 'Codul echipei nu este valid. Cere-l antrenorului.' });
+            }
+            // An existing, working account must not be flipped back to pending
+            // (and possibly to another role) by a team code.
+            if (req.user && req.user.status === 'active') {
+                return res.status(409).json({ error: 'Există deja un cont activ cu acest email. Autentifică-te.' });
+            }
+
+            const values = {
+                firebaseUid: firebaseUser.uid,
+                email: (firebaseUser.email || '').trim().toLowerCase(),
+                name,
+                firstName,
+                lastName,
+                phone: parsed.value.phone,
+                role: parsed.value.kind as 'parent' | 'player',
+                // In until a club admin or the team's coach approves a request.
+                status: 'pending' as const,
+                clubId: hit.team.clubId,
+            };
+            const saved = req.user
+                ? await db.update(users).set({ ...values, updatedAt: new Date().toISOString() }).where(eq(users.id, req.user.id)).returning()
+                : await db.insert(users).values(values).returning();
+            const userRecord = saved[0];
+            const requests = await createJoinRequests({ userId: userRecord.id, team: hit.team, input: parsed.value, firstName, lastName });
+
+            await writeAuditLog({
+                action: 'auth.signup_with_team_code',
+                entityType: 'team',
+                entityId: hit.team.id,
+                actorUserId: userRecord.id,
+                actorUid: firebaseUser.uid,
+                actorRole: parsed.value.kind,
+                clubId: hit.team.clubId,
+                metadata: { requests: requests.map((r) => r.id) },
+                ipAddress: req.ip ?? null,
+                userAgent: req.get('user-agent') ?? null,
+            });
+
+            return res.status(201).json({
+                success: true,
+                user: { userId: userRecord.id, clubId: hit.team.clubId, role: parsed.value.kind, status: 'pending' },
+            });
+        }
+
         // Short club code: the admin already bounded who can use it (expiry +
         // usage cap), so the account is active right away with the code's role.
         if (looksLikeInviteCode(String(inviteToken))) {
@@ -214,6 +354,7 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
                     role: consumed.role as any,
                     status: 'active' as const,
                     clubId: consumed.clubId,
+                    ...(phone ? { phone } : {}),
                 };
                 const saved = req.user
                     ? await db.update(users).set({ ...values, updatedAt: new Date().toISOString() }).where(eq(users.id, req.user.id)).returning()
@@ -253,6 +394,9 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
                 firstName,
                 lastName,
             });
+            if (phone) {
+                await db.update(users).set({ phone }).where(eq(users.firebaseUid, firebaseUser.uid));
+            }
         } else {
             const manageAccessInvite = await validateInviteToken(String(inviteToken));
             let userRecord = req.user;
@@ -267,6 +411,7 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
                     role: manageAccessInvite.role as any,
                     status: 'pending',
                     clubId: manageAccessInvite.clubId,
+                    ...(phone ? { phone } : {}),
                 }).returning();
                 userRecord = inserted[0];
             } else {
@@ -279,6 +424,7 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
                     role: manageAccessInvite.role as any,
                     status: 'pending',
                     clubId: manageAccessInvite.clubId,
+                    ...(phone ? { phone } : {}),
                     updatedAt: new Date().toISOString(),
                 }).where(eq(users.id, req.user.id)).returning();
                 userRecord = updated[0];

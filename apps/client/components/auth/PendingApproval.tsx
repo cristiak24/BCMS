@@ -64,7 +64,7 @@ export default function PendingApproval({ session, onSignOut }: PendingApprovalP
               {' '}la <strong style={{ color: 'var(--c-ink-soft)' }}>{session.clubName}</strong>
             </>
           ) : null}{' '}
-          a fost înregistrată și așteaptă aprobarea administratorului clubului.
+          a fost înregistrată și așteaptă aprobarea administratorului clubului sau a antrenorului echipei.
         </p>
 
         <div
