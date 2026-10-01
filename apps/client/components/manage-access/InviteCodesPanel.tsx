@@ -186,55 +186,59 @@ export default function InviteCodesPanel({ onNotify }: Props) {
     };
 
     return (
-        <View className="gap-4">
-            <AccessCard>
-                <View className="gap-4">
-                    <View>
-                        <FieldLabel>Pentru</FieldLabel>
-                        <RoleSelector selectedRole={role} onSelectRole={setRole} />
-                    </View>
+        // Desktop: generator on the left at form width, codes fill the rest of
+        // the page in a grid. Phones stack them.
+        <View className="flex-col lg:flex-row lg:items-start gap-4 lg:gap-6">
+            <View className="w-full lg:w-[420px] lg:shrink-0">
+                <AccessCard>
+                    <View className="gap-4">
+                        <View>
+                            <FieldLabel>Pentru</FieldLabel>
+                            <RoleSelector selectedRole={role} onSelectRole={setRole} />
+                        </View>
 
-                    <View className="flex-col sm:flex-row gap-4">
-                        <View className="sm:flex-1">
-                            <FieldLabel>Valabil</FieldLabel>
-                            <View className="flex-row flex-wrap gap-1.5">
-                                {VALIDITY_OPTIONS.map((option) => (
-                                    <OptionChip
-                                        key={option.hours}
-                                        label={option.label}
-                                        active={option.hours === validityHours}
-                                        onPress={() => setValidityHours(option.hours)}
-                                    />
-                                ))}
+                        <View className="flex-col sm:flex-row gap-4">
+                            <View className="sm:flex-1">
+                                <FieldLabel>Valabil</FieldLabel>
+                                <View className="flex-row flex-wrap gap-1.5">
+                                    {VALIDITY_OPTIONS.map((option) => (
+                                        <OptionChip
+                                            key={option.hours}
+                                            label={option.label}
+                                            active={option.hours === validityHours}
+                                            onPress={() => setValidityHours(option.hours)}
+                                        />
+                                    ))}
+                                </View>
+                            </View>
+                            <View>
+                                <FieldLabel hint="1–500">Max. conturi</FieldLabel>
+                                <TextInput
+                                    value={maxUsesInput}
+                                    onChangeText={(value: string) => setMaxUsesInput(value.replace(/[^0-9]/g, '').slice(0, 3))}
+                                    keyboardType="number-pad"
+                                    accessibilityLabel="Număr maxim de conturi"
+                                    className="w-full sm:w-28 h-8 rounded-[9px] border px-3 text-[13px] font-semibold outline-none t-num"
+                                    style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}
+                                />
                             </View>
                         </View>
-                        <View>
-                            <FieldLabel hint="1–500">Max. conturi</FieldLabel>
-                            <TextInput
-                                value={maxUsesInput}
-                                onChangeText={(value: string) => setMaxUsesInput(value.replace(/[^0-9]/g, '').slice(0, 3))}
-                                keyboardType="number-pad"
-                                accessibilityLabel="Număr maxim de conturi"
-                                className="w-full sm:w-28 h-8 rounded-[9px] border px-3 text-[13px] font-semibold outline-none t-num"
-                                style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}
-                            />
-                        </View>
+
+                        <AccessButton
+                            label="Generează cod"
+                            icon="confirmation-number"
+                            loading={creating}
+                            onPress={() => void handleCreate()}
+                        />
+
+                        {error ? (
+                            <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text>
+                        ) : null}
                     </View>
+                </AccessCard>
+            </View>
 
-                    <AccessButton
-                        label="Generează cod"
-                        icon="confirmation-number"
-                        loading={creating}
-                        onPress={() => void handleCreate()}
-                    />
-
-                    {error ? (
-                        <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text>
-                    ) : null}
-                </View>
-            </AccessCard>
-
-            <View>
+            <View className="flex-1 min-w-0">
                 <View className="flex-row items-center justify-between mb-2 px-0.5">
                     <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>
                         Coduri active{activeCodes.length ? ` · ${activeCodes.length}` : ''}
@@ -261,11 +265,11 @@ export default function InviteCodesPanel({ onNotify }: Props) {
                         <Text className="text-[13px]" style={{ color: 'var(--c-muted)' }}>Niciun cod activ. Generează unul mai sus.</Text>
                     </View>
                 ) : (
-                    <View className="gap-2 ui-stagger">{activeCodes.map(renderCode)}</View>
+                    <View className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-2 ui-stagger">{activeCodes.map(renderCode)}</View>
                 )}
 
                 {showHistory && pastCodes.length > 0 ? (
-                    <View className="gap-2 mt-3">{pastCodes.map(renderCode)}</View>
+                    <View className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-2 mt-3">{pastCodes.map(renderCode)}</View>
                 ) : null}
             </View>
 

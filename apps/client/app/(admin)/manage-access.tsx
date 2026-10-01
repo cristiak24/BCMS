@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
 import PageHeader from '../../components/ui/PageHeader';
+import PageContainer from '../../components/ui/PageContainer';
 import FilterChips from '../../components/ui/FilterChips';
 import InviteLinkGenerator from '../../components/manage-access/InviteLinkGenerator';
 import InviteCodesPanel from '../../components/manage-access/InviteCodesPanel';
@@ -193,7 +194,7 @@ export default function ManageAccessScreen() {
                 contentContainerStyle={{ paddingTop: 16, paddingBottom: 120 }}
                 showsVerticalScrollIndicator={false}
             >
-                <View className="w-full max-w-[880px] px-4 lg:px-6">
+                <PageContainer>
                     <PageHeader
                         title="Acces & invitații"
                         subtitle="Invită membri noi și aprobă cererile de înscriere."
@@ -240,7 +241,7 @@ export default function ManageAccessScreen() {
                         <Text className="t-meta mb-3 px-0.5" style={{ color: 'var(--c-muted)' }}>{activeTab.blurb}</Text>
                     ) : null}
 
-                    <View key={tab} className="ui-rise mt-2">
+                    <View key={tab} className={`ui-rise mt-2 ${tab === 'link' ? 'w-full max-w-[640px]' : 'w-full'}`}>
                         {tab === 'requests' ? (
                             <View className="gap-3">
                                 <View className="flex-row items-center gap-2">
@@ -298,7 +299,7 @@ export default function ManageAccessScreen() {
                             <InviteCodesPanel onNotify={showToast} />
                         )}
                     </View>
-                </View>
+                </PageContainer>
             </ScrollView>
 
             <ConfirmDialog
