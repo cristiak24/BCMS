@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
+import { useRouter } from '@/src/web/expoRouter';
 import { CalendarEvent, eventsApi } from '../../services/eventsApi';
 import { teamsApi, type Player, type Team } from '../../services/teamsApi';
 import { useSession } from '../../context/AuthContext';
@@ -28,7 +29,7 @@ type TeamWithPlayers = Team & {
   nextEvent: CalendarEvent | null;
 };
 
-function TeamCard({ team }: { team: TeamWithPlayers }) {
+function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => void }) {
   const chips = [
     team.level ? LEVEL_LABELS[team.level] : null,
     team.gender ? GENDER_LABELS[team.gender] : null,
@@ -51,8 +52,11 @@ function TeamCard({ team }: { team: TeamWithPlayers }) {
     : null;
 
   return (
-    <View
-      className="ui-lift relative overflow-hidden rounded-[16px] border p-5 gap-4 min-w-0"
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Vezi echipa ${team.name}`}
+      className="ui-lift ui-press relative overflow-hidden rounded-[16px] border p-5 gap-4 min-w-0 text-left w-full"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
       {/* Brand edge — a thin gradient cap so squads read as distinct objects
@@ -124,7 +128,7 @@ function TeamCard({ team }: { team: TeamWithPlayers }) {
       ) : (
         <EmptyState icon="groups" compact title="Lot gol" message="Niciun jucător alocat acestei echipe încă." />
       )}
-    </View>
+    </Pressable>
   );
 }
 
@@ -139,6 +143,7 @@ function TeamsSkeleton() {
 }
 
 export default function CoachTeamsScreen() {
+  const router = useRouter();
   const { session } = useSession();
   const [teams, setTeams] = useState<Team[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -154,18 +159,25 @@ export default function CoachTeamsScreen() {
     try {
       const since = new Date();
       since.setHours(0, 0, 0, 0);
-      const [teamRows, eventRows] = await Promise.all([
+      // One roster request for every team a coach has, grouped by team name
+      // client-side — matches dashboard.tsx's getRoster() pattern instead of
+      // firing a getTeamPlayers() request per team (N+1).
+      const [teamRows, eventRows, rosterRows] = await Promise.all([
         teamsApi.getTeams(),
         // Only "next session" is shown per team — no need for past events.
         eventsApi.getEvents({ start: since.toISOString() }),
+        teamsApi.getRoster().catch(() => []),
       ]);
-      const playerPairs = await Promise.all(
-        teamRows.map(async (team) => [team.id, await teamsApi.getTeamPlayers(team.id).catch(() => [])] as const),
-      );
+      const playersByTeamId: Record<number, Player[]> = {};
+      teamRows.forEach((team) => {
+        playersByTeamId[team.id] = rosterRows.filter(
+          (player) => player.teamName === team.name || player.teamNames?.includes(team.name),
+        );
+      });
 
       setTeams(teamRows);
       setEvents(eventRows);
-      setPlayersByTeam(Object.fromEntries(playerPairs));
+      setPlayersByTeam(playersByTeamId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nu s-au putut încărca echipele.');
     } finally {
@@ -242,7 +254,9 @@ export default function CoachTeamsScreen() {
           // Two columns only from xl: the cards carry a roster list, so at 1024px
           // a second column squeezed every player name to an ellipsis.
           <View className="grid grid-cols-1 xl:grid-cols-2 gap-4 ui-stagger">
-            {visibleTeams.map((team) => <TeamCard key={team.id} team={team} />)}
+            {visibleTeams.map((team) => (
+              <TeamCard key={team.id} team={team} onPress={() => router.push(`/coach/team/${team.id}` as any)} />
+            ))}
           </View>
         )}
       </PageContainer>

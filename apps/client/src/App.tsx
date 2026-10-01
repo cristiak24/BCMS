@@ -56,6 +56,8 @@ const loadCoachTeams = () => import('../app/(coach)/teams');
 const CoachTeams = lazyRoute(loadCoachTeams);
 const loadCoachAttendance = () => import('../app/(coach)/attendance');
 const CoachAttendance = lazyRoute(loadCoachAttendance);
+const loadCoachTeamDetail = () => import('../app/(coach)/team/[id]');
+const CoachTeamDetail = lazyRoute(loadCoachTeamDetail);
 
 const loadAdminLayout = () => import('../app/(admin)/_layout');
 const AdminLayout = lazyRoute(loadAdminLayout);
@@ -87,10 +89,10 @@ const loadAdminTeamDetails = () => import('../app/(admin)/team/[id]');
 const AdminTeamDetails = lazyRoute(loadAdminTeamDetails);
 const loadAdminEventDetails = () => import('../app/(admin)/event/[id]');
 const AdminEventDetails = lazyRoute(loadAdminEventDetails);
-const loadAdminAttendanceDetails = () => import('../app/(admin)/attendance/[id]');
-const AdminAttendanceDetails = lazyRoute(loadAdminAttendanceDetails);
 const loadAdminMatchDetails = () => import('../app/(admin)/match/[id]');
 const AdminMatchDetails = lazyRoute(loadAdminMatchDetails);
+const loadAdminAttendanceDetails = () => import('../app/(admin)/attendance/[id]');
+const AdminAttendanceDetails = lazyRoute(loadAdminAttendanceDetails);
 const loadAdminPlayerDetails = () => import('../app/(admin)/player/[id]');
 const AdminPlayerDetails = lazyRoute(loadAdminPlayerDetails);
 const loadAdminUsers = () => import('../app/(admin)/users');
@@ -182,6 +184,7 @@ export default function App() {
                   <Route index element={<Navigate to="/coach/dashboard" replace />} />
                   <Route path="dashboard" element={<CoachDashboard />} />
                   <Route path="teams" element={<CoachTeams />} />
+                  <Route path="team/:id" element={<CoachTeamDetail />} />
                   <Route path="attendance" element={<CoachAttendance />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
@@ -203,10 +206,10 @@ export default function App() {
                   <Route path="compliance" element={<AdminCompliance />} />
                   <Route path="team/:id" element={<AdminTeamDetails />} />
                   <Route path="event/:id" element={<AdminEventDetails />} />
+                  <Route path="match/:id" element={<AdminMatchDetails />} />
                   <Route path="attendance/:id" element={<AdminAttendanceDetails />} />
                   <Route path="player/:id" element={<AdminPlayerDetails />} />
                   <Route path="users" element={<AdminUsers />} />
-                  <Route path="match/:id" element={<AdminMatchDetails />} />
                   <Route path="users/:id" element={<AdminUserDetails />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
