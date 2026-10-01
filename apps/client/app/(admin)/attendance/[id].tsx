@@ -1,904 +1,641 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image, StyleSheet } from '@/src/web/reactNative';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from '@/src/web/reactNative';
+import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
-import {
-  Calendar,
-  Clock,
-  MapPin,
-  Search,
-  ChevronLeft,
-  UserCheck,
-  MessageSquare
-} from 'lucide-react';
 import { eventsApi, CalendarEvent } from '../../../services/eventsApi';
 import { teamsApi, Team, Player } from '../../../services/teamsApi';
-import { useResponsive } from '../../../hooks/useResponsive';
+import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../../components/HeaderContext';
+import PageContainer from '../../../components/ui/PageContainer';
+import FilterChips from '../../../components/ui/FilterChips';
+import ProgressRing from '../../../components/ui/ProgressRing';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
+import { Skeleton } from '../../../components/ui/Skeleton';
+import { EmptyState, ErrorState } from '../../../components/ui/ScreenState';
 import { ToastHost, useToasts } from '../../../components/ui/Toast';
+import { CoachPlayerRow } from '../../../components/coach/CoachPrimitives';
+import { eventTypeMeta, getPlayerBadge } from '../../../components/coach/coachDisplay';
+import { formatCoachDate, formatCoachTimeRange } from '../../../components/coach/coachUtils';
 
-type TabFilter = 'All Players' | 'Starters' | 'Injured Reserve';
+/**
+ * Admin "Notare prezență" for one event.
+ *
+ * Rebuilt on the coach Prezență vocabulary (status rail, filled segment,
+ * "restul prezenți"): the old page drew its title in `--c-brand-surface-deep`
+ * (invisible on the dark shell), used 4px coloured left borders on 20px-radius
+ * cards, a separate in-card search next to the header search, and a table
+ * header that sat over an empty roster.
+ *
+ * Unlike the coach screen this one edits in a draft and saves once — admins
+ * also write a per-player note here, and a note typed letter by letter should
+ * not be a request per keystroke. The header search filters the roster.
+ */
+
 type AttendanceStatus = 'present' | 'absent' | 'medical';
+type StatusFilter = 'all' | 'unmarked' | AttendanceStatus;
 
-const TAB_LABELS: Record<TabFilter, string> = {
-  'All Players': 'Toți jucătorii',
-  Starters: 'Disponibili',
-  'Injured Reserve': 'Indisponibili',
+type RosterEntry = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  number: number | null;
+  position: string | null;
+  status: AttendanceStatus | null;
+  note: string;
 };
+
+const SCHEDULE_PATH = '/admin/schedule';
+
+const STATUS_OPTIONS: { status: AttendanceStatus; label: string; icon: string; fg: string; bg: string; solid: string }[] = [
+  { status: 'present', label: 'Prezent', icon: 'check-circle', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)', solid: 'var(--c-success)' },
+  { status: 'absent', label: 'Absent', icon: 'cancel', fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)', solid: 'var(--c-danger)' },
+  { status: 'medical', label: 'Motivat', icon: 'medical-services', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)', solid: 'var(--c-warning)' },
+];
+
+const OPTION_BY_STATUS = Object.fromEntries(STATUS_OPTIONS.map((option) => [option.status, option])) as Record<AttendanceStatus, (typeof STATUS_OPTIONS)[number]>;
+
+function toStatus(raw: string | null | undefined): AttendanceStatus | null {
+  const value = String(raw ?? '').toLowerCase();
+  if (value === 'present') return 'present';
+  if (value === 'absent') return 'absent';
+  if (value === 'medical' || value === 'excused') return 'medical';
+  return null;
+}
+
+function sortRoster(a: RosterEntry, b: RosterEntry) {
+  const aNumber = a.number ?? 999;
+  const bNumber = b.number ?? 999;
+  if (aNumber !== bNumber) return aNumber - bNumber;
+  return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+}
+
+function isDirty(entry: RosterEntry, saved: RosterEntry | undefined) {
+  return !saved || saved.status !== entry.status || saved.note.trim() !== entry.note.trim();
+}
 
 export default function AttendanceScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { isMobile, isSmallPhone } = useResponsive();
-
-  const [loading, setLoading] = useState(true);
-  const [event, setEvent] = useState<CalendarEvent | null>(null);
-  const [team, setTeam] = useState<Team | null>(null);
-  const [players, setPlayers] = useState<(Omit<Player, 'status'> & { status: AttendanceStatus | null; note: string })[]>([]);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<TabFilter>('All Players');
-
-  const [hasChanges, setHasChanges] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { searchValue, setSearchPlaceholder, setSearchValue, setHeaderActions, setMobileFab } = useHeader();
   const { toasts, showToast, dismissToast } = useToasts();
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [event, setEvent] = useState<CalendarEvent | null>(null);
+  const [team, setTeam] = useState<Team | null>(null);
+  const [roster, setRoster] = useState<RosterEntry[]>([]);
+  // Last saved state, keyed by player — the draft is diffed against it.
+  const [saved, setSaved] = useState<Map<number, RosterEntry>>(new Map());
+  const [filter, setFilter] = useState<StatusFilter>('all');
+  const [openNotes, setOpenNotes] = useState<Set<number>>(new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
-    async function loadData() {
-      if (!id) return;
-      try {
-        setLoading(true);
-        const eventId = parseInt(id as string, 10);
+    setSearchPlaceholder('Caută jucător după nume sau număr…');
+    setHeaderActions(null);
+    setMobileFab(null);
+    return () => {
+      setSearchPlaceholder(DEFAULT_SEARCH_PLACEHOLDER);
+      setSearchValue('');
+      setHeaderActions(null);
+      setMobileFab(null);
+    };
+  }, [setHeaderActions, setMobileFab, setSearchPlaceholder, setSearchValue]);
 
-        const eventDetails = await eventsApi.getEventById(eventId);
-        setEvent(eventDetails);
-
-        if (eventDetails.teamId) {
-          const teamDetails = await teamsApi.getTeamById(eventDetails.teamId);
-          setTeam(teamDetails);
-
-          const [roster, attendanceData] = await Promise.all([
-            teamsApi.getTeamPlayers(eventDetails.teamId),
-            eventsApi.getEventAttendance(eventId)
-          ]);
-
-          const mappedPlayers = roster.map(p => {
-            const record = attendanceData.find(a => a.playerId === p.id);
-            let mappedStatus: AttendanceStatus | null = null;
-            if (record?.status === 'present') mappedStatus = 'present';
-            if (record?.status === 'absent') mappedStatus = 'absent';
-            if (record?.status === 'medical' || record?.status === 'excused') mappedStatus = 'medical';
-            return { ...p, status: mappedStatus, note: record?.note ?? '' };
-          });
-          setPlayers(mappedPlayers);
-        }
-      } catch (error) {
-        console.error('Failed to load attendance screen data', error);
-      } finally {
-        setLoading(false);
-      }
+  const loadData = useCallback(async () => {
+    const eventId = Number(id);
+    if (!Number.isInteger(eventId) || eventId <= 0) {
+      setError('Evenimentul nu există.');
+      setLoading(false);
+      return;
     }
-    loadData();
+    try {
+      setLoading(true);
+      setError(null);
+      const eventDetails = await eventsApi.getEventById(eventId);
+      setEvent(eventDetails);
+
+      if (eventDetails.teamId) {
+        const [teamDetails, players, attendance] = await Promise.all([
+          teamsApi.getTeamById(eventDetails.teamId).catch(() => null),
+          teamsApi.getTeamPlayers(eventDetails.teamId).catch(() => [] as Player[]),
+          eventsApi.getEventAttendance(eventId),
+        ]);
+        setTeam(teamDetails);
+
+        const rows = players
+          .map((player): RosterEntry => {
+            const record = attendance.find((row) => row.playerId === player.id);
+            return {
+              id: player.id,
+              firstName: player.firstName,
+              lastName: player.lastName,
+              number: player.number,
+              position: player.position,
+              status: toStatus(record?.status),
+              note: record?.note ?? '',
+            };
+          })
+          .sort(sortRoster);
+        setRoster(rows);
+        setSaved(new Map(rows.map((row) => [row.id, row])));
+        setOpenNotes(new Set(rows.filter((row) => row.note.trim()).map((row) => row.id)));
+      } else {
+        setRoster([]);
+        setSaved(new Map());
+      }
+    } catch (err) {
+      console.error('Failed to load attendance screen data', err);
+      setError(err instanceof Error ? err.message : 'Prezența nu a putut fi încărcată.');
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
-  const updatePlayerStatus = (playerId: number, newStatus: AttendanceStatus) => {
-    setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, status: newStatus } : p));
-    setHasChanges(true);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const dirtyRows = useMemo(() => roster.filter((row) => isDirty(row, saved.get(row.id))), [roster, saved]);
+  const dirtyCount = dirtyRows.length;
+
+  // A half-marked sheet is easy to lose with one misclick on the sidebar.
+  useEffect(() => {
+    if (!dirtyCount) return undefined;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirtyCount]);
+
+  const setStatus = (playerId: number, status: AttendanceStatus) => {
+    setRoster((rows) => rows.map((row) => (row.id === playerId ? { ...row, status: row.status === status ? null : status } : row)));
   };
 
-  const updatePlayerNote = (playerId: number, note: string) => {
-    setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, note } : p));
-    setHasChanges(true);
+  const setNote = (playerId: number, note: string) => {
+    setRoster((rows) => rows.map((row) => (row.id === playerId ? { ...row, note } : row)));
   };
 
-  const submitAttendance = async () => {
-    if (!event) return;
-    setIsSubmitting(true);
+  const toggleNote = (playerId: number) => {
+    setOpenNotes((current) => {
+      const next = new Set(current);
+      if (next.has(playerId)) next.delete(playerId);
+      else next.add(playerId);
+      return next;
+    });
+  };
+
+  const markRemainingPresent = () => {
+    setRoster((rows) => rows.map((row) => (row.status ? row : { ...row, status: 'present' })));
+    setBulkConfirmOpen(false);
+  };
+
+  const discard = () => {
+    setRoster((rows) => rows.map((row) => saved.get(row.id) ?? row));
+  };
+
+  const save = async () => {
+    if (!event || !dirtyCount || saving) return;
+    setSaving(true);
     try {
-      const payload = players.map(p => ({
-        playerId: p.id,
-        status: p.status || 'pending',
-        note: p.note.trim() ? p.note.trim() : null,
-      }));
-      await eventsApi.updateEventAttendance(event.id, payload);
-      const updatedEvent = await eventsApi.updateEvent(event.id, { status: 'graded' });
-      setEvent(updatedEvent);
-      setHasChanges(false);
-      showToast({ message: 'Prezența și notele au fost salvate.', variant: 'success' });
+      await eventsApi.updateEventAttendance(
+        event.id,
+        dirtyRows.map((row) => ({
+          playerId: row.id,
+          status: row.status ?? 'pending',
+          note: row.note.trim() ? row.note.trim() : null,
+        })),
+      );
+      const next = new Map(saved);
+      dirtyRows.forEach((row) => next.set(row.id, { ...row, note: row.note.trim() }));
+      setSaved(next);
+      // Flag the event as graded; a failure here must not undo a saved sheet.
+      eventsApi.updateEvent(event.id, { status: 'graded' }).then(setEvent).catch(() => undefined);
+      showToast({ variant: 'success', message: 'Prezența și notele au fost salvate.' });
     } catch (err) {
       console.error('Submit failed', err);
-      showToast({
-        message: err instanceof Error ? err.message : 'Salvarea a eșuat. Încearcă din nou.',
-        variant: 'error',
-      });
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Salvarea a eșuat. Încearcă din nou.' });
     } finally {
-      setIsSubmitting(false);
+      setSaving(false);
     }
   };
 
-  const filteredPlayers = useMemo(() => {
-    let result = players;
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(p =>
-        p.firstName.toLowerCase().includes(query) ||
-        p.lastName.toLowerCase().includes(query) ||
-        p.number?.toString().includes(query)
-      );
-    }
-    if (activeTab === 'Starters') {
-      result = result.filter(p => p.status !== 'medical');
-    } else if (activeTab === 'Injured Reserve') {
-      result = result.filter(p => p.status === 'medical');
-    }
-    return result;
-  }, [players, searchQuery, activeTab]);
+  const counts = useMemo(() => ({
+    all: roster.length,
+    unmarked: roster.filter((row) => !row.status).length,
+    present: roster.filter((row) => row.status === 'present').length,
+    absent: roster.filter((row) => row.status === 'absent').length,
+    medical: roster.filter((row) => row.status === 'medical').length,
+  }), [roster]);
 
-  const stats = useMemo(() => ({
-    total: players.length,
-    present: players.filter(p => p.status === 'present').length,
-    absent: players.filter(p => p.status === 'absent').length,
-    medical: players.filter(p => p.status === 'medical').length,
-  }), [players]);
+  const visibleRows = useMemo(() => {
+    const query = searchValue.trim().toLowerCase();
+    return roster.filter((row) => {
+      if (filter === 'unmarked' ? row.status : filter !== 'all' && row.status !== filter) return false;
+      if (!query) return true;
+      return `${row.firstName} ${row.lastName}`.toLowerCase().includes(query) || String(row.number ?? '').includes(query);
+    });
+  }, [roster, filter, searchValue]);
+
+  const goBack = () => router.back(SCHEDULE_PATH);
+
+  const backButton = (
+    <Pressable
+      onPress={goBack}
+      accessibilityRole="button"
+      accessibilityLabel="Înapoi la program"
+      className="ui-press self-start h-9 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5"
+      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+    >
+      <MaterialIcons name="chevron-left" size={18} color="var(--c-ink-soft)" />
+      <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Program</Text>
+    </Pressable>
+  );
 
   if (loading) {
     return (
-      <View style={styles.centeredFull}>
-        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
-      </View>
+      <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
+        <PageContainer>
+          <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă prezența">
+            <Skeleton className="h-9 w-28 rounded-[10px]" />
+            <Skeleton className="h-8 w-2/3 max-w-[520px] rounded-[10px]" />
+            <Skeleton className="h-[180px] lg:h-[104px] w-full rounded-[16px]" />
+            <View className="gap-2">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Skeleton key={index} className="h-[120px] lg:h-[68px] w-full rounded-[14px]" />
+              ))}
+            </View>
+          </View>
+        </PageContainer>
+      </ScrollView>
     );
   }
 
   if (!event) {
     return (
-      <View style={styles.centeredFull}>
-        <Text style={styles.notFoundText}>Evenimentul nu a fost găsit</Text>
-        <TouchableOpacity onPress={() => router.back('/admin/schedule')} style={styles.goBackBtn}>
-          <Text style={styles.goBackText}>Înapoi</Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
+        <PageContainer>
+          <View className="gap-4">
+            {backButton}
+            <ErrorState
+              title="Prezența nu a putut fi afișată"
+              message={error ?? 'Evenimentul nu există sau a fost șters.'}
+              actionLabel="Reîncearcă"
+              onAction={loadData}
+            />
+          </View>
+        </PageContainer>
+      </ScrollView>
     );
   }
 
-  const px = isMobile ? 16 : 40;
+  const meta = eventTypeMeta(event.type);
+  const graded = String(event.status ?? '').toLowerCase() === 'graded';
+  const marked = counts.all - counts.unmarked;
+  const markedPercent = counts.all ? Math.round((marked / counts.all) * 100) : 0;
+  const teamName = team?.name ?? event.teamName ?? null;
+  const facts = [
+    { icon: 'event', label: formatCoachDate(event.startTime) },
+    { icon: 'schedule', label: formatCoachTimeRange(event.startTime, event.endTime) },
+    event.location ? { icon: 'place', label: event.location } : null,
+    teamName ? { icon: 'groups', label: teamName } : null,
+  ].filter(Boolean) as { icon: string; label: string }[];
 
   return (
-    <View style={styles.root}>
-      {/* Header */}
-      <View style={[styles.header, { paddingHorizontal: px, paddingTop: isMobile ? 16 : 40, paddingBottom: isMobile ? 12 : 24 }]}>
-        <TouchableOpacity onPress={() => router.back('/admin/schedule')} style={styles.backBtn}>
-          <ChevronLeft size={20} color="var(--c-ink-soft)" />
-        </TouchableOpacity>
-        <View style={styles.headerText}>
-          <Text style={[styles.headerTitle, { fontSize: isMobile ? 22 : 32 }]} numberOfLines={1}>
-            Notare sesiune
-          </Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {event.title}{team ? ` - ${team.name}` : ''}
-          </Text>
-        </View>
-      </View>
-
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: px, paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Event snapshot card — wraps on mobile */}
-        <View style={[styles.snapshotCard, isMobile && styles.snapshotCardMobile]}>
-          <SnapshotItem icon={<Calendar size={18} color="var(--c-blue)" />} label="Data">
-            {new Date(event.startTime).toLocaleDateString('ro-RO', { month: 'short', day: 'numeric', year: 'numeric' })}
-          </SnapshotItem>
-          <SnapshotItem icon={<Clock size={18} color="var(--c-blue)" />} label="Ora">
-            {new Date(event.startTime).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })} –{' '}
-            {new Date(event.endTime).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
-          </SnapshotItem>
-          <SnapshotItem icon={<MapPin size={18} color="var(--c-blue)" />} label="Locație">
-            {event.location || 'Sală principală'}
-          </SnapshotItem>
-        </View>
-
-        {/* Stats cards — 2×2 on small phones, 4-in-a-row on tablet/desktop */}
-        <View style={[styles.statsRow, isSmallPhone && styles.statsRowWrap]}>
-          <StatCard label="Total" value={stats.total} color="var(--c-brand-fg)" />
-          <StatCard label="Prezenți" value={stats.present} color="var(--c-success)" />
-          <StatCard label="Absenți" value={stats.absent} color="var(--c-danger)" />
-          <StatCard label="Medical" value={stats.medical} color="var(--c-warning)" />
-        </View>
-
-        {/* Player list card */}
-        <View style={styles.playerListCard}>
-          {/* Search + tab row — stacks on mobile */}
-          <View style={[styles.listControls, isMobile && styles.listControlsMobile]}>
-            {/* Search bar */}
-            <View style={[styles.searchBar, isMobile && styles.searchBarMobile]}>
-              <Search size={16} color="var(--c-faint)" />
-              <TextInput
-                placeholder={isMobile ? 'Caută jucător...' : 'Caută jucător după nume sau număr...'}
-                placeholderTextColor="var(--c-faint)"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                style={styles.searchInput}
-              />
-            </View>
-
-            {/* Filter tabs — scroll horizontally on tiny screens */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.tabsContainer}
-            >
-              {(['All Players', 'Starters', 'Injured Reserve'] as TabFilter[]).map(tab => (
-                <TouchableOpacity
-                  key={tab}
-                  onPress={() => setActiveTab(tab)}
-                  style={[styles.tab, activeTab === tab && styles.tabActive]}
-                >
-                  <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                    {TAB_LABELS[tab]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Table header — hide position column on small phones */}
-          <View style={styles.tableHeader}>
-            <View style={styles.colPlayer}>
-              <Text style={styles.tableHeaderText}>Jucător</Text>
-            </View>
-            {!isSmallPhone && (
-              <View style={styles.colPosition}>
-                <Text style={styles.tableHeaderText}>Poziție</Text>
+    <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
+      <ScrollView className="flex-1" contentContainerClassName="pb-32" showsVerticalScrollIndicator={false}>
+        <PageContainer>
+          {/* Event header — the event is the content here, so it stays on phones too. */}
+          <View className="mb-5 gap-3">
+            <View className="flex-row flex-wrap items-center gap-2">
+              {backButton}
+              <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: meta.bg }}>
+                <MaterialIcons name={meta.icon} size={13} color={meta.fg} />
+                <Text className="text-[12px] font-bold" style={{ color: meta.fg }}>{meta.label}</Text>
               </View>
-            )}
-            <View style={styles.colStatus}>
-              <Text style={[styles.tableHeaderText, { textAlign: 'center' }]}>Status</Text>
+              {graded ? (
+                <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: 'var(--c-success-bg)' }}>
+                  <MaterialIcons name="task-alt" size={13} color="var(--c-success-fg)" />
+                  <Text className="text-[12px] font-bold" style={{ color: 'var(--c-success-fg)' }}>Notat</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <View>
+              <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Notare prezență</Text>
+              <Text
+                className="text-[22px] md:text-[28px] font-bold leading-tight mt-1"
+                style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.5px' } as any}
+              >
+                {event.title}
+              </Text>
+              <View className="flex-row flex-wrap items-center gap-x-4 gap-y-1.5 mt-2">
+                {facts.map((fact) => (
+                  <View key={fact.icon} className="flex-row items-center gap-1.5 min-w-0">
+                    <MaterialIcons name={fact.icon} size={15} color="var(--c-faint)" />
+                    <Text className="text-[13px] font-medium" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{fact.label}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
+
+          {/* Summary strip — one row on desktop so the roster below gets the
+              full page width (the note field is what needs it). Nothing to
+              summarise or filter on an empty roster, so both are skipped. */}
+          {roster.length > 0 ? (
+            <View
+              className="rounded-[16px] border p-4 md:p-5 mb-4 flex-col lg:flex-row lg:items-center gap-4 lg:gap-6"
+              style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
+            >
+              <View className="flex-row items-center gap-4 lg:shrink-0 lg:min-w-[260px]">
+                <ProgressRing
+                  value={markedPercent}
+                  size={64}
+                  stroke={7}
+                  color={markedPercent === 100 ? 'var(--c-success)' : 'var(--c-brand-fg)'}
+                  label={`${marked} din ${counts.all} marcați`}
+                >
+                  {markedPercent === 100 ? (
+                    <MaterialIcons name="check" size={22} color="var(--c-success-fg)" />
+                  ) : (
+                    <Text className="t-num text-[14px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{markedPercent}%</Text>
+                  )}
+                </ProgressRing>
+                <View className="flex-1 min-w-0">
+                  <Text className="t-num text-[22px] font-bold leading-none" style={{ color: 'var(--c-ink-strong)' }}>
+                    {marked}<Text className="text-[15px]" style={{ color: 'var(--c-faint)' }}> / {counts.all} marcați</Text>
+                  </Text>
+                  <Text className="text-[13px] font-medium mt-1" style={{ color: 'var(--c-muted)' }}>
+                    {counts.unmarked ? `${counts.unmarked} încă nemarcați` : 'Toți jucătorii sunt marcați'}
+                  </Text>
+                </View>
+              </View>
+
+              <View className="grid grid-cols-3 gap-2 lg:flex-1 lg:max-w-[520px]">
+                {STATUS_OPTIONS.map((option) => (
+                  <View
+                    key={option.status}
+                    className="rounded-[12px] px-3 py-2.5 min-w-0 flex-col xl:flex-row xl:items-center xl:gap-2.5"
+                    style={{ backgroundColor: option.bg }}
+                  >
+                    <View className="hidden xl:flex">
+                      <MaterialIcons name={option.icon} size={18} color={option.fg} />
+                    </View>
+                    <Text className="t-num text-[20px] font-bold leading-none" style={{ color: option.fg }}>{counts[option.status]}</Text>
+                    <Text className="text-[12px] font-semibold mt-1 xl:mt-0" style={{ color: option.fg }} numberOfLines={1}>
+                      {option.status === 'present' ? 'Prezenți' : option.status === 'absent' ? 'Absenți' : 'Motivați'}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {counts.unmarked > 0 ? (
+                <Pressable
+                  onPress={() => setBulkConfirmOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Marchează restul prezenți (${counts.unmarked})`}
+                  className="ui-press h-11 rounded-[12px] px-4 flex-row items-center justify-center gap-2 border lg:ml-auto lg:shrink-0"
+                  style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
+                >
+                  <MaterialIcons name="done-all" size={17} color="var(--c-success-fg)" />
+                  <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>
+                    Restul prezenți ({counts.unmarked})
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
 
           {/* Roster */}
-          {filteredPlayers.length === 0 ? (
-            <View style={styles.emptyState}>
-              <UserCheck size={40} color="var(--c-border)" />
-              <Text style={styles.emptyText}>Niciun jucător găsit.</Text>
-            </View>
-          ) : (
-            filteredPlayers.map((player, index) => (
-              <View
-                key={player.id}
-                style={[
-                  styles.playerEntry,
-                  index !== filteredPlayers.length - 1 && styles.playerRowBorder,
+          <View className="gap-3">
+            {roster.length > 0 ? (
+              <FilterChips
+                label="Filtru prezență"
+                value={filter}
+                onChange={setFilter}
+                options={[
+                  { key: 'all', label: 'Toți', count: counts.all },
+                  { key: 'unmarked', label: 'Nemarcați', dot: 'var(--c-border-strong)', count: counts.unmarked },
+                  { key: 'present', label: 'Prezenți', dot: 'var(--c-success)', count: counts.present },
+                  { key: 'absent', label: 'Absenți', dot: 'var(--c-danger)', count: counts.absent },
+                  { key: 'medical', label: 'Motivați', dot: 'var(--c-warning)', count: counts.medical },
                 ]}
-              >
-                <View style={styles.playerRow}>
-                {/* Player info */}
-                <View style={styles.colPlayer}>
-                  <View style={styles.avatarWrap}>
-                    {player.avatarUrl ? (
-                      <Image source={{ uri: player.avatarUrl }} style={styles.avatar} />
-                    ) : (
-                      <Text style={styles.avatarInitials}>{player.firstName[0]}{player.lastName[0]}</Text>
-                    )}
-                    <View style={styles.jerseyBadge}>
-                      <Text style={styles.jerseyNum}>{player.number || '00'}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.playerNameBlock}>
-                    <Text style={[styles.playerName, { fontSize: isMobile ? 13 : 15 }]} numberOfLines={1}>
-                      {player.firstName} {player.lastName}
-                    </Text>
-                    <Text style={styles.playerMeta} numberOfLines={1}>
-                      #{player.number || '00'} · {team?.name || 'Lot'}
-                    </Text>
-                  </View>
-                </View>
+              />
+            ) : null}
 
-                {/* Position — hidden on small phones */}
-                {!isSmallPhone && (
-                  <View style={styles.colPosition}>
-                    <View style={styles.positionBadge}>
-                      <Text style={styles.positionText}>{player.position || 'Jucător'}</Text>
-                    </View>
-                  </View>
-                )}
-
-                {/* Attendance segmented control */}
-                <View style={styles.colStatus}>
-                  <View style={[styles.segmentedControl, isMobile && styles.segmentedControlSmall]}>
-                    <TouchableOpacity
-                      onPress={() => updatePlayerStatus(player.id, 'present')}
-                      style={[styles.segment, player.status === 'present' && styles.segmentPresent]}
-                    >
-                      <Text style={[styles.segmentText, player.status === 'present' && styles.segmentTextActive]}>
-                        {isMobile ? '✓' : 'Prezent'}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => updatePlayerStatus(player.id, 'absent')}
-                      style={[styles.segment, player.status === 'absent' && styles.segmentAbsent]}
-                    >
-                      <Text style={[styles.segmentText, player.status === 'absent' && styles.segmentTextActive]}>
-                        {isMobile ? '✕' : 'Absent'}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => updatePlayerStatus(player.id, 'medical')}
-                      style={[styles.segment, player.status === 'medical' && styles.segmentMedical]}
-                    >
-                      <Text style={[styles.segmentText, player.status === 'medical' && styles.segmentTextActive]}>
-                        {isMobile ? '＋' : 'Medical'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                </View>
-
-                {/* Coach feedback / note for this player */}
-                <View style={styles.noteWrap}>
-                  <View style={styles.noteLabelRow}>
-                    <MessageSquare size={13} color="var(--c-faint)" />
-                    <Text style={styles.noteLabel}>Notă / feedback</Text>
-                    {player.note.trim() ? <View style={styles.noteDot} /> : null}
-                  </View>
-                  <TextInput
-                    value={player.note}
-                    onChangeText={(t: string) => updatePlayerNote(player.id, t)}
-                    placeholder="Adaugă o notiță despre jucător la acest eveniment…"
-                    placeholderTextColor="var(--c-faint)"
-                    multiline
-                    style={styles.noteInput}
-                  />
-                </View>
+            {roster.length === 0 ? (
+              <View className="rounded-[16px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
+                <EmptyState
+                  icon="groups"
+                  title={event.teamId ? 'Lotul echipei este gol' : 'Eveniment fără echipă'}
+                  message={event.teamId
+                    ? `${teamName ?? 'Echipa'} nu are încă jucători. Adaugă jucători în lot și revino aici pentru prezență.`
+                    : 'Prezența se notează pe lotul unei echipe. Alocă o echipă acestui eveniment.'}
+                  actionLabel={event.teamId ? 'Deschide echipa' : 'Deschide evenimentul'}
+                  onAction={() => router.push((event.teamId ? `/admin/team/${event.teamId}` : `/admin/event/${event.id}`) as any)}
+                />
               </View>
-            ))
-          )}
-
-          {/* Footer count */}
-          <View style={styles.listFooter}>
-            <Text style={styles.listFooterText}>
-              {filteredPlayers.length} / {players.length} jucători
-            </Text>
+            ) : visibleRows.length === 0 ? (
+              <EmptyState
+                compact
+                icon="search-off"
+                title="Niciun jucător"
+                message={searchValue.trim() ? `Nimic pentru „${searchValue.trim()}”.` : 'Niciun jucător în acest filtru.'}
+                actionLabel="Arată toți"
+                onAction={() => {
+                  setFilter('all');
+                  setSearchValue('');
+                }}
+              />
+            ) : (
+              <View className="gap-2 ui-stagger">
+                {visibleRows.map((row) => (
+                  <AttendanceRow
+                    key={row.id}
+                    row={row}
+                    dirty={isDirty(row, saved.get(row.id))}
+                    noteOpen={openNotes.has(row.id)}
+                    onToggleNote={() => toggleNote(row.id)}
+                    onStatus={(status) => setStatus(row.id, status)}
+                    onNote={(note) => setNote(row.id, note)}
+                  />
+                ))}
+              </View>
+            )}
           </View>
-        </View>
+        </PageContainer>
       </ScrollView>
 
-      {/* Floating submit button */}
-      {hasChanges && (
-        <View style={[styles.fab, { right: isMobile ? 16 : 40, bottom: isMobile ? 24 : 40 }]}>
-          <TouchableOpacity
-            onPress={submitAttendance}
-            disabled={isSubmitting}
-            style={styles.fabBtn}
+      {/* Save bar — only while there is something to save. Phones scroll the
+          window, not this page's ScrollView, so there it is fixed just above
+          the bottom nav (~88px + safe area); desktop pins it to the page. */}
+      {dirtyCount > 0 ? (
+        <View
+          className="fixed lg:absolute left-0 right-0 lg:bottom-6 px-3 lg:px-6 items-stretch lg:items-end z-30 bottom-[calc(96px+env(safe-area-inset-bottom,0px))]"
+          style={{ pointerEvents: 'none' } as any}
+        >
+          <View
+            className="ui-rise flex-row items-center gap-3 rounded-[16px] border pl-4 pr-2 py-2 lg:min-w-[440px]"
+            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-lg, 0 12px 32px rgba(0,0,0,0.18))', pointerEvents: 'auto' } as any}
           >
-            {isSubmitting ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.fabText}>Salvează notarea</Text>
-            )}
-          </TouchableOpacity>
+            <View className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--c-warning)' }} />
+            <Text className="flex-1 min-w-0 text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+              {dirtyCount === 1 ? '1 modificare' : `${dirtyCount} modificări`}
+              <Text className="hidden sm:inline">{dirtyCount === 1 ? ' nesalvată' : ' nesalvate'}</Text>
+            </Text>
+            <Pressable
+              onPress={discard}
+              disabled={saving}
+              accessibilityRole="button"
+              accessibilityLabel="Renunță la modificări"
+              className="ui-press h-10 px-3 rounded-[10px] items-center justify-center"
+            >
+              <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-muted)' }}>Renunță</Text>
+            </Pressable>
+            <Pressable
+              onPress={save}
+              disabled={saving}
+              accessibilityRole="button"
+              accessibilityLabel="Salvează prezența"
+              className="ui-press h-10 px-4 rounded-[10px] flex-row items-center justify-center gap-1.5"
+              style={{ backgroundColor: 'var(--c-brand-surface)', opacity: saving ? 0.7 : 1 } as any}
+            >
+              {saving ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : <MaterialIcons name="save" size={16} color="var(--c-on-brand)" />}
+              <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-on-brand)' }}>Salvează</Text>
+            </Pressable>
+          </View>
         </View>
-      )}
+      ) : null}
+
+      <ConfirmDialog
+        visible={bulkConfirmOpen}
+        icon="done-all"
+        title="Marchează restul prezenți"
+        message={`${counts.unmarked} ${counts.unmarked === 1 ? 'jucător nemarcat va fi trecut' : 'jucători nemarcați vor fi trecuți'} ca prezenți. Cei deja marcați nu se schimbă. Apasă apoi Salvează.`}
+        confirmLabel="Marchează"
+        cancelLabel="Anulează"
+        onConfirm={markRemainingPresent}
+        onCancel={() => setBulkConfirmOpen(false)}
+      />
 
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </View>
   );
 }
 
-/** Small reusable snapshot item for the event info card */
-function SnapshotItem({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+/**
+ * One player. Wide desktop (xl): name | note | status on a single line, so the
+ * page's width goes to the note instead of empty space. Tablet/laptop: name and
+ * status share a row, the note drops below when opened. Phones: name + note
+ * toggle, full-width status thirds, then the note. Tapping the active
+ * status again clears it.
+ */
+function AttendanceRow({
+  row,
+  dirty,
+  noteOpen,
+  onToggleNote,
+  onStatus,
+  onNote,
+}: {
+  row: RosterEntry;
+  dirty: boolean;
+  noteOpen: boolean;
+  onToggleNote: () => void;
+  onStatus: (status: AttendanceStatus) => void;
+  onNote: (note: string) => void;
+}) {
+  const active = row.status ? OPTION_BY_STATUS[row.status] : null;
+  const hasNote = Boolean(row.note.trim());
+  const metaParts = [row.position, row.status ? null : 'Nemarcat'].filter(Boolean);
+
   return (
-    <View style={snapStyles.item}>
-      <View style={snapStyles.iconWrap}>{icon}</View>
-      <View>
-        <Text style={snapStyles.label}>{label}</Text>
-        <Text style={snapStyles.value}>{children}</Text>
+    <View
+      className="relative overflow-hidden rounded-[14px] border pl-4 pr-3 py-3 flex-col md:flex-row md:flex-wrap xl:flex-nowrap md:items-center gap-3 xl:gap-4"
+      style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any}
+    >
+      <View
+        className="absolute left-0 top-0 bottom-0 w-[3px]"
+        style={{ backgroundColor: active?.solid ?? 'var(--c-border-strong)', transition: 'background-color 0.2s ease' } as any}
+      />
+
+      <View className="flex-row items-center gap-2 min-w-0 md:flex-1 xl:flex-none xl:w-[260px] 2xl:w-[300px] xl:shrink-0">
+        <View className="flex-1 min-w-0">
+          <CoachPlayerRow
+            bare
+            firstName={row.firstName}
+            lastName={row.lastName}
+            badge={getPlayerBadge(row)}
+            meta={metaParts.length ? metaParts.join(' · ') : null}
+          />
+        </View>
+        {dirty ? (
+          <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: 'var(--c-warning)' }} accessibilityLabel="Modificat, nesalvat" />
+        ) : null}
+        <Pressable
+          onPress={onToggleNote}
+          accessibilityRole="button"
+          accessibilityLabel={noteOpen ? 'Ascunde nota' : 'Adaugă notă'}
+          accessibilityState={{ expanded: noteOpen }}
+          className="xl:hidden ui-press w-9 h-9 rounded-[10px] border items-center justify-center shrink-0"
+          style={{
+            borderColor: hasNote ? 'color-mix(in srgb, var(--c-brand-fg) 35%, transparent)' : 'var(--c-border)',
+            backgroundColor: hasNote ? 'var(--c-surface-tint)' : 'var(--c-surface-2)',
+          } as any}
+        >
+          <MaterialIcons name={hasNote ? 'chat' : 'chat-bubble-outline'} size={16} color={hasNote ? 'var(--c-brand-fg)' : 'var(--c-muted)'} />
+        </Pressable>
+      </View>
+
+      <View className={`${noteOpen ? 'flex' : 'hidden'} xl:flex order-last xl:order-none w-full xl:w-auto xl:flex-1 min-w-0`}>
+        <TextInput
+          value={row.note}
+          onChangeText={onNote}
+          placeholder="Notă / feedback pentru jucător…"
+          placeholderTextColor="var(--c-faint)"
+          multiline
+          accessibilityLabel={`Notă pentru ${row.firstName} ${row.lastName}`}
+          className="w-full min-h-[40px] max-h-[140px] rounded-[10px] border px-3 py-2.5 text-[13px] font-medium outline-none"
+          style={{
+            backgroundColor: 'var(--c-surface-2)',
+            borderColor: 'var(--c-border)',
+            color: 'var(--c-ink)',
+            resize: 'none',
+            fieldSizing: 'content',
+            lineHeight: '18px',
+          } as any}
+        />
+      </View>
+
+      <View className="flex-row gap-1.5 shrink-0" accessibilityRole={'radiogroup' as any} accessibilityLabel={`Prezență ${row.firstName} ${row.lastName}`}>
+        {STATUS_OPTIONS.map((option) => {
+          const selected = row.status === option.status;
+          return (
+            <Pressable
+              key={option.status}
+              onPress={() => onStatus(option.status)}
+              accessibilityRole={'radio' as any}
+              accessibilityState={{ selected, checked: selected } as any}
+              accessibilityLabel={option.label}
+              className="ui-press flex-1 md:flex-none h-10 rounded-[10px] border px-3 flex-row items-center justify-center gap-1.5"
+              style={{
+                borderColor: selected ? option.fg : 'var(--c-border)',
+                backgroundColor: selected ? option.bg : 'var(--c-surface-2)',
+                boxShadow: selected ? `inset 0 0 0 1px ${option.fg}` : 'none',
+                transition: 'background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease',
+              } as any}
+            >
+              <MaterialIcons name={option.icon} size={16} color={selected ? option.fg : 'var(--c-muted)'} />
+              <Text className="text-[12.5px] font-bold" style={{ color: selected ? option.fg : 'var(--c-muted)' }} numberOfLines={1}>
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
 }
-
-/** Small stat card for the summary row */
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <View style={[statStyles.card, { borderLeftColor: color }]}>
-      <Text style={statStyles.label}>{label}</Text>
-      <Text style={[statStyles.value, { color }]}>{value}</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: 'var(--c-surface-2)',
-  },
-  centeredFull: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'var(--c-surface-2)',
-  },
-  notFoundText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: 'var(--c-faint)',
-  },
-  goBackBtn: {
-    marginTop: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 8,
-    backgroundColor: 'var(--c-border)',
-    borderRadius: 24,
-  },
-  goBackText: {
-    fontWeight: '700',
-    color: 'var(--c-muted)',
-  },
-  // Header
-  header: {
-    backgroundColor: 'var(--c-surface-2)',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'var(--c-surface)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'var(--c-surface-3)',
-    marginRight: 12,
-    flexShrink: 0,
-    shadowColor: 'var(--c-ink-strong)',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  headerText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  headerTitle: {
-    fontWeight: '900',
-    color: 'var(--c-brand-surface-deep)',
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: 'var(--c-brand-fg)',
-    marginTop: 2,
-  },
-  // Event snapshot card
-  snapshotCard: {
-    backgroundColor: 'var(--c-surface)',
-    borderRadius: 24,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'var(--c-surface-3)',
-    shadowColor: 'var(--c-ink-strong)',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  snapshotCardMobile: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 14,
-  },
-  // Stats row
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  statsRowWrap: {
-    flexWrap: 'wrap',
-  },
-  // Player list card
-  playerListCard: {
-    backgroundColor: 'var(--c-surface)',
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: 'var(--c-surface-3)',
-    overflow: 'hidden',
-    shadowColor: 'var(--c-ink-strong)',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  // Controls (search + tabs)
-  listControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'var(--c-surface-2)',
-    gap: 10,
-  },
-  listControlsMobile: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    gap: 10,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'var(--c-surface-2)',
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    flex: 1,
-    minWidth: 0,
-  },
-  searchBarMobile: {
-    flex: 0,
-    width: '100%',
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'var(--c-ink-soft)',
-    // Remove outline on web
-    outlineStyle: 'none',
-  } as any,
-  tabsContainer: {
-    flexDirection: 'row',
-    gap: 6,
-    paddingRight: 4,
-  },
-  tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 24,
-    backgroundColor: 'transparent',
-  },
-  tabActive: {
-    backgroundColor: 'var(--c-surface-tint)',
-  },
-  tabText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: 'var(--c-faint)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  tabTextActive: {
-    color: 'var(--c-brand-fg)',
-  },
-  // Table header  
-  tableHeader: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: 'var(--c-surface-2)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'var(--c-surface-3)',
-  },
-  tableHeaderText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: 'var(--c-faint)',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  // Column widths
-  colPlayer: {
-    flex: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: 0,
-  },
-  colPosition: {
-    flex: 1,
-    justifyContent: 'center',
-    minWidth: 0,
-  },
-  colStatus: {
-    flex: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Player row
-  playerEntry: {
-    paddingBottom: 6,
-  },
-  playerRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  playerRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'var(--c-surface-3)',
-  },
-  noteWrap: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 6,
-  },
-  noteLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  noteLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: 'var(--c-faint)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  noteDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'var(--c-brand-surface)',
-  },
-  noteInput: {
-    minHeight: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    backgroundColor: 'var(--c-surface-2)',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'var(--c-ink)',
-    textAlignVertical: 'top',
-  },
-  // Avatar
-  avatarWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'var(--c-surface-3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    marginRight: 10,
-    flexShrink: 0,
-    position: 'relative',
-  },
-  avatar: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 22,
-  },
-  avatarInitials: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: 'var(--c-faint)',
-    textTransform: 'uppercase',
-  },
-  jerseyBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: 'var(--c-brand-surface)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'var(--c-border)',
-  },
-  jerseyNum: {
-    fontSize: 7,
-    fontWeight: '900',
-    color: '#fff',
-  },
-  playerNameBlock: {
-    flex: 1,
-    minWidth: 0,
-  },
-  playerName: {
-    fontWeight: '900',
-    color: 'var(--c-brand-surface-deep)',
-  },
-  playerMeta: {
-    fontSize: 11,
-    color: 'var(--c-faint)',
-    marginTop: 2,
-  },
-  // Position badge
-  positionBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'var(--c-surface-3)',
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  positionText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: 'var(--c-muted)',
-  },
-  // Segmented attendance control
-  segmentedControl: {
-    flexDirection: 'row',
-    backgroundColor: 'var(--c-surface-2)',
-    borderRadius: 24,
-    padding: 3,
-    borderWidth: 1,
-    borderColor: 'var(--c-border)',
-    width: '100%',
-  },
-  segmentedControlSmall: {
-    // on mobile we abbreviate text to symbols so it fits
-  },
-  segment: {
-    flex: 1,
-    paddingVertical: 7,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentPresent: {
-    backgroundColor: 'var(--c-success)',
-    shadowColor: 'var(--c-success)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  segmentAbsent: {
-    backgroundColor: 'var(--c-danger)',
-    shadowColor: 'var(--c-danger)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  segmentMedical: {
-    backgroundColor: 'var(--c-warning)',
-    shadowColor: 'var(--c-warning)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  segmentText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: 'var(--c-muted)',
-  },
-  segmentTextActive: {
-    color: '#fff',
-  },
-  // List footer
-  listFooter: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'var(--c-surface-2)',
-    borderTopWidth: 1,
-    borderTopColor: 'var(--c-surface-3)',
-  },
-  listFooterText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'var(--c-faint)',
-  },
-  // Empty state
-  emptyState: {
-    paddingVertical: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    marginTop: 12,
-    fontSize: 14,
-    fontWeight: '700',
-    color: 'var(--c-faint)',
-  },
-  // FAB
-  fab: {
-    position: 'absolute',
-    zIndex: 50,
-  },
-  fabBtn: {
-    backgroundColor: 'var(--c-brand-surface)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    height: 56,
-    borderRadius: 28,
-    shadowColor: 'var(--c-brand-fg)',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  fabText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 13,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-});
-
-const snapStyles = StyleSheet.create({
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    minWidth: 0,
-    flexShrink: 1,
-  },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'var(--c-surface-tint)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  label: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: 'var(--c-faint)',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 2,
-  },
-  value: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: 'var(--c-ink-soft)',
-  },
-});
-
-const statStyles = StyleSheet.create({
-  card: {
-    flex: 1,
-    backgroundColor: 'var(--c-surface)',
-    borderRadius: 20,
-    padding: 14,
-    borderLeftWidth: 4,
-    borderTopWidth: 1,
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderTopColor: 'var(--c-surface-3)',
-    borderRightColor: 'var(--c-surface-3)',
-    borderBottomColor: 'var(--c-surface-3)',
-    shadowColor: 'var(--c-ink-strong)',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-    minWidth: 60,
-  },
-  label: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'var(--c-faint)',
-    marginBottom: 4,
-  },
-  value: {
-    fontSize: 26,
-    fontWeight: '900',
-  },
-});

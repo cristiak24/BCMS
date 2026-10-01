@@ -96,6 +96,7 @@ import {
   Copy,
   Ban,
   SearchX,
+  CheckCheck,
 } from 'lucide-react';
 
 type IconProps = {
@@ -212,6 +213,9 @@ const iconMap: Record<string, typeof Circle> = {
   'calendar-month': CalendarRange,
   'chat-bubble': MessageSquare,
   'chat-bubble-outline': MessageSquare,
+  chat: MessageSquareText,
+  'done-all': CheckCheck,
+  'task-alt': BadgeCheck,
   'basketball-ball': Trophy,
   'credit-card': CreditCard,
   terrain: MapPin,
