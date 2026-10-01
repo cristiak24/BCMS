@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import * as Linking from '@/src/web/linking';
@@ -10,6 +10,7 @@ import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
 import PageContainer from '../../components/ui/PageContainer';
 import PageHeader from '../../components/ui/PageHeader';
 import SectionHeader from '../../components/ui/SectionHeader';
+import Pagination, { usePagination } from '../../components/ui/Pagination';
 import { useResponsive } from '../../hooks/useResponsive';
 import { useSession } from '../../context/AuthContext';
 import { normalizeRole } from '../../utils/authSession';
@@ -22,6 +23,8 @@ import {
 } from '../../services/financeApi';
 
 type ActionTarget = 'all' | 'setup' | string | null;
+
+const TRANSACTIONS_PAGE_SIZE = 10;
 
 function formatCurrency(amount: number, currency: string) {
   try {
@@ -184,7 +187,13 @@ function PaymentMethodCard({ method }: { method: PlayerPaymentMethod }) {
   );
 }
 
-function TransactionRow({ transaction }: { transaction: PlayerPaymentTransaction }) {
+function TransactionRow({
+  transaction,
+  onOpenReceipt,
+}: {
+  transaction: PlayerPaymentTransaction;
+  onOpenReceipt?: () => void;
+}) {
   const isSuccess = transaction.status === 'success';
 
   return (
@@ -243,6 +252,18 @@ function TransactionRow({ transaction }: { transaction: PlayerPaymentTransaction
       <Text className="min-w-[98px] text-right text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>
         {formatCurrency(transaction.amount, transaction.currency)}
       </Text>
+
+      {onOpenReceipt ? (
+        <Pressable
+          onPress={onOpenReceipt}
+          accessibilityRole="button"
+          accessibilityLabel="Deschide chitanța"
+          className="ui-press h-9 w-9 rounded-[10px] items-center justify-center shrink-0"
+          style={{ backgroundColor: 'var(--c-surface-tint)' } as any}
+        >
+          <MaterialIcons name="receipt" size={17} color="var(--c-brand-fg)" />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -267,6 +288,9 @@ function PlayerPaymentsScreen() {
     () => summary?.fees.filter((fee) => fee.amount > 0) ?? [],
     [summary]
   );
+
+  const transactions = summary?.transactions ?? [];
+  const transactionsPager = usePagination(transactions, TRANSACTIONS_PAGE_SIZE, `${transactions.length}`);
 
   const loadSummary = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) {
@@ -390,19 +414,16 @@ function PlayerPaymentsScreen() {
     }
   };
 
-  const openReceipts = () => {
-    const receipts = summary?.transactions.map((transaction) => transaction.receiptUrl).filter(Boolean) ?? [];
-    if (!receipts.length) {
-      Alert.alert('Chitanțe', 'Nu există chitanțe disponibile încă.');
-      return;
-    }
-
+  // Opens a single receipt from a direct click, one URL per call — browsers
+  // block window.open() calls made in a forEach loop after the first popup,
+  // so receipts are opened one at a time from their own row instead of in bulk.
+  const openReceipt = (url: string) => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      receipts.forEach((url) => window.open(url as string, '_blank'));
+      window.open(url, '_blank');
       return;
     }
 
-    void WebBrowser.openBrowserAsync(receipts[0] as string);
+    void WebBrowser.openBrowserAsync(url);
   };
 
   // The skeleton lives inside the real page container and mirrors the balance
@@ -624,8 +645,6 @@ function PlayerPaymentsScreen() {
           <SectionHeader
             title="Istoric tranzacții"
             subtitle="Plățile efectuate și chitanțele lor."
-            actionLabel={summary?.transactions.length ? 'Descarcă chitanțele' : undefined}
-            onAction={summary?.transactions.length ? openReceipts : undefined}
             isMobile={isMobile}
           />
 
@@ -643,9 +662,13 @@ function PlayerPaymentsScreen() {
               <Text className="min-w-[98px] text-right text-[11px] font-bold uppercase tracking-[0.07em]" style={{ color: 'var(--c-faint)' }}>Sumă</Text>
             </View>
 
-            {summary?.transactions.length ? (
-              summary.transactions.map((transaction) => (
-                <TransactionRow key={transaction.id} transaction={transaction} />
+            {transactions.length ? (
+              transactionsPager.pageItems.map((transaction) => (
+                <TransactionRow
+                  key={transaction.id}
+                  transaction={transaction}
+                  onOpenReceipt={transaction.receiptUrl ? () => openReceipt(transaction.receiptUrl as string) : undefined}
+                />
               ))
             ) : (
               <EmptyState
@@ -656,6 +679,18 @@ function PlayerPaymentsScreen() {
               />
             )}
           </View>
+
+          {transactions.length > TRANSACTIONS_PAGE_SIZE ? (
+            <Pagination
+              page={transactionsPager.page}
+              totalPages={transactionsPager.totalPages}
+              onPageChange={transactionsPager.setPage}
+              rangeStart={transactionsPager.rangeStart}
+              rangeEnd={transactionsPager.rangeEnd}
+              total={transactionsPager.total}
+              itemNoun="tranzacții"
+            />
+          ) : null}
         </View>
       </PageContainer>
     </ScrollView>

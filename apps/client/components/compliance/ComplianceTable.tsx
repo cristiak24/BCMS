@@ -3,6 +3,7 @@ import { View, Text, Pressable, Image } from '@/src/web/reactNative';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { Player } from '../../services/teamsApi';
 import { useResponsive } from '../../hooks/useResponsive';
+import { EmptyState } from '../ui/ScreenState';
 
 interface ComplianceTableProps {
   data: Player[];
@@ -98,6 +99,10 @@ export default function ComplianceTable({ data, selectedIds, onToggleSelect, onS
   //    the header columns overlapping, so on phones each row becomes a
   //    self-contained card with the fields stacked and labelled. ──
   if (isMobile) {
+    if (data.length === 0) {
+      return <EmptyState icon="groups" title="Niciun sportiv" message="Nu există sportivi de afișat aici." compact />;
+    }
+
     return (
       <View className="gap-2.5 w-full">
         {data.map((player) => {
@@ -159,7 +164,11 @@ export default function ComplianceTable({ data, selectedIds, onToggleSelect, onS
         <Text className="w-32 text-[10px] font-semibold uppercase tracking-wider text-right" style={{ color: 'var(--c-faint)' }}>Acțiuni</Text>
       </View>
 
-      {data.map((player) => {
+      {data.length === 0 ? (
+        <View className="px-5 py-2">
+          <EmptyState icon="groups" title="Niciun sportiv" message="Nu există sportivi de afișat aici." compact />
+        </View>
+      ) : data.map((player) => {
         const isSelected = selectedIds.includes(player.id);
         const medStatus = getMedicalStatus(player.medicalCheckExpiry);
         return (

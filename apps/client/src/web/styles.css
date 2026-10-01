@@ -27,6 +27,21 @@ textarea {
   font-family: inherit;
 }
 
+/* Chrome/Safari paint autofilled inputs with their own yellow highlight and
+   there's no `background` override that beats it — only `-webkit-box-shadow`
+   can, by painting an opaque inset shadow the same colour as the field over
+   the browser's fill before the border. The absurdly long transition-delay is
+   the standard trick to stop the yellow flashing for a frame before the
+   shadow applies. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: inherit;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+  transition: background-color 600000s 0s, color 600000s 0s;
+}
+
 .rn-view {
   display: flex;
   flex-direction: column;

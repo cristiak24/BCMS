@@ -8,6 +8,10 @@ import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../../components/Heade
 import AdminHero, { AdminMetricCard } from '../../../components/admin/AdminHero';
 import { SkeletonList } from '../../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../../components/dashboard/ScreenStates';
+import PageContainer from '../../../components/ui/PageContainer';
+import Pagination, { usePagination } from '../../../components/ui/Pagination';
+
+const USERS_PER_PAGE = 24;
 
 const ROLE_VISUAL: Record<string, { tint: string; fg: string }> = {
     admin: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-strong)' },
@@ -78,8 +82,14 @@ export default function UserList() {
         return { total: users.length, admins };
     }, [users]);
 
+    const { page, totalPages, pageItems: pagedUsers, setPage, rangeStart, rangeEnd, total } = usePagination(
+        filteredUsers,
+        USERS_PER_PAGE,
+        searchValue.trim().toLowerCase()
+    );
+
     return (
-        <View className="w-full max-w-[1000px] mx-auto px-4 md:px-0 pt-6 pb-16">
+        <PageContainer className="pb-16">
             <AdminHero title="Users" subtitle="All accounts across every club on the platform.">
                 <View className="mt-5 md:mt-0 flex-row flex-wrap gap-3">
                     <AdminMetricCard label="Users" value={roleCounts.total} />
@@ -95,7 +105,7 @@ export default function UserList() {
                 <EmptyState title="Niciun utilizator găsit" message="Încearcă o altă căutare." icon="person-search" />
             ) : (
                 <View className="gap-2.5">
-                    {filteredUsers.map((item) => {
+                    {pagedUsers.map((item) => {
                         const rv = roleVisual(item.role);
                         return (
                             <Link key={item.id} href={`/admin/users/${item.id}`} asChild>
@@ -133,6 +143,16 @@ export default function UserList() {
                     })}
                 </View>
             )}
-        </View>
+
+            <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                rangeStart={rangeStart}
+                rangeEnd={rangeEnd}
+                total={total}
+                itemNoun="utilizatori"
+            />
+        </PageContainer>
     );
 }

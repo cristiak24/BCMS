@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, Text, View } from '@/src/web/reactNative
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
 import GlassCard from '../../components/ui/GlassCard';
+import PageContainer from '../../components/ui/PageContainer';
 import AdminHero from '../../components/admin/AdminHero';
 import AdminActionButton from '../../components/admin/AdminActionButton';
 import InviteForm from '../../components/user-access/InviteForm';
@@ -62,7 +63,7 @@ export default function CreateClubAdminScreen() {
 
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-      <View className="w-full max-w-[1000px] mx-auto px-4 md:px-0 pt-6 gap-5">
+      <PageContainer className="gap-5">
         <AdminHero
           title="Create Club Admin"
           subtitle="Create a club, issue an admin invite, and send the signup email without exposing raw invite tokens."
@@ -73,7 +74,9 @@ export default function CreateClubAdminScreen() {
           </View>
         </AdminHero>
 
-        <InviteForm />
+        <View className="w-full max-w-[640px]">
+          <InviteForm />
+        </View>
 
         <View className="flex-row flex-wrap gap-4">
           <GlassCard className="p-6 flex-1 min-w-[280px]">
@@ -90,7 +93,7 @@ export default function CreateClubAdminScreen() {
             </Text>
           </GlassCard>
         </View>
-      </View>
+      </PageContainer>
     </ScrollView>
   );
 }

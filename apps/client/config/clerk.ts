@@ -21,7 +21,12 @@ export function setClerkInstance(instance: ClerkInstance | null) {
 }
 
 export async function getClerk(): Promise<ClerkInstance> {
-  for (let attempt = 0; attempt < 200; attempt++) {
+  // Clerk's own script loads from its CDN separately from the app bundle, so
+  // on a slow/flaky mobile connection it can still be mid-download well past
+  // 5s (the old budget here) even though the login form is already visible
+  // and usable. That turned "the network is slow" into a dead-end error
+  // instead of just... waiting a bit longer.
+  for (let attempt = 0; attempt < 800; attempt++) {
     if (clerkInstance) {
       return clerkInstance;
     }

@@ -11,6 +11,10 @@ import ComplianceTable from '../../../components/compliance/ComplianceTable';
 import ComplianceStatsBottom from '../../../components/compliance/ComplianceStatsBottom';
 import AddAppointmentModal from '../../../components/compliance/modals/AddAppointmentModal';
 import UpdateFileModal from '../../../components/compliance/modals/UpdateFileModal';
+import RosterPagination from '../../../components/roster/RosterPagination';
+import { ErrorState } from '../../../components/dashboard/ScreenStates';
+
+const PLAYERS_PER_PAGE = 24;
 
 import { computeComplianceMetrics } from '../../../components/compliance/complianceMetrics';
 
@@ -21,12 +25,14 @@ export default function ComplianceDashboard() {
   const { isMobile } = useResponsive();
 
   const [activeTab, setActiveTab] = useState<'active' | 'archives'>('active');
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isNewEntryOpen, setIsNewEntryOpen] = useState(false);
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Sync Header Context. On mobile the header actions row has no room for two
   // buttons (and the desktop header that renders `headerActions` isn't even
@@ -93,11 +99,15 @@ export default function ComplianceDashboard() {
 
   const loadData = async () => {
       setLoading(true);
+      setError(null);
       try {
           // get roster gets everyone in the db tracking
           const allPlayers = await teamsApi.getRoster();
           setPlayers(allPlayers);
-      } catch(e) { console.error(e); }
+      } catch(e) {
+          console.error(e);
+          setError('Nu am putut încărca lista de conformitate.');
+      }
       finally { setLoading(false); }
   };
 
@@ -108,6 +118,23 @@ export default function ComplianceDashboard() {
   // KPIs are derived from the loaded roster rather than hardcoded, so the
   // headline figures always describe this club.
   const metrics = useMemo(() => computeComplianceMetrics(players), [players]);
+
+  const tableData = activeTab === 'active' ? players : [];
+  const totalPages = Math.max(1, Math.ceil(tableData.length / PLAYERS_PER_PAGE));
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * PLAYERS_PER_PAGE;
+    return tableData.slice(start, start + PLAYERS_PER_PAGE);
+  }, [tableData, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleToggleSelect = (id: number) => {
     setSelectedIds(prev => 
@@ -134,13 +161,24 @@ export default function ComplianceDashboard() {
                     <View className="bg-white rounded-3xl p-12 items-center justify-center border border-gray-100">
                         <ActivityIndicator size="large" color="var(--c-brand-fg)" />
                     </View>
+                ) : error && !players.length ? (
+                    <ErrorState title="Nu am putut încărca lista" message={error} onRetry={loadData} />
                 ) : (
-                    <ComplianceTable 
-                      data={activeTab === 'active' ? players : []}
-                      selectedIds={selectedIds}
-                      onToggleSelect={handleToggleSelect}
-                      onSelectAll={setSelectedIds}
-                    />
+                    <>
+                      <ComplianceTable
+                        data={paginatedData}
+                        selectedIds={selectedIds}
+                        onToggleSelect={handleToggleSelect}
+                        onSelectAll={setSelectedIds}
+                      />
+                      <RosterPagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={tableData.length}
+                        pageSize={PLAYERS_PER_PAGE}
+                        onPageChange={setCurrentPage}
+                      />
+                    </>
                 )}
             </View>
           </View>

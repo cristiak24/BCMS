@@ -44,46 +44,45 @@ export const dash = {
   },
 
   // ── Layered, diffuse shadows (Stripe/Linear feel) ──────
+  // Built on the --e-* elevation tokens (tokens.css) instead of literal
+  // rgba(15,23,42,x) so shadows repoint automatically in dark mode — a
+  // near-black shadow is invisible against a near-black dark surface.
   shadow: {
-    sm: web({
-      boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 3px 8px rgba(15,23,42,0.03)',
-    }),
+    sm: web({ boxShadow: 'var(--e-xs)' }),
     card: web({
-      boxShadow:
-        '0 0 0 1px rgba(15,23,42,0.04), 0 1px 2px rgba(15,23,42,0.03), 0 8px 24px rgba(15,23,42,0.05), 0 2px 6px rgba(15,23,42,0.03)',
+      boxShadow: '0 0 0 1px var(--c-border-soft), var(--e-sm)',
     }),
     lift: web({
-      boxShadow:
-        '0 0 0 1px rgba(15,23,42,0.05), 0 12px 28px rgba(15,23,42,0.09), 0 28px 56px rgba(99,91,255,0.08)',
+      boxShadow: '0 0 0 1px var(--c-border), var(--e-lg), 0 28px 56px color-mix(in srgb, var(--c-purple) 8%, transparent)',
     }),
     glow: web({
-      boxShadow: '0 0 0 1px rgba(99,91,255,0.1), 0 6px 20px rgba(99,91,255,0.14)',
+      boxShadow: '0 0 0 1px color-mix(in srgb, var(--c-purple) 10%, transparent), var(--e-brand)',
     }),
     inset: web({
-      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.7), inset 0 0 0 1px rgba(15,23,42,0.04)',
+      boxShadow: 'inset 0 1px 0 color-mix(in srgb, var(--c-surface) 70%, white), inset 0 0 0 1px var(--c-border-soft)',
     }),
   },
 
   // ── Gradients ──────────────────────────────────────────
   gradients: {
-    hero: 'linear-gradient(135deg, rgba(124,108,255,0.08) 0%, rgba(79,70,229,0.05) 42%, rgba(255,255,255,0) 72%)',
+    hero: 'linear-gradient(135deg, color-mix(in srgb, var(--c-purple) 8%, transparent) 0%, color-mix(in srgb, var(--c-brand-surface) 5%, transparent) 42%, transparent 72%)',
     // Indigo-tinted near-black to match the new brand (was slate-blue #0B1220).
     heroInk: 'linear-gradient(135deg, #17163A 0%, #201E52 52%, #14161F 100%)',
-    cardGreen: 'linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(255,255,255,0) 62%)',
-    cardBlue: 'linear-gradient(135deg, rgba(37,99,235,0.1) 0%, rgba(255,255,255,0) 62%)',
-    cardCyan: 'linear-gradient(135deg, rgba(14,165,233,0.1) 0%, rgba(255,255,255,0) 62%)',
-    cardPurple: 'linear-gradient(135deg, rgba(99,91,255,0.1) 0%, rgba(255,255,255,0) 62%)',
-    cardOrange: 'linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(255,255,255,0) 62%)',
-    sheen: 'linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.55) 48%, rgba(255,255,255,0) 100%)',
+    cardGreen: 'linear-gradient(135deg, color-mix(in srgb, var(--c-success) 10%, transparent) 0%, transparent 62%)',
+    cardBlue: 'linear-gradient(135deg, color-mix(in srgb, var(--c-blue) 10%, transparent) 0%, transparent 62%)',
+    cardCyan: 'linear-gradient(135deg, color-mix(in srgb, var(--c-sky) 10%, transparent) 0%, transparent 62%)',
+    cardPurple: 'linear-gradient(135deg, color-mix(in srgb, var(--c-purple) 10%, transparent) 0%, transparent 62%)',
+    cardOrange: 'linear-gradient(135deg, color-mix(in srgb, var(--c-warning) 10%, transparent) 0%, transparent 62%)',
+    sheen: 'linear-gradient(120deg, transparent 0%, color-mix(in srgb, var(--c-surface) 55%, white) 48%, transparent 100%)',
     ring: ['var(--c-purple)', 'var(--c-blue)'],
     ringSky: ['var(--c-sky)', 'var(--c-blue)'],
   },
 
   // ── Trend indicator tones ──────────────────────────────
   trend: {
-    up: { fg: 'var(--c-success)', bg: 'rgba(16,185,129,0.1)', icon: 'trending-up' as const },
-    down: { fg: 'var(--c-danger)', bg: 'rgba(239,68,68,0.09)', icon: 'trending-down' as const },
-    flat: { fg: 'var(--c-muted)', bg: 'rgba(100,116,139,0.1)', icon: 'show-chart' as const },
+    up: { fg: 'var(--c-success)', bg: 'color-mix(in srgb, var(--c-success) 10%, transparent)', icon: 'trending-up' as const },
+    down: { fg: 'var(--c-danger)', bg: 'color-mix(in srgb, var(--c-danger) 9%, transparent)', icon: 'trending-down' as const },
+    flat: { fg: 'var(--c-muted)', bg: 'color-mix(in srgb, var(--c-muted) 10%, transparent)', icon: 'show-chart' as const },
   },
 } as const;
 
@@ -104,51 +103,51 @@ export const statToneMap: Record<
 > = {
   blue: {
     gradient: dash.gradients.cardBlue,
-    iconBg: 'rgba(37,99,235,0.1)',
+    iconBg: 'color-mix(in srgb, var(--c-blue) 10%, transparent)',
     iconFg: 'var(--c-blue)',
-    badgeBg: 'rgba(37,99,235,0.08)',
+    badgeBg: 'color-mix(in srgb, var(--c-blue) 8%, transparent)',
     badgeFg: 'var(--c-blue-deep)',
-    glow: 'rgba(37,99,235,0.16)',
+    glow: 'color-mix(in srgb, var(--c-blue) 16%, transparent)',
     bar: 'linear-gradient(90deg, #2563EB, #60A5FA)',
     accent: 'var(--c-blue)',
   },
   cyan: {
     gradient: dash.gradients.cardCyan,
-    iconBg: 'rgba(14,165,233,0.1)',
+    iconBg: 'color-mix(in srgb, var(--c-sky) 10%, transparent)',
     iconFg: 'var(--c-sky)',
-    badgeBg: 'rgba(14,165,233,0.08)',
+    badgeBg: 'color-mix(in srgb, var(--c-sky) 8%, transparent)',
     badgeFg: 'var(--c-sky)',
-    glow: 'rgba(14,165,233,0.16)',
+    glow: 'color-mix(in srgb, var(--c-sky) 16%, transparent)',
     bar: 'linear-gradient(90deg, #0EA5E9, #38BDF8)',
     accent: 'var(--c-sky)',
   },
   green: {
     gradient: dash.gradients.cardGreen,
-    iconBg: 'rgba(16,185,129,0.1)',
+    iconBg: 'color-mix(in srgb, var(--c-success) 10%, transparent)',
     iconFg: 'var(--c-success)',
-    badgeBg: 'rgba(16,185,129,0.08)',
+    badgeBg: 'color-mix(in srgb, var(--c-success) 8%, transparent)',
     badgeFg: 'var(--c-success-fg)',
-    glow: 'rgba(16,185,129,0.16)',
+    glow: 'color-mix(in srgb, var(--c-success) 16%, transparent)',
     bar: 'linear-gradient(90deg, #10B981, #34D399)',
     accent: 'var(--c-success)',
   },
   purple: {
     gradient: dash.gradients.cardPurple,
-    iconBg: 'rgba(99,91,255,0.1)',
+    iconBg: 'color-mix(in srgb, var(--c-purple) 10%, transparent)',
     iconFg: 'var(--c-purple)',
-    badgeBg: 'rgba(99,91,255,0.08)',
+    badgeBg: 'color-mix(in srgb, var(--c-purple) 8%, transparent)',
     badgeFg: 'var(--c-brand-surface)',
-    glow: 'rgba(99,91,255,0.16)',
+    glow: 'color-mix(in srgb, var(--c-purple) 16%, transparent)',
     bar: 'linear-gradient(90deg, #635BFF, #A78BFA)',
     accent: 'var(--c-purple)',
   },
   orange: {
     gradient: dash.gradients.cardOrange,
-    iconBg: 'rgba(245,158,11,0.12)',
+    iconBg: 'color-mix(in srgb, var(--c-warning) 12%, transparent)',
     iconFg: 'var(--c-warning)',
-    badgeBg: 'rgba(245,158,11,0.1)',
+    badgeBg: 'color-mix(in srgb, var(--c-warning) 10%, transparent)',
     badgeFg: 'var(--c-warning-fg)',
-    glow: 'rgba(245,158,11,0.16)',
+    glow: 'color-mix(in srgb, var(--c-warning) 16%, transparent)',
     bar: 'linear-gradient(90deg, #F59E0B, #FBBF24)',
     accent: 'var(--c-warning)',
   },

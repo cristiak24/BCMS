@@ -41,7 +41,7 @@ const FILTER_ORDER: { key: Exclude<PlayerEventFilter, 'all'>; label: string }[] 
   { key: 'camp', label: 'Cantonamente' },
 ];
 
-/** Compact icon button — admin IconButton geometry (36x36, radius 10). */
+/** Compact icon button — 44px touch target on mobile, admin IconButton geometry (36x36, radius 10) from lg. */
 function IconButton({
   onPress, label, disabled, children,
 }: {
@@ -55,7 +55,7 @@ function IconButton({
       onPress={onPress}
       disabled={disabled}
       accessibilityLabel={label}
-      className={`relative w-9 h-9 rounded-[10px] items-center justify-center border bg-[var(--c-surface)] border-[var(--c-border)] ${
+      className={`relative w-11 h-11 lg:w-9 lg:h-9 rounded-[10px] items-center justify-center border bg-[var(--c-surface)] border-[var(--c-border)] ${
         disabled ? 'opacity-50' : ''
       }`}
     >

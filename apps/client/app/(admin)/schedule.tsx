@@ -26,6 +26,7 @@ import { AddEventModal } from '../../components/schedule/admin/AddEventModal';
 import { DayScheduleModal } from '../../components/schedule/admin/DayScheduleModal';
 import { EventAttendanceModal } from '../../components/schedule/admin/EventAttendanceModal';
 import { FilterModal } from '../../components/schedule/admin/FilterModal';
+import PageHeader from '../../components/ui/PageHeader';
 import TeamMedicalVisaModal from '../../components/schedule/admin/TeamMedicalVisaModal';
 import TeamPaymentsReportModal from '../../components/schedule/admin/TeamPaymentsReportModal';
 
@@ -559,6 +560,7 @@ export default function ScheduleScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
+      <PageHeader title="Program" className="px-6 xl:px-8 pt-4" />
       {/* Phones: Lunar / Prezență / Notare and the calendar view icons share
           one row (they were two rows, and the tabs only rendered on "Lunar" —
           from Prezență there was no way back). Desktop keeps them in the header. */}

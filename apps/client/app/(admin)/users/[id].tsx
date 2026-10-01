@@ -7,6 +7,7 @@ import { useResponsive } from '../../../hooks/useResponsive';
 import GlassCard from '../../../components/ui/GlassCard';
 import { ToastHost, useToasts } from '../../../components/ui/Toast';
 import { LoadingState, ErrorState } from '../../../components/dashboard/ScreenStates';
+import PageContainer from '../../../components/ui/PageContainer';
 
 const ROLES: User['role'][] = ['superadmin', 'admin', 'coach', 'player', 'parent', 'accountant'];
 
@@ -58,22 +59,27 @@ export default function UserDetail() {
 
     if (loading) {
         return (
-            <View className="max-w-3xl mx-auto w-full pt-6 px-4">
-                <LoadingState message="Se încarcă utilizatorul..." />
-            </View>
+            <PageContainer>
+                <View className="w-full max-w-[640px]">
+                    <LoadingState message="Se încarcă utilizatorul..." />
+                </View>
+            </PageContainer>
         );
     }
 
     if (loadError || !user) {
         return (
-            <View className="max-w-3xl mx-auto w-full pt-6 px-4">
-                <ErrorState title="Utilizator negăsit" message={loadError ?? undefined} onRetry={fetchUser} />
-            </View>
+            <PageContainer>
+                <View className="w-full max-w-[640px]">
+                    <ErrorState title="Utilizator negăsit" message={loadError ?? undefined} onRetry={fetchUser} />
+                </View>
+            </PageContainer>
         );
     }
 
     return (
-        <View className="max-w-3xl mx-auto w-full pt-6 px-4 pb-16">
+        <PageContainer className="pb-16">
+          <View className="w-full max-w-[640px]">
             <View className={`mb-6 ${isMobile ? 'gap-3' : 'flex-row items-center'}`}>
                 <Pressable
                     onPress={() => router.back('/admin/users')}
@@ -165,8 +171,9 @@ export default function UserDetail() {
                     </Pressable>
                 </View>
             </GlassCard>
+          </View>
 
             <ToastHost toasts={toasts} onDismiss={dismissToast} />
-        </View>
+        </PageContainer>
     );
 }

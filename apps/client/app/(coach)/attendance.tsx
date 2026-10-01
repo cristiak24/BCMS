@@ -143,7 +143,7 @@ function AttendanceRow({
               accessibilityRole="button"
               accessibilityState={{ selected: active, disabled: busy }}
               accessibilityLabel={`${option.label}: ${player.firstName} ${player.lastName}`}
-              className="ui-press flex-1 md:flex-none h-10 rounded-[11px] border px-3 flex-row items-center justify-center gap-1.5"
+              className="ui-press flex-1 md:flex-none h-11 rounded-[11px] border px-3 flex-row items-center justify-center gap-1.5"
               style={{
                 borderColor: active ? option.color : 'var(--c-border)',
                 backgroundColor: active ? option.bg : 'var(--c-surface-2)',

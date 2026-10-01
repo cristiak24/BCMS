@@ -193,7 +193,7 @@ export default function PlayerTeamDetailScreen() {
           onPress={() => router.push('/team')}
           accessibilityRole="button"
           accessibilityLabel="Înapoi la echipele mele"
-          className="flex-row items-center gap-1.5 self-start mb-3 h-8 px-2 -ml-2 rounded-[9px]"
+          className="flex-row items-center gap-1.5 self-start mb-3 min-h-[44px] lg:h-8 px-2 -ml-2 rounded-[9px]"
         >
           <MaterialIcons name="arrow-back" size={17} color="var(--c-muted)" />
           <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Echipele mele</Text>
@@ -201,6 +201,7 @@ export default function PlayerTeamDetailScreen() {
 
         <PageHeader
           keepTitleOnMobile
+          actionsOnMobile={false}
           title={team?.name || 'Echipă'}
           subtitle={team ? [team.leagueName, team.seasonName].filter(Boolean).join(' · ') : 'Se încarcă...'}
           actions={

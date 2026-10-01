@@ -47,7 +47,7 @@ export function MobileBottomNavigation({
     // every screen tracks light/dark instead of staying white on a dark shell.
     <View
       className="flex lg:hidden flex-row items-center border-t fixed bottom-0 left-0 right-0 w-full z-20 px-2"
-      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', paddingTop: 10, paddingBottom: Math.max(bottomInset, 12), ...theme.shadow.lift } as any}
+      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', paddingTop: 10, paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))', ...theme.shadow.lift } as any}
     >
       {items.map((item) => {
         const isActive = item.match === 'dashboard' ? isDashboard : pathname.includes(item.match);
@@ -101,7 +101,7 @@ export function MobileNavigationSheet({
           style={{
             backgroundColor: 'var(--c-surface)',
             borderColor: 'var(--c-border)',
-            paddingBottom: Math.max(bottomInset + 18, 28),
+            paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 18px))',
             boxShadow: '0 -12px 32px -12px rgba(0,0,0,0.35)',
           } as any}
         >

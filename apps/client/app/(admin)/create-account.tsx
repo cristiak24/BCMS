@@ -5,6 +5,7 @@ import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../components/HeaderCo
 import AdminHero from '../../components/admin/AdminHero';
 import AdminActionButton from '../../components/admin/AdminActionButton';
 import CreateClubAccountForm from '../../components/manage-access/CreateClubAccountForm';
+import PageContainer from '../../components/ui/PageContainer';
 
 export default function CreateAccountScreen() {
     const router = useRouter();
@@ -30,7 +31,7 @@ export default function CreateAccountScreen() {
             contentContainerStyle={{ paddingBottom: 120 }}
             showsVerticalScrollIndicator={false}
         >
-            <View className="w-full max-w-[900px] mx-auto px-4 md:px-0 pt-6 gap-5">
+            <PageContainer className="gap-5">
                 <AdminHero
                     title="Cont nou"
                     subtitle="Invită antrenori și jucători direct în clubul tău."
@@ -49,8 +50,10 @@ export default function CreateAccountScreen() {
                     />
                 </View>
 
-                <CreateClubAccountForm onCreated={() => router.push('/admin/manage-accounts')} />
-            </View>
+                <View className="w-full max-w-[640px]">
+                    <CreateClubAccountForm onCreated={() => router.push('/admin/manage-accounts')} />
+                </View>
+            </PageContainer>
         </ScrollView>
     );
 }

@@ -397,7 +397,7 @@ export default function CoachDashboardScreen() {
                     onPress={() => loadData(true)}
                     accessibilityRole="button"
                     accessibilityLabel="Reîmprospătează"
-                    className="ui-press h-10 w-10 rounded-[11px] border items-center justify-center"
+                    className="ui-press hidden sm:flex h-10 w-10 rounded-[11px] border items-center justify-center"
                     style={{ backgroundColor: 'var(--c-hero-chip)', borderColor: 'var(--c-hero-chip-border)' } as any}
                   >
                     {refreshing ? <ActivityIndicator size="small" color="#FFFFFF" /> : <MaterialIcons name="refresh" size={18} color="var(--c-hero-fg)" />}

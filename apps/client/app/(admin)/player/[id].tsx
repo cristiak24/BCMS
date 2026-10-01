@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { ArrowLeft, Save, User, Mail, Hash, Calendar, Shield, CreditCard, Activity, CheckCircle, X, Info, ChevronRight, Award } from 'lucide-react';
 import { LinearGradient } from '@/src/web/linearGradient';
 import { teamsApi, Player } from '../../../services/teamsApi';
+import { ErrorState } from '../../../components/ui/ScreenState';
 
 export default function PlayerProfile() {
   const { id, returnTo } = useLocalSearchParams();
@@ -12,6 +13,7 @@ export default function PlayerProfile() {
   const isCompact = width < 900;
   const [player, setPlayer] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -31,6 +33,7 @@ export default function PlayerProfile() {
 
     try {
       setLoading(true);
+      setLoadError(null);
       const data = await teamsApi.getPlayerById(parseInt(id as string));
       setPlayer(data);
       setFirstName(data.firstName || '');
@@ -42,6 +45,7 @@ export default function PlayerProfile() {
       setMedicalExpiry(data.medicalCheckExpiry ? new Date(data.medicalCheckExpiry).toISOString().split('T')[0] : '');
     } catch (error) {
       console.error('Fetch player error:', error);
+      setLoadError('Could not load player data.');
       Alert.alert('Error', 'Could not load player data');
     } finally {
       setLoading(false);
@@ -93,6 +97,19 @@ export default function PlayerProfile() {
     return (
       <View className="flex-1 items-center justify-center bg-[var(--c-surface)]">
         <ActivityIndicator size="large" color="var(--c-brand-fg)" />
+      </View>
+    );
+  }
+
+  if (loadError || !player) {
+    return (
+      <View className="flex-1 items-center justify-center bg-[var(--c-surface)] p-6">
+        <ErrorState
+          title="Jucător negăsit"
+          message={loadError ?? 'Acest jucător nu a putut fi găsit.'}
+          actionLabel="Încearcă din nou"
+          onAction={fetchPlayer}
+        />
       </View>
     );
   }
@@ -157,7 +174,7 @@ export default function PlayerProfile() {
           <Text className="mt-2 text-3xl font-black text-[#0E2041]">{value}</Text>
           <Text className="mt-1 text-[11px] font-bold text-slate-400" numberOfLines={1}>{caption}</Text>
         </View>
-        <View className="h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: `${color}14` }}>
+        <View className="h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)` }}>
           {icon}
         </View>
       </View>
@@ -491,7 +508,7 @@ export default function PlayerProfile() {
                <View className="flex-row justify-between items-center mb-8">
                   <Text className="text-2xl font-black text-slate-900">Set Expiry Date</Text>
                   <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                     <X color="black" size={24} />
+                     <X color="var(--c-ink)" size={24} />
                   </TouchableOpacity>
                </View>
 

@@ -91,7 +91,7 @@ export default function AppHeader({
     return (
       <View
         className="flex lg:hidden px-4 pb-3 z-10 w-full border-b"
-        style={{ paddingTop: Math.max(topInset + 8, 16), backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+        style={{ paddingTop: 'max(16px, calc(env(safe-area-inset-top, 0px) + 8px))', backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
       >
         {searchOpen ? (
           // Search MODE — replaces the whole header row rather than adding a
@@ -335,7 +335,7 @@ function ProfileActionsMenu({
           style={[
             theme.shadow.card,
             mobile
-              ? { top: Math.max(topInset + 66, 82), left: 16, right: 16 }
+              ? { top: 'max(82px, calc(env(safe-area-inset-top, 0px) + 66px))', left: 16, right: 16 }
               : { top: 66, right: 24, width: 270 },
           ]}
         >
@@ -425,7 +425,7 @@ function NotificationsPanel({
             theme.shadow.card,
             { backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any,
             mobile
-              ? { top: Math.max(topInset + 66, 82), left: 16, right: 16, maxHeight: '70%' }
+              ? { top: 'max(82px, calc(env(safe-area-inset-top, 0px) + 66px))', left: 16, right: 16, maxHeight: '70%' }
               : { top: 66, right: 24, width: 340, maxHeight: 440 },
           ]}
         >

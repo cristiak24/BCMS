@@ -87,11 +87,11 @@ export function ErrorState({ title, message, onRetry }: { title: string; message
     <View
       className="rounded-[20px] px-6 py-8 items-center justify-center w-full dash-fade-in border"
       style={{
-        backgroundColor: 'rgba(239,68,68,0.04)',
-        borderColor: 'rgba(239,68,68,0.14)',
+        backgroundColor: 'var(--c-danger-bg)',
+        borderColor: 'var(--c-danger-border)',
       }}
     >
-      <View className="w-12 h-12 rounded-[16px] items-center justify-center mb-3" style={{ backgroundColor: 'rgba(239,68,68,0.1)' }}>
+      <View className="w-12 h-12 rounded-[16px] items-center justify-center mb-3" style={{ backgroundColor: 'var(--c-danger-bg)' }}>
         <MaterialIcons name="error-outline" size={24} color={dash.danger} />
       </View>
       <Text className="text-base font-bold text-center tracking-tight" style={{ color: dash.ink }}>
@@ -105,7 +105,7 @@ export function ErrorState({ title, message, onRetry }: { title: string; message
       {onRetry ? (
         <View
           className="mt-4 flex-row items-center gap-1.5 px-3.5 py-2 rounded-[10px]"
-          style={{ backgroundColor: 'rgba(239,68,68,0.1)' }}
+          style={{ backgroundColor: 'var(--c-danger-bg)' }}
         >
           <MaterialIcons name="refresh" size={15} color={dash.dangerDeep} />
           <Text className="text-[12px] font-semibold" style={{ color: dash.dangerDeep }}>
