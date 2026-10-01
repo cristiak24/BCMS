@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
 import { eq } from 'drizzle-orm';
 import { requireRequestUser } from '../lib/requestContext';
 import { authenticate } from '../middleware/auth';
 import { toIso } from '../lib/dateUtils';
 import { db } from '../db';
 import { clubs, playersToTeams, teams, users } from '../db/schema';
+import { apiOrigin, deleteStoredFile, fileKeyFromUrl, saveStoredFile, sniffMime } from '../lib/storedFiles';
 import { requestedChildId, resolveSelfPlayer } from '../lib/selfPlayer';
 
 type NotificationPreferences = {
@@ -27,22 +27,10 @@ const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED_AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const ALLOWED_AVATAR_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
-const uploadDir = path.join(__dirname, '../../uploads/avatars');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => {
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        const extension = path.extname(file.originalname).toLowerCase();
-        cb(null, `${file.fieldname}-${uniqueSuffix}${extension}`);
-    },
-});
-
+// Memory, not disk: the API host's disk is wiped on every deploy, so avatars
+// live in Postgres (lib/storedFiles.ts) and are served from /api/files.
 const upload = multer({
-    storage,
+    storage: multer.memoryStorage(),
     limits: { fileSize: AVATAR_MAX_BYTES, files: 1 },
     fileFilter: (_req, file, cb) => {
         const extension = path.extname(file.originalname).toLowerCase();
@@ -227,9 +215,6 @@ router.post('/me/avatar', (req, res, next) => {
         const requestUser = await requireRequestUser(req, res);
 
         if (!requestUser) {
-            if (req.file) {
-                fs.unlink(req.file.path, () => {});
-            }
             return;
         }
 
@@ -237,17 +222,36 @@ router.post('/me/avatar', (req, res, next) => {
             return res.status(400).json({ error: 'No image uploaded' });
         }
 
-        const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+        const mimeType = sniffMime(req.file.buffer);
+        if (!mimeType || !ALLOWED_AVATAR_MIME_TYPES.has(mimeType)) {
+            return res.status(400).json({ error: 'Only JPG, PNG or WebP images up to 2MB are allowed.' });
+        }
+
         const existingUser = await findUserByNumericId(requestUser.id);
 
         if (!existingUser) {
             return res.status(404).json({ error: 'Profile not found' });
         }
 
+        const key = await saveStoredFile({
+            buffer: req.file.buffer,
+            mimeType,
+            fileName: req.file.originalname,
+            kind: 'avatar',
+            isPublic: true,
+            clubId: existingUser.clubId ?? null,
+            uploadedBy: existingUser.id,
+        });
+        // Absolute: the web app renders it from another origin.
+        const avatarUrl = `${apiOrigin(req)}/api/files/${key}`;
+
         await db.update(users).set({
             avatarUrl,
             updatedAt: new Date().toISOString(),
         }).where(eq(users.id, requestUser.id));
+
+        // The previous picture is no longer referenced anywhere.
+        await deleteStoredFile(fileKeyFromUrl(existingUser.avatarUrl)).catch(() => undefined);
 
         return res.json({ success: true, avatarUrl });
     } catch (error) {

@@ -1,7 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
 import Stripe from 'stripe';
 import { toDate, toIso } from '../lib/dateUtils';
 import { verifyBearerToken } from '../lib/clerkAuth';
@@ -11,6 +10,7 @@ import { buildDefaultSettings, DEFAULT_PAYMENT_DUE_DAY, DEFAULT_SETTINGS_ROW_ID 
 import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import { writeAuditLog, type AuditLogInput } from '../services/auditService';
 import { requestedChildId, resolveSelfPlayer } from '../lib/selfPlayer';
+import { saveStoredFile, sniffMime } from '../lib/storedFiles';
 import { db } from '../db';
 import {
     events as pgEvents,
@@ -112,7 +112,6 @@ type PlayerDoc = {
     email?: string | null;
     teamId?: number | null;
     clubId?: number | null;
-    stripeCustomerId?: string | null;
 };
 
 type FinancialSettingsDoc = {
@@ -878,15 +877,26 @@ function buildDueLabel(fees: PlayerPaymentFee[]) {
     return diffDays === 1 ? 'Due in 1 day' : `Due in ${diffDays} days`;
 }
 
-async function listPlayerPaymentMethods(player: PlayerDoc) {
+type Payer = { id: number; email: string; name: string; stripeCustomerId: string | null };
+
+/** The signed-in account paying — a player for themselves, or a parent for their child. */
+async function getPayer(req: Request): Promise<Payer> {
+    const user = (req as AuthenticatedRequest).user;
+    if (!user?.id) {
+        throw Object.assign(new Error('You must be signed in to pay.'), { statusCode: 401 });
+    }
+    return { id: Number(user.id), email: user.email, name: user.name, stripeCustomerId: user.stripeCustomerId ?? null };
+}
+
+async function listPayerPaymentMethods(payer: Payer) {
     const stripe = getStripeIfConfigured();
-    if (!stripe || !player.stripeCustomerId) {
+    if (!stripe || !payer.stripeCustomerId) {
         return [];
     }
 
     try {
         const methods = await stripe.paymentMethods.list({
-            customer: player.stripeCustomerId,
+            customer: payer.stripeCustomerId,
             type: 'card',
             limit: 5,
         });
@@ -900,26 +910,37 @@ async function listPlayerPaymentMethods(player: PlayerDoc) {
             isDefault: index === 0,
         }));
     } catch (error) {
-        console.error('[GET /api/finance/player/summary] Stripe payment methods error:', error);
+        console.error('[finance] Stripe payment methods error:', error);
         return [];
     }
 }
 
-async function ensureStripeCustomer(player: CurrentPlayer) {
-    if (player.data.stripeCustomerId) {
-        return player.data.stripeCustomerId;
+/**
+ * The payer's Stripe customer, created once and stored on the account. It was
+ * never persisted before, so every checkout made a new customer and saved
+ * cards never came back. A stored id Stripe no longer knows (deleted, or the
+ * keys moved from test to live) is replaced.
+ */
+async function ensureStripeCustomer(payer: Payer) {
+    const stripe = getStripe();
+    if (payer.stripeCustomerId) {
+        try {
+            const existing = await stripe.customers.retrieve(payer.stripeCustomerId);
+            if (!(existing as { deleted?: boolean }).deleted) {
+                return payer.stripeCustomerId;
+            }
+        } catch (error: any) {
+            if (error?.code !== 'resource_missing') throw error;
+        }
     }
 
-    const stripe = getStripe();
     const customer = await stripe.customers.create({
-        email: player.data.email ?? undefined,
-        name: getPlayerName(player.data),
-        metadata: {
-            playerId: String(player.data.id),
-        },
+        email: payer.email || undefined,
+        name: payer.name || undefined,
+        metadata: { userId: String(payer.id) },
     });
-
-    player.data.stripeCustomerId = customer.id;
+    await db.update(pgUsers).set({ stripeCustomerId: customer.id }).where(eq(pgUsers.id, payer.id));
+    payer.stripeCustomerId = customer.id;
     return customer.id;
 }
 
@@ -1126,21 +1147,10 @@ export async function stripeWebhookHandler(req: Request, res: Response) {
     }
 }
 
-const uploadDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname).toLowerCase());
-    }
-});
-
+// Memory, not disk: the API host's disk is wiped on every deploy, so documents
+// live in Postgres (lib/storedFiles.ts) and open through /api/files signed links.
 const upload = multer({
-    storage,
+    storage: multer.memoryStorage(),
     limits: { fileSize: FINANCE_UPLOAD_MAX_BYTES, files: 1 },
     fileFilter: (_req, file, cb) => {
         const extension = path.extname(file.originalname).toLowerCase();
@@ -1241,9 +1251,6 @@ router.post('/upload', (req, res, next) => {
     try {
         const clubId = await resolveAdminFinanceClubId(req, res);
         if (clubId === null && res.headersSent) {
-            if (req.file) {
-                fs.unlink(req.file.path, () => {});
-            }
             return;
         }
 
@@ -1252,9 +1259,25 @@ router.post('/upload', (req, res, next) => {
             return;
         }
 
+        const mimeType = sniffMime(req.file.buffer);
+        if (!mimeType || !ALLOWED_FINANCE_UPLOAD_MIME_TYPES.has(mimeType)) {
+            res.status(400).json({ error: 'Only PDF, JPG, PNG or WebP files up to 10MB are allowed.' });
+            return;
+        }
+
         const { type, amount, description } = req.body;
         const parsedAmount = normalizeMoneyValue(amount);
-        const documentUrl = `/uploads/${req.file.filename}`;
+        const key = await saveStoredFile({
+            buffer: req.file.buffer,
+            mimeType,
+            fileName: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
+            kind: 'finance_doc',
+            isPublic: false,
+            clubId: clubId ?? null,
+            uploadedBy: (req as AuthenticatedRequest).user?.id ?? null,
+        });
+        // Private: opened through POST /api/files/:key/link (signed, 5 minutes).
+        const documentUrl = `/api/files/${key}`;
         const record = {
             type: type || 'expense',
             amount: parsedAmount != null ? Math.round(parsedAmount) : 0,
@@ -1280,9 +1303,6 @@ router.post('/upload', (req, res, next) => {
         });
     } catch (error) {
         console.error('[POST /api/finance/upload] error:', error);
-        if (req.file) {
-            fs.unlink(req.file.path, () => {});
-        }
         res.status(500).json({ error: 'Failed to upload document' });
     }
 });
@@ -1309,7 +1329,7 @@ router.get('/player/summary', async (req, res) => {
                 configured: Boolean(process.env.STRIPE_SECRET_KEY?.trim()),
             },
             fees,
-            paymentMethods: await listPlayerPaymentMethods(currentPlayer.data),
+            paymentMethods: await listPayerPaymentMethods(await getPayer(req)),
             transactions: buildTransactions(paymentRows, currency, await payerNamesFor(paymentRows)),
         });
     } catch (error) {
@@ -1438,7 +1458,7 @@ router.post('/admin/manual-payment', async (req, res) => {
 router.post('/player/checkout-session', async (req, res) => {
     try {
         const currentPlayer = await getCurrentPlayer(req);
-        const customerId = await ensureStripeCustomer(currentPlayer);
+        const customerId = await ensureStripeCustomer(await getPayer(req));
         const currency = DEFAULT_PAYMENT_CURRENCY;
         const paymentRows = await getPlayerPaymentRows(currentPlayer.data.id);
         const fees = selectedFeesFromBody(
@@ -1506,7 +1526,7 @@ router.post('/player/checkout-session', async (req, res) => {
 router.post('/player/setup-session', async (req, res) => {
     try {
         const currentPlayer = await getCurrentPlayer(req);
-        const customerId = await ensureStripeCustomer(currentPlayer);
+        const customerId = await ensureStripeCustomer(await getPayer(req));
         const stripe = getStripe();
         const returnUrl = getPaymentsReturnUrl(req);
 
@@ -1589,7 +1609,7 @@ router.post('/player/confirm-setup-session', async (req, res) => {
 
         res.json({
             success: true,
-            paymentMethods: await listPlayerPaymentMethods(currentPlayer.data),
+            paymentMethods: await listPayerPaymentMethods(await getPayer(req)),
         });
     } catch (error) {
         handleRouteError(res, error, '[POST /api/finance/player/confirm-setup-session]');

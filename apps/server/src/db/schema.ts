@@ -52,6 +52,9 @@ export const users = pgTable("users", {
 	lastLoginAt: timestamp("last_login_at", { mode: 'string' }),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+	// Stripe customer of the person who pays (the player or a parent), so saved
+	// cards belong to whoever saved them — never shared between family accounts.
+	stripeCustomerId: varchar("stripe_customer_id", { length: 64 }),
 }, (table) => [
 	unique("users_email_unique").on(table.email),
 	unique("users_firebase_uid_unique").on(table.firebaseUid),
@@ -374,6 +377,26 @@ export const familyJoinRequests = pgTable("family_join_requests", {
 			foreignColumns: [players.id],
 			name: "family_join_requests_player_id_players_id_fk"
 		}).onDelete('set null'),
+]);
+
+// Uploaded files that used to go to ./uploads on the API host (lost on every
+// deploy): profile pictures (public, served by an unguessable key) and finance
+// documents (private, opened through a short-lived signed link).
+// routes/files.ts serves them. Never select `data` in a listing.
+export const storedFiles = pgTable("stored_files", {
+	id: serial().primaryKey().notNull(),
+	key: varchar({ length: 32 }).notNull(),
+	clubId: integer("club_id"),
+	uploadedBy: integer("uploaded_by"),
+	kind: varchar({ length: 20 }).notNull(),
+	isPublic: boolean("is_public").default(false).notNull(),
+	fileName: varchar("file_name", { length: 255 }).notNull(),
+	mimeType: varchar("mime_type", { length: 100 }).notNull(),
+	sizeBytes: integer("size_bytes").notNull(),
+	data: bytea().notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("stored_files_key_unique").on(table.key),
 ]);
 
 // Club document library (small PDFs: regulations, forms, schedules). The file

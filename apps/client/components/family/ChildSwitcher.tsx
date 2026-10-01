@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { familyApi, type FamilyChild, type FamilyPendingRequest } from '../../services/familyApi';
+import { loadFamily } from './useActiveChild';
 import { getActiveChildId, setActiveChildId } from '../../services/apiClient';
 import { getInitials } from '../coach/coachDisplay';
 
@@ -137,7 +138,7 @@ export default function ChildSwitcher() {
   const [adding, setAdding] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const load = () => familyApi.children()
+  const load = (force = false) => loadFamily(force)
     .then((data) => {
       setChildren(data.children);
       setPending(data.pending);
@@ -147,7 +148,7 @@ export default function ChildSwitcher() {
         setActiveChildId(data.children[0].id);
       }
     })
-    .catch(() => setChildren([]));
+    ;
 
   useEffect(() => {
     void load();
@@ -258,7 +259,7 @@ export default function ChildSwitcher() {
         onSent={(teamName) => {
           setAdding(false);
           setNotice(`Cererea a fost trimisă antrenorului echipei ${teamName}.`);
-          void load();
+          void load(true);
         }}
       />
     </View>

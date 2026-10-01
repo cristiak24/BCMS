@@ -15,12 +15,12 @@ import dashboardRoutes from './routes/dashboard';
 import teamsRoutes from './routes/teams';
 import playerRoutes from './routes/playerRoutes';
 import eventRoutes from './routes/eventRoutes';
-import documentRoutes from './routes/documents';
 import l12Routes from './routes/l12';
 import clubDocumentRoutes from './routes/clubDocuments';
 import contactRoutes from './routes/contacts';
 import familyRequestRoutes from './routes/familyRequests';
 import familyRoutes from './routes/family';
+import fileRoutes from './routes/files';
 import notificationRoutes from './routes/notificationRoutes';
 import { loadServerEnv } from './lib/loadEnv';
 import { createAllowedOrigins, isOriginAllowed } from './lib/corsOrigins';
@@ -79,12 +79,12 @@ export function createServerApp() {
     app.use('/api/teams', teamsRoutes);
     app.use('/api/players', playerRoutes);
     app.use('/api/events', eventRoutes);
-    app.use('/api/documents', documentRoutes);
     app.use('/api/l12', l12Routes);
     app.use('/api/club-documents', clubDocumentRoutes);
     app.use('/api/contacts', contactRoutes);
     app.use('/api/family-requests', familyRequestRoutes);
     app.use('/api/family', familyRoutes);
+    app.use('/api/files', fileRoutes);
     app.use('/api/notifications', notificationRoutes);
 
     app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

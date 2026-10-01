@@ -4,7 +4,8 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import * as DocumentPicker from '@/src/web/documentPicker';
 import { financeApi, FinancialSettings, FinancialDocument, StripeAdminConfig, AdminRecentPayment } from '../../../services/financeApi';
 import { useResponsive } from '../../../hooks/useResponsive';
-import { resolveDocumentUrl } from '../../../config/serverUrl';
+import { buildServerUrl, resolveDocumentUrl } from '../../../config/serverUrl';
+import { apiFetch } from '../../../services/apiClient';
 import AdminHero from '../../../components/admin/AdminHero';
 import StatCard from '../../../components/ui/StatCard';
 import { EmptyState, SkeletonBlock } from '../../../components/dashboard/ScreenStates';
@@ -389,12 +390,28 @@ export default function FinancialSettingsPage() {
         }
     };
 
-    const openDocumentUrl = (documentUrl: string | null) => {
-        const url = resolveDocumentUrl(documentUrl);
-        if (Platform.OS === 'web' && url) {
-            window.open(url, '_blank');
-        } else {
+    const openDocumentUrl = async (documentUrl: string | null) => {
+        if (Platform.OS !== 'web' || !documentUrl) {
             Alert.alert('Info', 'Folosiți interfața web pentru a descărca documentul.');
+            return;
+        }
+        // Documents stored in the database are private: ask for a 5-minute
+        // signed link. Open the tab first, inside the tap, or popup blockers eat it.
+        const key = documentUrl.match(/^\/api\/files\/([a-f0-9]{32})$/)?.[1];
+        if (!key) {
+            const url = resolveDocumentUrl(documentUrl);
+            if (url) window.open(url, '_blank');
+            return;
+        }
+        const tab = window.open('about:blank', '_blank');
+        try {
+            const { path } = await apiFetch<{ path: string }>(`/files/${key}/link`, { method: 'POST' });
+            const url = buildServerUrl(path);
+            if (tab) tab.location.href = url;
+            else window.location.assign(url);
+        } catch {
+            tab?.close();
+            Alert.alert('Eroare', 'Nu am putut deschide documentul.');
         }
     };
 
@@ -780,7 +797,7 @@ export default function FinancialSettingsPage() {
                                                         <View className="flex-row items-center gap-2">
                                                             {entry.documentUrl ? (
                                                                 <Pressable
-                                                                    onPress={() => openDocumentUrl(entry.documentUrl)}
+                                                                    onPress={() => void openDocumentUrl(entry.documentUrl)}
                                                                     className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-[10px]"
                                                                     style={{ backgroundColor: dash.lineSoft }}
                                                                 >

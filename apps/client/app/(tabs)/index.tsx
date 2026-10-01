@@ -21,6 +21,7 @@ import GlassCard from '../../components/ui/GlassCard';
 import { Skeleton } from '../../components/ui/Skeleton';
 import PageContainer from '../../components/ui/PageContainer';
 import HeroBanner, { formatToday, getGreeting, HeroButton, HeroChip } from '../../components/ui/HeroBanner';
+import { useActiveChild } from '../../components/family/useActiveChild';
 import ProgressRing from '../../components/ui/ProgressRing';
 import DateTile from '../../components/ui/DateTile';
 import { PLAYER_FEATURE_FLAGS } from '../../config/playerFeatureFlags';
@@ -908,6 +909,8 @@ function PlayerFormStats({
 function PlayerHomeScreen() {
   const router = useRouter();
   const { session } = useSession();
+  const isParent = session?.role === 'parent';
+  const { active: activeChild } = useActiveChild(isParent);
   const { isMobile } = useResponsive();
   // Search lives in the global app header (components/AppHeader.tsx, wired via
   // HeaderContext) — same as the schedule screen. Home used to render its own
@@ -1115,7 +1118,11 @@ function PlayerHomeScreen() {
         <HeroBanner
           eyebrow={formatToday()}
           title={session?.name?.trim() ? `${getGreeting()}, ${getFirstName(session)}` : getGreeting()}
-          subtitle={[session?.clubName, session?.teamName].filter(Boolean).join(' · ') || 'Spațiul tău de jucător'}
+          // A parent is greeted by their own name, but everything below is the
+          // selected child's — say whose.
+          subtitle={isParent
+            ? (activeChild ? [`Pentru ${activeChild.firstName}`, ...activeChild.teams].join(' · ') : 'Adaugă copilul ca să-i vezi programul')
+            : [session?.clubName, session?.teamName].filter(Boolean).join(' · ') || 'Spațiul tău de jucător'}
           // Chips wait for data — "0 antrenamente" flashing during the load
           // reads as a real (and alarming) number.
           chips={loading ? null : (
@@ -1127,7 +1134,7 @@ function PlayerHomeScreen() {
           )}
           actions={
             <>
-              <HeroButton label="Programul meu" icon="calendar-today" onPress={goToSchedule} />
+              <HeroButton label={isParent ? 'Programul copilului' : 'Programul meu'} icon="calendar-today" onPress={goToSchedule} />
               {PLAYER_FEATURE_FLAGS.teammatesView ? (
                 <HeroButton label="Echipa mea" icon="groups" variant="ghost" onPress={() => router.push('/team' as any)} className="hidden sm:flex" />
               ) : null}
