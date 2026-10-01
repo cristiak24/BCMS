@@ -21,6 +21,7 @@ import contactRoutes from './routes/contacts';
 import familyRequestRoutes from './routes/familyRequests';
 import familyRoutes from './routes/family';
 import fileRoutes from './routes/files';
+import gameRoutes from './routes/games';
 import notificationRoutes from './routes/notificationRoutes';
 import { loadServerEnv } from './lib/loadEnv';
 import { createAllowedOrigins, isOriginAllowed } from './lib/corsOrigins';
@@ -85,6 +86,7 @@ export function createServerApp() {
     app.use('/api/family-requests', familyRequestRoutes);
     app.use('/api/family', familyRoutes);
     app.use('/api/files', fileRoutes);
+    app.use('/api/games', gameRoutes);
     app.use('/api/notifications', notificationRoutes);
 
     app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

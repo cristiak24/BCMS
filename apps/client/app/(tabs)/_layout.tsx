@@ -8,6 +8,7 @@ import AppHeader from '../../components/AppHeader';
 import { MobileBottomNavigation, MobileNavigationSheet } from '../../components/MobileNavigation';
 import { PLAYER_FEATURE_FLAGS } from '../../config/playerFeatureFlags';
 import ChildSwitcher from '../../components/family/ChildSwitcher';
+import AssignedGamesBanner from '../../components/stats/AssignedGamesBanner';
 
 const PLAYER_MENU_ITEMS = [
     { href: '/myclub' as const, label: 'Acasă', icon: 'grid-view' as const, match: 'myclub' },
@@ -52,9 +53,14 @@ const MOBILE_PRIMARY_MATCHES = [
 
 type TabMenuItem = (typeof PLAYER_MENU_ITEMS)[number] | (typeof COACH_MENU_ITEMS)[number];
 
-function getActivePlayerItem<T extends { href: string; match: string }>(pathname: string, items: T[]) {
+function getActivePlayerItem<T extends { href: string; match: string; label: string }>(pathname: string, items: T[]): T {
     const normalizedPathname = pathname || '/myclub';
-    return items.find((item) => normalizedPathname.startsWith(item.href)) ?? items[0];
+    const match = items.find((item) => normalizedPathname.startsWith(item.href));
+    if (match) return match;
+    // Pages without a menu entry still need a truthful header title (not "Acasă").
+    if (/\/stats\//.test(normalizedPathname)) return { ...items[0], label: 'Statistică meci', match: 'stats' };
+    if (normalizedPathname.startsWith('/coach/l12')) return { ...items[0], label: 'L12', match: 'coach/l12' };
+    return items[0];
 }
 
 // Split into two components so HeaderProvider wraps the consumer, matching
@@ -130,6 +136,7 @@ function PlayerTabsLayoutContent() {
                 <div className="flex-1 min-w-0 overflow-auto overflow-x-hidden flex flex-col relative h-full">
                     <div className="flex-1 min-w-0 pb-24 lg:pb-0 relative w-full flex flex-col">
                         {isParent ? <ChildSwitcher /> : null}
+                        {!isCoach ? <AssignedGamesBanner /> : null}
                         <Outlet />
                     </div>
                 </div>

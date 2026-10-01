@@ -396,6 +396,23 @@ export default function EventDetailScreen() {
               {event.type === 'match' && event.teamId && !cancelled ? (
                 <L12MatchLink eventId={event.id} onOpen={(path) => router.push(path as any)} />
               ) : null}
+              {event.type === 'match' && event.teamId && !cancelled ? (
+                <Pressable
+                  onPress={() => router.push(`/admin/stats/${event.id}` as any)}
+                  accessibilityRole="button"
+                  className="ui-lift ui-press rounded-[16px] border p-4 flex-row items-center gap-3 text-left"
+                  style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
+                >
+                  <View className="w-10 h-10 rounded-[11px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-success-bg)' }}>
+                    <MaterialIcons name="leaderboard" size={19} color="var(--c-success-fg)" />
+                  </View>
+                  <View className="flex-1 min-w-0">
+                    <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-ink)' }}>Statistică live</Text>
+                    <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Scor, puncte și faulturi pe jucător · fișa meciului</Text>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
+                </Pressable>
+              ) : null}
 
               <Card title="Echipă">
                 {event.teamId ? (

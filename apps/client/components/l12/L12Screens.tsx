@@ -423,6 +423,7 @@ export function L12MatchScreen() {
         <View className="flex-row flex-wrap gap-2">
           <ActionButton icon="picture-as-pdf" label="PDF" onPress={() => docInput && printL12(docInput)} />
           <ActionButton icon="description" label="Word" onPress={() => docInput && downloadL12Word(docInput)} />
+          <ActionButton icon="leaderboard" label="Statistică live" onPress={() => router.push(`${base.replace('/l12', '')}/stats/${eventId}` as any)} />
           {template ? <ActionButton icon="restore" label="Încarcă L12 constant" onPress={() => setConfirm('template')} /> : null}
           <ActionButton icon="bookmark" label="Salvează ca L12 constant" onPress={() => setConfirm('saveTemplate')} disabled={draft.players.length === 0} />
           {saved ? <ActionButton icon="delete-outline" label="Șterge" tone="danger" onPress={() => setConfirm('reset')} /> : null}

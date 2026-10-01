@@ -399,6 +399,73 @@ export const storedFiles = pgTable("stored_files", {
 	unique("stored_files_key_unique").on(table.key),
 ]);
 
+// Live match statistics (lib/gameStats.ts, routes/games.ts). One row per
+// match event; the actions themselves live in game_stat_events and everything
+// (score, box score, minutes) is derived from them. score_us/score_them and
+// current_period are a snapshot for listings and the live view.
+export const gameStats = pgTable("game_stats", {
+	id: serial().primaryKey().notNull(),
+	eventId: integer("event_id").notNull(),
+	teamId: integer("team_id").notNull(),
+	clubId: integer("club_id").notNull(),
+	mode: varchar({ length: 10 }).notNull(),
+	status: varchar({ length: 10 }).default('setup').notNull(),
+	// Null = kept without a game clock (simple mode); else seconds per period.
+	periodSec: integer("period_sec"),
+	opponentName: varchar("opponent_name", { length: 160 }),
+	// [{ number, name }] — empty when the opponent is kept as a team only.
+	opponentRoster: jsonb("opponent_roster").default([]).notNull(),
+	// Snapshot: [{ playerId, number, firstName, lastName }].
+	roster: jsonb().default([]).notNull(),
+	starters: jsonb().default([]).notNull(),
+	scorekeeperUserId: integer("scorekeeper_user_id"),
+	scoreUs: integer("score_us").default(0).notNull(),
+	scoreThem: integer("score_them").default(0).notNull(),
+	currentPeriod: integer("current_period").default(1).notNull(),
+	clockSec: integer("clock_sec"),
+	createdBy: integer("created_by"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+	finishedAt: timestamp("finished_at", { mode: 'string' }),
+}, (table) => [
+	unique("game_stats_event_id_unique").on(table.eventId),
+	foreignKey({
+			columns: [table.eventId],
+			foreignColumns: [events.id],
+			name: "game_stats_event_id_events_id_fk"
+		}).onDelete('cascade'),
+	foreignKey({
+			columns: [table.teamId],
+			foreignColumns: [teams.id],
+			name: "game_stats_team_id_teams_id_fk"
+		}).onDelete('cascade'),
+]);
+
+export const gameStatEvents = pgTable("game_stat_events", {
+	id: serial().primaryKey().notNull(),
+	gameId: integer("game_id").notNull(),
+	// Generated on the scorer's device: makes offline re-sends idempotent.
+	clientId: varchar("client_id", { length: 40 }).notNull(),
+	seq: integer().notNull(),
+	period: integer().notNull(),
+	clockSec: integer("clock_sec"),
+	side: varchar({ length: 4 }).notNull(),
+	playerId: integer("player_id"),
+	otherPlayerId: integer("other_player_id"),
+	oppNumber: varchar("opp_number", { length: 3 }),
+	type: varchar({ length: 16 }).notNull(),
+	deleted: boolean().default(false).notNull(),
+	createdBy: integer("created_by"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("game_stat_events_game_client_unique").on(table.gameId, table.clientId),
+	foreignKey({
+			columns: [table.gameId],
+			foreignColumns: [gameStats.id],
+			name: "game_stat_events_game_id_game_stats_id_fk"
+		}).onDelete('cascade'),
+]);
+
 // Club document library (small PDFs: regulations, forms, schedules). The file
 // bytes live in Postgres on purpose — the API host has no persistent disk, so
 // anything written to ./uploads disappears on the next deploy. Size limits are

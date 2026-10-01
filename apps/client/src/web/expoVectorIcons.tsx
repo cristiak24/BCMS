@@ -109,6 +109,13 @@ import {
   ArrowUpDown,
   Share2,
   ListPlus,
+  ArrowLeftRight,
+  Undo2,
+  Pause,
+  Play,
+  Flag,
+  CloudOff,
+  ChevronsRight,
 } from 'lucide-react';
 
 type IconProps = {
@@ -231,6 +238,13 @@ const iconMap: Record<string, typeof Circle> = {
   'vpn-key': KeyRound,
   share: Share2,
   'group-add': ListPlus,
+  'swap-horiz': ArrowLeftRight,
+  undo: Undo2,
+  pause: Pause,
+  'play-arrow': Play,
+  flag: Flag,
+  'cloud-off': CloudOff,
+  'skip-next': ChevronsRight,
   info: Info,
   assignment: ClipboardList,
   star: Star,
