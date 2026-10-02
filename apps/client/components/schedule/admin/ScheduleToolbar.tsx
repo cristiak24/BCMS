@@ -389,24 +389,21 @@ export function ScheduleToolbar({
     );
   }
 
+  // Two fixed rows: period + view/actions, then the type chips. A single
+  // wrapping row broke into three uneven lines at 1280px.
   return (
-    <View>
-      <View className="flex-row items-center gap-3 flex-wrap">
+    <View className="gap-3">
+      <View className="flex-row items-center gap-3">
         {monthNav}
-
         <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>
           {eventCount} {eventCount === 1 ? 'eveniment' : 'evenimente'}
         </Text>
-
-        <View className="w-px h-6" style={{ backgroundColor: 'var(--c-border)' }} />
-
-        {typeChips}
-
         <View className="ml-auto flex-row items-center gap-2">
           {viewSwitcher}
           {actions}
         </View>
       </View>
+      {typeChips}
       {activePills}
     </View>
   );

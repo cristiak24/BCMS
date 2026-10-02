@@ -27,6 +27,7 @@ import { DayScheduleModal } from '../../components/schedule/admin/DayScheduleMod
 import { EventAttendanceModal } from '../../components/schedule/admin/EventAttendanceModal';
 import { FilterModal } from '../../components/schedule/admin/FilterModal';
 import PageHeader from '../../components/ui/PageHeader';
+import Button from '../../components/ui/Button';
 import TeamMedicalVisaModal from '../../components/schedule/admin/TeamMedicalVisaModal';
 import TeamPaymentsReportModal from '../../components/schedule/admin/TeamPaymentsReportModal';
 
@@ -108,46 +109,9 @@ export default function ScheduleScreen() {
   }, []);
 
   useEffect(() => {
-    setHeaderActions(
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <View style={{ flexDirection: 'row', backgroundColor: 'var(--c-surface-3)', borderRadius: 24, padding: 3 }}>
-          {(['Monthly', 'Attendance', 'Grade'] as const).map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              onPress={() => setActiveTab(tab)}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 6,
-                borderRadius: 20,
-                backgroundColor: activeTab === tab ? 'var(--c-surface)' : 'transparent',
-                shadowColor: activeTab === tab ? 'var(--c-ink-strong)' : 'transparent',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: activeTab === tab ? 0.08 : 0,
-                shadowRadius: 4,
-              }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: '800', color: activeTab === tab ? 'var(--c-brand-fg)' : 'var(--c-faint)', textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' } as any}>
-                {TOP_TAB_LABELS[tab]}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Pressable
-          onPress={() => { setAddEventDate(null); setShowAddModal(true); }}
-          accessibilityRole="button"
-          accessibilityLabel="Adaugă eveniment"
-          className="ui-press"
-          style={{
-            flexDirection: 'row', alignItems: 'center', backgroundColor: 'var(--c-brand-surface)', height: 36, paddingHorizontal: 14,
-            borderRadius: 10, gap: 6, boxShadow: 'var(--e-brand)',
-          } as any}
-        >
-          <Plus color="#FFFFFF" size={16} strokeWidth={2.4} />
-          <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700', whiteSpace: 'nowrap' } as any}>Adaugă eveniment</Text>
-        </Pressable>
-      </View>
-    );
+    // Tabs and "Adaugă eveniment" live in the page header now; in the top
+    // bar they squeezed the search field down to "Caută evenim…".
+    setHeaderActions(null);
 
     // Extended FAB ("+ Eveniment"): fixed to the viewport above the bottom
     // nav. It was `position: absolute` inside the page flow and carried a
@@ -503,14 +467,14 @@ export default function ScheduleScreen() {
             onGrade={navigateToGrade}
           />
         ) : (
-          <View className={`${isDesktop ? 'flex-row gap-5 items-start w-full' : 'gap-4'}`}>
+          <View className={`${isWideDesktop ? 'flex-row gap-5 items-start w-full' : 'gap-5'}`}>
             <View className="flex-1 min-w-0">
               {/* Month header removed — the toolbar above already owns the month
                   label, count and stepper. The grid card is now just the grid. */}
               <MonthlyCalendarGrid currentDate={currentDate} events={visibleEvents} onSelectEvent={navigateToEvent} onSelectDay={openDaySchedule} />
             </View>
 
-            <View className={`${isDesktop ? 'shrink-0' : 'w-full'} gap-3`} style={isDesktop ? { width: isWideDesktop ? 380 : 340 } : undefined}>
+            <View className={`${isWideDesktop ? 'shrink-0' : 'w-full'} gap-3`} style={isWideDesktop ? { width: 380 } : undefined}>
               <View className="flex-row items-center justify-between px-0.5">
                 <Text className="text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>
                   Evenimente viitoare{upcomingCount ? <Text style={{ color: 'var(--c-faint)' }}>{` · ${upcomingCount}`}</Text> : null}
@@ -560,12 +524,16 @@ export default function ScheduleScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
-      <PageHeader title="Program" className="px-6 xl:px-8 pt-4" />
-      {/* Phones: Lunar / Prezență / Notare and the calendar view icons share
-          one row (they were two rows, and the tabs only rendered on "Lunar" —
-          from Prezență there was no way back). Desktop keeps them in the header. */}
-      {!isDesktop && (
-        <View className="flex-row items-center justify-between gap-2 px-4 pt-3">
+      <PageHeader
+        title="Program"
+        className="px-6 xl:px-8 pt-4 !mb-0"
+        actionsOnMobile={false}
+        actions={<Button icon="add" label="Adaugă eveniment" variant="primary" onPress={() => { setAddEventDate(null); setShowAddModal(true); }} />}
+      />
+      {/* Lunar / Prezență / Notare share one row with the calendar view icons
+          (on phones the view icons sit at the right of the same row). */}
+      {(
+        <View className={`flex-row items-center justify-between gap-2 ${isMobile ? 'px-4 pt-3' : 'px-6 xl:px-8 pt-3'}`}>
           <View
             className="flex-row items-center rounded-[10px] p-[3px] gap-[2px] shrink min-w-0"
             style={{ backgroundColor: 'var(--c-surface-3)' }}
@@ -590,7 +558,7 @@ export default function ScheduleScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          {activeTab === 'Monthly' ? (
+          {activeTab === 'Monthly' && !isDesktop ? (
             <ScheduleViewSwitcher view={scheduleView} onViewChange={changeView} iconOnly />
           ) : null}
         </View>

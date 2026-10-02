@@ -1,34 +1,35 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, ScrollView, TextInput } from '@/src/web/reactNative';
-import { CalendarDays, CheckCircle2, Clock, MapPin, Medal, Star, UserCheck, ChevronLeft, ChevronRight, X, Search } from 'lucide-react';
+import { View, Text, Pressable, ScrollView } from '@/src/web/reactNative';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
 import { CalendarEvent, eventsApi } from '../../services/eventsApi';
 import { useResponsive } from '../../hooks/useResponsive';
-import { RO_LOCALE, RO_MONTHS } from './scheduleShared';
+import { RO_LOCALE, RO_MONTHS, getEventTypeMeta } from './scheduleShared';
+import { useHeader } from '../HeaderContext';
 import ThemedCheckbox from '../myclub/ThemedCheckbox';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import Button from '../ui/Button';
+import FilterChips from '../ui/FilterChips';
+import SelectField from '../ui/SelectField';
+import Pagination, { usePagination } from '../ui/Pagination';
+import { EmptyState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
 import { Skeleton } from '../ui/Skeleton';
 
 type GradeStatusFilter = 'pending' | 'graded';
 type GradeTypeFilter = 'all' | CalendarEvent['type'];
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 15;
 
 function isEventGraded(event: CalendarEvent) {
   return event.status === 'completed' || event.status === 'graded';
 }
 
-function getEventTypeTone(type: CalendarEvent['type']) {
-  if (type === 'match') return { label: 'Meci', bg: 'bg-[#EAF2FF]', text: 'text-[#1D3E90]' };
-  if (type === 'camp') return { label: 'Cantonament', bg: 'bg-[#F1E8FF]', text: 'text-[#6D28D9]' };
-  if (type === 'admin') return { label: 'Administrativ', bg: 'bg-slate-100', text: 'text-slate-600' };
-  return { label: 'Antrenament', bg: 'bg-[#E1F1FF]', text: 'text-[#0A5EA8]' };
-}
-
 export function GradeTab() {
   const router = useRouter();
-  const { isMobile, isSmallPhone } = useResponsive();
+  const { isMobile } = useResponsive();
+  const { searchValue: search } = useHeader();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,8 +37,6 @@ export function GradeTab() {
   const [typeFilter, setTypeFilter] = useState<GradeTypeFilter>('all');
   const [teamFilter, setTeamFilter] = useState<number | 'all'>('all');
   const [coachFilter, setCoachFilter] = useState<number | 'all'>('all');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [confirmBulk, setConfirmBulk] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -65,7 +64,6 @@ export function GradeTab() {
   }, [viewYear, viewMonth]);
 
   useEffect(() => {
-    setPage(0);
     setSelectedIds(new Set());
   }, [statusFilter, typeFilter, teamFilter, coachFilter, search, viewMonth, viewYear]);
 
@@ -112,13 +110,11 @@ export function GradeTab() {
     return true;
   });
 
-  const activeFilterCount =
-    (typeFilter !== 'all' ? 1 : 0) + (teamFilter !== 'all' ? 1 : 0) + (coachFilter !== 'all' ? 1 : 0) + (search.trim() ? 1 : 0);
-  const resetFilters = () => { setTypeFilter('all'); setTeamFilter('all'); setCoachFilter('all'); setSearch(''); };
-
-  const totalPages = Math.max(1, Math.ceil(filteredEvents.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const paginatedEvents = filteredEvents.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+  const { page, totalPages, pageItems: paginatedEvents, setPage, rangeStart, rangeEnd, total } = usePagination(
+    filteredEvents,
+    PAGE_SIZE,
+    `${statusFilter}|${typeFilter}|${teamFilter}|${coachFilter}|${search}|${viewYear}-${viewMonth}`,
+  );
 
   // Bulk-grade is only offered in the "To Grade" view.
   const selectable = statusFilter === 'pending';
@@ -160,334 +156,154 @@ export function GradeTab() {
     }
   };
 
-  const typeFilters: { label: string; value: GradeTypeFilter }[] = [
-    { label: 'Toate', value: 'all' },
-    { label: 'Antrenamente', value: 'training' },
-    { label: 'Meciuri', value: 'match' },
-    { label: 'Cantonamente', value: 'camp' },
-    { label: 'Administrativ', value: 'admin' },
+  const statusScoped = pastEvents.filter((event) => (statusFilter === 'graded' ? isEventGraded(event) : !isEventGraded(event)));
+  const typeOptions = [
+    { key: 'all' as GradeTypeFilter, label: 'Toate', count: statusScoped.length },
+    ...(['training', 'match', 'camp', 'admin'] as const).map((type) => ({
+      key: type as GradeTypeFilter,
+      label: getEventTypeMeta(type).label,
+      dot: getEventTypeMeta(type).solid,
+      count: statusScoped.filter((e) => e.type === type).length,
+    })).filter((o) => o.count > 0 || typeFilter === o.key),
   ];
 
-  const renderSummaryCard = (label: string, value: number, icon: React.ReactNode, tone: string) => (
-    <View className={`rounded-[14px] p-3.5 border ${tone}`}>
-      <View className="flex-row items-center justify-between">
-        <Text className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</Text>
-        {icon}
-      </View>
-      <Text className="text-[22px] font-bold text-[#0E2041] mt-2 tabular">{value}</Text>
-    </View>
-  );
-
-  const renderPagination = () => {
-    if (filteredEvents.length <= PAGE_SIZE) return null;
-
-    return (
-      <View className={`${isMobile ? 'gap-3 mx-4' : 'flex-row items-center justify-between mx-8'} bg-white rounded-[24px] border border-[#DDE7F5] p-4 mb-8 max-w-[1180px] self-center w-full`}>
-        <Text className="text-slate-500 font-black text-[12px] uppercase tracking-widest">
-          Pagina {safePage + 1} din {totalPages}
-        </Text>
-        <View className="flex-row gap-2">
-          <TouchableOpacity
-            disabled={safePage === 0}
-            onPress={() => setPage((value) => Math.max(value - 1, 0))}
-            className={`px-4 py-2 rounded-full border ${safePage === 0 ? 'bg-slate-50 border-slate-100 opacity-50' : 'bg-white border-[#CFE0EF]'}`}
-          >
-            <Text className="text-[#1D3E90] text-[11px] font-black uppercase tracking-widest">Înapoi</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            disabled={safePage >= totalPages - 1}
-            onPress={() => setPage((value) => Math.min(value + 1, totalPages - 1))}
-            className={`px-4 py-2 rounded-full border ${safePage >= totalPages - 1 ? 'bg-slate-50 border-slate-100 opacity-50' : 'bg-[#1D3E90] border-[#1D3E90]'}`}
-          >
-            <Text className={`${safePage >= totalPages - 1 ? 'text-[#1D3E90]' : 'text-white'} text-[11px] font-black uppercase tracking-widest`}>
-              Înainte
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
   return (
-    <View className="flex-1 bg-[#EDF4FB]">
-      <View className={`${isMobile ? 'px-4 pt-5' : 'px-8 pt-8'} w-full`}>
-        <View className="w-full max-w-[1180px] self-center">
-          {/* Compact header on the page background (was a 32px navy slab that
-              repeated the section title and pushed content down). */}
-          <View className={`mb-4 ${isMobile ? 'gap-3' : 'flex-row items-center justify-between'}`}>
-            {/* Desktop only — on phones the Notare tab above already says it. */}
-            <View className="hidden lg:flex flex-1">
-              <Text className="text-[22px] md:text-[26px] font-bold tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }}>
-                Centru de notare
-              </Text>
-              <Text className="text-[13px] font-medium mt-1" style={{ color: 'var(--c-muted)' }}>
-                Notează sesiunile trecute și revizuiește-le pe cele notate.
-              </Text>
-            </View>
-
-            <View className="flex-row items-center rounded-[10px] p-[3px] self-start border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
-              <TouchableOpacity
-                onPress={() => setCurrentDate(new Date(viewYear, viewMonth - 1, 1))}
-                className="w-8 h-8 items-center justify-center rounded-[8px]"
-              >
-                <ChevronLeft size={16} color="var(--c-ink-soft)" />
-              </TouchableOpacity>
-              <View className="px-3 h-8 justify-center">
-                <Text className="text-[12px] font-semibold tracking-wide uppercase" style={{ color: 'var(--c-ink)' }}>
-                  {RO_MONTHS[viewMonth]} {viewYear}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setCurrentDate(new Date(viewYear, viewMonth + 1, 1))}
-                className="w-8 h-8 items-center justify-center rounded-[8px]"
-              >
-                <ChevronRight size={16} color="var(--c-ink-soft)" />
-              </TouchableOpacity>
-            </View>
+    <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 132 }}>
+      <View className={`${isMobile ? 'px-4 pt-3' : 'px-6 xl:px-8 pt-4'} w-full gap-4`}>
+        {/* Period + status */}
+        <View className="flex-row flex-wrap items-center gap-3">
+          <View className="flex-row items-center gap-1">
+            <Pressable onPress={() => setCurrentDate(new Date(viewYear, viewMonth - 1, 1))} accessibilityLabel="Luna anterioară" className="ui-press w-8 h-8 rounded-[9px] items-center justify-center border" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' }}>
+              <ChevronLeft size={16} color="var(--c-ink-soft)" />
+            </Pressable>
+            <Text className="text-[15px] font-bold px-2.5 min-w-[132px]" style={{ color: 'var(--c-ink)' }}>
+              {RO_MONTHS[viewMonth].charAt(0).toUpperCase() + RO_MONTHS[viewMonth].slice(1)} {viewYear}
+            </Text>
+            <Pressable onPress={() => setCurrentDate(new Date(viewYear, viewMonth + 1, 1))} accessibilityLabel="Luna următoare" className="ui-press w-8 h-8 rounded-[9px] items-center justify-center border" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' }}>
+              <ChevronRight size={16} color="var(--c-ink-soft)" />
+            </Pressable>
           </View>
-
-          <View className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-            {renderSummaryCard('De notat', pendingEvents.length, <Star size={18} color="var(--c-warning)" />, 'bg-amber-50 border-amber-100')}
-            {renderSummaryCard('Notate', gradedEvents.length, <CheckCircle2 size={18} color="var(--c-success-fg)" />, 'bg-emerald-50 border-emerald-100')}
-            {renderSummaryCard('Antrenamente', trainingCount, <CalendarDays size={18} color="var(--c-brand-fg)" />, 'bg-white border-[#DDE7F5]')}
-            {renderSummaryCard('Meciuri', matchCount, <Medal size={18} color="#0789A3" />, 'bg-cyan-50 border-cyan-100')}
+          <View className="p-[3px] rounded-[10px] flex-row sm:ml-auto" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+            {(['pending', 'graded'] as GradeStatusFilter[]).map((status) => {
+              const active = statusFilter === status;
+              const count = status === 'pending' ? pendingEvents.length : gradedEvents.length;
+              return (
+                <Pressable
+                  key={status}
+                  onPress={() => setStatusFilter(status)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  className="px-3 h-[30px] rounded-[8px] flex-row items-center gap-1.5"
+                  style={active ? ({ backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any) : undefined}
+                >
+                  <Text className="text-[12.5px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>{status === 'pending' ? 'De notat' : 'Notate'}</Text>
+                  <Text className="t-num text-[11.5px] font-semibold" style={{ color: status === 'pending' && count > 0 ? 'var(--c-warning-fg)' : 'var(--c-faint)' }}>{count}</Text>
+                </Pressable>
+              );
+            })}
           </View>
+        </View>
 
-          <View className={`bg-white rounded-[28px] border border-[#DDE7F5] p-4 mb-5 ${isMobile ? 'gap-4' : 'flex-row items-center justify-between'}`}>
-            <View className="flex-row bg-[#F1F5F9] rounded-full p-1 self-start">
-              {(['pending', 'graded'] as GradeStatusFilter[]).map((status) => {
-                const active = statusFilter === status;
+        {/* Filters */}
+        <View className="flex-col lg:flex-row lg:items-center gap-2">
+          {teamOptions.length > 1 ? (
+            <SelectField
+              label="Echipă"
+              icon="groups"
+              options={[{ key: 'all', label: 'Toate echipele' }, ...teamOptions.map((t) => ({ key: String(t.id), label: t.name }))]}
+              value={teamFilter === 'all' ? 'all' : String(teamFilter)}
+              onChange={(v) => setTeamFilter(v === 'all' ? 'all' : Number(v))}
+              className="w-full lg:w-[240px]"
+            />
+          ) : null}
+          {coachOptions.length > 1 ? (
+            <SelectField
+              label="Antrenor"
+              icon="person"
+              options={[{ key: 'all', label: 'Toți antrenorii' }, ...coachOptions.map((c) => ({ key: String(c.id), label: c.name }))]}
+              value={coachFilter === 'all' ? 'all' : String(coachFilter)}
+              onChange={(v) => setCoachFilter(v === 'all' ? 'all' : Number(v))}
+              className="w-full lg:w-[220px]"
+            />
+          ) : null}
+          <View className="flex-1 min-w-0">
+            <FilterChips label="Tip eveniment" options={typeOptions} value={typeFilter} onChange={setTypeFilter} />
+          </View>
+        </View>
+
+        {selectable && selectedIds.size > 0 ? (
+          <View className="flex-row items-center gap-3 rounded-[12px] px-3.5 py-2.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+            <Text className="flex-1 text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
+              {selectedIds.size} {selectedIds.size === 1 ? 'eveniment selectat' : 'evenimente selectate'}
+            </Text>
+            <Button size="sm" variant="ghost" label="Renunță" onPress={() => setSelectedIds(new Set())} />
+            <Button size="sm" variant="primary" icon="done-all" label="Marchează ca notate" loading={bulkBusy} onPress={() => setConfirmBulk(true)} />
+          </View>
+        ) : null}
+
+        {loading ? (
+          <View className="gap-2">
+            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[58px] w-full rounded-[12px]" />)}
+          </View>
+        ) : filteredEvents.length === 0 ? (
+          <EmptyState
+            compact
+            icon={statusFilter === 'pending' ? 'task-alt' : 'search-off'}
+            title={statusFilter === 'pending' ? 'Nimic de notat' : 'Niciun eveniment notat'}
+            message={`Niciun eveniment ${statusFilter === 'graded' ? 'notat' : 'de notat'} în ${RO_MONTHS[viewMonth]} ${viewYear} pentru filtrele alese.`}
+          />
+        ) : (
+          <>
+            <View className="rounded-[14px] border overflow-hidden" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
+              {selectable ? (
+                <View className="flex-row items-center gap-2 px-3 py-2 border-b" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}>
+                  <ThemedCheckbox checked={pageAllSelected} onToggle={toggleSelectPage} ariaLabel="Selectează pagina" size={18} />
+                  <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{pageAllSelected ? 'Deselectează pagina' : 'Selectează pagina'}</Text>
+                </View>
+              ) : null}
+              {paginatedEvents.map((item, index) => {
+                const eventDate = new Date(item.startTime);
+                const meta = getEventTypeMeta(item.type);
+                const graded = isEventGraded(item);
+                const checked = selectedIds.has(item.id);
                 return (
-                  <TouchableOpacity
-                    key={status}
-                    onPress={() => setStatusFilter(status)}
-                    className={`px-5 py-2 rounded-full ${active ? 'bg-white shadow-sm' : ''}`}
+                  <View
+                    key={item.id}
+                    className="flex-row items-center gap-3 px-3 py-2.5"
+                    style={{ borderTopWidth: index > 0 ? 1 : 0, borderTopColor: 'var(--c-border)', backgroundColor: checked ? 'var(--c-surface-tint)' : 'transparent' } as any}
                   >
-                    <Text className={`text-[11px] font-black uppercase tracking-widest ${active ? 'text-[#1D3E90]' : 'text-slate-400'}`}>
-                      {status === 'pending' ? 'De notat' : 'Notate'}
-                    </Text>
-                  </TouchableOpacity>
+                    {selectable ? (
+                      <ThemedCheckbox checked={checked} onToggle={() => toggleSelect(item.id)} ariaLabel={`Selectează ${item.title}`} size={18} />
+                    ) : null}
+                    <View className="w-11 items-center shrink-0">
+                      <Text className="text-[10px] font-bold uppercase" style={{ color: 'var(--c-muted)' }}>
+                        {eventDate.toLocaleString(RO_LOCALE, { month: 'short' }).replace('.', '')}
+                      </Text>
+                      <Text className="t-num text-[17px] font-bold leading-none mt-0.5" style={{ color: 'var(--c-ink)' }}>{eventDate.getDate()}</Text>
+                    </View>
+                    <View className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: meta.solid }} />
+                    <Pressable onPress={() => router.push(`/admin/attendance/${item.id}` as any)} accessibilityRole="link" className="flex-1 min-w-0 text-left">
+                      <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{item.title}</Text>
+                      <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+                        {[eventDate.toLocaleTimeString(RO_LOCALE, { hour: '2-digit', minute: '2-digit' }), meta.label, item.teamName, item.location].filter(Boolean).join(' · ')}
+                      </Text>
+                    </Pressable>
+                    {graded ? (
+                      <View className="flex-row items-center gap-1 rounded-full px-2.5 py-1 shrink-0" style={{ backgroundColor: 'var(--c-success-bg)' }}>
+                        <MaterialIcons name="check" size={13} color="var(--c-success-fg)" />
+                        <Text className="text-[11.5px] font-semibold" style={{ color: 'var(--c-success-fg)' }}>Notat</Text>
+                      </View>
+                    ) : (
+                      <Button size="sm" variant="primary" icon="how-to-reg" label="Notează" iconOnlyOnMobile onPress={() => router.push(`/admin/attendance/${item.id}` as any)} />
+                    )}
+                  </View>
                 );
               })}
             </View>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View className="flex-row gap-2">
-                {typeFilters.map((filter) => {
-                  const active = typeFilter === filter.value;
-                  return (
-                    <TouchableOpacity
-                      key={filter.value}
-                      onPress={() => setTypeFilter(filter.value)}
-                      className={`px-4 py-2 rounded-full border ${active ? 'bg-[#1D3E90] border-[#1D3E90]' : 'bg-white border-[#DDE7F5]'}`}
-                    >
-                      <Text className={`text-[11px] font-black ${active ? 'text-white' : 'text-[#0E2041]'}`}>
-                        {filter.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          </View>
-
-          {/* Team / coach / search — the useful filters for finding what to grade */}
-          <View className={`bg-white rounded-[28px] border border-[#DDE7F5] p-4 mb-5 ${isMobile ? 'gap-3' : 'flex-row items-center gap-3 flex-wrap'}`}>
-            <View className="relative flex-1 min-w-[200px]">
-              <View className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <Search size={15} color="var(--c-faint)" />
-              </View>
-              <TextInput
-                value={search}
-                onChangeText={setSearch}
-                placeholder="Caută eveniment, echipă, antrenor sau locație"
-                placeholderTextColor="var(--c-faint)"
-                className="w-full h-[40px] rounded-[12px] border border-[#DDE7F5] bg-[#FBFDFF] pl-9 pr-3 text-[13px] font-semibold text-[#0E2041]"
-              />
-            </View>
-
-            <View className="flex-row items-center gap-1.5">
-              <Text className="text-[11px] font-black text-[#64748B] uppercase tracking-widest">Echipă</Text>
-              <select
-                value={teamFilter === 'all' ? 'all' : String(teamFilter)}
-                onChange={(e) => setTeamFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                className="h-[36px] rounded-[10px] border border-[#DDE7F5] bg-white px-3 text-[12px] font-bold text-[#475569]"
-              >
-                <option value="all">Toate echipele</option>
-                {teamOptions.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </View>
-
-            <View className="flex-row items-center gap-1.5">
-              <Text className="text-[11px] font-black text-[#64748B] uppercase tracking-widest">Antrenor</Text>
-              <select
-                value={coachFilter === 'all' ? 'all' : String(coachFilter)}
-                onChange={(e) => setCoachFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                className="h-[36px] rounded-[10px] border border-[#DDE7F5] bg-white px-3 text-[12px] font-bold text-[#475569]"
-              >
-                <option value="all">Toți antrenorii</option>
-                {coachOptions.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </View>
-
-            {activeFilterCount > 0 && (
-              <TouchableOpacity
-                onPress={resetFilters}
-                className="flex-row items-center gap-1.5 h-[36px] px-3 rounded-[10px] border border-[#F3C6C6] bg-[#FEF3F2]"
-              >
-                <X size={13} color="var(--c-danger-fg)" />
-                <Text className="text-[#B42318] text-[12px] font-bold">Șterge filtrele ({activeFilterCount})</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Bulk-grade controls (only in "To Grade") */}
-          {selectable && filteredEvents.length > 0 && (
-            <View className={`flex-row items-center gap-3 mb-4 ${isMobile ? 'flex-wrap' : ''}`}>
-              <TouchableOpacity onPress={toggleSelectPage} className="flex-row items-center gap-2">
-                <ThemedCheckbox checked={pageAllSelected} onToggle={toggleSelectPage} ariaLabel="Selectează pagina" size={18} />
-                <Text className="text-[12px] font-bold text-[#475569]">{pageAllSelected ? 'Deselectează pagina' : 'Selectează pagina'}</Text>
-              </TouchableOpacity>
-              {selectedIds.size > 0 && (
-                <View className="flex-row items-center gap-2.5 bg-[#EBF1FF] border border-[#BFDBFE] rounded-full pl-4 pr-2 py-1.5">
-                  <Text className="text-[#1D3E90] text-[12px] font-black">{selectedIds.size} selectate</Text>
-                  {bulkBusy ? (
-                    <ActivityIndicator size="small" color="var(--c-brand-fg)" />
-                  ) : (
-                    <>
-                      <TouchableOpacity onPress={() => setConfirmBulk(true)} className="bg-[#1D3E90] rounded-full px-3 py-1.5">
-                        <Text className="text-white text-[11px] font-black uppercase tracking-widest">Marchează ca notate</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setSelectedIds(new Set())} className="w-6 h-6 items-center justify-center">
-                        <X size={14} color="var(--c-brand-fg)" />
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </View>
-              )}
-            </View>
-          )}
-        </View>
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} rangeStart={rangeStart} rangeEnd={rangeEnd} total={total} itemNoun="evenimente" />
+          </>
+        )}
       </View>
-
-      {loading && (
-        <View className={`${isMobile ? 'px-4' : 'px-8'} w-full`}>
-          <View className="w-full max-w-[1180px] self-center gap-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <View key={i} className={`bg-white rounded-[28px] border border-[#DDE7F5] ${isMobile ? 'p-4 gap-3' : 'p-5 flex-row items-center'}`}>
-                <View className={isMobile ? 'flex-row items-center gap-4' : 'flex-row items-center flex-1'}>
-                  <Skeleton className={`${isMobile ? 'w-12 h-12 rounded-2xl' : 'w-16 h-16 rounded-[22px] mr-5'}`} />
-                  <View className="flex-1 gap-2">
-                    <Skeleton className="h-4 w-2/5" />
-                    <Skeleton className="h-3 w-3/5" />
-                  </View>
-                </View>
-                <Skeleton className={`h-11 w-32 rounded-2xl ${isMobile ? 'mt-1' : 'ml-5'}`} />
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {!loading && filteredEvents.length === 0 && (
-        <View className="flex-1 items-center justify-center px-8">
-          <View className="bg-white rounded-[32px] border border-[#DDE7F5] p-8 items-center max-w-[520px]">
-            <CheckCircle2 size={38} color="var(--c-faint)" />
-            <Text className="text-slate-400 font-bold text-center mt-4">
-              Niciun eveniment {statusFilter === 'graded' ? 'notat' : 'de notat'} în {RO_MONTHS[viewMonth]} {viewYear}.{'\n'}Încearcă alt filtru sau altă lună.
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {!loading && filteredEvents.length > 0 && (
-        <>
-          <FlatList
-            data={paginatedEvents}
-            keyExtractor={item => item.id.toString()}
-            contentContainerStyle={{ paddingBottom: 24, paddingHorizontal: isMobile ? 16 : 32, maxWidth: 1180, alignSelf: 'center', width: '100%' }}
-            renderItem={({ item }) => {
-              const eventDate = new Date(item.startTime);
-              const typeTone = getEventTypeTone(item.type);
-              const graded = isEventGraded(item);
-              const checked = selectedIds.has(item.id);
-
-              return (
-                <View className="mb-4 flex-row items-center gap-3">
-                  {selectable && (
-                    <ThemedCheckbox checked={checked} onToggle={() => toggleSelect(item.id)} ariaLabel={`Selectează ${item.title}`} size={20} />
-                  )}
-                  <TouchableOpacity
-                    onPress={() => router.push(`/admin/attendance/${item.id}` as any)}
-                    activeOpacity={0.82}
-                    className={`flex-1 bg-white shadow-lg border border-[#DDE7F5] ${isMobile ? 'rounded-[24px] p-4' : 'rounded-[28px] p-5 flex-row items-center'}`}
-                  >
-                    <View className={isMobile ? 'gap-4' : 'flex-row items-center flex-1'}>
-                      <View className={`${isMobile ? 'w-12 h-12 rounded-2xl' : 'w-16 h-16 rounded-[22px] mr-5'} bg-[#EAF2FF] border border-[#CFE0FF] items-center justify-center`}>
-                        <Text className="text-[10px] font-black text-[#1D3E90] uppercase">
-                          {eventDate.toLocaleString(RO_LOCALE, { month: 'short' }).toUpperCase()}
-                        </Text>
-                        <Text className={`${isMobile ? 'text-lg' : 'text-xl'} font-black text-slate-900`}>
-                          {eventDate.getDate()}
-                        </Text>
-                      </View>
-
-                      <View className="flex-1 min-w-0">
-                        <View className="flex-row items-start gap-3 mb-2">
-                          <Text className={`${isMobile ? 'text-base' : 'text-lg'} font-black text-[#1E293B] flex-1`} numberOfLines={1}>
-                            {item.title}
-                          </Text>
-                          {isMobile ? (
-                            <View className={`${typeTone.bg} rounded-full px-3 py-1`}>
-                              <Text className={`${typeTone.text} text-[9px] font-black uppercase tracking-widest`}>{typeTone.label}</Text>
-                            </View>
-                          ) : null}
-                        </View>
-                        <View className={`${isMobile ? 'gap-2' : 'flex-row items-center gap-4'}`}>
-                          <View className="flex-row items-center">
-                            <Clock size={14} color="var(--c-faint)" />
-                            <Text className="text-[11px] text-slate-500 font-bold ml-1.5 uppercase tracking-widest">
-                              {eventDate.toLocaleTimeString(RO_LOCALE, { hour: '2-digit', minute: '2-digit' })}
-                            </Text>
-                          </View>
-                          <View className="flex-row items-center">
-                            <MapPin size={14} color="var(--c-faint)" />
-                            <Text
-                              numberOfLines={isMobile && isSmallPhone ? 1 : 2}
-                              className="text-[11px] text-slate-500 font-bold ml-1.5 uppercase tracking-widest"
-                            >
-                              {item.location || 'Sală principală'}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-
-                      <View className={`${isMobile ? 'self-start mt-1' : 'ml-5 flex-row items-center justify-end gap-3 min-w-[180px]'}`}>
-                        {!isMobile ? (
-                          <View className={`${typeTone.bg} rounded-full px-3 py-1.5`}>
-                            <Text className={`${typeTone.text} text-[9px] font-black uppercase tracking-widest`}>{typeTone.label}</Text>
-                          </View>
-                        ) : null}
-                        <View className={`${graded ? 'bg-emerald-50 border-emerald-100' : 'bg-[#1D3E90] border-[#1D3E90]'} border px-5 py-3 rounded-2xl flex-row items-center justify-center`}>
-                          <UserCheck size={16} color={graded ? 'var(--c-success-fg)' : 'var(--c-surface)'} />
-                          <Text className={`${graded ? 'text-emerald-700' : 'text-white'} text-[10px] font-black uppercase tracking-widest ml-2`}>
-                            {graded ? 'Notat' : 'Notează'}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              );
-            }}
-          />
-          {renderPagination()}
-        </>
-      )}
 
       <ConfirmDialog
         visible={confirmBulk}
@@ -501,6 +317,6 @@ export function GradeTab() {
       />
 
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
-    </View>
+    </ScrollView>
   );
 }
