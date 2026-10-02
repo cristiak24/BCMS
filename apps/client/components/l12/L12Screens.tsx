@@ -683,7 +683,7 @@ export function L12TemplateScreen() {
         </View>
       </View>
 
-      <L12Editor lineup={draft} onChange={setDraft} roster={roster} rosterLoading={rosterLoading} />
+      <L12Editor lineup={draft} onChange={setDraft} roster={roster} rosterLoading={rosterLoading} showMatchDetails={false} />
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </PageShell>
   );
