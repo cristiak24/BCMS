@@ -5,7 +5,7 @@ import { contactsApi, type ContactsResponse, type PlayerContact, type PlayerCont
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../HeaderContext';
 import PageContainer from '../ui/PageContainer';
 import PageHeader from '../ui/PageHeader';
-import FilterChips from '../ui/FilterChips';
+import SelectField from '../ui/SelectField';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
@@ -388,8 +388,10 @@ export default function ContactsScreen() {
               {tab === 'players' ? (
                 <View className="gap-3">
                   {data.teams.length > 1 ? (
-                    <FilterChips
+                    <SelectField
                       label="Echipă"
+                      icon="groups"
+                      className="w-full sm:w-[300px]"
                       value={teamFilter}
                       onChange={setTeamFilter}
                       options={[

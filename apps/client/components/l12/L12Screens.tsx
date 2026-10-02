@@ -11,7 +11,7 @@ import UnsavedBar from '../ui/UnsavedBar';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
-import FilterChips from '../ui/FilterChips';
+import SelectField from '../ui/SelectField';
 import Pagination, { usePagination } from '../ui/Pagination';
 import L12Editor, { EMPTY_LINEUP, lineupForRoster, sortLineupPlayers, validateLineup } from './L12Editor';
 import { downloadL12Word, printL12, type L12DocumentInput } from './l12Document';
@@ -126,16 +126,63 @@ function LoadingSheet() {
 // Home
 // ─────────────────────────────────────────────────────────────
 
-const MATCHES_PAGE_SIZE = 10;
+const MATCHES_PAGE_SIZE = 12;
 
 type StatusFilter = 'all' | 'unset' | 'set';
+type HomeTab = 'matches' | 'teams';
+
+function dayKey(iso: string) {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? '' : date.toDateString();
+}
+
+function dayLabel(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return 'Fără dată';
+  const today = new Date();
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  if (date.toDateString() === today.toDateString()) return 'Azi';
+  if (date.toDateString() === tomorrow.toDateString()) return 'Mâine';
+  const label = date.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function timeLabel(iso: string) {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+}
+
+function Segmented<T extends string>({ value, onChange, options }: { value: T; onChange: (next: T) => void; options: { key: T; label: string; count?: number }[] }) {
+  return (
+    <View className="p-[3px] rounded-[10px] flex-row self-start" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+      {options.map((option) => {
+        const active = option.key === value;
+        return (
+          <Pressable
+            key={option.key}
+            onPress={() => onChange(option.key)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            className="px-3 h-[30px] rounded-[8px] flex-row items-center gap-1.5"
+            style={active ? ({ backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any) : undefined}
+          >
+            <Text className="text-[12.5px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>{option.label}</Text>
+            {option.count != null ? (
+              <Text className="t-num text-[11.5px] font-semibold" style={{ color: 'var(--c-faint)' }}>{option.count}</Text>
+            ) : null}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
 
 export function L12HomeScreen() {
   const router = useRouter();
   const base = useL12Base();
   const [data, setData] = useState<L12Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [mobileTab, setMobileTab] = useState<'matches' | 'teams'>('matches');
+  const [tab, setTab] = useState<HomeTab>('matches');
   const [teamFilter, setTeamFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
@@ -159,7 +206,7 @@ export function L12HomeScreen() {
   }, [data, teamFilter]);
 
   const statusOptions = useMemo(() => [
-    { key: 'all' as const, label: 'Toate', count: teamScopedMatches.length },
+    { key: 'all' as const, label: 'Toate' },
     { key: 'unset' as const, label: 'Nesetate', count: teamScopedMatches.filter((m) => !m.hasLineup).length },
     { key: 'set' as const, label: 'Setate', count: teamScopedMatches.filter((m) => m.hasLineup).length },
   ], [teamScopedMatches]);
@@ -175,6 +222,19 @@ export function L12HomeScreen() {
     `${teamFilter}:${statusFilter}`,
   );
 
+  // A page of matches split into day groups, so the list reads as a schedule
+  // rather than one undifferentiated column of cards.
+  const dayGroups = useMemo(() => {
+    const groups: { key: string; label: string; matches: typeof pagedMatches }[] = [];
+    for (const match of pagedMatches) {
+      const key = dayKey(match.startTime);
+      const last = groups[groups.length - 1];
+      if (last && last.key === key) last.matches.push(match);
+      else groups.push({ key, label: dayLabel(match.startTime), matches: [match] });
+    }
+    return groups;
+  }, [pagedMatches]);
+
   const teamOptions = useMemo(() => {
     if (!data) return [];
     return [
@@ -187,9 +247,11 @@ export function L12HomeScreen() {
     ];
   }, [data]);
 
+  const teamsSet = data ? data.teams.filter((t) => t.hasTemplate).length : 0;
+
   return (
     <PageShell>
-      <PageHeader title="L12" subtitle="Lista oficială a echipei pentru joc: 12 jucători, căpitanul și staff-ul tehnic." />
+      <PageHeader title="L12" />
 
       {error ? (
         <ErrorState title="Nu am putut încărca L12" message={error} actionLabel="Reîncearcă" onAction={load} />
@@ -201,106 +263,114 @@ export function L12HomeScreen() {
         </View>
       ) : (
         <View className="gap-4">
-          {/* Below xl, only one section shows at a time — the team/L12-constant
-              section used to sit under a potentially long match list and was
-              easy to miss on a phone. */}
-          <View className="p-[3px] rounded-[10px] flex-row self-start xl:hidden" style={{ backgroundColor: 'var(--c-surface-3)' }}>
-            <Pressable
-              onPress={() => setMobileTab('matches')}
-              accessibilityRole="button"
-              accessibilityState={{ selected: mobileTab === 'matches' }}
-              className="px-3.5 h-8 rounded-[8px] justify-center"
-              style={mobileTab === 'matches' ? ({ backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any) : undefined}
-            >
-              <Text className="text-[12px] font-semibold" style={{ color: mobileTab === 'matches' ? 'var(--c-ink)' : 'var(--c-muted)' }}>Meciuri</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setMobileTab('teams')}
-              accessibilityRole="button"
-              accessibilityState={{ selected: mobileTab === 'teams' }}
-              className="px-3.5 h-8 rounded-[8px] justify-center"
-              style={mobileTab === 'teams' ? ({ backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any) : undefined}
-            >
-              <Text className="text-[12px] font-semibold" style={{ color: mobileTab === 'teams' ? 'var(--c-ink)' : 'var(--c-muted)' }}>L12 constant</Text>
-            </Pressable>
-          </View>
+          <Segmented
+            value={tab}
+            onChange={setTab}
+            options={[
+              { key: 'matches', label: 'Meciuri', count: data.matches.length },
+              { key: 'teams', label: 'L12 constant', count: data.teams.length },
+            ]}
+          />
 
-          <View className="flex-col xl:flex-row xl:items-start gap-6">
-            <View className={`flex-1 min-w-0 ${mobileTab === 'teams' ? 'hidden xl:flex' : 'flex'}`}>
-              <Text className="text-[15px] font-bold mb-1" style={{ color: 'var(--c-ink)' }}>Meciuri</Text>
-              <Text className="t-meta mb-3" style={{ color: 'var(--c-muted)' }}>Meciurile următoare. Un L12 nesetat pornește din L12-ul constant al echipei.</Text>
-
-              {data.matches.length === 0 ? (
-                <EmptyState compact icon="sports-basketball" title="Niciun meci programat" message="Meciurile din program (inclusiv cele sincronizate de la FRB) apar aici." />
-              ) : (
-                <View className="gap-3">
-                  <View className="gap-2">
-                    {teamOptions.length > 2 ? <FilterChips options={teamOptions} value={teamFilter} onChange={setTeamFilter} label="Echipă" /> : null}
-                    <FilterChips options={statusOptions} value={statusFilter} onChange={setStatusFilter} label="Stare L12" />
-                  </View>
-
-                  {filteredMatches.length === 0 ? (
-                    <EmptyState compact icon="search-off" title="Niciun meci pentru acest filtru" message="Încearcă alt filtru de echipă sau de stare." />
-                  ) : (
-                    <>
-                      <View className="gap-2 ui-stagger">
-                        {pagedMatches.map((match) => (
-                          <Pressable
-                            key={match.eventId}
-                            onPress={() => router.push(`${base}/match/${match.eventId}` as any)}
-                            accessibilityRole="button"
-                            accessibilityLabel={`L12 pentru ${match.title}`}
-                            className="ui-lift ui-press rounded-[14px] border px-4 py-3 flex-row items-center gap-3 text-left"
-                            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
-                          >
-                            <View className="flex-1 min-w-0">
-                              <Text className="text-[14.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{match.title}</Text>
-                              <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-                                {[formatDate(match.startTime, true), match.teamName].filter(Boolean).join(' · ')}
-                              </Text>
-                            </View>
-                            <StatusChip set={match.hasLineup} label={match.hasLineup ? `${match.playerCount}/12` : 'Nesetat'} />
-                            <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
-                          </Pressable>
-                        ))}
-                      </View>
-                      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} rangeStart={rangeStart} rangeEnd={rangeEnd} total={total} itemNoun="meciuri" />
-                    </>
-                  )}
+          {tab === 'matches' ? (
+            data.matches.length === 0 ? (
+              <EmptyState compact icon="sports-basketball" title="Niciun meci programat" message="Meciurile din program (inclusiv cele sincronizate de la FRB) apar aici." />
+            ) : (
+              <View className="gap-4">
+                <View className="flex-col sm:flex-row sm:items-center gap-2">
+                  {data.teams.length > 1 ? (
+                    <SelectField
+                      label="Echipă"
+                      icon="groups"
+                      options={teamOptions}
+                      value={teamFilter}
+                      onChange={setTeamFilter}
+                      className="w-full sm:w-[300px]"
+                    />
+                  ) : null}
+                  <Segmented value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
                 </View>
-              )}
-            </View>
 
-            <View className={`w-full xl:w-[420px] shrink-0 ${mobileTab === 'matches' ? 'hidden xl:flex' : 'flex'}`}>
-              <Text className="text-[15px] font-bold mb-1" style={{ color: 'var(--c-ink)' }}>L12 constant</Text>
-              <Text className="t-meta mb-3" style={{ color: 'var(--c-muted)' }}>Formula de bază a fiecărei echipe — jucători, căpitan și staff. Setează-o o dată aici și fiecare meci nou pornește din ea.</Text>
-              {data.teams.length === 0 ? (
-                <EmptyState compact icon="groups" title="Nicio echipă" message="Creează o echipă ca să-i setezi L12-ul." />
-              ) : (
-                <View className="gap-2 ui-stagger">
-                  {data.teams.map((team) => (
-                    <Pressable
-                      key={team.id}
-                      onPress={() => router.push(`${base}/team/${team.id}` as any)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`L12 constant pentru ${team.name}`}
-                      className="ui-lift ui-press rounded-[14px] border px-4 py-3 flex-row items-center gap-3 text-left"
-                      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
-                    >
-                      <View className="flex-1 min-w-0">
-                        <Text className="text-[14.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{team.name}</Text>
-                        <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-                          {[team.leagueName, team.coachName].filter(Boolean).join(' · ') || '—'}
-                        </Text>
-                      </View>
-                      <StatusChip set={team.hasTemplate} label={team.hasTemplate ? `${team.templatePlayerCount}/12` : 'Nesetat'} />
-                      <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
-                    </Pressable>
-                  ))}
-                </View>
-              )}
+                {filteredMatches.length === 0 ? (
+                  <EmptyState compact icon="search-off" title="Niciun meci pentru acest filtru" message="Încearcă altă echipă sau altă stare." />
+                ) : (
+                  <>
+                    <View className="gap-5">
+                      {dayGroups.map((group) => (
+                        <View key={group.key + group.label} className="gap-2">
+                          <Text className="text-[12px] font-bold uppercase tracking-[0.06em]" style={{ color: 'var(--c-muted)' }}>{group.label}</Text>
+                          <View className="rounded-[14px] border overflow-hidden" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
+                            {group.matches.map((match, index) => {
+                              const sides = match.title.split(/\s+vs\.?\s+/i).map((part) => part.trim());
+                              const [homeTeam, awayTeam] = sides.length === 2 ? sides : [match.title, null];
+                              // The club's team is usually one of the two sides already.
+                              const showTeam = teamFilter === 'all' && match.teamName && !sides.includes(match.teamName);
+                              return (
+                                <Pressable
+                                  key={match.eventId}
+                                  onPress={() => router.push(`${base}/match/${match.eventId}` as any)}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`L12 pentru ${match.title}`}
+                                  className="ui-press px-3.5 sm:px-4 py-3 flex-row items-center gap-3 sm:gap-4 text-left hover:bg-[var(--c-surface-2)]"
+                                  style={index > 0 ? ({ borderTopWidth: 1, borderTopColor: 'var(--c-border)' } as any) : undefined}
+                                >
+                                  <Text className="t-num text-[13px] font-bold w-[42px] shrink-0" style={{ color: 'var(--c-ink-soft)' }}>{timeLabel(match.startTime)}</Text>
+                                  <View className="flex-1 min-w-0 gap-0.5">
+                                    <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{homeTeam}</Text>
+                                    {awayTeam ? (
+                                      <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
+                                        <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>vs </Text>
+                                        {awayTeam}
+                                      </Text>
+                                    ) : null}
+                                    {showTeam ? (
+                                      <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{match.teamName}</Text>
+                                    ) : null}
+                                  </View>
+                                  <View className="shrink-0"><StatusChip set={match.hasLineup} label={match.hasLineup ? `${match.playerCount}/12` : 'Nesetat'} /></View>
+                                  <View className="hidden sm:flex shrink-0"><MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" /></View>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                    <Pagination page={page} totalPages={totalPages} onPageChange={setPage} rangeStart={rangeStart} rangeEnd={rangeEnd} total={total} itemNoun="meciuri" />
+                  </>
+                )}
+              </View>
+            )
+          ) : data.teams.length === 0 ? (
+            <EmptyState compact icon="groups" title="Nicio echipă" message="Creează o echipă ca să-i setezi L12-ul." />
+          ) : (
+            <View className="gap-3">
+              <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{teamsSet} din {data.teams.length} echipe au L12 constant setat.</Text>
+              <View className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2.5">
+                {data.teams.map((team) => (
+                  <Pressable
+                    key={team.id}
+                    onPress={() => router.push(`${base}/team/${team.id}` as any)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`L12 constant pentru ${team.name}`}
+                    className="ui-lift ui-press rounded-[14px] border px-4 py-3 flex-row items-center gap-3 text-left"
+                    style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}
+                  >
+                    <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+                      <MaterialIcons name="groups" size={18} color="var(--c-brand-fg)" />
+                    </View>
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{team.name}</Text>
+                      <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+                        {[team.leagueName, team.coachName].filter(Boolean).join(' · ') || '—'}
+                      </Text>
+                    </View>
+                    <View className="shrink-0"><StatusChip set={team.hasTemplate} label={team.hasTemplate ? `${team.templatePlayerCount}/12` : 'Nesetat'} /></View>
+                  </Pressable>
+                ))}
+              </View>
             </View>
-          </View>
+          )}
         </View>
       )}
     </PageShell>
