@@ -149,7 +149,7 @@ router.get('/overview', async (req: AuthenticatedRequest, res) => {
             db.select().from(events)
                 .where(and(inArray(events.teamId, teamIds), eq(events.type, 'match'), gte(events.startTime, since)))
                 .orderBy(asc(events.startTime))
-                .limit(40),
+                .limit(300),
         ]);
 
         const coachIds = Array.from(new Set(teamRows.map((t) => t.coachId).filter((id): id is number => id != null)));

@@ -11,6 +11,8 @@ import UnsavedBar from '../ui/UnsavedBar';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
+import FilterChips from '../ui/FilterChips';
+import Pagination, { usePagination } from '../ui/Pagination';
 import L12Editor, { EMPTY_LINEUP, lineupForRoster, sortLineupPlayers, validateLineup } from './L12Editor';
 import { downloadL12Word, printL12, type L12DocumentInput } from './l12Document';
 import { StatusChip, useL12Base } from './L12MatchLink';
@@ -124,11 +126,18 @@ function LoadingSheet() {
 // Home
 // ─────────────────────────────────────────────────────────────
 
+const MATCHES_PAGE_SIZE = 10;
+
+type StatusFilter = 'all' | 'unset' | 'set';
+
 export function L12HomeScreen() {
   const router = useRouter();
   const base = useL12Base();
   const [data, setData] = useState<L12Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mobileTab, setMobileTab] = useState<'matches' | 'teams'>('matches');
+  const [teamFilter, setTeamFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const load = useCallback(async () => {
     try {
@@ -143,6 +152,41 @@ export function L12HomeScreen() {
     load();
   }, [load]);
 
+  const teamScopedMatches = useMemo(() => {
+    if (!data) return [];
+    if (teamFilter === 'all') return data.matches;
+    return data.matches.filter((match) => String(match.teamId) === teamFilter);
+  }, [data, teamFilter]);
+
+  const statusOptions = useMemo(() => [
+    { key: 'all' as const, label: 'Toate', count: teamScopedMatches.length },
+    { key: 'unset' as const, label: 'Nesetate', count: teamScopedMatches.filter((m) => !m.hasLineup).length },
+    { key: 'set' as const, label: 'Setate', count: teamScopedMatches.filter((m) => m.hasLineup).length },
+  ], [teamScopedMatches]);
+
+  const filteredMatches = useMemo(() => {
+    if (statusFilter === 'all') return teamScopedMatches;
+    return teamScopedMatches.filter((m) => (statusFilter === 'set' ? m.hasLineup : !m.hasLineup));
+  }, [teamScopedMatches, statusFilter]);
+
+  const { page, totalPages, pageItems: pagedMatches, setPage, rangeStart, rangeEnd, total } = usePagination(
+    filteredMatches,
+    MATCHES_PAGE_SIZE,
+    `${teamFilter}:${statusFilter}`,
+  );
+
+  const teamOptions = useMemo(() => {
+    if (!data) return [];
+    return [
+      { key: 'all', label: 'Toate echipele', count: data.matches.length },
+      ...data.teams.map((team) => ({
+        key: String(team.id),
+        label: team.name,
+        count: data.matches.filter((m) => m.teamId === team.id).length,
+      })),
+    ];
+  }, [data]);
+
   return (
     <PageShell>
       <PageHeader title="L12" subtitle="Lista oficială a echipei pentru joc: 12 jucători, căpitanul și staff-ul tehnic." />
@@ -156,65 +200,106 @@ export function L12HomeScreen() {
           <Skeleton className="h-[64px] w-full rounded-[14px]" />
         </View>
       ) : (
-        <View className="flex-col xl:flex-row xl:items-start gap-6">
-          <View className="flex-1 min-w-0">
-            <Text className="text-[15px] font-bold mb-1" style={{ color: 'var(--c-ink)' }}>Meciuri</Text>
-            <Text className="t-meta mb-3" style={{ color: 'var(--c-muted)' }}>Meciurile următoare. Un L12 nesetat pornește din L12-ul constant al echipei.</Text>
-            {data.matches.length === 0 ? (
-              <EmptyState compact icon="sports-basketball" title="Niciun meci programat" message="Meciurile din program (inclusiv cele sincronizate de la FRB) apar aici." />
-            ) : (
-              <View className="gap-2 ui-stagger">
-                {data.matches.map((match) => (
-                  <Pressable
-                    key={match.eventId}
-                    onPress={() => router.push(`${base}/match/${match.eventId}` as any)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`L12 pentru ${match.title}`}
-                    className="ui-lift ui-press rounded-[14px] border px-4 py-3 flex-row items-center gap-3 text-left"
-                    style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
-                  >
-                    <View className="flex-1 min-w-0">
-                      <Text className="text-[14.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{match.title}</Text>
-                      <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-                        {[formatDate(match.startTime, true), match.teamName].filter(Boolean).join(' · ')}
-                      </Text>
-                    </View>
-                    <StatusChip set={match.hasLineup} label={match.hasLineup ? `${match.playerCount}/12` : 'Nesetat'} />
-                    <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
-                  </Pressable>
-                ))}
-              </View>
-            )}
+        <View className="gap-4">
+          {/* Below xl, only one section shows at a time — the team/L12-constant
+              section used to sit under a potentially long match list and was
+              easy to miss on a phone. */}
+          <View className="p-[3px] rounded-[10px] flex-row self-start xl:hidden" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+            <Pressable
+              onPress={() => setMobileTab('matches')}
+              accessibilityRole="button"
+              accessibilityState={{ selected: mobileTab === 'matches' }}
+              className="px-3.5 h-8 rounded-[8px] justify-center"
+              style={mobileTab === 'matches' ? ({ backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any) : undefined}
+            >
+              <Text className="text-[12px] font-semibold" style={{ color: mobileTab === 'matches' ? 'var(--c-ink)' : 'var(--c-muted)' }}>Meciuri</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setMobileTab('teams')}
+              accessibilityRole="button"
+              accessibilityState={{ selected: mobileTab === 'teams' }}
+              className="px-3.5 h-8 rounded-[8px] justify-center"
+              style={mobileTab === 'teams' ? ({ backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any) : undefined}
+            >
+              <Text className="text-[12px] font-semibold" style={{ color: mobileTab === 'teams' ? 'var(--c-ink)' : 'var(--c-muted)' }}>L12 constant</Text>
+            </Pressable>
           </View>
 
-          <View className="w-full xl:w-[420px] shrink-0">
-            <Text className="text-[15px] font-bold mb-1" style={{ color: 'var(--c-ink)' }}>L12 constant</Text>
-            <Text className="t-meta mb-3" style={{ color: 'var(--c-muted)' }}>Formula de bază a fiecărei echipe, folosită la fiecare meci nou.</Text>
-            {data.teams.length === 0 ? (
-              <EmptyState compact icon="groups" title="Nicio echipă" message="Creează o echipă ca să-i setezi L12-ul." />
-            ) : (
-              <View className="gap-2 ui-stagger">
-                {data.teams.map((team) => (
-                  <Pressable
-                    key={team.id}
-                    onPress={() => router.push(`${base}/team/${team.id}` as any)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`L12 constant pentru ${team.name}`}
-                    className="ui-lift ui-press rounded-[14px] border px-4 py-3 flex-row items-center gap-3 text-left"
-                    style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
-                  >
-                    <View className="flex-1 min-w-0">
-                      <Text className="text-[14.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{team.name}</Text>
-                      <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-                        {[team.leagueName, team.coachName].filter(Boolean).join(' · ') || '—'}
-                      </Text>
-                    </View>
-                    <StatusChip set={team.hasTemplate} label={team.hasTemplate ? `${team.templatePlayerCount}/12` : 'Nesetat'} />
-                    <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
-                  </Pressable>
-                ))}
-              </View>
-            )}
+          <View className="flex-col xl:flex-row xl:items-start gap-6">
+            <View className={`flex-1 min-w-0 ${mobileTab === 'teams' ? 'hidden xl:flex' : 'flex'}`}>
+              <Text className="text-[15px] font-bold mb-1" style={{ color: 'var(--c-ink)' }}>Meciuri</Text>
+              <Text className="t-meta mb-3" style={{ color: 'var(--c-muted)' }}>Meciurile următoare. Un L12 nesetat pornește din L12-ul constant al echipei.</Text>
+
+              {data.matches.length === 0 ? (
+                <EmptyState compact icon="sports-basketball" title="Niciun meci programat" message="Meciurile din program (inclusiv cele sincronizate de la FRB) apar aici." />
+              ) : (
+                <View className="gap-3">
+                  <View className="gap-2">
+                    {teamOptions.length > 2 ? <FilterChips options={teamOptions} value={teamFilter} onChange={setTeamFilter} label="Echipă" /> : null}
+                    <FilterChips options={statusOptions} value={statusFilter} onChange={setStatusFilter} label="Stare L12" />
+                  </View>
+
+                  {filteredMatches.length === 0 ? (
+                    <EmptyState compact icon="search-off" title="Niciun meci pentru acest filtru" message="Încearcă alt filtru de echipă sau de stare." />
+                  ) : (
+                    <>
+                      <View className="gap-2 ui-stagger">
+                        {pagedMatches.map((match) => (
+                          <Pressable
+                            key={match.eventId}
+                            onPress={() => router.push(`${base}/match/${match.eventId}` as any)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`L12 pentru ${match.title}`}
+                            className="ui-lift ui-press rounded-[14px] border px-4 py-3 flex-row items-center gap-3 text-left"
+                            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
+                          >
+                            <View className="flex-1 min-w-0">
+                              <Text className="text-[14.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{match.title}</Text>
+                              <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+                                {[formatDate(match.startTime, true), match.teamName].filter(Boolean).join(' · ')}
+                              </Text>
+                            </View>
+                            <StatusChip set={match.hasLineup} label={match.hasLineup ? `${match.playerCount}/12` : 'Nesetat'} />
+                            <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
+                          </Pressable>
+                        ))}
+                      </View>
+                      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} rangeStart={rangeStart} rangeEnd={rangeEnd} total={total} itemNoun="meciuri" />
+                    </>
+                  )}
+                </View>
+              )}
+            </View>
+
+            <View className={`w-full xl:w-[420px] shrink-0 ${mobileTab === 'matches' ? 'hidden xl:flex' : 'flex'}`}>
+              <Text className="text-[15px] font-bold mb-1" style={{ color: 'var(--c-ink)' }}>L12 constant</Text>
+              <Text className="t-meta mb-3" style={{ color: 'var(--c-muted)' }}>Formula de bază a fiecărei echipe — jucători, căpitan și staff. Setează-o o dată aici și fiecare meci nou pornește din ea.</Text>
+              {data.teams.length === 0 ? (
+                <EmptyState compact icon="groups" title="Nicio echipă" message="Creează o echipă ca să-i setezi L12-ul." />
+              ) : (
+                <View className="gap-2 ui-stagger">
+                  {data.teams.map((team) => (
+                    <Pressable
+                      key={team.id}
+                      onPress={() => router.push(`${base}/team/${team.id}` as any)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`L12 constant pentru ${team.name}`}
+                      className="ui-lift ui-press rounded-[14px] border px-4 py-3 flex-row items-center gap-3 text-left"
+                      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
+                    >
+                      <View className="flex-1 min-w-0">
+                        <Text className="text-[14.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{team.name}</Text>
+                        <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+                          {[team.leagueName, team.coachName].filter(Boolean).join(' · ') || '—'}
+                        </Text>
+                      </View>
+                      <StatusChip set={team.hasTemplate} label={team.hasTemplate ? `${team.templatePlayerCount}/12` : 'Nesetat'} />
+                      <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
           </View>
         </View>
       )}
