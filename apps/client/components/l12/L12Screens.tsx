@@ -13,7 +13,9 @@ import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
 import SelectField from '../ui/SelectField';
 import Pagination, { usePagination } from '../ui/Pagination';
-import L12Editor, { EMPTY_LINEUP, lineupForRoster, sortLineupPlayers, validateLineup } from './L12Editor';
+import L12Editor, { EMPTY_LINEUP, L12_MIN_PLAYERS, lineupForRoster, resolveTeamGender, sortLineupPlayers, validateLineup } from './L12Editor';
+import Button from '../ui/Button';
+import ActionSheet from '../ui/ActionSheet';
 import { downloadL12Word, printL12, type L12DocumentInput } from './l12Document';
 import { StatusChip, useL12Base } from './L12MatchLink';
 
@@ -77,23 +79,6 @@ function BackButton({ label, onPress }: { label: string; onPress: () => void }) 
     >
       <MaterialIcons name="chevron-left" size={18} color="var(--c-ink-soft)" />
       <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function ActionButton({ icon, label, onPress, tone = 'neutral', disabled }: { icon: string; label: string; onPress: () => void; tone?: 'neutral' | 'danger'; disabled?: boolean }) {
-  const fg = tone === 'danger' ? 'var(--c-danger-fg)' : 'var(--c-ink-soft)';
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      className="ui-press h-10 px-3.5 rounded-[10px] border flex-row items-center gap-1.5 shrink-0"
-      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', opacity: disabled ? 0.5 : 1 } as any}
-    >
-      <MaterialIcons name={icon} size={16} color={fg} />
-      <Text className="text-[13px] font-semibold" style={{ color: fg }}>{label}</Text>
     </Pressable>
   );
 }
@@ -398,7 +383,33 @@ function useRoster(teamId: number | null) {
 }
 
 function defaultLineup(team: L12Team): L12Lineup {
-  return { ...EMPTY_LINEUP, competition: team.leagueName || null, gender: team.gender ?? null };
+  return { ...EMPTY_LINEUP, competition: team.leagueName || null, gender: resolveTeamGender(team) };
+}
+
+/** The sheet's category always follows the team — it is not a user choice. */
+function withTeamGender(lineup: L12Lineup, team: L12Team): L12Lineup {
+  const gender = resolveTeamGender(team);
+  return gender && lineup.gender !== gender ? { ...lineup, gender } : lineup;
+}
+
+/** Exports go out only when the sheet is printable; small sheets get a nudge, not a block. */
+function checkBeforeExport(lineup: L12Lineup, notify: (message: string, variant: 'error' | 'info') => void) {
+  const problem = validateLineup(lineup);
+  if (problem) {
+    notify(problem, 'error');
+    return false;
+  }
+  if (lineup.players.length < L12_MIN_PLAYERS) notify(`Foaia are ${lineup.players.length} jucători — minimum ${L12_MIN_PLAYERS} pentru joc.`, 'info');
+  return true;
+}
+
+function MetaChip({ icon, label }: { icon: string; label: string }) {
+  return (
+    <View className="flex-row items-center gap-1.5 h-7 px-2.5 rounded-[8px]" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+      <MaterialIcons name={icon} size={14} color="var(--c-muted)" />
+      <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-ink-soft)' }} numberOfLines={1}>{label}</Text>
+    </View>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -425,6 +436,8 @@ export function L12MatchScreen() {
   const [seeded, setSeeded] = useState(false);
   // What "no changes" means: the saved sheet, or the blank sheet it opened with.
   const [baseline, setBaseline] = useState<L12Lineup | null>(null);
+
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!Number.isInteger(eventId) || eventId <= 0) {
@@ -457,11 +470,12 @@ export function L12MatchScreen() {
   useEffect(() => {
     if (!team || rosterLoading || seeded) return;
     if (saved) {
-      setDraft(saved);
-      setBaseline(saved);
+      // Baseline gets the same category fix so it never reads as an edit.
+      setDraft(withTeamGender(saved, team));
+      setBaseline(withTeamGender(saved, team));
     } else if (template) {
       // Pre-filled from the template but not yet on this match: offer the save.
-      setDraft(lineupForRoster({ ...template, competition: template.competition ?? team.leagueName ?? null }, roster));
+      setDraft(withTeamGender(lineupForRoster({ ...template, competition: template.competition ?? team.leagueName ?? null }, roster), team));
       setBaseline(null);
     } else {
       setDraft(defaultLineup(team));
@@ -481,10 +495,10 @@ export function L12MatchScreen() {
     }
     setSaving(true);
     try {
-      const result = await l12Api.saveForEvent(eventId, { ...draft, players: sortLineupPlayers(draft.players) });
+      const result = await l12Api.saveForEvent(eventId, { ...(team ? withTeamGender(draft, team) : draft), players: sortLineupPlayers(draft.players) });
       setSaved(result);
-      setDraft(result);
-      setBaseline(result);
+      setDraft(team ? withTeamGender(result, team) : result);
+      setBaseline(team ? withTeamGender(result, team) : result);
       showToast({ variant: 'success', message: 'L12 salvat pentru acest meci.' });
     } catch (err) {
       showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Salvarea a eșuat.' });
@@ -501,7 +515,7 @@ export function L12MatchScreen() {
       return;
     }
     try {
-      const result = await l12Api.saveTemplate(team.id, { ...draft, players: sortLineupPlayers(draft.players) });
+      const result = await l12Api.saveTemplate(team.id, { ...withTeamGender(draft, team), players: sortLineupPlayers(draft.players) });
       setTemplate(result);
       showToast({ variant: 'success', message: `L12 constant pentru ${team.name} actualizat.` });
     } catch (err) {
@@ -528,7 +542,7 @@ export function L12MatchScreen() {
       homeTeam,
       awayTeam,
       competition: draft.competition ?? '',
-      gender: draft.gender,
+      gender: resolveTeamGender(team),
       date: formatDate(event.startTime),
       lineup: { ...draft, players: sortLineupPlayers(draft.players) },
     };
@@ -548,6 +562,15 @@ export function L12MatchScreen() {
   }
 
   const fromTemplate = !saved && Boolean(template);
+  const { homeTeam, awayTeam } = splitTeams(event.title, team.name);
+  const teamGender = resolveTeamGender(team);
+  const notify = (message: string, variant: 'error' | 'info') => showToast({ variant, message });
+  const exportAs = (kind: 'pdf' | 'word') => {
+    if (!docInput || !checkBeforeExport(docInput.lineup, notify)) return;
+    if (kind === 'pdf') printL12(docInput);
+    else downloadL12Word(docInput);
+  };
+  const known = [...(template?.players ?? []), ...(saved?.players ?? [])];
 
   return (
     <PageShell
@@ -556,45 +579,65 @@ export function L12MatchScreen() {
           label={saved ? 'Modificări nesalvate' : 'L12 nesalvat'}
           saving={saving}
           onSave={save}
-          onDiscard={saved ? () => setDraft(saved) : undefined}
+          onDiscard={saved ? () => setDraft(withTeamGender(saved, team)) : undefined}
         />
       ) : null}
     >
-      <View className="mb-5 gap-3">
-        <View className="flex-row flex-wrap items-center gap-2">
-          <BackButton label="L12" onPress={() => router.back(base)} />
-          <StatusChip set={Boolean(saved)} />
-        </View>
-        <View>
-          <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Formular L-12 · {team.name}</Text>
-          <Text className="text-[22px] md:text-[28px] font-bold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.5px' } as any}>
-            {event.title}
-          </Text>
-          <Text className="text-[13px] font-medium mt-1.5" style={{ color: 'var(--c-muted)' }}>
-            {[formatDate(event.startTime, true), event.location].filter(Boolean).join(' · ')}
-          </Text>
+      <View className="mb-5 gap-4">
+        <View className="flex-row items-center gap-2">
+          <Button size="sm" icon="chevron-left" label="L12" onPress={() => router.back(base)} />
+          <StatusChip set={Boolean(saved)} label={saved ? 'Setat pentru meci' : 'Nesetat'} />
         </View>
 
-        <View className="flex-row flex-wrap gap-2">
-          <ActionButton icon="picture-as-pdf" label="PDF" onPress={() => docInput && printL12(docInput)} />
-          <ActionButton icon="description" label="Word" onPress={() => docInput && downloadL12Word(docInput)} />
-          <ActionButton icon="leaderboard" label="Statistică live" onPress={() => router.push(`${base.replace('/l12', '')}/stats/${eventId}` as any)} />
-          {template ? <ActionButton icon="restore" label="Încarcă L12 constant" onPress={() => setConfirm('template')} /> : null}
-          <ActionButton icon="bookmark" label="Salvează ca L12 constant" onPress={() => setConfirm('saveTemplate')} disabled={draft.players.length === 0} />
-          {saved ? <ActionButton icon="delete-outline" label="Șterge" tone="danger" onPress={() => setConfirm('reset')} /> : null}
-        </View>
-
-        {fromTemplate ? (
-          <View className="flex-row items-center gap-2 rounded-[12px] px-3.5 py-2.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-            <MaterialIcons name="info" size={16} color="var(--c-brand-fg)" />
-            <Text className="flex-1 text-[13px] font-medium" style={{ color: 'var(--c-ink-soft)' }}>
-              Pornit din L12-ul constant al echipei. Modifică ce e nevoie și salvează ca să-l fixezi pe acest meci.
-            </Text>
+        <View className="rounded-[18px] border p-4 md:p-5 gap-4" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
+          <View className="flex-col lg:flex-row lg:items-start gap-4">
+            <View className="flex-1 min-w-0">
+              <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Formular L-12 · {team.name}</Text>
+              <View className="mt-1.5 gap-0.5">
+                <Text className="text-[20px] md:text-[24px] font-bold leading-tight" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.4px' } as any} numberOfLines={2}>{homeTeam}</Text>
+                <Text className="text-[20px] md:text-[24px] font-bold leading-tight" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.4px' } as any} numberOfLines={2}>
+                  <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-faint)' }}>vs </Text>{awayTeam}
+                </Text>
+              </View>
+              <View className="flex-row flex-wrap gap-1.5 mt-3">
+                <MetaChip icon="event" label={formatDate(event.startTime, true)} />
+                {event.location ? <MetaChip icon="place" label={event.location} /> : null}
+                {teamGender ? <MetaChip icon="groups" label={teamGender === 'M' ? 'Masculin' : 'Feminin'} /> : null}
+              </View>
+            </View>
+            <View className="flex-row flex-wrap gap-2 lg:justify-end shrink-0">
+              <Button icon="picture-as-pdf" label="PDF" onPress={() => exportAs('pdf')} />
+              <Button icon="description" label="Word" onPress={() => exportAs('word')} />
+              <Button icon="leaderboard" label="Statistică live" onPress={() => router.push(`${base.replace('/l12', '')}/stats/${eventId}` as any)} />
+              <Button icon="more-horiz" label="Mai multe" iconOnlyOnMobile accessibilityLabel="Mai multe acțiuni" onPress={() => setMenuOpen(true)} />
+            </View>
           </View>
-        ) : null}
+
+          {fromTemplate ? (
+            <View className="flex-row items-center gap-2.5 rounded-[12px] px-3.5 py-2.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+              <MaterialIcons name="info-outline" size={17} color="var(--c-brand-fg)" />
+              <Text className="flex-1 text-[13px] font-medium" style={{ color: 'var(--c-ink-soft)' }}>
+                Pornit din L12-ul constant al echipei. Salvează ca să-l fixezi pe acest meci.
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
-      <L12Editor lineup={draft} onChange={setDraft} roster={roster} rosterLoading={rosterLoading} />
+      <L12Editor lineup={draft} onChange={setDraft} roster={roster} rosterLoading={rosterLoading} known={known} />
+
+      <ActionSheet
+        visible={menuOpen}
+        title="L12 pentru acest meci"
+        subtitle={team.name}
+        onClose={() => setMenuOpen(false)}
+        actions={[
+          ...(template ? [{ key: 'load', label: 'Încarcă L12 constant', icon: 'restore', hint: 'Înlocuiește foaia cu formula de bază', onPress: () => setConfirm('template') }] : []),
+          ...(draft.players.length > 0 ? [{ key: 'saveTemplate', label: 'Salvează ca L12 constant', icon: 'bookmark', hint: 'Meciurile următoare pornesc de aici', onPress: () => setConfirm('saveTemplate') }] : []),
+          { key: 'team', label: 'Deschide L12 constant', icon: 'groups', onPress: () => router.push(`${base}/team/${team.id}` as any) },
+          ...(saved ? [{ key: 'reset', label: 'Șterge L12-ul meciului', icon: 'delete-outline', tone: 'danger' as const, onPress: () => setConfirm('reset') }] : []),
+        ]}
+      />
 
       <ConfirmDialog
         visible={confirm != null}
@@ -613,7 +656,7 @@ export function L12MatchScreen() {
           setConfirm(null);
           if (action === 'reset') void reset();
           else if (action === 'saveTemplate') void saveAsTemplate();
-          else if (template) setDraft(lineupForRoster({ ...template, competition: template.competition ?? draft.competition }, roster));
+          else if (template) setDraft(withTeamGender(lineupForRoster({ ...template, competition: template.competition ?? draft.competition }, roster), team));
         }}
         onCancel={() => setConfirm(null)}
       />
@@ -670,7 +713,7 @@ export function L12TemplateScreen() {
 
   useEffect(() => {
     if (!team || rosterLoading || seeded) return;
-    const initial = saved ? lineupForRoster(saved, roster) : defaultLineup(team);
+    const initial = saved ? withTeamGender(lineupForRoster(saved, roster), team) : defaultLineup(team);
     setDraft(initial);
     setBaseline(initial);
     setSeeded(true);
@@ -687,10 +730,10 @@ export function L12TemplateScreen() {
     }
     setSaving(true);
     try {
-      const result = await l12Api.saveTemplate(teamId, { ...draft, players: sortLineupPlayers(draft.players) });
+      const result = await l12Api.saveTemplate(teamId, { ...(team ? withTeamGender(draft, team) : draft), players: sortLineupPlayers(draft.players) });
       setSaved(result);
-      setDraft(result);
-      setBaseline(result);
+      setDraft(team ? withTeamGender(result, team) : result);
+      setBaseline(team ? withTeamGender(result, team) : result);
       showToast({ variant: 'success', message: 'L12 constant salvat.' });
     } catch (err) {
       showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Salvarea a eșuat.' });
@@ -712,14 +755,21 @@ export function L12TemplateScreen() {
     );
   }
 
+  const teamGender = resolveTeamGender(team);
   const blankDoc: L12DocumentInput = {
     teamName: team.name,
     homeTeam: team.name,
     awayTeam: '',
-    competition: draft.competition ?? '',
-    gender: draft.gender,
+    competition: draft.competition ?? team.leagueName ?? '',
+    gender: teamGender,
     date: '',
     lineup: { ...draft, players: sortLineupPlayers(draft.players) },
+  };
+  const notify = (message: string, variant: 'error' | 'info') => showToast({ variant, message });
+  const exportAs = (kind: 'pdf' | 'word') => {
+    if (!checkBeforeExport(blankDoc.lineup, notify)) return;
+    if (kind === 'pdf') printL12(blankDoc);
+    else downloadL12Word(blankDoc);
   };
 
   return (
@@ -729,31 +779,42 @@ export function L12TemplateScreen() {
           label={saved ? 'Modificări nesalvate' : 'L12 constant nesalvat'}
           saving={saving}
           onSave={save}
-          onDiscard={saved ? () => setDraft(lineupForRoster(saved, roster)) : undefined}
+          onDiscard={saved ? () => setDraft(withTeamGender(lineupForRoster(saved, roster), team)) : undefined}
         />
       ) : null}
     >
-      <View className="mb-5 gap-3">
-        <View className="flex-row flex-wrap items-center gap-2">
-          <BackButton label="L12" onPress={() => router.back(base)} />
-          <StatusChip set={Boolean(saved)} />
+      <View className="mb-5 gap-4">
+        <View className="flex-row items-center gap-2">
+          <Button size="sm" icon="chevron-left" label="L12" onPress={() => router.back(base)} />
+          <StatusChip set={Boolean(saved)} label={saved ? 'Salvat' : 'Nesetat'} />
         </View>
-        <View>
-          <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>L12 constant</Text>
-          <Text className="text-[22px] md:text-[28px] font-bold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.5px' } as any}>
-            {team.name}
-          </Text>
-          <Text className="text-[13px] font-medium mt-1.5" style={{ color: 'var(--c-muted)' }}>
-            Formula de bază: fiecare meci nou al echipei pornește de aici. Pe meci o poți modifica oricând.
-          </Text>
-        </View>
-        <View className="flex-row flex-wrap gap-2">
-          <ActionButton icon="picture-as-pdf" label="PDF" onPress={() => printL12(blankDoc)} />
-          <ActionButton icon="description" label="Word" onPress={() => downloadL12Word(blankDoc)} />
+
+        <View className="rounded-[18px] border p-4 md:p-5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
+          <View className="flex-col lg:flex-row lg:items-start gap-4">
+            <View className="flex-1 min-w-0">
+              <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>L12 constant</Text>
+              <Text className="text-[20px] md:text-[24px] font-bold leading-tight mt-1.5" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.4px' } as any} numberOfLines={2}>
+                {team.name}
+              </Text>
+              <Text className="text-[13px] font-medium mt-1" style={{ color: 'var(--c-muted)' }}>
+                Formula de bază a echipei. Fiecare meci nou pornește de aici.
+              </Text>
+              <View className="flex-row flex-wrap gap-1.5 mt-3">
+                {team.leagueName ? <MetaChip icon="emoji-events" label={team.leagueName} /> : null}
+                {team.seasonName ? <MetaChip icon="date-range" label={team.seasonName} /> : null}
+                {teamGender ? <MetaChip icon="groups" label={teamGender === 'M' ? 'Masculin' : 'Feminin'} /> : null}
+                {saved?.updatedAt ? <MetaChip icon="schedule" label={`Actualizat ${formatDate(saved.updatedAt)}`} /> : null}
+              </View>
+            </View>
+            <View className="flex-row flex-wrap gap-2">
+              <Button icon="picture-as-pdf" label="PDF" onPress={() => exportAs('pdf')} />
+              <Button icon="description" label="Word" onPress={() => exportAs('word')} />
+            </View>
+          </View>
         </View>
       </View>
 
-      <L12Editor lineup={draft} onChange={setDraft} roster={roster} rosterLoading={rosterLoading} showMatchDetails={false} />
+      <L12Editor lineup={draft} onChange={setDraft} roster={roster} rosterLoading={rosterLoading} showMatchDetails={false} known={saved?.players ?? []} />
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </PageShell>
   );
