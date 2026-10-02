@@ -511,11 +511,11 @@ export default function ManageAccountsScreen() {
                 actions.push({ key: option.role, label: option.label, icon: option.icon, onPress: () => setPending({ kind: 'role', account, role: option.role }) });
             });
         }
-        if (isInvite) actions.push({ key: 'resend', label: 'Retrimite invitația', icon: 'forward-to-inbox', onPress: () => setPending({ kind: 'resend', account }) });
+        if (isInvite) actions.push({ key: 'resend', label: 'Retrimite invitația', icon: 'send', onPress: () => setPending({ kind: 'resend', account }) });
         if (!isInvite && !isPrivileged && isInactive) actions.push({ key: 'reactivate', label: 'Reactivează', icon: 'restart-alt', onPress: () => setPending({ kind: 'reactivate', account }) });
         if (!isPrivileged && !isInactive) {
             actions.push(isInvite
-                ? { key: 'cancel', label: 'Anulează invitația', icon: 'cancel-schedule-send', tone: 'danger', onPress: () => setPending({ kind: 'deactivate', account }) }
+                ? { key: 'cancel', label: 'Anulează invitația', icon: 'cancel', tone: 'danger', onPress: () => setPending({ kind: 'deactivate', account }) }
                 : { key: 'deactivate', label: 'Dezactivează', icon: 'block', tone: 'danger', hint: 'Oprește accesul, se poate reactiva', onPress: () => setPending({ kind: 'deactivate', account }) });
         }
         if (!isInvite && !isPrivileged) actions.push({ key: 'delete', label: 'Șterge definitiv', icon: 'delete-forever', tone: 'danger', onPress: () => setPending({ kind: 'delete', account }) });

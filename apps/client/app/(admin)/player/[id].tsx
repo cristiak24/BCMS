@@ -1,28 +1,59 @@
-import React, { useCallback, useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Pressable, useWindowDimensions } from '@/src/web/reactNative';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ScrollView, Text, View } from '@/src/web/reactNative';
+import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
-import { ArrowLeft, Save, User, Mail, Hash, Calendar, Shield, CreditCard, Activity, CheckCircle, X, Info, ChevronRight, Award } from 'lucide-react';
-import { LinearGradient } from '@/src/web/linearGradient';
-import { teamsApi, Player } from '../../../services/teamsApi';
+import { teamsApi, type Player } from '../../../services/teamsApi';
+import PageContainer from '../../../components/ui/PageContainer';
+import Button from '../../../components/ui/Button';
+import SelectField from '../../../components/ui/SelectField';
+import { FormField } from '../../../components/ui/FormField';
+import { Skeleton } from '../../../components/ui/Skeleton';
 import { ErrorState } from '../../../components/ui/ScreenState';
-import GuardiansPanel from '../../../components/family/GuardiansPanel';
 import { ToastHost, useToasts } from '../../../components/ui/Toast';
+import GuardiansPanel from '../../../components/family/GuardiansPanel';
+import { MEDICAL_META, formatDate, medicalStatus } from '../../../components/myclub/teamDisplay';
+
+/**
+ * Admin view of one player: identity form, medical visa, payments and family
+ * links. Every figure on the page comes from the player record — the old
+ * screen padded it with "Specialty camps 0%", a mock match calendar and a
+ * "Remove player" button that did nothing.
+ */
+
+const PAID = ['paid', 'processed', 'succeeded', 'success'];
+
+function Card({ title, icon, right, children }: { title: string; icon: string; right?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <View className="rounded-[16px] border p-4 md:p-5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
+      <View className="flex-row items-center gap-2.5 mb-4">
+        <View className="w-8 h-8 rounded-[9px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+          <MaterialIcons name={icon} size={17} color="var(--c-brand-fg)" />
+        </View>
+        <Text className="flex-1 text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
+        {right}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function Fact({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return (
+    <View className="flex-1 min-w-[130px] px-4 py-3">
+      <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{label}</Text>
+      <Text className="text-[15px] font-bold mt-1" style={{ color: tone ?? 'var(--c-ink)' }} numberOfLines={1}>{value}</Text>
+    </View>
+  );
+}
 
 export default function PlayerProfile() {
   const { id, returnTo } = useLocalSearchParams();
-  const { toasts, showToast, dismissToast } = useToasts();
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const isCompact = width < 900;
+  const { toasts, showToast, dismissToast } = useToasts();
   const [player, setPlayer] = useState<Player | null>(null);
-  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTransactions, setShowTransactions] = useState(false);
 
-  // Form state
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -31,27 +62,25 @@ export default function PlayerProfile() {
   const [status, setStatus] = useState('active');
   const [medicalExpiry, setMedicalExpiry] = useState('');
 
+  const hydrate = (data: Player) => {
+    setFirstName(data.firstName || '');
+    setLastName(data.lastName || '');
+    setEmail(data.email || '');
+    setNumber(data.number?.toString() || '');
+    setBirthYear(data.birthYear?.toString() || '');
+    setStatus(data.status || 'active');
+    setMedicalExpiry(data.medicalCheckExpiry ? new Date(data.medicalCheckExpiry).toISOString().slice(0, 10) : '');
+  };
+
   const fetchPlayer = useCallback(async () => {
     if (!id) return;
-
     try {
-      setLoading(true);
       setLoadError(null);
-      const data = await teamsApi.getPlayerById(parseInt(id as string));
+      const data = await teamsApi.getPlayerById(parseInt(id as string, 10));
       setPlayer(data);
-      setFirstName(data.firstName || '');
-      setLastName(data.lastName || '');
-      setEmail(data.email || '');
-      setNumber(data.number?.toString() || '');
-      setBirthYear(data.birthYear?.toString() || '');
-      setStatus(data.status || 'active');
-      setMedicalExpiry(data.medicalCheckExpiry ? new Date(data.medicalCheckExpiry).toISOString().split('T')[0] : '');
-    } catch (error) {
-      console.error('Fetch player error:', error);
-      setLoadError('Could not load player data.');
-      Alert.alert('Error', 'Could not load player data');
-    } finally {
-      setLoading(false);
+      hydrate(data);
+    } catch {
+      setLoadError('Nu am putut încărca jucătorul.');
     }
   }, [id]);
 
@@ -64,518 +93,235 @@ export default function PlayerProfile() {
       router.back('/admin/roster');
       return;
     }
-
     if (typeof returnTo === 'string' && returnTo.startsWith('/')) {
       router.replace(returnTo as any);
       return;
     }
-
     router.replace('/admin/roster' as any);
   }, [returnTo, router]);
 
+  const dirty = useMemo(() => {
+    if (!player) return false;
+    const original = {
+      firstName: player.firstName || '',
+      lastName: player.lastName || '',
+      email: player.email || '',
+      number: player.number?.toString() || '',
+      birthYear: player.birthYear?.toString() || '',
+      status: player.status || 'active',
+      medicalExpiry: player.medicalCheckExpiry ? new Date(player.medicalCheckExpiry).toISOString().slice(0, 10) : '',
+    };
+    return JSON.stringify(original) !== JSON.stringify({ firstName, lastName, email, number, birthYear, status, medicalExpiry });
+  }, [player, firstName, lastName, email, number, birthYear, status, medicalExpiry]);
+
+  const numberError = number && !/^\d{1,2}$/.test(number) ? 'Un număr între 0 și 99.' : null;
+  const yearError = birthYear && !/^(19|20)\d{2}$/.test(birthYear) ? 'An de forma 2010.' : null;
+
   const handleSave = async () => {
-    if (!player) return;
+    if (!player || numberError || yearError) return;
     setSaving(true);
     try {
-      await teamsApi.updatePlayer(player.id, {
-        firstName,
-        lastName,
-        email,
-        number: parseInt(number),
-        birthYear: parseInt(birthYear),
+      const payload: Partial<Player> = {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim() || null,
+        number: number ? parseInt(number, 10) : null,
+        birthYear: birthYear ? parseInt(birthYear, 10) : null,
         status,
-        medicalCheckExpiry: medicalExpiry ? new Date(medicalExpiry).toISOString() : null
-      });
-      Alert.alert('Success', 'Profile saved successfully');
-      handleGoBack();
-    } catch (error) {
-      console.error('Save player error:', error);
-      Alert.alert('Error', 'Failed to save changes');
+        medicalCheckExpiry: medicalExpiry ? new Date(`${medicalExpiry}T12:00:00Z`).toISOString() : null,
+      };
+      await teamsApi.updatePlayer(player.id, payload);
+      const next = { ...player, ...payload } as Player;
+      setPlayer(next);
+      hydrate(next);
+      showToast({ variant: 'success', message: 'Profilul a fost salvat.' });
+    } catch {
+      showToast({ variant: 'error', message: 'Nu am putut salva modificările.' });
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
+  if (loadError) {
     return (
-      <View className="flex-1 items-center justify-center bg-[var(--c-surface)]">
-        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
+      <View className="flex-1 items-center justify-center p-6" style={{ backgroundColor: 'var(--c-bg)' }}>
+        <ErrorState title="Jucător negăsit" message={loadError} actionLabel="Încearcă din nou" onAction={fetchPlayer} />
       </View>
     );
   }
 
-  if (loadError || !player) {
+  if (!player) {
     return (
-      <View className="flex-1 items-center justify-center bg-[var(--c-surface)] p-6">
-        <ErrorState
-          title="Jucător negăsit"
-          message={loadError ?? 'Acest jucător nu a putut fi găsit.'}
-          actionLabel="Încearcă din nou"
-          onAction={fetchPlayer}
-        />
+      <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
+        <PageContainer>
+          <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă profilul">
+            <Skeleton className="h-9 w-28 rounded-[10px]" />
+            <Skeleton className="h-[120px] w-full rounded-[16px]" />
+            <Skeleton className="h-[320px] w-full rounded-[16px]" />
+          </View>
+        </PageContainer>
       </View>
     );
   }
 
-  // Dynamic data mapping & fallbacks
-  const initials = `${firstName?.[0] || 'P'}${lastName?.[0] || ''}`.toUpperCase();
-  const displayCategory = player?.category || player?.teamNames?.[0] || player?.teamName || 'Unassigned';
-  const displayStatus = player?.status || 'active';
-  const displayPositionSq = `${player?.position || 'Player'} • ${player?.teamNames?.join(', ') || player?.teamName || 'No Team'}`;
+  const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || '?';
+  const teams = player.teamNames?.length ? player.teamNames : player.teamName ? [player.teamName] : [];
+  const isActive = status.toLowerCase() === 'active';
+  const med = medicalStatus(medicalExpiry || null);
+  const medMeta = MEDICAL_META[med];
 
-  // Extension fields (would come from extended API)
-  const attendanceRate = player?.attendanceRate ?? 0;
-  const attendanceTrend = (player as any)?.attendanceTrend ?? 'No trend data';
-
-  const campsRate = (player as any)?.campsRate ?? 0;
-  const campsText = (player as any)?.campsText ?? 'No participation data';
-
-  const matchesRate = (player as any)?.matchesRate ?? 0;
-  const matchesLabel = (player as any)?.matchesLabel ?? 'N/A';
-  const matchesDesc = (player as any)?.matchesDesc ?? 'No match data available.';
-
-  const isMedicalValid = !!medicalExpiry && new Date(medicalExpiry) > new Date();
-  
-  const paymentStatusDisplay = ['paid', 'processed', 'succeeded', 'success'].includes(player?.paymentStatus?.toLowerCase() ?? '') ? 'Paid' : 'Pending';
-  const feesName = (player as any)?.feesName ?? 'Season Fees';
-  const paymentCurrency = player?.paymentCurrency || 'ron';
-  const paymentTransactions = player?.paymentTransactions ?? [];
-  const amountDue = player?.outstandingAmount ?? player?.amountDue ?? 0;
-  const paidAmount = player?.paidAmount ?? paymentTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
-  const displayedPaymentAmount = amountDue > 0 ? amountDue : paidAmount;
-  const formatMoney = (amount: number, currency = paymentCurrency) =>
-    new Intl.NumberFormat('ro-RO', { style: 'currency', currency: currency.toUpperCase() }).format(amount);
-
-  const profileFields = [firstName, lastName, email, birthYear, number, medicalExpiry];
-  const profileCompletion = Math.round((profileFields.filter(Boolean).length / profileFields.length) * 100);
-  const medicalStatusLabel = isMedicalValid ? 'Valid' : 'Needs date';
-  const paymentTone = paymentStatusDisplay === 'Paid' ? 'blue' : 'orange';
-
-  const FieldLabel = ({ children }: { children: React.ReactNode }) => (
-    <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{children}</Text>
-  );
-
-  const MetricCard = ({
-    label,
-    value,
-    caption,
-    icon,
-    color,
-    progress,
-  }: {
-    label: string;
-    value: string;
-    caption: string;
-    icon: React.ReactNode;
-    color: string;
-    progress: number;
-  }) => (
-    <View className="flex-1 min-w-[210px] rounded-[24px] border border-[#E5ECF6] bg-[var(--c-surface)] p-5 shadow-sm">
-      <View className="flex-row items-start justify-between gap-3">
-        <View className="flex-1">
-          <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</Text>
-          <Text className="mt-2 text-3xl font-black text-[#0E2041]">{value}</Text>
-          <Text className="mt-1 text-[11px] font-bold text-slate-400" numberOfLines={1}>{caption}</Text>
-        </View>
-        <View className="h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)` }}>
-          {icon}
-        </View>
-      </View>
-      <View className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
-        <View className="h-full rounded-full" style={{ width: `${Math.min(Math.max(progress, 0), 100)}%`, backgroundColor: color }} />
-      </View>
-    </View>
-  );
-
-  const AdminStatusPill = ({ label, tone }: { label: string; tone: 'red' | 'blue' | 'orange' | 'emerald' }) => {
-    const stylesByTone = {
-      red: { backgroundColor: 'var(--c-danger-bg)', color: 'var(--c-danger)' },
-      blue: { backgroundColor: 'var(--c-surface-tint)', color: 'var(--c-blue)' },
-      orange: { backgroundColor: 'var(--c-warning-bg)', color: '#EA580C' },
-      emerald: { backgroundColor: 'var(--c-success-bg)', color: 'var(--c-success-fg)' },
-    };
-
-    return (
-      <View className="self-start rounded-full px-3 py-1" style={{ backgroundColor: stylesByTone[tone].backgroundColor }}>
-        <Text className="text-[9px] font-black uppercase tracking-widest leading-none" style={{ color: stylesByTone[tone].color }}>{label}</Text>
-      </View>
-    );
-  };
-
+  const currency = (player.paymentCurrency || 'ron').toUpperCase();
+  const transactions = player.paymentTransactions ?? [];
+  const amountDue = player.outstandingAmount ?? player.amountDue ?? 0;
+  const paid = PAID.includes(player.paymentStatus?.toLowerCase() ?? '') && amountDue <= 0;
+  const money = (amount: number, cur = currency) => new Intl.NumberFormat('ro-RO', { style: 'currency', currency: cur.toUpperCase() }).format(amount);
+  const attendance = player.attendanceRate;
 
   return (
-    <ScrollView className="flex-1 bg-[#F1F5F9]" showsVerticalScrollIndicator={false} contentContainerClassName="pb-16">
-      <View className="pt-6 md:pt-8" style={{ paddingHorizontal: isCompact ? 16 : 32 }}>
-        <View className="mb-5 flex-row items-center justify-between gap-3">
-          <TouchableOpacity onPress={handleGoBack} className="h-11 w-11 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[var(--c-surface)] shadow-sm">
-            <ArrowLeft color="var(--c-ink)" size={19} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleSave}
-            disabled={saving}
-            className="h-11 flex-row items-center justify-center rounded-2xl bg-[#123B95] px-5 shadow-md shadow-blue-900/20 disabled:opacity-60"
-          >
-            {saving ? <ActivityIndicator size="small" color="white" /> : <Save color="white" size={17} />}
-            <Text className="ml-2 text-[11px] font-black uppercase tracking-widest text-white">Save Profile</Text>
-          </TouchableOpacity>
-        </View>
+    <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
+      <ScrollView className="flex-1" contentContainerClassName="pb-36" showsVerticalScrollIndicator={false}>
+        <PageContainer>
+          <View className="flex-row items-center justify-between gap-3 mb-4">
+            <Button icon="chevron-left" label="Înapoi" size="sm" onPress={handleGoBack} />
+            <Button
+              icon="check"
+              label={saving ? 'Se salvează…' : dirty ? 'Salvează' : 'Salvat'}
+              variant={dirty ? 'primary' : 'secondary'}
+              disabled={!dirty || !!numberError || !!yearError}
+              loading={saving}
+              onPress={handleSave}
+            />
+          </View>
 
-        <View className="overflow-hidden rounded-[34px] border border-[#DCE7F5] bg-[var(--c-surface)] shadow-sm">
-          <LinearGradient
-            colors={['#0E2F7F', 'var(--c-brand-fg)', '#2F6FE4']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ padding: isCompact ? 20 : 28 }}
-          >
-            <View style={{ flexDirection: isCompact ? 'column' : 'row', gap: 20, alignItems: isCompact ? 'flex-start' : 'center' }}>
-              <View className="relative">
-                <View className="h-24 w-24 items-center justify-center overflow-hidden rounded-[28px] border-2 border-white/30 bg-white/15">
-                  <Text className="text-3xl font-black text-white">{initials}</Text>
+          {/* Identity */}
+          <View className="rounded-[18px] border overflow-hidden mb-5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
+            <View className="flex-row items-center gap-4 p-4 md:p-5">
+              <View className="w-16 h-16 md:w-[72px] md:h-[72px] rounded-[18px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+                <Text className="text-[22px] md:text-[24px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{initials}</Text>
+              </View>
+              <View className="flex-1 min-w-0">
+                <Text className="text-[22px] md:text-[26px] font-bold leading-tight" style={{ color: 'var(--c-ink)', letterSpacing: '-0.5px' } as any} numberOfLines={2}>
+                  {`${firstName} ${lastName}`.trim() || 'Jucător fără nume'}
+                </Text>
+                <Text className="text-[13px] font-medium mt-1" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
+                  {[player.position, teams.join(', ') || 'Fără echipă'].filter(Boolean).join(' · ')}
+                </Text>
+                <View className="flex-row flex-wrap gap-1.5 mt-2">
+                  <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: isActive ? 'var(--c-success-bg)' : 'var(--c-surface-3)' }}>
+                    <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isActive ? 'var(--c-success)' : 'var(--c-faint)' }} />
+                    <Text className="text-[11.5px] font-semibold" style={{ color: isActive ? 'var(--c-success-fg)' : 'var(--c-muted)' }}>{isActive ? 'Activ' : 'Inactiv'}</Text>
+                  </View>
+                  {player.category ? (
+                    <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+                      <Text className="text-[11.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{player.category}</Text>
+                    </View>
+                  ) : null}
                 </View>
-                {displayStatus.toLowerCase() === 'active' && (
-                  <View className="absolute -bottom-2 -right-2 h-8 w-8 items-center justify-center rounded-full border-4 border-[#1D3E90] bg-emerald-400">
-                    <CheckCircle color="var(--c-surface)" size={15} />
+              </View>
+            </View>
+            <View className="flex-row flex-wrap border-t" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' }}>
+              <Fact label="Tricou" value={number ? `#${number}` : '—'} />
+              <Fact label="Prezență" value={attendance != null ? `${Math.round(attendance)}%` : '—'} tone={attendance != null && attendance < 60 ? 'var(--c-danger-fg)' : undefined} />
+              <Fact label="Viză medicală" value={medMeta.label} tone={medMeta.fg} />
+              <Fact label="Plată" value={paid ? 'La zi' : amountDue > 0 ? `Restanță ${money(amountDue)}` : 'În așteptare'} tone={paid ? 'var(--c-success-fg)' : 'var(--c-warning-fg)'} />
+            </View>
+          </View>
+
+          <View className="flex-col lg:flex-row lg:items-start gap-5">
+            <View className="flex-1 min-w-0 gap-5">
+              <Card title="Date personale" icon="badge">
+                <View className="gap-4">
+                  <View className="flex-col sm:flex-row gap-4">
+                    <View className="flex-1"><FormField label="Prenume" value={firstName} onChangeText={setFirstName} /></View>
+                    <View className="flex-1"><FormField label="Nume" value={lastName} onChangeText={setLastName} /></View>
+                  </View>
+                  <FormField label="Email" icon="mail-outline" value={email} onChangeText={setEmail} placeholder="nume@exemplu.ro" keyboardType="email-address" autoCapitalize="none" />
+                  <View className="flex-col sm:flex-row gap-4">
+                    <View className="flex-1"><FormField label="An naștere" value={birthYear} onChangeText={setBirthYear} keyboardType="numeric" placeholder="2010" error={yearError} /></View>
+                    <View className="flex-1"><FormField label="Număr tricou" value={number} onChangeText={setNumber} keyboardType="numeric" placeholder="7" error={numberError} /></View>
+                  </View>
+                  <View>
+                    <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Stare în club</Text>
+                    <SelectField
+                      label="Stare în club"
+                      options={[{ key: 'active', label: 'Activ' }, { key: 'inactive', label: 'Inactiv' }]}
+                      value={isActive ? 'active' : 'inactive'}
+                      onChange={setStatus}
+                      className="sm:max-w-[240px]"
+                    />
+                  </View>
+                </View>
+              </Card>
+
+              {Number(id) > 0 ? (
+                <GuardiansPanel playerId={Number(id)} playerName={`${firstName} ${lastName}`.trim() || 'jucător'} onNotify={showToast} />
+              ) : null}
+            </View>
+
+            <View className="w-full lg:w-[380px] gap-5 shrink-0">
+              <Card
+                title="Viză medicală"
+                icon="medical-services"
+                right={(
+                  <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: medMeta.bg }}>
+                    <Text className="text-[11.5px] font-semibold" style={{ color: medMeta.fg }}>{medMeta.label}</Text>
                   </View>
                 )}
-              </View>
+              >
+                <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Valabilă până la</Text>
+                <input
+                  type="date"
+                  value={medicalExpiry}
+                  onChange={(e) => setMedicalExpiry(e.target.value)}
+                  aria-label="Viză valabilă până la"
+                  style={{
+                    width: '100%',
+                    height: 44,
+                    borderRadius: 11,
+                    border: '1px solid var(--c-border)',
+                    backgroundColor: 'var(--c-surface-2)',
+                    color: 'var(--c-ink)',
+                    padding: '0 12px',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    colorScheme: 'light dark',
+                  }}
+                />
+                <Text className="t-meta mt-2" style={{ color: 'var(--c-muted)' }}>
+                  {medicalExpiry ? `Expiră pe ${formatDate(medicalExpiry)}.` : 'Nicio viză înregistrată.'} Salvează ca să aplici.
+                </Text>
+              </Card>
 
-              <View className="flex-1">
-                <View className="mb-3 flex-row flex-wrap gap-2">
-                  <View className="rounded-full bg-white/15 px-3 py-1.5">
-                    <Text className="text-[10px] font-black uppercase tracking-widest text-blue-50" numberOfLines={1}>{displayCategory}</Text>
-                  </View>
-                  <View className="flex-row items-center rounded-full bg-white px-3 py-1.5">
-                    <View className={`mr-2 h-1.5 w-1.5 rounded-full ${displayStatus.toLowerCase() === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                    <Text className="text-[10px] font-black uppercase tracking-widest text-[#123B95]">{displayStatus}</Text>
-                  </View>
+              <Card title="Plăți" icon="payments">
+                <View className="rounded-[12px] px-3.5 py-3 mb-3" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+                  <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{amountDue > 0 ? 'De plătit' : 'Plătit total'}</Text>
+                  <Text className="t-num text-[24px] font-bold mt-1" style={{ color: amountDue > 0 ? 'var(--c-warning-fg)' : 'var(--c-ink)' }}>
+                    {money(amountDue > 0 ? amountDue : player.paidAmount ?? transactions.reduce((sum, t) => sum + t.amount, 0))}
+                  </Text>
                 </View>
-                <Text className="text-4xl font-black leading-tight text-white md:text-5xl" numberOfLines={2}>{firstName || 'Unknown'} {lastName || 'Player'}</Text>
-                <Text className="mt-2 text-sm font-bold text-blue-100" numberOfLines={2}>{displayPositionSq}</Text>
-              </View>
-
-              <View className="w-full rounded-[24px] border border-white/15 bg-white/10 p-4 md:w-[300px]">
-                <Text className="text-[10px] font-black uppercase tracking-widest text-blue-100">Profile readiness</Text>
-                <View className="mt-3 flex-row items-end justify-between">
-                  <Text className="text-4xl font-black text-white">{profileCompletion}%</Text>
-                  <Text className="pb-1 text-[11px] font-bold text-blue-100">{profileFields.filter(Boolean).length}/{profileFields.length} fields</Text>
-                </View>
-                <View className="mt-4 h-2 overflow-hidden rounded-full bg-white/20">
-                  <View className="h-full rounded-full bg-white" style={{ width: `${profileCompletion}%` }} />
-                </View>
-              </View>
-            </View>
-          </LinearGradient>
-
-          <View className="flex-row flex-wrap border-t border-[#E8EEF7] bg-[var(--c-surface)]">
-            <View className="min-w-[170px] flex-1 border-r border-[#EEF3F8] px-5 py-4">
-              <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email</Text>
-              <Text className="mt-1 text-sm font-black text-[#0E2041] break-anywhere">{email || 'No email'}</Text>
-            </View>
-            <View className="min-w-[140px] flex-1 border-r border-[#EEF3F8] px-5 py-4">
-              <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">Jersey</Text>
-              <Text className="mt-1 text-sm font-black text-[#0E2041]">#{number || '--'}</Text>
-            </View>
-            <View className="min-w-[150px] flex-1 border-r border-[#EEF3F8] px-5 py-4">
-              <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">Medical</Text>
-              <Text className={`mt-1 text-sm font-black ${isMedicalValid ? 'text-emerald-600' : 'text-red-500'}`}>{medicalStatusLabel}</Text>
-            </View>
-            <View className="min-w-[150px] flex-1 px-5 py-4">
-              <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment</Text>
-              <Text className={`mt-1 text-sm font-black ${paymentStatusDisplay === 'Paid' ? 'text-blue-600' : 'text-orange-600'}`}>{paymentStatusDisplay}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View className="mt-6 flex-row flex-wrap gap-4">
-          <MetricCard
-            label="Training"
-            value={`${attendanceRate}%`}
-            caption={attendanceTrend}
-            icon={<Activity color="var(--c-blue)" size={19} />}
-            color="var(--c-blue)"
-            progress={attendanceRate}
-          />
-          <MetricCard
-            label="Specialty camps"
-            value={`${campsRate}%`}
-            caption={campsText}
-            icon={<Award color="var(--c-warning)" size={19} />}
-            color="var(--c-warning)"
-            progress={campsRate}
-          />
-          <TouchableOpacity onPress={() => setShowCalendar(true)} className="min-w-[240px] flex-1 rounded-[24px] bg-[#0E2041] p-5 shadow-md shadow-slate-900/20">
-            <View className="flex-row items-start justify-between">
-              <View className="flex-1 pr-4">
-                <Text className="text-[10px] font-black uppercase tracking-widest text-blue-200">Match presence</Text>
-                <View className="mt-2 flex-row items-center gap-3">
-                  <Text className="text-3xl font-black text-white">{matchesRate}%</Text>
-                  {matchesLabel !== 'N/A' && (
-                    <View className="rounded-full bg-yellow-300 px-2 py-1">
-                      <Text className="text-[8px] font-black uppercase tracking-widest text-[#0E2041]">{matchesLabel}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text className="mt-1 text-[11px] font-bold text-blue-100" numberOfLines={1}>{matchesDesc}</Text>
-              </View>
-              <View className="h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
-                <ChevronRight color="var(--c-surface)" size={18} />
-              </View>
-            </View>
-            <View className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
-              <View className="h-full rounded-full bg-blue-300" style={{ width: `${Math.min(Math.max(matchesRate, 0), 100)}%` }} />
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        <View className="mt-6" style={{ flexDirection: isCompact ? 'column' : 'row', gap: 20, alignItems: 'flex-start' }}>
-          <View className="w-full flex-1 rounded-[30px] border border-[#E1EAF5] bg-[var(--c-surface)] p-5 shadow-sm md:p-7" style={{ minWidth: isCompact ? undefined : 0 }}>
-            <View className="mb-6 flex-row items-center justify-between gap-4">
-              <View className="flex-row items-center gap-3">
-                <View className="h-10 w-10 items-center justify-center rounded-2xl bg-[#EEF4FF]">
-                  <User color="var(--c-brand-fg)" size={18} />
-                </View>
-                <View>
-                  <Text className="text-xl font-black text-[#0E2041]">Player details</Text>
-                  <Text className="text-xs font-bold text-slate-400">Editable roster identity</Text>
-                </View>
-              </View>
-            </View>
-
-            <View className="gap-5">
-              <View style={{ flexDirection: isCompact ? 'column' : 'row', gap: 14 }}>
-                <View className="flex-1">
-                  <FieldLabel>First name</FieldLabel>
-                  <TextInput className="h-12 rounded-2xl border border-[#DFE8F3] bg-[#F8FBFF] px-5 py-0 font-bold text-slate-900" value={firstName} onChangeText={setFirstName} />
-                </View>
-                <View className="flex-1">
-                  <FieldLabel>Last name</FieldLabel>
-                  <TextInput className="h-12 rounded-2xl border border-[#DFE8F3] bg-[#F8FBFF] px-5 py-0 font-bold text-slate-900" value={lastName} onChangeText={setLastName} />
-                </View>
-              </View>
-
-              <View>
-                <FieldLabel>Email address</FieldLabel>
-                <View className="relative">
-                  <TextInput className="h-12 rounded-2xl border border-[#DFE8F3] bg-[#F8FBFF] pl-12 pr-5 py-0 font-bold text-slate-900" value={email} onChangeText={setEmail} placeholder="player@academy.com" keyboardType="email-address" />
-                  <View pointerEvents="none" className="absolute bottom-0 left-5 top-0 justify-center">
-                    <Mail color="var(--c-faint)" size={17} />
-                  </View>
-                </View>
-              </View>
-
-              <View style={{ flexDirection: isCompact ? 'column' : 'row', gap: 14 }}>
-                <View className="flex-1">
-                  <FieldLabel>Birth year</FieldLabel>
-                  <TextInput className="h-12 rounded-2xl border border-[#DFE8F3] bg-[#F8FBFF] px-5 py-0 font-bold text-slate-900" value={birthYear} onChangeText={setBirthYear} keyboardType="numeric" />
-                </View>
-                <View className="flex-1">
-                  <FieldLabel>Jersey number</FieldLabel>
-                  <View className="relative">
-                    <TextInput className="h-12 rounded-2xl border border-[#DFE8F3] bg-[#F8FBFF] pl-12 pr-5 py-0 font-black text-[#123B95]" value={number} onChangeText={setNumber} keyboardType="numeric" />
-                    <View pointerEvents="none" className="absolute bottom-0 left-5 top-0 justify-center">
-                      <Hash color="var(--c-faint)" size={17} />
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            <View className="mt-7 rounded-[24px] border border-red-100 bg-red-50/50 p-4" style={{ flexDirection: isCompact ? 'column' : 'row', gap: 14, alignItems: isCompact ? 'flex-start' : 'center' }}>
-              <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[var(--c-surface)]">
-                <Info color="var(--c-danger)" size={18} />
-              </View>
-              <View className="flex-1">
-                <Text className="font-black text-slate-900">Danger Zone</Text>
-                <Text className="mt-1 text-[11px] font-bold text-slate-500">Once removed, all data is archived.</Text>
-              </View>
-              <TouchableOpacity className="h-10 items-center justify-center rounded-2xl border border-red-200 bg-[var(--c-surface)] px-5">
-                <Text className="text-[10px] font-black uppercase tracking-widest text-red-600">Remove player</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View className="w-full gap-4 md:w-[410px]">
-            <View className="rounded-[30px] border border-[#E1EAF5] bg-[var(--c-surface)] p-5 shadow-sm">
-              <View className="mb-5 flex-row items-center justify-between">
-                <View className="flex-row items-center gap-3">
-                  <View className={`h-11 w-11 items-center justify-center rounded-2xl ${isMedicalValid ? 'bg-emerald-50' : 'bg-red-50'}`}>
-                    <Activity color={isMedicalValid ? 'var(--c-success)' : 'var(--c-danger)'} size={20} />
-                  </View>
+                {transactions.length === 0 ? (
+                  <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Nicio tranzacție încă.</Text>
+                ) : (
                   <View>
-                    <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">Medical visa</Text>
-                    <Text className="text-lg font-black text-[#0E2041]">Compliance</Text>
+                    {transactions.slice(0, 6).map((t, index) => (
+                      <View key={t.id} className="flex-row items-center gap-3 py-2.5" style={index > 0 ? ({ borderTopWidth: 1, borderTopColor: 'var(--c-border)' } as any) : undefined}>
+                        <View className="flex-1 min-w-0">
+                          <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{t.label}</Text>
+                          <Text className="t-meta" style={{ color: t.status === 'success' ? 'var(--c-muted)' : 'var(--c-danger-fg)' }}>
+                            {new Date(t.date).toLocaleDateString('ro-RO')} · {t.status === 'success' ? 'Plătit' : 'Eșuat'}
+                          </Text>
+                        </View>
+                        <Text className="t-num text-[13.5px] font-bold" style={{ color: 'var(--c-ink)' }}>{money(t.amount, t.currency)}</Text>
+                      </View>
+                    ))}
                   </View>
-                </View>
-                <AdminStatusPill label={isMedicalValid ? 'Valid' : 'Expired'} tone={isMedicalValid ? 'emerald' : 'red'} />
-              </View>
-              <TouchableOpacity onPress={() => setShowDatePicker(true)} className="rounded-[22px] border border-[#E8EEF7] bg-[#F8FBFF] p-4">
-                <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">Expires</Text>
-                <Text className="mt-1 text-2xl font-black text-[#0E2041]">{medicalExpiry ? new Date(medicalExpiry).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Set Date'}</Text>
-                <View className="mt-3 flex-row items-center">
-                  <Calendar size={13} color="var(--c-faint)" />
-                  <Text className="ml-2 text-[11px] font-bold text-slate-400">Last check: {medicalExpiry || 'N/A'}</Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-
-            <View className="rounded-[30px] border border-[#E1EAF5] bg-[var(--c-surface)] p-5 shadow-sm">
-              <View className="mb-5 flex-row items-center justify-between">
-                <View className="flex-row items-center gap-3">
-                  <View className={`h-11 w-11 items-center justify-center rounded-2xl ${paymentTone === 'blue' ? 'bg-blue-50' : 'bg-orange-50'}`}>
-                    <CreditCard color={paymentTone === 'blue' ? 'var(--c-blue)' : 'var(--c-warning)'} size={20} />
-                  </View>
-                  <View>
-                    <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">{feesName}</Text>
-                    <Text className="text-lg font-black text-[#0E2041]">Finance</Text>
-                  </View>
-                </View>
-                <AdminStatusPill label={paymentStatusDisplay} tone={paymentTone} />
-              </View>
-              <View className="rounded-[22px] border border-[#E8EEF7] bg-[#F8FBFF] p-4">
-                <Text className="text-[10px] font-black uppercase tracking-widest text-slate-400">{amountDue > 0 ? 'Outstanding' : 'Paid amount'}</Text>
-                <Text className="mt-1 text-3xl font-black text-[#0E2041]">{formatMoney(displayedPaymentAmount)}</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowTransactions(true)} className="mt-4 h-11 flex-row items-center justify-center rounded-2xl bg-[#EEF4FF] px-5">
-                <Text className="text-[10px] font-black uppercase tracking-widest text-[#123B95]">View transactions</Text>
-                <ChevronRight color="var(--c-brand-fg)" size={15} />
-              </TouchableOpacity>
-            </View>
-
-            {Number(id) > 0 ? (
-              <GuardiansPanel playerId={Number(id)} playerName={`${firstName} ${lastName}`.trim() || 'jucător'} onNotify={showToast} />
-            ) : null}
-
-            <View className="rounded-[30px] border border-[#E1EAF5] bg-[#0E2041] p-5 shadow-sm">
-              <View className="mb-4 flex-row items-center gap-3">
-                <View className="h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
-                  <Shield color="var(--c-surface)" size={18} />
-                </View>
-                <View>
-                  <Text className="text-[10px] font-black uppercase tracking-widest text-blue-200">Admin snapshot</Text>
-                  <Text className="text-lg font-black text-white">Ready for staff review</Text>
-                </View>
-              </View>
-              <View className="gap-3">
-                <View className="flex-row items-center justify-between rounded-2xl bg-white/10 px-4 py-3">
-                  <Text className="text-xs font-bold text-blue-100">Roster identity</Text>
-                  <Text className="text-xs font-black text-white">{profileCompletion >= 70 ? 'Good' : 'Incomplete'}</Text>
-                </View>
-                <View className="flex-row items-center justify-between rounded-2xl bg-white/10 px-4 py-3">
-                  <Text className="text-xs font-bold text-blue-100">Medical status</Text>
-                  <Text className="text-xs font-black text-white">{isMedicalValid ? 'Cleared' : 'Action needed'}</Text>
-                </View>
-              </View>
+                )}
+              </Card>
             </View>
           </View>
-        </View>
-      </View>
-
-      {/* Attendance Calendar Modal */}
-      <Modal visible={showCalendar} transparent animationType="fade">
-        <Pressable 
-          className="flex-1 bg-black/40 justify-center items-center p-6"
-          onPress={() => setShowCalendar(false)}
-        >
-          <View className="bg-[var(--c-surface)] rounded-[40px] w-full max-w-lg p-8 shadow-2xl">
-             <View className="flex-row justify-between items-center mb-6">
-                <View>
-                   <Text className="text-2xl font-black text-slate-900 tracking-tight">Match Presence Log</Text>
-                   <Text className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">Player Statistics</Text>
-                </View>
-                <TouchableOpacity onPress={() => setShowCalendar(false)} className="w-10 h-10 bg-slate-50 rounded-xl items-center justify-center">
-                   <X color="var(--c-faint)" size={20} />
-                </TouchableOpacity>
-             </View>
-
-             {/* Simple Calendar Grid */}
-             <View className="flex-row flex-wrap gap-2 mb-8">
-                {[...Array(30)].map((_, i) => (
-                  <View 
-                    key={i} 
-                    className={`w-10 h-10 rounded-xl items-center justify-center border ${i < 20 ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}
-                  >
-                     <Text className={`font-bold text-[10px] ${i < 20 ? 'text-emerald-600' : 'text-slate-400'}`}>{i + 1}</Text>
-                     {i < 20 && <View className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500" />}
-                  </View>
-                ))}
-             </View>
-
-             <View className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex-row items-center">
-                <Info color="var(--c-brand-fg)" size={16} />
-                <Text className="text-xs text-slate-600 font-bold ml-3 italic">Mock calendar view for illustration.</Text>
-             </View>
-          </View>
-        </Pressable>
-      </Modal>
-
-      {/* Date Picker Modal (Simplified) */}
-      <Modal visible={showDatePicker} transparent animationType="slide">
-         <View className="flex-1 bg-black/50 justify-end">
-            <View className="bg-[var(--c-surface)] rounded-t-[40px] p-8">
-               <View className="flex-row justify-between items-center mb-8">
-                  <Text className="text-2xl font-black text-slate-900">Set Expiry Date</Text>
-                  <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                     <X color="var(--c-ink)" size={24} />
-                  </TouchableOpacity>
-               </View>
-
-               <View className="space-y-4">
-                  <Text className="text-slate-500 font-bold text-xs uppercase tracking-widest">Enter valid until date (YYYY-MM-DD)</Text>
-                  <TextInput 
-                    className="bg-slate-100 rounded-2xl px-6 py-4 font-bold text-lg"
-                    placeholder="2025-09-12"
-                    value={medicalExpiry}
-                    onChangeText={setMedicalExpiry}
-                  />
-                  
-                  <TouchableOpacity 
-                    onPress={() => setShowDatePicker(false)}
-                    className="bg-[#1D3E90] h-16 rounded-2xl items-center justify-center shadow-lg mt-4"
-                  >
-                    <Text className="text-white font-black uppercase tracking-widest">Confirm Date</Text>
-                  </TouchableOpacity>
-               </View>
-            </View>
-         </View>
-      </Modal>
-
-      <Modal visible={showTransactions} transparent animationType="fade">
-        <Pressable className="flex-1 bg-black/40 justify-center items-center p-6" onPress={() => setShowTransactions(false)}>
-          <Pressable className="bg-[var(--c-surface)] rounded-[32px] w-full max-w-lg p-6" onPress={(event) => event.stopPropagation()}>
-            <View className="flex-row items-center justify-between mb-5">
-              <View>
-                <Text className="text-xl font-black text-[#1E293B]">Transactions</Text>
-                <Text className="text-slate-400 text-xs font-bold mt-1">{firstName} {lastName}</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowTransactions(false)} className="w-10 h-10 rounded-2xl bg-slate-100 items-center justify-center">
-                <X color="var(--c-ink-soft)" size={18} />
-              </TouchableOpacity>
-            </View>
-
-            {paymentTransactions.length ? (
-              <View className="gap-3">
-                {paymentTransactions.map((transaction) => (
-                  <View key={transaction.id} className="rounded-2xl border border-slate-100 bg-[#F8FAFC] p-4 flex-row items-center justify-between">
-                    <View className="flex-1 pr-4">
-                      <Text className="font-black text-slate-900">{transaction.label}</Text>
-                      <Text className="text-slate-400 text-xs font-bold mt-1">
-                        {new Date(transaction.date).toLocaleDateString('ro-RO')} • {transaction.status === 'success' ? 'Paid' : 'Failed'}
-                      </Text>
-                    </View>
-                    <Text className="font-black text-[#1D3E90]">{formatMoney(transaction.amount, transaction.currency)}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <View className="rounded-2xl bg-slate-50 border border-slate-100 p-6 items-center">
-                <Text className="font-black text-slate-700">No transactions yet.</Text>
-              </View>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
+        </PageContainer>
+      </ScrollView>
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
-    </ScrollView>
+    </View>
   );
 }
