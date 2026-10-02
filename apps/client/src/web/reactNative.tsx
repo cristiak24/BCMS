@@ -316,15 +316,11 @@ export const Text = React.forwardRef<HTMLElement, AnyProps>(function Text(props,
   const { rest, native } = omitNativeProps(props);
   const { children, className, style, ...domProps } = rest;
   const flattened = flattenStyle(style);
-  const lineClamp =
-    typeof native.numberOfLines === 'number'
-      ? ({
-          WebkitBoxOrient: 'vertical',
-          WebkitLineClamp: native.numberOfLines,
-          display: '-webkit-box',
-          overflow: 'hidden',
-        } as CSSProperties)
-      : undefined;
+  // display/orient/overflow live in the zero-specificity `.rn-clamp` rule, not
+  // inline: an inline `display` beat every responsive utility, so a clamped
+  // <Text className="md:hidden"> stayed visible on desktop.
+  const clamped = typeof native.numberOfLines === 'number';
+  const lineClamp = clamped ? ({ WebkitLineClamp: native.numberOfLines } as CSSProperties) : undefined;
 
   return (
     <span
@@ -333,7 +329,7 @@ export const Text = React.forwardRef<HTMLElement, AnyProps>(function Text(props,
       data-testid={native.testID}
       ref={ref}
       style={{ ...flattened, ...lineClamp }}
-      className={cx('rn-text', className)}
+      className={cx('rn-text', clamped && 'rn-clamp', className)}
     >
       {children}
     </span>

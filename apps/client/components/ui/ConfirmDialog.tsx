@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 
@@ -20,6 +20,10 @@ type ConfirmDialogProps = {
      * confirm button enables (e.g. "DELETE").
      */
     requireTypedConfirmation?: string;
+    /** Extra form content (a date field, a select) between message and actions. */
+    children?: ReactNode;
+    /** Disables confirm without a spinner (e.g. a required field is empty). */
+    confirmDisabled?: boolean;
     onConfirm: () => void;
     onCancel: () => void;
 };
@@ -38,12 +42,14 @@ export default function ConfirmDialog({
     visible,
     title,
     message,
-    confirmLabel = 'Confirm',
-    cancelLabel = 'Cancel',
+    confirmLabel = 'Confirmă',
+    cancelLabel = 'Anulează',
     destructive = false,
     loading = false,
     icon,
     requireTypedConfirmation,
+    children,
+    confirmDisabled = false,
     onConfirm,
     onCancel,
 }: ConfirmDialogProps) {
@@ -55,7 +61,7 @@ export default function ConfirmDialog({
         if (!visible) setTyped('');
     }, [visible]);
 
-    const confirmBlocked = !!requireTypedConfirmation && typed.trim().toUpperCase() !== requireTypedConfirmation.toUpperCase();
+    const confirmBlocked = confirmDisabled || (!!requireTypedConfirmation && typed.trim().toUpperCase() !== requireTypedConfirmation.toUpperCase());
 
     useEffect(() => {
         if (!visible || typeof document === 'undefined') return;
@@ -125,7 +131,7 @@ export default function ConfirmDialog({
         <Modal visible onRequestClose={loading ? undefined : onCancel}>
             {/* Backdrop */}
             <Pressable
-                accessibilityLabel="Dismiss dialog"
+                accessibilityLabel="Închide dialogul"
                 onPress={loading ? undefined : onCancel}
                 style={{
                     flex: 1,
@@ -171,17 +177,19 @@ export default function ConfirmDialog({
                         </View>
                     </View>
 
+                    {children ? <View className="mt-5">{children}</View> : null}
+
                     {requireTypedConfirmation ? (
                         <View className="mt-5 gap-1.5">
                             <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>
-                                Type <Text className="font-bold" style={{ color: 'var(--c-ink)' }}>{requireTypedConfirmation}</Text> to confirm
+                                Scrie <Text className="font-bold" style={{ color: 'var(--c-ink)' }}>{requireTypedConfirmation}</Text> ca să confirmi
                             </Text>
                             <TextInput
                                 value={typed}
                                 onChangeText={setTyped}
                                 autoCapitalize="characters"
                                 autoCorrect={false}
-                                accessibilityLabel={`Type ${requireTypedConfirmation} to confirm`}
+                                accessibilityLabel={`Scrie ${requireTypedConfirmation} ca să confirmi`}
                                 onSubmitEditing={() => { if (!confirmBlocked && !loading) onConfirm(); }}
                                 className="rounded-[10px] border px-3.5 h-11 text-[14px]"
                                 style={{ backgroundColor: 'var(--c-surface-2)', borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}

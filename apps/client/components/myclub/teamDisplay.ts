@@ -34,10 +34,10 @@ export function medicalStatus(expiry: string | null | undefined): MedicalStatus 
 }
 
 export const MEDICAL_META: Record<MedicalStatus, { label: string; bg: string; fg: string }> = {
-    valid: { label: 'Vizită validă', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },
-    soon: { label: 'Expiră curând', bg: '#FCF3E3', fg: 'var(--c-warning-fg)' },
-    expired: { label: 'Vizită expirată', bg: '#FBEAEA', fg: 'var(--c-danger-fg)' },
-    missing: { label: 'Fără vizită', bg: 'var(--c-surface-3)', fg: 'var(--c-muted)' },
+    valid: { label: 'Viză valabilă', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },
+    soon: { label: 'Expiră curând', bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' },
+    expired: { label: 'Viză expirată', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)' },
+    missing: { label: 'Fără viză', bg: 'var(--c-surface-3)', fg: 'var(--c-muted)' },
 };
 
 export function formatDate(iso: string | null | undefined) {

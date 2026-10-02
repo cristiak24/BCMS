@@ -55,9 +55,20 @@ input:-webkit-autofill:focus {
 }
 
 .rn-text {
-  display: inline;
   min-width: 0;
   white-space: pre-wrap;
+}
+
+:where(.rn-text) {
+  display: inline;
+}
+
+/* numberOfLines. :where() keeps it at zero specificity so `hidden`,
+   `md:hidden` etc. on the same Text still win. */
+:where(.rn-text.rn-clamp) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .rn-pressable {
