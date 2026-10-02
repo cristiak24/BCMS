@@ -114,7 +114,7 @@ export default function TeamEventsPanel({ teamId, scope }: { teamId: number; sco
                                     <View className="flex-row items-center gap-2">
                                         <Text className="text-[13.5px] font-black text-[#0E2041]" numberOfLines={1}>{e.title}</Text>
                                         <View className="px-1.5 py-0.5 rounded-full flex-none" style={{ backgroundColor: meta.tint }}>
-                                            <Text className="text-[9px] font-black uppercase tracking-wide" style={{ color: meta.accent }}>{meta.label}</Text>
+                                            <Text className="text-[11px] font-semibold" style={{ color: meta.accent }}>{meta.label}</Text>
                                         </View>
                                     </View>
                                     <View className="flex-row items-center gap-3 mt-0.5">
@@ -131,7 +131,7 @@ export default function TeamEventsPanel({ teamId, scope }: { teamId: number; sco
                                     </View>
                                 </View>
                                 <View className="px-2.5 py-1 rounded-full flex-none" style={{ backgroundColor: scope === 'past' ? 'var(--c-surface-3)' : meta.tint }}>
-                                    <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: scope === 'past' ? 'var(--c-muted)' : meta.accent }}>
+                                    <Text className="text-[11px] font-semibold" style={{ color: scope === 'past' ? 'var(--c-muted)' : meta.accent }}>
                                         {scope === 'past' ? 'Încheiat' : 'Programat'}
                                     </Text>
                                 </View>

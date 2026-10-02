@@ -132,7 +132,7 @@ export default function UserList() {
                                         </Text>
                                     </View>
                                     <View className="rounded-full px-2.5 py-1 flex-none" style={{ backgroundColor: rv.tint }}>
-                                        <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: rv.fg }}>
+                                        <Text className="text-[11px] font-semibold" style={{ color: rv.fg }}>
                                             {item.role}
                                         </Text>
                                     </View>

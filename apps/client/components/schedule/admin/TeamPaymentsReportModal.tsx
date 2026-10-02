@@ -318,7 +318,7 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
                       <View className="items-end">
                         <Text className="font-black text-[15px] text-[#0D2040]">{formatCurrency(payment.amount, payment.currency)}</Text>
                         <View className="px-2 py-0.5 rounded-full mt-1" style={{ backgroundColor: meta.bg }}>
-                          <Text className="text-[9px] font-black uppercase tracking-wide" style={{ color: meta.color }}>{meta.label}</Text>
+                          <Text className="text-[11px] font-semibold" style={{ color: meta.color }}>{meta.label}</Text>
                         </View>
                       </View>
                     </View>

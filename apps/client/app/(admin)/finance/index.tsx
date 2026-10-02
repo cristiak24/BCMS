@@ -791,7 +791,7 @@ export default function FinancialSettingsPage() {
                                                     <View className="flex-row items-center justify-between flex-wrap gap-2 mt-1">
                                                         <View className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ backgroundColor: meta.bg }}>
                                                             <MaterialIcons name={meta.icon} size={12} color={meta.fg} />
-                                                            <Text className="text-[10px] font-bold uppercase tracking-wide" style={{ color: meta.fg }}>{meta.label}</Text>
+                                                            <Text className="text-[11px] font-semibold" style={{ color: meta.fg }}>{meta.label}</Text>
                                                         </View>
 
                                                         <View className="flex-row items-center gap-2">
@@ -855,51 +855,39 @@ export default function FinancialSettingsPage() {
                                 subtitle="Încasări jucători prin Stripe / club"
                             />
 
-                            <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
-                                {loadingRecentPayments ? (
-                                    <View className="gap-3">
-                                        {[0, 1, 2].map((i) => (
-                                            <View key={i} className="p-4 rounded-[16px] border" style={{ borderColor: dash.hairline }}>
-                                                <SkeletonBlock width="50%" height={12} className="mb-2" />
-                                                <SkeletonBlock width="80%" height={16} />
-                                            </View>
-                                        ))}
-                                    </View>
-                                ) : recentPayments.length === 0 ? (
-                                    <EmptyState title="Nu există plăți" message="Plățile jucătorilor vor apărea aici." icon="payment" />
-                                ) : (
-                                    <View className="gap-3">
-                                        {recentPayments.map((payment) => {
-                                            const paid = ['paid', 'processed', 'succeeded', 'success'].includes(payment.status.toLowerCase());
-                                            return (
-                                                <View key={payment.id} className="p-4 rounded-[16px] border" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
-                                                    <View className="flex-row justify-between gap-3">
-                                                        <View className="flex-1 min-w-0">
-                                                            <Text className="font-black" style={{ color: dash.ink }} numberOfLines={1}>{payment.playerName}</Text>
-                                                            <Text className="text-[12px] font-medium mt-1" style={{ color: dash.muted }} numberOfLines={1}>
-                                                                {payment.teamName || payment.playerEmail || 'Jucător'}
-                                                            </Text>
-                                                        </View>
-                                                        <Text className="font-black text-[15px]" style={{ color: dash.accent }}>
-                                                            {formatCurrency(payment.amount, payment.currency)}
-                                                        </Text>
-                                                    </View>
-                                                    <View className="flex-row justify-between items-center mt-3">
-                                                        <View className="px-2.5 py-1 rounded-lg" style={{ backgroundColor: paid ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)' }}>
-                                                            <Text className="text-[10px] font-black uppercase" style={{ color: paid ? dash.successDeep : dash.warningDeep }}>
-                                                                {payment.status}
-                                                            </Text>
-                                                        </View>
-                                                        <Text className="text-[11px] font-bold" style={{ color: dash.faint }}>
-                                                            {formatPaymentDate(payment.date)}
-                                                        </Text>
-                                                    </View>
+                            {loadingRecentPayments ? (
+                                <View className="gap-2">
+                                    {[0, 1, 2].map((i) => <SkeletonBlock key={i} width="100%" height={44} />)}
+                                </View>
+                            ) : recentPayments.length === 0 ? (
+                                <EmptyState title="Nu există plăți" message="Plățile jucătorilor vor apărea aici." icon="payment" />
+                            ) : (
+                                // Rows, not one card per payment inside a 460px inner scroller
+                                // that clipped the last card mid-way.
+                                <View>
+                                    {recentPayments.map((payment, index) => {
+                                        const status = payment.status.toLowerCase();
+                                        const paid = ['paid', 'processed', 'succeeded', 'success'].includes(status);
+                                        const failed = ['failed', 'canceled', 'cancelled', 'refunded'].includes(status);
+                                        const label = paid ? 'Plătit' : failed ? (status === 'refunded' ? 'Rambursat' : 'Eșuat') : 'În așteptare';
+                                        const tone = paid ? 'var(--c-success-fg)' : failed ? 'var(--c-danger-fg)' : 'var(--c-warning-fg)';
+                                        return (
+                                            <View key={payment.id} className="flex-row items-center gap-3 py-2.5" style={index > 0 ? ({ borderTopWidth: 1, borderTopColor: 'var(--c-border)' } as any) : undefined}>
+                                                <View className="flex-1 min-w-0">
+                                                    <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{payment.playerName}</Text>
+                                                    <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+                                                        {[formatPaymentDate(payment.date), payment.teamName, payment.provider === 'cash' ? 'numerar' : payment.provider === 'stripe' ? 'card' : null].filter(Boolean).join(' · ')}
+                                                    </Text>
                                                 </View>
-                                            );
-                                        })}
-                                    </View>
-                                )}
-                            </ScrollView>
+                                                <View className="items-end shrink-0">
+                                                    <Text className="t-num text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>{formatCurrency(payment.amount, payment.currency)}</Text>
+                                                    <Text className="text-[11.5px] font-semibold" style={{ color: tone }}>{label}</Text>
+                                                </View>
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            )}
                         </View>
                     </View>
                 </View>
@@ -923,7 +911,7 @@ export default function FinancialSettingsPage() {
                                     style={{ backgroundColor: stripeConfig?.configured ? 'rgba(16,185,129,0.1)' : loadingStripeConfig ? 'rgba(37,99,235,0.08)' : 'rgba(239,68,68,0.08)' }}
                                 >
                                     <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: stripeConfig?.configured ? dash.successDeep : loadingStripeConfig ? dash.accentBlue : dash.dangerDeep }} />
-                                    <Text className="text-[12px] font-black uppercase" style={{ color: stripeConfig?.configured ? dash.successDeep : loadingStripeConfig ? dash.accentBlue : dash.dangerDeep }}>
+                                    <Text className="text-[12.5px] font-semibold" style={{ color: stripeConfig?.configured ? dash.successDeep : loadingStripeConfig ? dash.accentBlue : dash.dangerDeep }}>
                                         {loadingStripeConfig ? 'Se încarcă' : stripeConfig?.configured ? 'Activ' : 'Necesită configurare'}
                                     </Text>
                                 </View>
@@ -938,7 +926,7 @@ export default function FinancialSettingsPage() {
                                     { label: 'Secret webhook', value: loadingStripeConfig ? '...' : stripeConfig?.webhookSecretConfigured ? 'Configurat' : 'Lipsește' },
                                 ].map((row, idx, arr) => (
                                     <View key={row.label} className={`flex-row justify-between items-center py-2.5 ${idx < arr.length - 1 ? 'border-b' : ''}`} style={{ borderColor: dash.hairline }}>
-                                        <Text className="font-bold text-[12px] uppercase tracking-wide" style={{ color: dash.muted }}>{row.label}</Text>
+                                        <Text className="font-medium text-[13px]" style={{ color: dash.muted }}>{row.label}</Text>
                                         <Text className="font-black text-[13px]" style={{ color: dash.ink }}>{row.value}</Text>
                                     </View>
                                 ))}

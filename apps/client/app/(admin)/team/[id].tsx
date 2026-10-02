@@ -255,18 +255,18 @@ export default function TeamDetailsScreen() {
                                 <Text className="text-[#0E2041] text-[22px] font-black leading-tight" numberOfLines={2}>{team.name}</Text>
                                 <View className="flex-row flex-wrap items-center gap-1.5 mt-2">
                                     <View className="flex-row items-center gap-1 px-2 py-1 rounded-full" style={{ backgroundColor: crestTint }}>
-                                        <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}>{frb ? 'Sincronizat FRB' : 'Administrat local'}</Text>
+                                        <Text className="text-[11px] font-semibold" style={{ color: frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}>{frb ? 'Sincronizat FRB' : 'Administrat local'}</Text>
                                     </View>
                                     {team.gender && (
                                         <View className="px-2 py-1 rounded-full" style={{ backgroundColor: team.gender === 'M' ? 'var(--c-surface-tint)' : 'var(--c-danger-bg)' }}>
-                                            <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: team.gender === 'M' ? 'var(--c-gender-m)' : 'var(--c-gender-f)' }}>{GENDER_LABELS[team.gender]}</Text>
+                                            <Text className="text-[11px] font-semibold" style={{ color: team.gender === 'M' ? 'var(--c-gender-m)' : 'var(--c-gender-f)' }}>{GENDER_LABELS[team.gender]}</Text>
                                         </View>
                                     )}
                                     {team.level && (
-                                        <View className="px-2 py-1 rounded-full bg-[#F1F5F9]"><Text className="text-[10px] font-black uppercase tracking-wide text-[#64748B]">{LEVEL_LABELS[team.level]}</Text></View>
+                                        <View className="px-2 py-1 rounded-full bg-[#F1F5F9]"><Text className="text-[11px] font-semibold text-[#64748B]">{LEVEL_LABELS[team.level]}</Text></View>
                                     )}
                                     {!team.isActive && (
-                                        <View className="px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--c-surface-3)' }}><Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: 'var(--c-muted)' }}>Inactivă</Text></View>
+                                        <View className="px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--c-surface-3)' }}><Text className="text-[11px] font-semibold" style={{ color: 'var(--c-muted)' }}>Inactivă</Text></View>
                                     )}
                                 </View>
                                 <Text className="text-[#94A3B8] text-[12px] font-bold mt-2" numberOfLines={1}>{team.leagueName} • {team.seasonName}</Text>
@@ -351,7 +351,7 @@ export default function TeamDetailsScreen() {
                                 )}
                                 <Pressable onPress={() => setShowAdd((v) => !v)} className={`flex-row items-center gap-1.5 h-10 px-4 rounded-[12px] ${showAdd ? 'bg-[#EBF1FF] border border-[#BFD3F5]' : 'bg-[#1D3E90]'}`}>
                                     {showAdd ? <X size={15} color="var(--c-brand-fg)" /> : <UserPlus size={15} color="var(--c-surface)" />}
-                                    <Text className={`text-[12px] font-black uppercase tracking-wide ${showAdd ? 'text-[#1D3E90]' : 'text-white'}`}>{showAdd ? 'Închide' : 'Adaugă jucător'}</Text>
+                                    <Text className={`text-[13px] font-semibold ${showAdd ? 'text-[#1D3E90]' : 'text-white'}`}>{showAdd ? 'Închide' : 'Adaugă jucător'}</Text>
                                 </Pressable>
                             </View>
 
@@ -387,7 +387,7 @@ export default function TeamDetailsScreen() {
                                                         <Text className="text-[13px] font-bold text-[#0E2041] truncate" numberOfLines={1}>{rp.firstName} {rp.lastName}</Text>
                                                     </View>
                                                     <Pressable onPress={() => handleAddExistingPlayer(rp)} disabled={isAdding !== null} className="h-8 px-3 rounded-[10px] bg-[#1D3E90] items-center justify-center flex-row gap-1">
-                                                        {isAdding === rp.id ? <ActivityIndicator size="small" color="#fff" /> : <Text className="text-white text-[11px] font-black uppercase">Adaugă</Text>}
+                                                        {isAdding === rp.id ? <ActivityIndicator size="small" color="#fff" /> : <Text className="text-white text-[12.5px] font-semibold">Adaugă</Text>}
                                                     </Pressable>
                                                 </View>
                                             ))}
@@ -546,7 +546,7 @@ function PaymentPill({ status }: { status: 'paid' | 'due' | 'none' }) {
     }[status];
     return (
         <View className="px-2 py-0.5 rounded-full self-start" style={{ backgroundColor: map.bg }}>
-            <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: map.fg }}>{map.label}</Text>
+            <Text className="text-[11px] font-semibold" style={{ color: map.fg }}>{map.label}</Text>
         </View>
     );
 }
@@ -570,7 +570,7 @@ function AttendanceMeter({ stat, showCount }: { stat: TeamPlayerStat | undefined
     return (
         <View className="w-full">
             <View className="flex-row items-center justify-between mb-1">
-                <Text className="text-[10px] font-black uppercase tracking-wide text-[#94A3B8]">Prezență</Text>
+                <Text className="text-[11px] font-semibold text-[#94A3B8]">Prezență</Text>
                 <Text className="text-[11px] font-black" style={{ color: col }}>{rate != null ? `${rate}%` : 'N/A'}</Text>
             </View>
             <View className="h-1.5 rounded-full bg-[#EEF2F8] overflow-hidden">
@@ -603,7 +603,7 @@ function PlayerRosterCard({ player: p, stat, removing, onOpen, onRemove }: RowPr
                 <View className="flex-col items-end gap-1 flex-none">
                     <PaymentPill status={stat?.paymentStatus ?? 'none'} />
                     <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: med.bg }}>
-                        <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: med.fg }}>{med.label}</Text>
+                        <Text className="text-[11px] font-semibold" style={{ color: med.fg }}>{med.label}</Text>
                     </View>
                 </View>
             </View>
@@ -627,7 +627,7 @@ function PlayerRosterRow({ player: p, stat, removing, last, onOpen, onRemove }: 
             <View className="w-[84px] hidden md:flex flex-none"><PaymentPill status={stat?.paymentStatus ?? 'none'} /></View>
             <View className="w-[112px] hidden md:flex flex-none">
                 <View className="px-2 py-0.5 rounded-full self-start" style={{ backgroundColor: med.bg }}>
-                    <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: med.fg }}>{med.label}</Text>
+                    <Text className="text-[11px] font-semibold" style={{ color: med.fg }}>{med.label}</Text>
                 </View>
             </View>
             <RowActions removing={removing} onOpen={onOpen} onRemove={onRemove} />
