@@ -87,9 +87,9 @@ export default function UserDetail() {
                     style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
                 >
                     <MaterialIcons name="arrow-back" size={17} color="var(--c-brand-fg)" />
-                    <Text className="ml-2 font-black" style={{ color: 'var(--c-ink-soft)' }}>Back</Text>
+                    <Text className="ml-2 font-black" style={{ color: 'var(--c-ink-soft)' }}>Înapoi</Text>
                 </Pressable>
-                <Text className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-black`} style={{ color: 'var(--c-ink-strong)' }}>Edit User</Text>
+                <Text className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-black`} style={{ color: 'var(--c-ink-strong)' }}>Editează utilizatorul</Text>
             </View>
 
             <GlassCard className={isMobile ? 'p-5' : 'p-8'}>
@@ -105,19 +105,19 @@ export default function UserDetail() {
 
                 <View className="gap-6">
                     <View>
-                        <Text className="text-[11px] font-black uppercase tracking-widest mb-3" style={{ color: 'var(--c-faint)' }}>Full Name</Text>
+                        <Text className="text-[11px] font-black uppercase tracking-widest mb-3" style={{ color: 'var(--c-faint)' }}>Nume complet</Text>
                         <TextInput
                             className="border rounded-2xl px-5 py-4 text-base font-bold outline-none"
                             style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)', color: 'var(--c-ink)' } as any}
                             value={name}
                             onChangeText={setName}
-                            placeholder="Enter name"
+                            placeholder="Nume și prenume"
                             placeholderTextColor="var(--c-faint)"
                         />
                     </View>
 
                     <View>
-                        <Text className="text-[11px] font-black uppercase tracking-widest mb-3" style={{ color: 'var(--c-faint)' }}>Role Permissions</Text>
+                        <Text className="text-[11px] font-black uppercase tracking-widest mb-3" style={{ color: 'var(--c-faint)' }}>Rol și permisiuni</Text>
                         <View className={`gap-3 ${isMobile ? '' : 'flex-row flex-wrap'}`}>
                             {ROLES.map((r) => {
                                 const active = role === r;
@@ -152,7 +152,7 @@ export default function UserDetail() {
                         className="min-h-[48px] px-6 py-3 rounded-2xl border items-center justify-center"
                         style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
                     >
-                        <Text className="font-black" style={{ color: 'var(--c-ink-soft)' }}>Cancel</Text>
+                        <Text className="font-black" style={{ color: 'var(--c-ink-soft)' }}>Anulează</Text>
                     </Pressable>
                     <Pressable
                         onPress={handleSave}
@@ -165,7 +165,7 @@ export default function UserDetail() {
                         ) : (
                             <>
                                 <MaterialIcons name="save" size={20} color="var(--c-on-brand)" style={{ marginRight: 8 }} />
-                                <Text className="font-bold" style={{ color: 'var(--c-on-brand)' }}>Save Changes</Text>
+                                <Text className="font-bold" style={{ color: 'var(--c-on-brand)' }}>Salvează</Text>
                             </>
                         )}
                     </Pressable>

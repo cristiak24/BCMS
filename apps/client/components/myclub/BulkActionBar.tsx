@@ -39,7 +39,7 @@ export default function BulkActionBar({
             <View className="flex-row items-center gap-2.5 overflow-x-auto sm:ml-auto sm:justify-end pb-1 sm:pb-0">
                 <Pressable onPress={onExport} className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#1D3E90] bg-white flex-none">
                     <Download size={13} color="var(--c-brand-fg)" />
-                    <Text className="text-[#1D3E90] text-[11.5px] font-bold">Export CSV</Text>
+                    <Text className="text-[#1D3E90] text-[11.5px] font-bold">Exportă CSV</Text>
                 </Pressable>
 
                 <Pressable onPress={onActivate} className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#1D3E90] bg-white flex-none">

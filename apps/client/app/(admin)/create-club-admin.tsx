@@ -50,7 +50,7 @@ export default function CreateClubAdminScreen() {
           </Text>
           <View className="mt-6">
             <AdminActionButton
-              label="Go back"
+              label="Înapoi"
               icon="arrow-back"
               variant="primary"
               onPress={() => router.replace(getHomeRouteForRole(session?.role ?? 'player'))}
@@ -65,12 +65,12 @@ export default function CreateClubAdminScreen() {
     <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
       <PageContainer className="gap-5">
         <AdminHero
-          title="Create Club Admin"
-          subtitle="Create a club, issue an admin invite, and send the signup email without exposing raw invite tokens."
+          title="Club nou și administrator"
+          subtitle="Creează un club și trimite invitația de administrator pe email."
         >
           <View className="flex-row flex-wrap gap-2.5">
-            <AdminActionButton label="Refresh" icon="refresh" onPress={reloadSession} />
-            <AdminActionButton label="Logout" icon="logout" onPress={signOut} />
+            <AdminActionButton label="Reîncarcă" icon="refresh" onPress={reloadSession} />
+            <AdminActionButton label="Deconectare" icon="logout" onPress={signOut} />
           </View>
         </AdminHero>
 

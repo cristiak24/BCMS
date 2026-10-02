@@ -12,7 +12,7 @@ export default function CreateAccountScreen() {
     const { setSearchPlaceholder, setSearchValue, setHeaderActions, setMobileFab } = useHeader();
 
     useEffect(() => {
-        setSearchPlaceholder('Create coach or player invites...');
+        setSearchPlaceholder('Caută…');
         setHeaderActions(null);
         setMobileFab(null);
 
@@ -39,12 +39,12 @@ export default function CreateAccountScreen() {
 
                 <View className="flex-row flex-wrap gap-2.5">
                     <AdminActionButton
-                        label="Manage Access"
+                        label="Acces & invitații"
                         icon="verified-user"
                         onPress={() => router.push('/admin/manage-access')}
                     />
                     <AdminActionButton
-                        label="Manage Accounts"
+                        label="Conturi"
                         icon="groups"
                         onPress={() => router.push('/admin/manage-accounts')}
                     />

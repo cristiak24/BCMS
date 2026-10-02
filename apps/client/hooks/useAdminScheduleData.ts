@@ -47,7 +47,7 @@ export function useAdminScheduleData(currentDate: Date, filters: ScheduleFilters
       setTeams(teamsData);
     } catch (err) {
       console.error('Fetch schedule error:', err);
-      setError(err instanceof Error ? err.message : 'Could not load the schedule.');
+      setError(err instanceof Error ? err.message : 'Nu am putut încărca programul.');
     } finally {
       setLoading(false);
     }

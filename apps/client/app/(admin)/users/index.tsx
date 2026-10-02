@@ -90,10 +90,10 @@ export default function UserList() {
 
     return (
         <PageContainer className="pb-16">
-            <AdminHero title="Users" subtitle="All accounts across every club on the platform.">
+            <AdminHero title="Utilizatori" subtitle="Toate conturile, din toate cluburile platformei.">
                 <View className="mt-5 md:mt-0 flex-row flex-wrap gap-3">
-                    <AdminMetricCard label="Users" value={roleCounts.total} />
-                    <AdminMetricCard label="Admins" value={roleCounts.admins} />
+                    <AdminMetricCard label="Utilizatori" value={roleCounts.total} />
+                    <AdminMetricCard label="Administratori" value={roleCounts.admins} />
                 </View>
             </AdminHero>
 

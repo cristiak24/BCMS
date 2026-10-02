@@ -69,7 +69,7 @@ export function DayScheduleModal({
                 <TouchableOpacity
                   onPress={onClose}
                   className="w-10 h-10 rounded-full bg-[#F4F7FC] border border-[#E3EAF5] items-center justify-center"
-                  accessibilityLabel="Close"
+                  accessibilityLabel="Închide"
                 >
                   <X color="var(--c-ink-soft)" size={18} />
                 </TouchableOpacity>

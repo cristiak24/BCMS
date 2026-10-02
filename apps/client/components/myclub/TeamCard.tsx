@@ -50,7 +50,7 @@ export default function TeamCard({
                 </View>
 
                 <Pressable onPress={onOpen} className="flex-1 min-w-0 flex-col items-start pt-0.5">
-                    <Text className="text-[#0E2041] text-[15px] font-black leading-tight text-left" numberOfLines={2}>
+                    <Text className="text-[#0E2041] text-[15px] font-bold leading-tight text-left" numberOfLines={2}>
                         {team.name}
                     </Text>
                     <Text className="text-[#94A3B8] text-[11.5px] font-bold mt-1 text-left" numberOfLines={1}>
@@ -67,25 +67,25 @@ export default function TeamCard({
             <View className="flex-row flex-wrap gap-1.5 mb-4">
                 <View className="flex-row items-center gap-1 px-2 py-1 rounded-full" style={{ backgroundColor: crestTint }}>
                     {frb && <RefreshCw size={9} color={frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)'} />}
-                    <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}>
+                    <Text className="text-[11px] font-semibold" style={{ color: frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}>
                         {frb ? 'Sincronizat FRB' : 'Administrat local'}
                     </Text>
                 </View>
-                {team.gender && (
+                {team.gender && GENDER_LABELS[team.gender] && (
                     <View className="px-2 py-1 rounded-full" style={{ backgroundColor: team.gender === 'M' ? 'var(--c-surface-tint)' : 'var(--c-danger-bg)' }}>
-                        <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: team.gender === 'M' ? 'var(--c-gender-m)' : 'var(--c-gender-f)' }}>
+                        <Text className="text-[11px] font-semibold" style={{ color: team.gender === 'M' ? 'var(--c-gender-m)' : 'var(--c-gender-f)' }}>
                             {GENDER_LABELS[team.gender]}
                         </Text>
                     </View>
                 )}
-                {team.level && (
+                {team.level && LEVEL_LABELS[team.level] && (
                     <View className="px-2 py-1 rounded-full bg-[#F1F5F9]">
-                        <Text className="text-[10px] font-black uppercase tracking-wide text-[#64748B]">{LEVEL_LABELS[team.level]}</Text>
+                        <Text className="text-[11px] font-semibold text-[#64748B]">{LEVEL_LABELS[team.level]}</Text>
                     </View>
                 )}
                 {!team.isActive && (
                     <View className="px-2 py-1 rounded-full bg-slate-100">
-                        <Text className="text-[10px] font-black uppercase tracking-wide text-slate-500">Inactivă</Text>
+                        <Text className="text-[11px] font-semibold text-slate-500">Inactivă</Text>
                     </View>
                 )}
             </View>
@@ -117,10 +117,12 @@ export default function TeamCard({
             </View>
 
             {/* Updated timestamp */}
-            <View className="flex-row items-center gap-1.5 mb-3.5">
-                <Clock size={12} color="var(--c-faint)" />
-                <Text className="text-[11.5px] font-semibold text-[#94A3B8]">actualizat {formatRelativeDate(team.updatedAt)}</Text>
-            </View>
+            {team.updatedAt ? (
+                <View className="flex-row items-center gap-1.5 mb-3.5">
+                    <Clock size={12} color="var(--c-faint)" />
+                    <Text className="text-[11.5px] font-medium" style={{ color: 'var(--c-faint)' }}>actualizat {formatRelativeDate(team.updatedAt)}</Text>
+                </View>
+            ) : null}
 
             {/* Footer: coach + actions */}
             <View className="flex-row items-center justify-between pt-3.5 border-t border-[#F1F5F9]">
@@ -165,9 +167,14 @@ export default function TeamCard({
             </View>
 
             {/* Open CTA */}
-            <Pressable onPress={onOpen} className="flex-row items-center justify-center gap-1.5 mt-3.5 h-10 rounded-[12px] bg-[#1D3E90] active:bg-[#15316f] transition-colors">
-                <Text className="text-white text-[11px] font-black uppercase tracking-widest">Deschide echipa</Text>
-                <ArrowRight size={13} color="var(--c-surface)" />
+            <Pressable
+                onPress={onOpen}
+                accessibilityRole="button"
+                className="ui-press flex-row items-center justify-center gap-1.5 mt-3.5 h-9 rounded-[10px] border"
+                style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'transparent' } as any}
+            >
+                <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Deschide echipa</Text>
+                <ArrowRight size={14} color="var(--c-brand-fg)" />
             </Pressable>
         </View>
     );

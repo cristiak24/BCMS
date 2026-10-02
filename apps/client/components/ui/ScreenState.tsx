@@ -30,7 +30,7 @@ type EmptyStateProps = {
 };
 
 export function LoadingScreen({
-  message = 'Loading your workspace...',
+  message = 'Se încarcă…',
   backgroundColor = 'var(--c-bg)',
   color = 'var(--c-brand-fg)',
 }: LoadingScreenProps) {
@@ -59,7 +59,7 @@ export function LoadingScreen({
 }
 
 export function ErrorState({
-  title = 'Something went wrong',
+  title = 'Ceva nu a funcționat',
   message,
   actionLabel,
   onAction,

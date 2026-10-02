@@ -790,7 +790,7 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
               style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
             >
               <Download size={14} color="var(--c-brand-fg)" />
-              <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Export CSV</Text>
+              <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Exportă CSV</Text>
             </TouchableOpacity>
           </View>
         </View>

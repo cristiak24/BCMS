@@ -214,7 +214,7 @@ export default function TeamDetailsScreen() {
                     <View className="flex-col lg:flex-row lg:items-center lg:justify-between gap-2.5 mb-4">
                         <Pressable onPress={() => router.push('/admin/my-club-admin' as any)} className="flex-row items-center gap-2 h-9 pl-2 pr-3.5 rounded-[10px] self-start border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
                             <ArrowLeft size={16} color="var(--c-ink)" />
-                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink)' }}>My Club</Text>
+                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink)' }}>Clubul meu</Text>
                         </Pressable>
                         <ScrollView
                             horizontal

@@ -195,7 +195,7 @@ export default function AppHeader({
                   className="w-10 h-10 items-center justify-center rounded-[12px]"
                   style={{ backgroundColor: 'var(--c-brand-surface-deep)' } as any}
                   accessibilityRole="button"
-                  accessibilityLabel="Open navigation menu"
+                  accessibilityLabel="Deschide meniul"
                 >
                   <MaterialIcons name="menu" size={22} color="#FFFFFF" />
                 </Pressable>

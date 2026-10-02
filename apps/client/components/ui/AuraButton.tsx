@@ -31,7 +31,7 @@ export default function AuraButton({ label, loading, variant = 'primary', classN
                     {loading ? (
                         <View className="flex-row items-center gap-3">
                             <ActivityIndicator color="white" size="small" />
-                            <Text className="font-bold text-base text-white">Please wait</Text>
+                            <Text className="font-bold text-base text-white">Se încarcă…</Text>
                         </View>
                     ) : (
                         <View className="flex-row items-center justify-center gap-2">

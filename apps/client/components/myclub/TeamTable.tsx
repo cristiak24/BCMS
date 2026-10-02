@@ -79,7 +79,7 @@ export default function TeamTable({
                         <SortableHeader label="Jucători" sortKey="players" sort={sort} onToggle={onToggleSort} />
                         <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#64748B]">Antrenor</th>
                         <SortableHeader label="Actualizat" sortKey="updated" sort={sort} onToggle={onToggleSort} />
-                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#64748B]">Status</th>
+                        <th className="text-left px-3 py-3 text-[10.5px] font-black uppercase tracking-widest text-[#64748B]">Stare</th>
                         <th className="w-32 px-3 py-3" />
                     </tr>
                 </thead>
