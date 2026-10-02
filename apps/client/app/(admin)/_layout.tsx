@@ -15,6 +15,22 @@ const MOBILE_NAV_ITEMS = [
     { href: '/admin/schedule' as const, label: 'Program', icon: 'calendar-today' as const, match: 'schedule' },
 ];
 
+// The accountant role shares this exact shell (same sidebar, same header,
+// same /admin/* pages) but only ever needs the finance-related corner of it —
+// club ops (roster, schedule, compliance, access management) isn't theirs to
+// see. Same pattern as the coach/player split in (tabs)/_layout.tsx.
+const ACCOUNTANT_MENU_ITEMS: typeof ADMIN_MENU_ITEMS = [
+    { label: 'Finanțe', icon: 'payments', href: '/admin/finance' },
+    { label: 'Documente', icon: 'folder', href: '/admin/documents' },
+    { label: 'Agendă', icon: 'contacts', href: '/admin/contacts' },
+];
+
+const ACCOUNTANT_MOBILE_NAV_ITEMS = [
+    { href: '/admin/finance' as const, label: 'Finanțe', icon: 'payments' as const, match: 'finance' },
+    { href: '/admin/documents' as const, label: 'Documente', icon: 'folder' as const, match: 'documents' },
+    { href: '/admin/contacts' as const, label: 'Agendă', icon: 'contacts' as const, match: 'contacts' },
+];
+
 /**
  * Titles for admin screens that intentionally have no sidebar entry (detail
  * pages and sub-flows reached from another screen).
@@ -38,12 +54,12 @@ function getAdminPath(pathname: string) {
     return pathname || '/admin/dashboard';
 }
 
-function getActiveAdminItem(pathname: string) {
+function getActiveAdminItem(pathname: string, menuItems: typeof ADMIN_MENU_ITEMS) {
     const normalizedPathname = getAdminPath(pathname);
 
     // Longest matching href wins, so /admin/users/12 does not match /admin/users
     // before the more specific detail-page title below.
-    const menuMatch = ADMIN_MENU_ITEMS
+    const menuMatch = menuItems
         .filter((item) => normalizedPathname.startsWith(item.href)
             || (item.href === '/admin/dashboard' && normalizedPathname === '/admin'))
         .sort((a, b) => b.href.length - a.href.length)[0];
@@ -56,7 +72,7 @@ function getActiveAdminItem(pathname: string) {
         return { label: sectionMatch.label, href: sectionMatch.prefix };
     }
 
-    return menuMatch ?? ADMIN_MENU_ITEMS[0];
+    return menuMatch ?? menuItems[0];
 }
 
 // Split into two components so HeaderProvider wraps the consumer.
@@ -76,16 +92,20 @@ function AdminLayoutContent() {
     const { session } = useSession();
     const { isMobile } = useResponsive();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    
-    const activeAdminItem = getActiveAdminItem(pathname);
+
+    const isAccountant = normalizeRole(session?.role) === 'accountant';
+    const menuItems = isAccountant ? ACCOUNTANT_MENU_ITEMS : ADMIN_MENU_ITEMS;
+    const mobileNavItems = isAccountant ? ACCOUNTANT_MOBILE_NAV_ITEMS : MOBILE_NAV_ITEMS;
+
+    const activeAdminItem = getActiveAdminItem(pathname, menuItems);
     const availableMenuItems = useMemo(
-        () => ADMIN_MENU_ITEMS.filter((item) => !item.superadminOnly || isSuperadmin(session)),
-        [session],
+        () => menuItems.filter((item) => !item.superadminOnly || isSuperadmin(session)),
+        [session, menuItems],
     );
 
     const isDashboard = pathname.includes('dashboard') || pathname === '/admin';
     const normalizedAdminPath = getAdminPath(pathname);
-    const primaryMobileMatches = MOBILE_NAV_ITEMS.map((item) => item.match);
+    const primaryMobileMatches = mobileNavItems.map((item) => item.match);
     const moreIsActive = availableMenuItems.some((item) => {
         const section = item.href.split('/').filter(Boolean).pop() ?? '';
         return normalizedAdminPath.startsWith(item.href) && !primaryMobileMatches.includes(section);
@@ -102,7 +122,7 @@ function AdminLayoutContent() {
 
     return (
         <div className="flex flex-1 min-h-screen bg-[#EAF1F8] lg:flex-row flex-col">
-            <Sidebar />
+            <Sidebar items={menuItems} />
 
             <div className="flex flex-1 min-w-0 flex-col relative">
                 <div className="lg:hidden sticky top-0 z-30">
@@ -145,7 +165,7 @@ function AdminLayoutContent() {
 
                 <div className="lg:hidden">
                     <MobileBottomNavigation
-                        items={MOBILE_NAV_ITEMS}
+                        items={mobileNavItems}
                         pathname={pathname}
                         isDashboard={isDashboard}
                         moreIsActive={moreIsActive}

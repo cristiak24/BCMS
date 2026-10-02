@@ -83,8 +83,12 @@ export function getHomeRouteForRole(role?: UserRole | string | null) {
     return '/super-admin';
   }
 
-  if (normalized === 'admin' || normalized === 'accountant' || normalized === 'staff') {
+  if (normalized === 'admin' || normalized === 'staff') {
     return '/admin/dashboard';
+  }
+
+  if (normalized === 'accountant') {
+    return '/admin/finance';
   }
 
   if (normalized === 'coach') {

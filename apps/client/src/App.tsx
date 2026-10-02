@@ -100,8 +100,10 @@ const AdminEventDetails = lazyRoute(loadAdminEventDetails);
 const loadAdminMatchDetails = () => import('../app/(admin)/match/[id]');
 const AdminMatchDetails = lazyRoute(loadAdminMatchDetails);
 const AdminL12 = lazyRoute(() => import('../app/(admin)/l12/index'));
-const AdminDocuments = lazyRoute(() => import('../app/(admin)/documents'));
-const AdminContacts = lazyRoute(() => import('../app/(admin)/contacts'));
+const loadAdminDocuments = () => import('../app/(admin)/documents');
+const AdminDocuments = lazyRoute(loadAdminDocuments);
+const loadAdminContacts = () => import('../app/(admin)/contacts');
+const AdminContacts = lazyRoute(loadAdminContacts);
 const AdminGameStats = lazyRoute(() => import('../app/(admin)/stats/[id]'));
 const AdminL12Match = lazyRoute(() => import('../app/(admin)/l12/match/[id]'));
 const AdminL12Team = lazyRoute(() => import('../app/(admin)/l12/team/[id]'));
@@ -152,6 +154,8 @@ function RoutePrefetcher() {
       prefetchRoutes([loadPlayerLayout, loadPlayerHome, loadPlayerSchedule, loadPlayerAttendance, loadPlayerPayments, loadPlayerTeam, loadPlayerAccount]);
     } else if (role === 'superadmin') {
       prefetchRoutes([loadSuperAdminLayout, loadSuperAdminDashboard, loadSuperAdminClubs, loadSuperAdminUsers, loadAdminLayout, loadAdminDashboard]);
+    } else if (role === 'accountant') {
+      prefetchRoutes([loadAdminLayout, loadAdminFinance, loadAdminDocuments, loadAdminContacts, loadProfile]);
     } else {
       prefetchRoutes([loadAdminLayout, loadAdminDashboard, loadAdminFinance, loadAdminRoster, loadAdminSchedule, loadAdminMyClubAdmin, loadProfile]);
     }
