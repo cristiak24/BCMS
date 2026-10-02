@@ -1,1794 +1,375 @@
-import {
-    View,
-    Text,
-    ScrollView,
-    Pressable,
-    ActivityIndicator,
-    Modal,
-    FlatList,
-} from '@/src/web/reactNative';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import Svg, { Circle, Defs, LinearGradient, Path, Stop } from '@/src/web/reactNativeSvg';
-import * as React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { basketballApi, League, Season, Team, Match, StandingRow } from '../../services/basketballApi';
-import { dashboardApi, DashboardSummary, ExpiringItem } from '../../services/dashboardApi';
-import { teamsApi, Team as SavedTeam } from '../../services/teamsApi';
-import { useResponsive } from '../../hooks/useResponsive';
-import StatCard from '../../components/dashboard/StatCard';
-import FilterBar from '../../components/dashboard/FilterBar';
-import { EmptyState, ErrorState, LoadingState, SkeletonBlock } from '../../components/dashboard/ScreenStates';
-import { GameCard, ResultCard as DashboardResultCard } from '../../components/dashboard/EventCards';
-import { dash } from '../../components/dashboard/dashboardTheme';
+import { useRouter } from '@/src/web/expoRouter';
+import { useSession } from '../../context/AuthContext';
+import PageContainer from '../../components/ui/PageContainer';
+import PageHeader from '../../components/ui/PageHeader';
+import StatCard from '../../components/ui/StatCard';
+import Button from '../../components/ui/Button';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/ScreenState';
+import { getEventTypeMeta } from '../../components/schedule/scheduleShared';
+import { dashboardApi, type DashboardSummary } from '../../services/dashboardApi';
+import { eventsApi, type CalendarEvent } from '../../services/eventsApi';
+import { l12Api, type L12Overview } from '../../services/l12Api';
+import { manageAccessApi } from '../../services/manageAccessApi';
+import { familyRequestsApi } from '../../services/familyRequestsApi';
+import { basketballApi, type Match } from '../../services/basketballApi';
+import { teamsApi, type Team as SavedTeam } from '../../services/teamsApi';
 
-// ─────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────
+/**
+ * Admin home: the club at a glance.
+ *
+ * It used to open on an FRB league explorer that auto-picked the first league,
+ * season and team in FRB's list — often another club's team — under an English
+ * "Basketball Operations · Live / Dashboard Admin" banner. FRB fixtures and
+ * standings live on each team's page (Competiție FRB); home now answers "what
+ * needs me today": KPIs, things to fix, the next 7 days, recent results.
+ */
 
-type PickerItem = { id: string; label: string };
+const DAY = 86400000;
 
-type RecentResult = Match & {
-    savedTeamName: string;
+type RecentResult = Match & { savedTeamName: string };
+
+type AttentionItem = {
+  key: string;
+  icon: string;
+  tone: 'danger' | 'warning' | 'brand';
+  title: string;
+  detail?: string;
+  href: string;
 };
 
-type TeamStanding = {
-    played: number;
-    wins: number;
-    losses: number;
-    draws: number;
-    pointsFor: number;
-    pointsAgainst: number;
-    diff: number;
-    winRate: number;
-    lastFive: Match['result'][];
-    streakLabel: string;
-    rows: TeamStandingRow[];
-};
+const TONE = {
+  danger: { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)' },
+  warning: { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' },
+  brand: { bg: 'var(--c-surface-tint)', fg: 'var(--c-brand-fg)' },
+} as const;
 
-type TeamStandingRow = {
-    position: number;
-    team: string;
-    played: number;
-    wins: number;
-    losses: number;
-    draws: number;
-    pointsFor: number;
-    pointsAgainst: number;
-    diff: number;
-    points: number;
-};
-
-type PickerProps = {
-    visible: boolean;
-    items: PickerItem[];
-    onSelect: (id: string) => void;
-    onClose: () => void;
-    title: string;
-    icon?: keyof typeof MaterialIcons.glyphMap;
-    selectedId?: string;
-};
-
-// ─────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────
-
-const MONTHS: PickerItem[] = [
-    { id: '1', label: 'Ianuarie' }, { id: '2', label: 'Februarie' },
-    { id: '3', label: 'Martie' },  { id: '4', label: 'Aprilie' },
-    { id: '5', label: 'Mai' },     { id: '6', label: 'Iunie' },
-    { id: '7', label: 'Iulie' },   { id: '8', label: 'August' },
-    { id: '9', label: 'Septembrie' }, { id: '10', label: 'Octombrie' },
-    { id: '11', label: 'Noiembrie' }, { id: '12', label: 'Decembrie' },
-];
-
-const RON_MONTHS = ['IAN', 'FEB', 'MAR', 'APR', 'MAI', 'IUN', 'IUL', 'AUG', 'SEP', 'OCT', 'NOI', 'DEC'];
-
-// ─────────────────────────────────────────────────────────────
-// Date Helpers (pure functions — fără side effects)
-// ─────────────────────────────────────────────────────────────
-
-/**
- * Parsează "DD.MM.YYYY" într-un obiect Date.
- * Returnează null dacă formatul e invalid.
- */
-function parseDateStr(dateStr: string): Date | null {
-    if (!dateStr) return null;
-    const parts = dateStr.split('.');
-    if (parts.length !== 3) return null;
-    const [day, month, year] = parts.map(Number);
-    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-    return new Date(year, month - 1, day);
+function parseFrbDate(match: Match) {
+  const [d, m, y] = (match.date || '').split('.').map(Number);
+  if (!d || !m || !y) return 0;
+  const [hh, mm] = /^\d{1,2}:\d{2}$/.test(match.time) ? match.time.split(':').map(Number) : [0, 0];
+  return new Date(y, m - 1, d, hh, mm).getTime();
 }
 
-function parseMatchDateTime(match: Match): Date | null {
-    const date = parseDateStr(match.date);
-    if (!date) return null;
-
-    if (match.time && /^\d{1,2}:\d{2}$/.test(match.time)) {
-        const [hours, minutes] = match.time.split(':').map(Number);
-        date.setHours(hours, minutes, 0, 0);
-        return date;
-    }
-
-    date.setHours(23, 59, 59, 999);
-    return date;
+function dayLabel(date: Date) {
+  const today = new Date();
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  if (date.toDateString() === today.toDateString()) return 'Azi';
+  if (date.toDateString() === tomorrow.toDateString()) return 'Mâine';
+  const label = date.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function isFutureMatch(match: Match): boolean {
-    const matchDate = parseMatchDateTime(match);
-    if (!matchDate) return false;
-    return matchDate.getTime() >= Date.now();
-}
+const time = (iso: string) => new Date(iso).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
 
-/**
- * Întoarce ziua relativă față de astăzi: TODAY, TOMORROW, IN X DAYS, etc.
- * Funcționează cu formatul "DD.MM.YYYY".
- */
-function relativeDay(dateStr: string): string {
-    const matchDate = parseDateStr(dateStr);
-    if (!matchDate) return dateStr;
+const money = (amount: number) => new Intl.NumberFormat('ro-RO', { maximumFractionDigits: 0 }).format(amount);
 
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const diffDays = Math.round((matchDate.getTime() - now.getTime()) / 86400000);
-
-    if (diffDays === 0) return 'AZI';
-    if (diffDays === 1) return 'MÂINE';
-    if (diffDays === -1) return 'IERI';
-    if (diffDays < -1 && diffDays >= -7) return `ACUM ${Math.abs(diffDays)} ZILE`;
-    if (diffDays > 1 && diffDays <= 7) return `ÎN ${diffDays} ZILE`;
-    return dateStr;
-}
-
-/**
- * Extrage luna (abreviată română) și ziua dintr-un șir "DD.MM.YYYY".
- */
-function splitDate(dateStr: string): { month: string; day: string } {
-    const parts = dateStr?.split('.');
-    if (parts?.length === 3) {
-        const monthIndex = Number(parts[1]) - 1;
-        return {
-            month: RON_MONTHS[monthIndex] ?? parts[1],
-            day: parts[0],
-        };
-    }
-    return { month: '---', day: '??' };
-}
-
-/**
- * Formatează suma monetară în RON cu separator de mii.
- */
-function formatCurrency(amount: number): string {
-    if (amount === 0) return '0 RON';
-    return `${amount.toLocaleString('ro-RO')} RON`;
-}
-
-/**
- * Money for the tight 3-up financial tiles. The full "3.900 RON" form
- * overflowed an ~85px column at 16px and got ellipsised to "3.900 …", so the
- * unit is dropped here (shown once in the card header) and large values switch
- * to compact K/M notation so the figure always fits on one line.
- */
-function formatMoneyCompact(amount: number): string {
-    const abs = Math.abs(amount);
-    if (abs >= 1_000_000) return `${(amount / 1_000_000).toLocaleString('ro-RO', { maximumFractionDigits: 1 })}M`;
-    if (abs >= 100_000) return `${Math.round(amount / 1000).toLocaleString('ro-RO')}K`;
-    return amount.toLocaleString('ro-RO');
-}
-
-function polarToCartesian(cx: number, cy: number, radius: number, angleInDegrees: number) {
-    const angleInRadians = (angleInDegrees - 90) * (Math.PI / 180);
-    return {
-        x: cx + radius * Math.cos(angleInRadians),
-        y: cy + radius * Math.sin(angleInRadians),
-    };
-}
-
-function describeArc(cx: number, cy: number, radius: number, startAngle: number, endAngle: number) {
-    const start = polarToCartesian(cx, cy, radius, endAngle);
-    const end = polarToCartesian(cx, cy, radius, startAngle);
-    const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
-
-    return [
-        'M',
-        start.x,
-        start.y,
-        'A',
-        radius,
-        radius,
-        0,
-        largeArcFlag,
-        0,
-        end.x,
-        end.y,
-    ].join(' ');
-}
-
-function AttendanceRing({
-    rate,
-    loading,
-    size,
-    strokeWidth,
-}: {
-    rate: number | null;
-    loading: boolean;
-    size: number;
-    strokeWidth: number;
-}) {
-    const progress = rate == null ? 0 : Math.max(0, Math.min(100, rate));
-    const radius = (size - strokeWidth) / 2;
-    const center = size / 2;
-    const innerSize = size - strokeWidth * 2;
-    const hasProgress = progress > 0;
-    const arcPath = hasProgress ? describeArc(center, center, radius, 0, progress / 100 * 360) : null;
-    const isFullRing = progress >= 99.99;
-    const gradientId = React.useId();
-
-    return (
-        <View className="items-center justify-center" style={{ width: size, height: size }}>
-            <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-                <Defs>
-                    <LinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-                        <Stop offset="0%" stopColor={dash.gradients.ring[0]} />
-                        <Stop offset="100%" stopColor={dash.gradients.ring[1]} />
-                    </LinearGradient>
-                </Defs>
-                <Circle
-                    cx={center}
-                    cy={center}
-                    r={radius}
-                    stroke="rgba(99,91,255,0.1)"
-                    strokeWidth={strokeWidth}
-                    fill="transparent"
-                />
-                {arcPath ? isFullRing ? (
-                    <Circle
-                        cx={center}
-                        cy={center}
-                        r={radius}
-                        stroke={`url(#${gradientId})`}
-                        strokeWidth={strokeWidth}
-                        fill="transparent"
-                    />
-                ) : (
-                    <Path
-                        d={arcPath}
-                        stroke={`url(#${gradientId})`}
-                        strokeWidth={strokeWidth}
-                        fill="transparent"
-                        strokeLinecap="round"
-                    />
-                ) : null}
-            </Svg>
-            <View className="absolute items-center justify-center" style={{ width: innerSize, height: innerSize }}>
-                {loading ? (
-                    <ActivityIndicator size="small" color={dash.accent} />
-                ) : (
-                    // Percentage only. The "PREZENȚĂ" caption used to stack under
-                    // it, but at the small (size 60 → 48px inner) ring the second
-                    // line collided with the bottom of the stroke and clipped to
-                    // "PREZENT". Both call sites already label the ring elsewhere
-                    // (card title / external caption), so the number stands alone.
-                    // Font scales with the ring so the digits never touch the edge.
-                    <Text
-                        className="font-semibold tracking-tight"
-                        style={{ color: dash.ink, fontSize: Math.round(size * 0.3), lineHeight: Math.round(size * 0.34) } as any}
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                    >
-                        {rate !== null ? `${Math.round(rate)}%` : '—'}
-                    </Text>
-                )}
-            </View>
-        </View>
-    );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Match Filter Helpers
-// ─────────────────────────────────────────────────────────────
-
-/**
- * Filtrează meciurile programate care chiar urmează.
- * Sursa de adevăr: câmpul `status === 'scheduled'`.
- */
-function filterScheduled(matches: Match[]): Match[] {
-    return matches.filter((m) => m.status === 'scheduled' && isFutureMatch(m));
-}
-
-/**
- * Filtrează meciurile terminate (cu scor).
- * Sursa de adevăr: câmpul `status === 'finished'`.
- */
-function filterFinished<T extends Match>(matches: T[]): T[] {
-    return matches.filter((m) => m.status === 'finished');
-}
-
-/**
- * Sortează meciurile programate în ordine cronologică ascendentă (cel mai apropiat primul).
- */
-function sortAscending<T extends Match>(matches: T[]): T[] {
-    return [...matches].sort((a, b) => {
-        const da = parseDateStr(a.date)?.getTime() ?? 0;
-        const db = parseDateStr(b.date)?.getTime() ?? 0;
-        return da - db;
-    });
-}
-
-/**
- * Sortează meciurile terminate în ordine descrescătoare (cel mai recent primul).
- */
-function sortDescending<T extends Match>(matches: T[]): T[] {
-    return [...matches].sort((a, b) => {
-        const da = parseMatchDateTime(a)?.getTime() ?? 0;
-        const db = parseMatchDateTime(b)?.getTime() ?? 0;
-        return db - da;
-    });
-}
-
-function hasFrbIds(team: SavedTeam): boolean {
-    return Boolean(team.frbTeamId && team.frbLeagueId && team.frbSeasonId);
-}
-
-function dedupeResults(results: RecentResult[]): RecentResult[] {
-    return Array.from(
-        new Map(
-            results.map((match) => [
-                [
-                    match.savedTeamName,
-                    match.date,
-                    match.time,
-                    match.homeTeam,
-                    match.awayTeam,
-                    match.homeScore,
-                    match.awayScore,
-                ].join('|'),
-                match,
-            ])
-        ).values()
-    );
-}
-
-function normalizeTeamName(name: string) {
-    return name.toLowerCase().replace(/\s+/g, ' ').trim();
-}
-
-function calculateTeamStanding(matches: Match[], teamName?: string, officialRows: StandingRow[] = []): TeamStanding {
-    const normalizedSelectedTeam = normalizeTeamName(teamName ?? '');
-    const finishedMatches = filterFinished(matches).filter((match) => {
-        if (!normalizedSelectedTeam) return true;
-        return normalizeTeamName(match.homeTeam) === normalizedSelectedTeam || normalizeTeamName(match.awayTeam) === normalizedSelectedTeam;
-    });
-
-    const standing = finishedMatches.reduce<TeamStanding>((acc, match) => {
-        const homeScore = Number(match.homeScore);
-        const awayScore = Number(match.awayScore);
-        if (!Number.isFinite(homeScore) || !Number.isFinite(awayScore)) return acc;
-
-        const isSelectedHome = normalizeTeamName(match.homeTeam) === normalizedSelectedTeam;
-        const pointsFor = isSelectedHome ? homeScore : awayScore;
-        const pointsAgainst = isSelectedHome ? awayScore : homeScore;
-
-        acc.played += 1;
-        acc.pointsFor += pointsFor;
-        acc.pointsAgainst += pointsAgainst;
-        if (pointsFor > pointsAgainst) acc.wins += 1;
-        else if (pointsFor < pointsAgainst) acc.losses += 1;
-        else acc.draws += 1;
-
-        return acc;
-    }, {
-        played: 0,
-        wins: 0,
-        losses: 0,
-        draws: 0,
-        pointsFor: 0,
-        pointsAgainst: 0,
-        diff: 0,
-        winRate: 0,
-        lastFive: [],
-        streakLabel: 'Fără rezultate',
-        rows: [],
-    });
-
-    standing.diff = standing.pointsFor - standing.pointsAgainst;
-    standing.winRate = standing.played > 0 ? Math.round((standing.wins / standing.played) * 100) : 0;
-    standing.lastFive = sortDescending(finishedMatches).slice(0, 5).map((match) => match.result);
-
-    const currentStreak = standing.lastFive[0];
-    const streakCount = currentStreak && currentStreak !== 'N/A'
-        ? standing.lastFive.findIndex((result) => result !== currentStreak)
-        : -1;
-    const count = streakCount === -1 ? standing.lastFive.filter((result) => result === currentStreak).length : streakCount;
-    standing.streakLabel = currentStreak && currentStreak !== 'N/A'
-        ? `${currentStreak}${count || 1}`
-        : 'Fără serie';
-    standing.rows = officialRows.map((row) => ({
-        position: row.position,
-        team: row.team,
-        played: row.played,
-        wins: row.wins,
-        losses: row.losses,
-        draws: 0,
-        pointsFor: 0,
-        pointsAgainst: 0,
-        diff: 0,
-        points: row.points,
-    }));
-    const selectedOfficialRow = standing.rows.find((row) => normalizeTeamName(row.team) === normalizedSelectedTeam);
-    if (selectedOfficialRow) {
-        standing.played = selectedOfficialRow.played;
-        standing.wins = selectedOfficialRow.wins;
-        standing.losses = selectedOfficialRow.losses;
-        standing.draws = selectedOfficialRow.draws;
-        standing.winRate = selectedOfficialRow.played > 0
-            ? Math.round((selectedOfficialRow.wins / selectedOfficialRow.played) * 100)
-            : 0;
-    }
-
-    return standing;
-}
-
-// ─────────────────────────────────────────────────────────────
-// Sub-components
-// ─────────────────────────────────────────────────────────────
-
-const DropdownPicker = ({ visible, items, onSelect, onClose, title, icon = 'apps', selectedId }: PickerProps) => (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-        {/* Bottom sheet on phones (thumb reach, slides up), centred dialog
-            from lg up. */}
-        <Pressable className="ui-backdrop flex-1 items-center justify-end lg:justify-center lg:p-4" style={{ backgroundColor: 'rgba(10,15,28,0.5)' }} onPress={onClose}>
-            <Pressable
-                className="ui-sheet rounded-t-[22px] lg:rounded-[22px] w-full lg:max-w-[360px] max-h-[78vh] lg:max-h-[70vh] border overflow-hidden flex-col"
-                style={{ backgroundColor: dash.surface, borderColor: 'rgba(15,23,42,0.06)', ...dash.shadow.lift }}
-                onPress={(event: any) => event.stopPropagation()}
-            >
-                <View
-                    pointerEvents="none"
-                    className="absolute top-0 left-0 right-0 h-[3px]"
-                    style={{ backgroundImage: 'linear-gradient(90deg, #635BFF, #2563EB)' } as any}
-                />
-                <View className="flex-row items-center justify-between px-5 pt-6 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: 'rgba(15,23,42,0.05)' }}>
-                    <View className="flex-row items-center flex-1 pr-3">
-                        <View className="w-9 h-9 rounded-[12px] items-center justify-center mr-3" style={{ backgroundColor: 'rgba(99,91,255,0.1)' }}>
-                            <MaterialIcons name={icon} size={17} color={dash.accent} />
-                        </View>
-                        <View className="flex-1">
-                            <Text className="text-base font-semibold" style={{ color: dash.ink }} numberOfLines={1}>{title}</Text>
-                            <Text className="text-[11px] mt-0.5 font-medium" style={{ color: dash.muted }}>
-                                {items.length} {items.length === 1 ? 'opțiune' : 'opțiuni'} disponibile
-                            </Text>
-                        </View>
-                    </View>
-                    <Pressable
-                        onPress={onClose}
-                        className="w-8 h-8 rounded-full items-center justify-center active:opacity-70"
-                        style={{ backgroundColor: dash.lineSoft }}
-                    >
-                        <MaterialIcons name="close" size={15} color={dash.faint} />
-                    </Pressable>
-                </View>
-                <FlatList
-                    className="px-3 py-3 max-h-[50vh]"
-                    data={items}
-                    keyExtractor={(i) => i.id}
-                    renderItem={({ item }) => {
-                        const isSelected = selectedId != null && item.id === selectedId;
-                        return (
-                            <Pressable
-                                onPress={() => { onSelect(item.id); onClose(); }}
-                                className="dash-row-hover flex-row items-center justify-between py-3 px-3.5 rounded-[13px] mb-1 border active:opacity-80"
-                                style={{
-                                    backgroundColor: isSelected ? 'rgba(99,91,255,0.08)' : 'transparent',
-                                    borderColor: isSelected ? 'rgba(99,91,255,0.25)' : 'transparent',
-                                }}
-                            >
-                                <Text
-                                    className="text-sm"
-                                    style={{ color: isSelected ? dash.accent : dash.inkSoft, fontWeight: isSelected ? '700' : '500' }}
-                                >
-                                    {item.label}
-                                </Text>
-                                {isSelected ? (
-                                    <View className="w-5 h-5 rounded-full items-center justify-center" style={{ backgroundColor: dash.accent }}>
-                                        <MaterialIcons name="check" size={12} color="var(--c-surface)" />
-                                    </View>
-                                ) : null}
-                            </Pressable>
-                        );
-                    }}
-                />
-            </Pressable>
-        </Pressable>
-    </Modal>
-);
-
-// ─────────────────────────────────────────────────────────────
-// Match Cards
-// ─────────────────────────────────────────────────────────────
-
-const ScheduledMatchCard = ({ game, leagueName, onPress }: { game: Match; leagueName: string; onPress?: () => void }) => {
-    const { month, day } = splitDate(game.date);
-    const categoryLabel = leagueName || game.league || 'Categorie';
-    return (
-        <GameCard
-            title={`${game.homeTeam} vs ${game.awayTeam}`}
-            dateLabel={game.date}
-            month={month}
-            day={day}
-            time={game.time}
-            meta={categoryLabel}
-            location={game.league}
-            onPress={onPress}
-        />
-    );
-};
-
-const ResultCard = ({ m, leagueName, isSmallPhone }: { m: RecentResult; leagueName: string; isSmallPhone: boolean }) => {
-    const contextLabel = m.savedTeamName || leagueName || m.league;
-    return (
-        <DashboardResultCard
-            homeTeam={m.homeTeam}
-            awayTeam={m.awayTeam}
-            score={`${m.homeScore}-${m.awayScore}`}
-            context={contextLabel}
-            dateLabel={relativeDay(m.date)}
-            result={m.result}
-            compact={isSmallPhone}
-        />
-    );
-};
-
-// ─────────────────────────────────────────────────────────────
-// Risk Management Block — conectat la date reale
-// ─────────────────────────────────────────────────────────────
-
-interface RiskManagementBlockProps {
-    expiringItems: ExpiringItem[];
-    expiredCount: number;
-    loading: boolean;
-    compact?: boolean;
-    showHeader?: boolean;
-    /** Opens the compliance screen from the expired-visa callout. */
-    onOpenCompliance?: () => void;
-}
-
-const RiskManagementBlock = ({ expiringItems, expiredCount, loading, compact = false, showHeader = true, onOpenCompliance }: RiskManagementBlockProps) => {
-    // "All good" only when there is truly nothing: no expired visas AND no
-    // upcoming deadlines. It used to key off the list alone, while the list
-    // (from an older API) held only FUTURE expiries — so the card showed
-    // "2 EXPIRATE" and "Totul e în regulă" at the same time.
-    const needsAttention = expiredCount > 0 || expiringItems.length > 0;
-    const listedExpired = expiringItems.filter((item) => item.expired || item.daysLeft === null).length;
-    const unlistedExpired = Math.max(0, expiredCount - listedExpired);
-
-    return (
-    <View>
-        {showHeader ? (
-            <View className="flex-row justify-between items-center mb-4 px-1 lg:px-0">
-                <View>
-                    <Text className="text-lg lg:text-xl font-semibold" style={{ color: dash.ink }}>Riscuri și conformitate</Text>
-                    <Text className="text-xs mt-0.5 font-medium" style={{ color: dash.muted }}>Conformitate &amp; scadențe</Text>
-                </View>
-                {expiredCount > 0 && (
-                    <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: 'rgba(239,68,68,0.1)' }}>
-                        <Text className="text-[10px] font-semibold" style={{ color: dash.danger }}>{expiredCount} EXPIRATE</Text>
-                    </View>
-                )}
-            </View>
+function SectionCard({ title, action, children }: { title: string; action?: { label: string; onPress: () => void }; children: React.ReactNode }) {
+  return (
+    <View className="rounded-[16px] border overflow-hidden" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
+      <View className="flex-row items-center justify-between px-4 pt-3.5 pb-2.5">
+        <Text className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
+        {action ? (
+          <Pressable onPress={action.onPress} accessibilityRole="link" className="ui-press flex-row items-center gap-0.5">
+            <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{action.label}</Text>
+            <MaterialIcons name="chevron-right" size={16} color="var(--c-brand-fg)" />
+          </Pressable>
         ) : null}
-        <View
-            className={`dash-card-hover rounded-[18px] ${compact ? 'p-4 min-h-[142px]' : 'p-4 min-h-[176px]'} flex-col border dash-fade-in`}
-            style={{ backgroundColor: dash.surface, borderColor: 'rgba(15,23,42,0.06)', ...dash.shadow.card }}
-        >
-            <View className={`flex-row items-center justify-between ${compact ? 'mb-3' : 'mb-3'}`}>
-                <View className="flex-row items-center flex-1">
-                    <View
-                        className="w-9 h-9 rounded-[12px] items-center justify-center"
-                        style={{ backgroundColor: expiredCount > 0 ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)' }}
-                    >
-                        <MaterialIcons name={needsAttention ? 'warning' : 'verified'} size={17} color={expiredCount > 0 ? dash.danger : needsAttention ? dash.warning : dash.success} />
-                    </View>
-                    <View className="ml-3 flex-1">
-                        <Text className="text-[13px] font-semibold" style={{ color: expiredCount > 0 ? 'var(--c-danger-fg)' : needsAttention ? 'var(--c-warning-fg)' : 'var(--c-success-fg)' }}>
-                            {needsAttention ? 'Necesită atenție' : 'Totul e în regulă'}
-                        </Text>
-                        {compact ? (
-                            <Text className="text-[11px] font-medium mt-0.5" style={{ color: dash.muted }} numberOfLines={1}>
-                                {expiredCount > 0
-                                    ? `${expiredCount} ${expiredCount === 1 ? 'viză medicală expirată' : 'vize medicale expirate'}`
-                                    : expiringItems.length ? `${expiringItems.length} scadențe apropiate` : 'Status verificat'}
-                            </Text>
-                        ) : null}
-                    </View>
-                </View>
-                {!showHeader && expiredCount > 0 ? (
-                    <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: 'rgba(239,68,68,0.1)' }}>
-                        <Text className="text-[10px] font-semibold" style={{ color: dash.danger }}>{expiredCount} EXPIRATE</Text>
-                    </View>
-                ) : null}
-            </View>
-
-            {loading && (
-                <View className={`${compact ? 'py-3' : 'py-4'} gap-2.5`}>
-                    <SkeletonBlock width="100%" height={compact ? 48 : 52} className="rounded-[14px]" />
-                    {!compact ? <SkeletonBlock width="80%" height={44} className="rounded-[14px]" /> : null}
-                </View>
-            )}
-
-            {!loading && unlistedExpired > 0 && (
-                <Pressable
-                    onPress={onOpenCompliance}
-                    disabled={!onOpenCompliance}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${unlistedExpired} vize medicale expirate — deschide Conformitate`}
-                    className="ui-press flex-row items-center gap-3 p-3 rounded-[14px] border mb-2.5 text-left"
-                    style={{ backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-border)' } as any}
-                >
-                    <MaterialIcons name="medical-services" size={18} color="var(--c-danger-fg)" />
-                    <View className="flex-1 min-w-0">
-                        <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>
-                            {unlistedExpired} {unlistedExpired === 1 ? 'viză medicală expirată' : 'vize medicale expirate'}
-                        </Text>
-                        <Text className="text-[12px] font-medium mt-0.5" style={{ color: dash.muted }}>Vezi detaliile în Conformitate</Text>
-                    </View>
-                    {onOpenCompliance ? <MaterialIcons name="chevron-right" size={18} color="var(--c-danger-fg)" /> : null}
-                </Pressable>
-            )}
-
-            {!loading && !needsAttention && (
-                <View className={`items-center ${compact ? 'py-2' : 'py-4'}`}>
-                    {!compact ? (
-                        <View className="w-10 h-10 rounded-full items-center justify-center mb-2" style={{ backgroundColor: 'rgba(16,185,129,0.1)' }}>
-                            <MaterialIcons name="check-circle" size={24} color={dash.success} />
-                        </View>
-                    ) : null}
-                    <Text className="text-sm font-semibold mt-1" style={{ color: dash.success }}>Totul e în regulă</Text>
-                    <Text className="text-xs mt-1 font-medium" style={{ color: dash.faint }}>Nicio urgență activă</Text>
-                </View>
-            )}
-
-            {/* Desktop list */}
-            {!loading && expiringItems.length > 0 && (
-                <View className={`hidden lg:flex flex-col ${compact ? 'gap-2.5' : 'gap-3'} w-full`}>
-                    {expiringItems.slice(0, compact ? 2 : 4).map((d, i) => (
-                        <React.Fragment key={i}>
-                            <View
-                                className="flex-row pl-3.5 border-l-2 items-start rounded-r-[12px] py-1"
-                                style={{
-                                    borderLeftColor: d.urgent ? dash.danger : dash.warning,
-                                    backgroundColor: d.urgent ? 'rgba(239,68,68,0.03)' : 'rgba(245,158,11,0.04)',
-                                }}
-                            >
-                                <View className="flex-col pb-1 flex-1">
-                                    <Text className="text-[9px] font-medium uppercase tracking-[0.06em]" style={{ color: dash.faint }}>
-                                        {d.type}
-                                    </Text>
-                                    <Text className="text-[13px] font-semibold mt-0.5" style={{ color: dash.inkSoft }}>
-                                        {d.name}
-                                    </Text>
-                                    <View className="flex-row items-center gap-3 mt-1.5">
-                                        <View
-                                            className="px-2 py-[3px] rounded-md"
-                                            style={{ backgroundColor: d.urgent ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.12)' }}
-                                        >
-                                            <Text className="text-[9px] font-semibold tracking-wide" style={{ color: d.urgent ? dash.danger : 'var(--c-warning-fg)' }}>
-                                                {d.daysLeft !== null ? `${d.daysLeft} ZILE RĂMASE` : d.daysOverdue ? `EXPIRAT DE ${d.daysOverdue} ZILE` : 'EXPIRAT'}
-                                            </Text>
-                                        </View>
-                                        {!compact ? <Text className="text-[10px] font-medium" style={{ color: dash.muted }}>Exp: {d.expiryDate}</Text> : null}
-                                    </View>
-                                </View>
-                            </View>
-                        </React.Fragment>
-                    ))}
-                </View>
-            )}
-
-            {/* Mobile list */}
-            {!loading && expiringItems.length > 0 && (
-                <View className="flex lg:hidden flex-col gap-2.5">
-                    {expiringItems.slice(0, 3).map((d, i) => (
-                        <React.Fragment key={i}>
-                            <View
-                                className="flex-row items-center justify-between p-3 rounded-[14px] min-h-[62px] border"
-                                style={{ backgroundColor: dash.lineSoft, borderColor: 'rgba(15,23,42,0.04)' }}
-                            >
-                                <View className="flex-1 pr-2">
-                                    <Text className="text-[13px] font-semibold" style={{ color: dash.ink }} numberOfLines={1}>{d.name}</Text>
-                                    <Text className="text-[11.5px] mt-1 font-medium" style={{ color: dash.muted }}>{d.type === 'VIZĂ MEDICALĂ' ? 'Viză medicală' : d.type === 'COTIZAȚIE LUNARĂ' ? 'Cotizație lunară' : d.type}</Text>
-                                </View>
-                                <View
-                                    className="px-2.5 py-1.5 rounded-full"
-                                    style={{ backgroundColor: d.urgent ? dash.danger : dash.ink }}
-                                >
-                                    <Text className="text-white text-[11px] font-bold leading-none">
-                                        {d.daysLeft !== null ? `${d.daysLeft} zile` : 'Expirat'}
-                                    </Text>
-                                </View>
-                            </View>
-                        </React.Fragment>
-                    ))}
-                </View>
-            )}
-
-            {!compact ? <View className="hidden lg:flex mt-auto pt-5">
-                <Pressable
-                    className="w-full py-2.5 rounded-[12px] border items-center justify-center dash-btn-hover"
-                    style={{ borderColor: 'rgba(99,91,255,0.2)', backgroundColor: 'rgba(99,91,255,0.04)' }}
-                >
-                    <Text className="text-[13px] font-semibold" style={{ color: dash.accent }}>
-                        Notifică Echipa de Conformitate
-                    </Text>
-                </Pressable>
-            </View> : null}
-        </View>
+      </View>
+      {children}
     </View>
-    );
-};
-
-// ─────────────────────────────────────────────────────────────
-// Financial Summary — venit/cheltuială/profit într-un singur card compact
-// ─────────────────────────────────────────────────────────────
-
-interface FinancialSummaryCardProps {
-    income: number;
-    expense: number;
-    profit: number;
-    profitChangePercent: number | null;
-    loading: boolean;
+  );
 }
-
-const FinancialSummaryCard = ({ income, expense, profit, profitChangePercent, loading }: FinancialSummaryCardProps) => {
-    const trendTone = profitChangePercent == null
-        ? null
-        : profitChangePercent > 0 ? dash.trend.up : profitChangePercent < 0 ? dash.trend.down : dash.trend.flat;
-
-    return (
-        <View
-            className="dash-card dash-card-hover flex-1 rounded-[18px] p-4 border min-w-[280px] overflow-hidden relative dash-fade-in"
-            style={{ backgroundColor: dash.surface, borderColor: dash.hairline, ...dash.shadow.card }}
-        >
-            <View pointerEvents="none" className="absolute top-0 left-0 right-0 h-[3px]" style={{ backgroundImage: 'linear-gradient(90deg, #10B981, #635BFF)' } as any} />
-            <Text className="text-[10px] font-semibold uppercase tracking-[0.09em] mb-3" style={{ color: dash.muted }}>
-                Financiar · luna curentă · RON
-            </Text>
-
-            {loading ? (
-                <View className="flex-row gap-3">
-                    <SkeletonBlock width="30%" height={36} />
-                    <SkeletonBlock width="30%" height={36} />
-                    <SkeletonBlock width="30%" height={36} />
-                </View>
-            ) : (
-                <View className="flex-row">
-                    <View className="flex-1 pr-3">
-                        <Text className="text-[10px] font-semibold" style={{ color: dash.muted }}>Venituri</Text>
-                        <Text className="text-[17px] font-bold mt-1 tabular" style={{ color: dash.successDeep }} numberOfLines={1}>
-                            {formatMoneyCompact(income)}
-                        </Text>
-                    </View>
-                    <View className="w-px" style={{ backgroundColor: dash.line }} />
-                    <View className="flex-1 px-3">
-                        <Text className="text-[10px] font-semibold" style={{ color: dash.muted }}>Cheltuieli</Text>
-                        <Text className="text-[17px] font-bold mt-1 tabular" style={{ color: dash.warningDeep }} numberOfLines={1}>
-                            {formatMoneyCompact(expense)}
-                        </Text>
-                    </View>
-                    <View className="w-px" style={{ backgroundColor: dash.line }} />
-                    <View className="flex-1 pl-3">
-                        <Text className="text-[10px] font-semibold" style={{ color: dash.muted }}>Profit</Text>
-                        <Text className="text-[17px] font-bold mt-1 tabular" style={{ color: profit >= 0 ? dash.ink : dash.danger }} numberOfLines={1}>
-                            {formatMoneyCompact(profit)}
-                        </Text>
-                        {trendTone && profitChangePercent != null ? (
-                            <View className="flex-row items-center gap-0.5 mt-1">
-                                <MaterialIcons name={trendTone.icon} size={11} color={trendTone.fg} />
-                                <Text className="text-[10px] font-bold" style={{ color: trendTone.fg }} numberOfLines={1}>
-                                    {profitChangePercent > 0 ? '+' : ''}{profitChangePercent}% vs. luna trecută
-                                </Text>
-                            </View>
-                        ) : null}
-                    </View>
-                </View>
-            )}
-        </View>
-    );
-};
-
-// ─────────────────────────────────────────────────────────────
-// Selected Team Standing
-// ─────────────────────────────────────────────────────────────
-
-const TeamStandingWidget = ({
-    teamName,
-    standing,
-    loading,
-}: {
-    teamName?: string;
-    standing: TeamStanding;
-    loading: boolean;
-}) => {
-    const selectedRow = standing.rows.find((row) => normalizeTeamName(row.team) === normalizeTeamName(teamName ?? ''));
-    const stats = [
-        { label: 'MJ', value: standing.played },
-        { label: 'V', value: standing.wins },
-        { label: 'Î', value: standing.losses },
-        { label: 'PCT', value: selectedRow?.points ?? standing.wins * 2 + standing.draws },
-    ];
-
-    return (
-        <View
-            className="dash-card-hover rounded-[20px] p-4 border mb-5 dash-fade-in"
-            style={{ backgroundColor: dash.surface, borderColor: 'rgba(15,23,42,0.06)', ...dash.shadow.card }}
-        >
-            <View className="flex-row items-start justify-between mb-3.5">
-                <View className="flex-1 pr-3">
-                    <Text className="text-[17px] font-semibold" style={{ color: dash.ink }}>Clasament</Text>
-                    <Text className="text-xs mt-1 font-medium" style={{ color: dash.muted }} numberOfLines={1}>
-                        {teamName ?? 'Alege o echipă din filtre'}
-                    </Text>
-                </View>
-                <View className="w-9 h-9 rounded-[12px] items-center justify-center" style={{ backgroundColor: 'rgba(99,91,255,0.08)' }}>
-                    <MaterialIcons name="leaderboard" size={16} color={dash.accent} />
-                </View>
-            </View>
-
-            {loading ? (
-                <View className="gap-3 py-2">
-                    <SkeletonBlock width="100%" height={120} className="rounded-[16px]" />
-                    <SkeletonBlock width="100%" height={140} className="rounded-[14px]" />
-                </View>
-            ) : (
-                <>
-                    <View
-                        className="rounded-[16px] p-4 mb-4 border overflow-hidden"
-                        style={{
-                            backgroundColor: dash.ink,
-                            borderColor: 'rgba(255,255,255,0.06)',
-                            backgroundImage: 'linear-gradient(135deg, #0A0F1C 0%, #1E293B 100%)',
-                        } as any}
-                    >
-                        <View className="flex-row items-center justify-between">
-                            <View>
-                                <Text className="text-[10px] font-medium uppercase tracking-[0.06em]" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                                    Rată victorii
-                                </Text>
-                                <Text className="text-white text-[30px] font-semibold mt-1 leading-none">{standing.winRate}%</Text>
-                            </View>
-                            <View className="items-end">
-                                <Text className="text-[10px] font-medium uppercase tracking-[0.06em]" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                                    Loc
-                                </Text>
-                                <View className="px-3 py-1.5 rounded-full mt-2" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
-                                    <Text className="text-white text-xs font-semibold">
-                                        {selectedRow ? `#${selectedRow.position}` : standing.streakLabel}
-                                    </Text>
-                                </View>
-                            </View>
-                        </View>
-                        <View className="flex-row gap-2 mt-4">
-                            {stats.map((item) => (
-                                <View key={item.label} className="flex-1 rounded-[12px] py-2.5 items-center" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-                                    <Text className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>{item.label}</Text>
-                                    <Text className="text-white text-[14px] font-semibold mt-1">{item.value}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    </View>
-
-                    <View className="mb-4 rounded-[14px] border overflow-hidden" style={{ borderColor: 'rgba(15,23,42,0.06)' }}>
-                        <View className="flex-row items-center px-3 py-2.5" style={{ backgroundColor: dash.lineSoft }}>
-                            <Text className="w-7 text-[9px] font-semibold uppercase tracking-wide" style={{ color: dash.faint }}>#</Text>
-                            <Text className="flex-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: dash.faint }}>ECHIPĂ</Text>
-                            <Text className="w-8 text-right text-[9px] font-semibold uppercase tracking-wide" style={{ color: dash.faint }}>MJ</Text>
-                            <Text className="w-7 text-right text-[9px] font-semibold uppercase tracking-wide" style={{ color: dash.faint }}>V</Text>
-                            <Text className="w-7 text-right text-[9px] font-semibold uppercase tracking-wide" style={{ color: dash.faint }}>Î</Text>
-                            <Text className="w-9 text-right text-[9px] font-semibold uppercase tracking-wide" style={{ color: dash.faint }}>PCT</Text>
-                        </View>
-                        {(standing.rows.length ? standing.rows : [{
-                            position: 1,
-                            team: teamName ?? 'Fără rezultate',
-                            played: 0,
-                            wins: 0,
-                            losses: 0,
-                            draws: 0,
-                            pointsFor: 0,
-                            pointsAgainst: 0,
-                            diff: 0,
-                            points: 0,
-                        }]).map((row, index) => {
-                            const isSelected = normalizeTeamName(row.team) === normalizeTeamName(teamName ?? '');
-                            return (
-                                <View
-                                    key={`${row.team}-${index}`}
-                                    className="dash-row-hover flex-row items-center px-3 py-2.5 border-t"
-                                    style={{
-                                        backgroundColor: isSelected ? 'rgba(99,91,255,0.06)' : dash.surface,
-                                        borderTopColor: 'rgba(15,23,42,0.04)',
-                                    }}
-                                >
-                                    <Text className="w-7 text-[11px] font-semibold" style={{ color: isSelected ? dash.accent : dash.muted }}>
-                                        {row.position}
-                                    </Text>
-                                    <Text className="flex-1 text-[11px] font-medium pr-2" style={{ color: isSelected ? dash.ink : dash.inkSoft }} numberOfLines={1}>
-                                        {row.team}
-                                    </Text>
-                                    <Text className="w-8 text-right text-[11px] font-medium" style={{ color: dash.inkSoft }}>{row.played}</Text>
-                                    <Text className="w-7 text-right text-[11px] font-semibold" style={{ color: dash.success }}>{row.wins}</Text>
-                                    <Text className="w-7 text-right text-[11px] font-semibold" style={{ color: dash.danger }}>{row.losses}</Text>
-                                    <Text className="w-9 text-right text-[11px] font-semibold" style={{ color: dash.ink }}>{row.points}</Text>
-                                </View>
-                            );
-                        })}
-                    </View>
-
-                    <View className="flex-row items-center justify-between pt-1">
-                        <Text className="text-[11px] font-medium uppercase tracking-[0.06em]" style={{ color: dash.muted }}>Formă</Text>
-                        <View className="flex-row gap-1.5">
-                            {(standing.lastFive.length ? standing.lastFive : ['N/A']).map((result, index) => {
-                                const isWin = result === 'W';
-                                const isLoss = result === 'L';
-                                const bg = isWin ? 'rgba(16,185,129,0.1)' : isLoss ? 'rgba(239,68,68,0.08)' : dash.lineSoft;
-                                const text = isWin ? dash.success : isLoss ? dash.danger : dash.faint;
-                                return (
-                                    <View key={`${result}-${index}`} className="w-6 h-6 rounded-full items-center justify-center" style={{ backgroundColor: bg }}>
-                                        <Text className="text-[10px] font-bold" style={{ color: text }}>{result}</Text>
-                                    </View>
-                                );
-                            })}
-                        </View>
-                    </View>
-                </>
-            )}
-        </View>
-    );
-};
-
-// ─────────────────────────────────────────────────────────────
-// Club Health Block — conectat la date reale de prezență
-// ─────────────────────────────────────────────────────────────
-
-interface ClubHealthBlockProps {
-    attendanceRate: number | null;
-    presentCount: number;
-    totalRecords: number;
-    loading: boolean;
-    isSmallPhone: boolean;
-}
-
-const ClubHealthBlock = ({ attendanceRate, presentCount, totalRecords, loading, isSmallPhone }: ClubHealthBlockProps) => {
-    const absentCount = Math.max(0, totalRecords - presentCount);
-    const rate = attendanceRate ?? 0;
-    const hasData = attendanceRate != null && totalRecords > 0;
-    const label = !hasData ? 'Nicio prezență marcată luna aceasta' : rate >= 80 ? 'Optim' : rate >= 60 ? 'Mediu' : 'Scăzut';
-
-    return (
-        <View
-            className="flex lg:hidden rounded-[20px] p-4 border overflow-hidden relative"
-            style={{ backgroundColor: dash.surface, borderColor: dash.hairline, ...dash.shadow.card }}
-        >
-            <View pointerEvents="none" className="absolute top-0 left-0 right-0 h-[3px]" style={{ backgroundImage: 'linear-gradient(90deg, #635BFF, #2563EB)' } as any} />
-            <View pointerEvents="none" className="absolute inset-0" style={{ backgroundImage: dash.gradients.cardPurple } as any} />
-            <View className="relative flex-row justify-between items-start mb-3">
-                <View>
-                    <Text className="text-base font-bold tracking-tight" style={{ color: dash.ink }}>Prezență club</Text>
-                    <Text className="text-xs mt-1 font-medium" style={{ color: dash.muted }}>Prezență luna curentă</Text>
-                </View>
-                {loading ? (
-                    <ActivityIndicator size="small" color={dash.accentSky} />
-                ) : (
-                    // "LIVE" only when there is something live to show.
-                    hasData ? (
-                        <View className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full mt-1" style={{ backgroundColor: 'var(--c-success-bg)' }}>
-                            <View className="w-1.5 h-1.5 rounded-full dash-pulse-dot" style={{ backgroundColor: dash.success }} />
-                            <Text className="text-[11px] font-bold" style={{ color: dash.successDeep }}>Live</Text>
-                        </View>
-                    ) : null
-                )}
-            </View>
-
-            {!loading && (
-                <>
-                    <View className="items-center justify-center my-2 relative">
-                        <AttendanceRing
-                            rate={attendanceRate}
-                            loading={loading}
-                            size={isSmallPhone ? 112 : 132}
-                            strokeWidth={isSmallPhone ? 10 : 13}
-                        />
-                        {!loading ? (
-                            <Text className="text-[12px] font-semibold mt-2 text-center" style={{ color: hasData ? 'var(--c-brand-fg)' : dash.muted }}>
-                                {label}
-                            </Text>
-                        ) : null}
-                    </View>
-                    <View className="flex-row justify-around px-2 mt-3">
-                        <View className="flex-row items-center gap-2">
-                            <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--c-brand-surface)' }} />
-                            <View>
-                                <Text className="text-[12px] font-semibold" style={{ color: dash.muted }}>Prezenți</Text>
-                                <Text className="font-bold text-lg mt-[-2px]" style={{ color: dash.ink }}>{presentCount}</Text>
-                            </View>
-                        </View>
-                        <View className="flex-row items-center gap-2">
-                            <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--c-border-strong)' }} />
-                            <View>
-                                <Text className="text-[12px] font-semibold" style={{ color: dash.muted }}>Absenți</Text>
-                                <Text className="font-bold text-lg mt-[-2px]" style={{ color: dash.ink }}>{absentCount}</Text>
-                            </View>
-                        </View>
-                    </View>
-                </>
-            )}
-        </View>
-    );
-};
-
-/**
- * Mobile widget carousel.
- *
- * The next card peeks in from the right edge, so "swipe for more" is obvious
- * without the old "Un card pe ecran, glisează pentru următorul" caption. Native
- * CSS scroll-snap does the swipe (momentum and all), the container height
- * eases to the active card instead of jumping, and inactive cards dim slightly
- * so the focus follows the swipe.
- *
- * The previous version rendered every widget TWICE (an off-screen copy just to
- * measure heights) and synced state from debounced scroll-end events — double
- * the render cost on the most expensive screen, and a stutter at every snap.
- */
-type MobileWidget = { key: string; label: string; icon: string; badge?: number; node: React.ReactNode };
-
-/**
- * Phones: the three dense widgets behind one segmented control.
- *
- * This was a horizontal swipe carousel. The cards have very different heights
- * (Club Health ~300px, the standings table ~700px), so every swipe resized the
- * carousel and shoved the rest of the page up or down mid-gesture, and the
- * neighbouring cards peeked in cut off at the edges. Tabs change height only
- * on an explicit tap, and show one whole card at a time.
- */
-function MobileWidgetStack({ items }: { items: MobileWidget[] }) {
-    const [activeKey, setActiveKey] = React.useState(items[0]?.key);
-    const active = items.find((item) => item.key === activeKey) ?? items[0];
-    if (!active) return null;
-
-    return (
-        <View className="lg:hidden mb-5">
-            <View
-                className="flex-row p-[3px] rounded-[12px] mb-3"
-                style={{ backgroundColor: 'var(--c-surface-3)' }}
-                accessibilityRole={'tablist' as any}
-            >
-                {items.map((item) => {
-                    const selected = item.key === active.key;
-                    return (
-                        <Pressable
-                            key={item.key}
-                            onPress={() => setActiveKey(item.key)}
-                            accessibilityRole={'tab' as any}
-                            accessibilityState={{ selected }}
-                            className="flex-1 min-w-0 h-9 rounded-[9px] flex-row items-center justify-center gap-1.5"
-                            style={selected ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
-                        >
-                            <MaterialIcons name={item.icon} size={15} color={selected ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
-                            <Text numberOfLines={1} className="text-[12.5px] font-semibold" style={{ color: selected ? 'var(--c-ink)' : 'var(--c-muted)' }}>
-                                {item.label}
-                            </Text>
-                            {item.badge ? (
-                                <View className="min-w-[17px] h-[17px] px-1 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-danger)' }}>
-                                    <Text className="text-[10px] font-bold t-num" style={{ color: '#FFFFFF' }}>{item.badge}</Text>
-                                </View>
-                            ) : null}
-                        </Pressable>
-                    );
-                })}
-            </View>
-            <View key={active.key} className="ui-rise">
-                {active.node}
-            </View>
-        </View>
-    );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Main Dashboard
-// ─────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-    const { isSmallPhone, width } = useResponsive();
-    const currentMonth = new Date().getMonth() + 1;
+  const router = useRouter();
+  const { session } = useSession() as any;
 
-    // ── Filter state ──
-    const [leagues, setLeagues] = React.useState<League[]>([]);
-    const [seasons, setSeasons] = React.useState<Season[]>([]);
-    const [teams, setTeams] = React.useState<Team[]>([]);
-    const [selectedLeague, setSelectedLeague] = React.useState<League | null>(null);
-    const [selectedSeason, setSelectedSeason] = React.useState<Season | null>(null);
-    const [selectedTeam, setSelectedTeam] = React.useState<Team | null>(null);
-    const [selectedMonth, setSelectedMonth] = React.useState<number>(currentMonth);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [summaryFailed, setSummaryFailed] = useState(false);
+  const [events, setEvents] = useState<CalendarEvent[] | null>(null);
+  const [l12, setL12] = useState<L12Overview | null>(null);
+  const [pendingRequests, setPendingRequests] = useState(0);
+  const [results, setResults] = useState<RecentResult[] | null>(null);
 
-    // ── Data state ──
-    const [matches, setMatches] = React.useState<Match[]>([]);
-    const [teamSeasonMatches, setTeamSeasonMatches] = React.useState<Match[]>([]);
-    const [officialStandings, setOfficialStandings] = React.useState<StandingRow[]>([]);
-    const [recentResults, setRecentResults] = React.useState<RecentResult[]>([]);
-    const [summary, setSummary] = React.useState<DashboardSummary | null>(null);
-    const [loading, setLoading] = React.useState(false);
-    const [loadingRecentResults, setLoadingRecentResults] = React.useState(true);
-    const [loadingTeams, setLoadingTeams] = React.useState(false);
-    const [loadingSummary, setLoadingSummary] = React.useState(true);
-    const [loadingStandings, setLoadingStandings] = React.useState(false);
-    const [resultsScrollX, setResultsScrollX] = React.useState(0);
-    const [mobileResultsScrollX, setMobileResultsScrollX] = React.useState(0);
-    const resultsScrollRef = React.useRef<ScrollView>(null);
-    const mobileResultsScrollRef = React.useRef<ScrollView>(null);
-
-    // ── Picker visibility ──
-    const [showLeague, setShowLeague] = React.useState(false);
-    const [showSeason, setShowSeason] = React.useState(false);
-    const [showTeam, setShowTeam] = React.useState(false);
-    const [showMonth, setShowMonth] = React.useState(false);
-
-    // ── Main content tab (desktop): Meciuri & Rezultate vs. Clasament ──
-    const [mainView, setMainView] = React.useState<'matches' | 'standings'>('matches');
-
-    // ── Boot: încarcă ligile și KPI-urile ──
-    React.useEffect(() => {
-        // Încarcă ligile
-        basketballApi.getLeagues().then((data) => {
-            setLeagues(data);
-            if (data.length > 0) handleLeagueSelect(data[0].id, data);
-        }).catch(console.error);
-
-        // Încarcă KPI-urile din dashboard summary
-        setLoadingSummary(true);
-        dashboardApi.getSummary()
-            .then(setSummary)
-            .catch((e) => {
-                console.error('[dashboard summary]', e);
-                setSummary(null);
-            })
-            .finally(() => setLoadingSummary(false));
-
-        loadRecentResults();
-    }, []);
-
-    async function loadRecentResults() {
-        setLoadingRecentResults(true);
+  const loadResults = useCallback(async () => {
+    try {
+      const saved = await teamsApi.getTeams();
+      const frbTeams = saved.filter((t: SavedTeam) => t.frbTeamId && t.frbLeagueId && t.frbSeasonId);
+      const perTeam = await Promise.all(frbTeams.map(async (team) => {
         try {
-            const savedTeams = await teamsApi.getTeams();
-            const importableTeams = savedTeams.filter(hasFrbIds);
-            const results = await Promise.all(
-                importableTeams.map(async (team) => {
-                    const teamMatches = await basketballApi.getMatches(
-                        team.frbLeagueId,
-                        team.frbSeasonId,
-                        team.frbTeamId,
-                        'all'
-                    );
-
-                    return filterFinished(teamMatches).map((match) => ({
-                        ...match,
-                        savedTeamName: team.name,
-                    }));
-                })
-            );
-
-            const uniqueResults = dedupeResults(results.flat());
-            setRecentResults(sortDescending(uniqueResults).slice(0, 12));
-        } catch (e) {
-            console.error('[dashboard recent results]', e);
-            setRecentResults([]);
-        } finally {
-            setLoadingRecentResults(false);
+          const matches = await basketballApi.getMatches(team.frbLeagueId, team.frbSeasonId, team.frbTeamId, 'all');
+          return matches.filter((m) => m.status === 'finished').map((m) => ({ ...m, savedTeamName: team.name }));
+        } catch {
+          return [];
         }
+      }));
+      const seen = new Set<string>();
+      const flat = perTeam.flat().filter((m) => {
+        const key = `${m.savedTeamName}|${m.date}|${m.homeTeam}|${m.awayTeam}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setResults(flat.sort((a, b) => parseFrbDate(b) - parseFrbDate(a)).slice(0, 6));
+    } catch {
+      setResults([]);
     }
+  }, []);
 
-    async function handleLeagueSelect(leagueId: string, leagueList = leagues) {
-        const league = leagueList.find((l) => l.id === leagueId) || null;
-        setSelectedLeague(league);
-        setSelectedSeason(null);
-        setSelectedTeam(null);
-        setMatches([]);
-        setTeamSeasonMatches([]);
-        setOfficialStandings([]);
-        try {
-            const data = await basketballApi.getSeasons(leagueId);
-            setSeasons(data);
-            if (data.length > 0) handleSeasonSelect(data[0].id, data, leagueId);
-        } catch (e) { console.error(e); }
+  useEffect(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start.getTime() + 8 * DAY);
+
+    dashboardApi.getSummary().then(setSummary).catch(() => setSummaryFailed(true));
+    eventsApi.getEvents({ start: start.toISOString(), end: end.toISOString() })
+      .then((rows) => setEvents(rows.filter((e) => e.status !== 'cancelled')))
+      .catch(() => setEvents([]));
+    // Staff/accountant roles get 403 on these — the home just leaves them out.
+    l12Api.overview().then(setL12).catch(() => setL12(null));
+    Promise.allSettled([manageAccessApi.listRequests(), familyRequestsApi.list()]).then(([access, family]) => {
+      const a = access.status === 'fulfilled' ? access.value.filter((r) => r.status === 'pending').length : 0;
+      const f = family.status === 'fulfilled' ? family.value.length : 0;
+      setPendingRequests(a + f);
+    });
+    loadResults();
+  }, [loadResults]);
+
+  const upcoming = useMemo(() => {
+    if (!events) return null;
+    const now = Date.now();
+    const horizon = now + 7 * DAY;
+    const rows = events
+      .filter((e) => new Date(e.endTime || e.startTime).getTime() >= now && new Date(e.startTime).getTime() <= horizon)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const groups: { key: string; label: string; items: CalendarEvent[] }[] = [];
+    for (const event of rows) {
+      const date = new Date(event.startTime);
+      const key = date.toDateString();
+      const last = groups[groups.length - 1];
+      if (last?.key === key) last.items.push(event);
+      else groups.push({ key, label: dayLabel(date), items: [event] });
     }
+    return groups;
+  }, [events]);
 
-    async function handleSeasonSelect(seasonId: string, seasonList = seasons, leagueId = selectedLeague?.id ?? '') {
-        const season = seasonList.find((s) => s.id === seasonId) || null;
-        setSelectedSeason(season);
-        setSelectedTeam(null);
-        setMatches([]);
-        setTeamSeasonMatches([]);
-        setOfficialStandings([]);
-        if (!leagueId) return;
-        setLoadingTeams(true);
-        try {
-            fetchLeagueStandings(leagueId, seasonId);
-            const data = await basketballApi.getTeams(leagueId, seasonId);
-            setTeams(data);
-            if (data.length > 0) handleTeamSelect(data[0].id, data, leagueId, seasonId);
-        } catch (e) { console.error(e); } finally { setLoadingTeams(false); }
+  const attention = useMemo<AttentionItem[]>(() => {
+    const items: AttentionItem[] = [];
+    if (summary?.expiredVisasCount) {
+      items.push({ key: 'visas', icon: 'medical-services', tone: 'danger', title: `${summary.expiredVisasCount} ${summary.expiredVisasCount === 1 ? 'viză medicală expirată' : 'vize medicale expirate'}`, detail: 'Sportivii nu pot juca până la reînnoire', href: '/admin/compliance' });
     }
-
-    async function handleTeamSelect(
-        teamId: string,
-        teamList = teams,
-        leagueId = selectedLeague?.id ?? '',
-        seasonId = selectedSeason?.id ?? ''
-    ) {
-        const team = teamList.find((t) => t.id === teamId) || null;
-        setSelectedTeam(team);
-        if (!leagueId || !seasonId) return;
-        fetchMatches(leagueId, seasonId, teamId, selectedMonth);
-        fetchTeamSeasonMatches(leagueId, seasonId, teamId);
+    const soon = summary?.expiringItems?.filter((i) => !i.expired && i.urgent).length ?? 0;
+    if (soon > 0) {
+      items.push({ key: 'soon', icon: 'schedule', tone: 'warning', title: `${soon} ${soon === 1 ? 'viză expiră' : 'vize expiră'} în 7 zile`, href: '/admin/compliance' });
     }
-
-    async function fetchLeagueStandings(leagueId: string, seasonId: string) {
-        setLoadingStandings(true);
-        try {
-            const data = await basketballApi.getStandings(leagueId, seasonId);
-            setOfficialStandings(data);
-        } catch (e) {
-            console.error('[dashboard official standings]', e);
-            setOfficialStandings([]);
-        } finally {
-            setLoadingStandings(false);
-        }
+    if (l12) {
+      const weekAhead = Date.now() + 7 * DAY;
+      const unset = l12.matches.filter((m) => !m.hasLineup && new Date(m.startTime).getTime() <= weekAhead);
+      if (unset.length > 0) {
+        items.push({ key: 'l12', icon: 'assignment', tone: 'warning', title: `${unset.length} ${unset.length === 1 ? 'meci fără L12' : 'meciuri fără L12'} săptămâna asta`, detail: unset.slice(0, 2).map((m) => m.title).join(' · '), href: '/admin/l12' });
+      }
     }
-
-    async function fetchMatches(leagueId: string, seasonId: string, teamId: string, month: number) {
-        setLoading(true);
-        try {
-            const data = await basketballApi.getMatches(leagueId, seasonId, teamId, month);
-            setMatches(data);
-        } catch (e) { console.error(e); } finally { setLoading(false); }
+    if (summary?.pendingPaymentsCount) {
+      items.push({ key: 'payments', icon: 'payments', tone: 'warning', title: `${summary.pendingPaymentsCount} ${summary.pendingPaymentsCount === 1 ? 'plată restantă' : 'plăți restante'}`, href: '/admin/roster' });
     }
-
-    async function fetchTeamSeasonMatches(leagueId: string, seasonId: string, teamId: string) {
-        try {
-            const data = await basketballApi.getMatches(leagueId, seasonId, teamId, 'all');
-            setTeamSeasonMatches(data);
-        } catch (e) {
-            console.error('[dashboard team standings]', e);
-            setTeamSeasonMatches([]);
-        }
+    if (pendingRequests > 0) {
+      items.push({ key: 'requests', icon: 'person-add', tone: 'brand', title: `${pendingRequests} ${pendingRequests === 1 ? 'cerere de acces' : 'cereri de acces'} de aprobat`, href: '/admin/manage-access' });
     }
+    return items;
+  }, [summary, l12, pendingRequests]);
 
-    async function handleMonthSelect(monthId: string) {
-        const m = Number(monthId);
-        setSelectedMonth(m);
-        if (selectedLeague && selectedSeason && selectedTeam) {
-            fetchMatches(selectedLeague.id, selectedSeason.id, selectedTeam.id, m);
-        }
-    }
+  const firstName = session?.firstName || session?.name?.split(' ')[0] || '';
+  const today = new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' });
+  const loadingSummary = !summary && !summaryFailed;
+  const attendanceDelta = summary?.attendanceChangePoints;
 
-    // ── Filtrare și sortare (fără date hardcodate) ──
-    const scheduled = sortAscending(filterScheduled(matches));
-    // Când e selectată o echipă din filtru, rezultatele recente arată doar meciurile acelei echipe
-    // (recalculat dinamic din teamSeasonMatches, care se reîncarcă la fiecare schimbare de echipă).
-    const finished = selectedTeam
-        ? sortDescending(filterFinished(teamSeasonMatches)).slice(0, 12).map((match) => ({
-              ...match,
-              savedTeamName: selectedTeam.name,
-          }))
-        : recentResults;
-    const selectedTeamStanding = React.useMemo(
-        () => calculateTeamStanding(teamSeasonMatches, selectedTeam?.name, officialStandings),
-        [teamSeasonMatches, selectedTeam?.name, officialStandings]
-    );
-
-    // KPI-uri din summary
-    const expiringItems: ExpiringItem[] = summary?.expiringItems ?? [];
-    const navigate = useNavigate();
-    const openCompliance = React.useCallback(() => navigate('/admin/compliance'), [navigate]);
-    const expiredCount = summary?.expiredVisasCount ?? 0;
-
-    const scrollResults = (direction: 'left' | 'right') => {
-        const nextX = Math.max(0, resultsScrollX + (direction === 'right' ? 420 : -420));
-        resultsScrollRef.current?.scrollTo({ x: nextX, animated: true });
-        setResultsScrollX(nextX);
-    };
-
-    const scrollMobileResults = (direction: 'left' | 'right') => {
-        const step = Math.max(232, Math.min(width * 0.68, 300));
-        const nextX = Math.max(0, mobileResultsScrollX + (direction === 'right' ? step : -step));
-        mobileResultsScrollRef.current?.scrollTo({ x: nextX, animated: true });
-        setMobileResultsScrollX(nextX);
-    };
-
-    const renderResultsFeed = () => (
-        <View className="mt-8 lg:mt-10 mb-10 min-h-[160px]">
-            <View className="flex-row items-center justify-between mb-4 px-1 lg:px-0">
-                <View className="flex-row items-center gap-3">
-                    <View className="w-9 h-9 rounded-[12px] items-center justify-center" style={{ backgroundColor: 'rgba(99,91,255,0.1)' }}>
-                        <MaterialIcons name="emoji-events" size={18} color={dash.accent} />
-                    </View>
-                    <View>
-                        <Text className="text-lg lg:text-xl font-bold tracking-tight" style={{ color: dash.ink }}>
-                            Rezultate Recente
-                        </Text>
-                        {finished.length > 0 && (
-                            <Text className="text-[11px] font-semibold uppercase tracking-[0.06em]" style={{ color: dash.faint }}>
-                                {finished.length} meciuri finalizate
-                            </Text>
-                        )}
-                    </View>
-                </View>
-                {finished.length > 0 && (
-                    <>
-                        <View className="hidden lg:flex flex-row gap-2">
-                            <Pressable
-                                onPress={() => scrollResults('left')}
-                                className="w-10 h-10 rounded-full bg-white border border-[#DCE6F5] items-center justify-center shadow-sm dash-nav-btn"
-                            >
-                                <MaterialIcons name="chevron-left" size={22} color="var(--c-ink)" />
-                            </Pressable>
-                            <Pressable
-                                onPress={() => scrollResults('right')}
-                                className="w-10 h-10 rounded-full bg-[#0D2040] items-center justify-center shadow-sm dash-nav-btn"
-                            >
-                                <MaterialIcons name="chevron-right" size={22} color="var(--c-surface)" />
-                            </Pressable>
-                        </View>
-                        <View className="flex lg:hidden flex-row gap-2">
-                            <Pressable
-                                onPress={() => scrollMobileResults('left')}
-                                className="w-9 h-9 rounded-full bg-white border border-[#DCE6F5] items-center justify-center shadow-sm dash-nav-btn"
-                            >
-                                <MaterialIcons name="chevron-left" size={20} color="var(--c-ink)" />
-                            </Pressable>
-                            <Pressable
-                                onPress={() => scrollMobileResults('right')}
-                                className="w-9 h-9 rounded-full bg-[#0D2040] items-center justify-center shadow-sm dash-nav-btn"
-                            >
-                                <MaterialIcons name="chevron-right" size={20} color="var(--c-surface)" />
-                            </Pressable>
-                        </View>
-                    </>
-                )}
-            </View>
-
-            {loadingRecentResults && (
-                <LoadingState compact message="Se încarcă ultimele rezultate..." />
-            )}
-
-            {!loadingRecentResults && finished.length === 0 && (
-                <EmptyState
-                    title="Niciun rezultat final"
-                    message="Echipele salvate nu au încă rezultate finale importate."
-                    icon="emoji-events"
-                />
-            )}
-
-            {!loadingRecentResults && finished.length > 0 && (
-                <ScrollView
-                    ref={resultsScrollRef}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    className="hidden lg:flex flex-row pb-4"
-                    onScroll={(event) => setResultsScrollX(event.nativeEvent.contentOffset.x)}
-                    scrollEventThrottle={16}
-                >
-                    <View className="flex-row gap-4 px-1 pb-2">
-                        {finished.slice(0, 12).map((m, i) => (
-                            <ResultCard
-                                key={`res-desktop-${m.date}-${m.homeTeam}-${i}`}
-                                m={m}
-                                leagueName={selectedLeague?.name ?? ''}
-                                isSmallPhone={isSmallPhone}
-                            />
-                        ))}
-                    </View>
-                </ScrollView>
-            )}
-
-            {!loadingRecentResults && finished.length > 0 && (
-                <ScrollView
-                    ref={mobileResultsScrollRef}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    className="flex lg:hidden pb-12"
-                    onScroll={(event) => setMobileResultsScrollX(event.nativeEvent.contentOffset.x)}
-                    scrollEventThrottle={16}
-                >
-                    <View className="flex-row gap-4 pb-4 px-1">
-                        {finished.slice(0, 5).map((m, i) => (
-                            <ResultCard
-                                key={`res-mobile-${m.date}-${m.homeTeam}-${i}`}
-                                m={m}
-                                leagueName={selectedLeague?.name ?? ''}
-                                isSmallPhone={isSmallPhone}
-                            />
-                        ))}
-                    </View>
-                </ScrollView>
-            )}
+  const attentionCard = (
+    <SectionCard title="Necesită atenție">
+      {loadingSummary ? (
+        <View className="px-4 pb-4 gap-2">
+          {[0, 1].map((i) => <Skeleton key={i} className="h-[48px] w-full rounded-[10px]" />)}
         </View>
-    );
+      ) : attention.length === 0 ? (
+        <View className="flex-row items-center gap-3 px-4 pb-4">
+          <View className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-success-bg)' }}>
+            <MaterialIcons name="check" size={18} color="var(--c-success-fg)" />
+          </View>
+          <Text className="flex-1 text-[13.5px] font-medium" style={{ color: 'var(--c-ink-soft)' }}>Totul e în regulă. Nimic urgent azi.</Text>
+        </View>
+      ) : (
+        <View className="pb-1.5">
+          {attention.map((item) => (
+            <Pressable
+              key={item.key}
+              onPress={() => router.push(item.href as any)}
+              accessibilityRole="link"
+              className="ui-press flex-row items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--c-surface-2)]"
+              style={{ borderTopWidth: 1, borderTopColor: 'var(--c-border)' } as any}
+            >
+              <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: TONE[item.tone].bg }}>
+                <MaterialIcons name={item.icon} size={18} color={TONE[item.tone].fg} />
+              </View>
+              <View className="flex-1 min-w-0">
+                <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{item.title}</Text>
+                {item.detail ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{item.detail}</Text> : null}
+              </View>
+              <MaterialIcons name="chevron-right" size={18} color="var(--c-faint)" />
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </SectionCard>
+  );
 
-    // ── Filter Bar ──
-    // An element, not an inline component: `const MatchFilterBar = () => …`
-    // declared inside render was a NEW component type every render, so React
-    // unmounted and remounted the whole bar on each state change.
-    const matchFilterBar = (
-        <FilterBar
-            items={[
-                {
-                    key: 'league',
-                    label: 'Ligă',
-                    icon: 'emoji-events',
-                    value: selectedLeague?.name ?? 'Alege liga',
-                    onPress: () => setShowLeague(true),
-                },
-                {
-                    key: 'season',
-                    label: 'Sezon',
-                    icon: 'date-range',
-                    value: selectedSeason?.text ?? 'Alege sezonul',
-                    onPress: () => setShowSeason(true),
-                },
-                {
-                    key: 'team',
-                    label: 'Echipă',
-                    icon: 'groups',
-                    value: selectedTeam?.name ?? 'Alege echipa',
-                    loading: loadingTeams,
-                    onPress: () => setShowTeam(true),
-                },
-                {
-                    key: 'month',
-                    label: 'Lună',
-                    icon: 'calendar-month',
-                    value: MONTHS.find((m) => m.id === String(selectedMonth))?.label ?? 'Alege luna',
-                    active: true,
-                    onPress: () => setShowMonth(true),
-                },
-            ]}
-        />
-    );
+  return (
+    <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
+      <ScrollView className="flex-1" contentContainerClassName="pb-36" showsVerticalScrollIndicator={false}>
+        <PageContainer>
+          <PageHeader
+            title={firstName ? `Bună, ${firstName}` : 'Acasă'}
+            subtitle={today.charAt(0).toUpperCase() + today.slice(1)}
+            actionsOnMobile={false}
+            actions={<Button icon="calendar-month" label="Program" onPress={() => router.push('/admin/schedule' as any)} />}
+          />
 
-    return (
-        <ScrollView
-            className="flex-1 bg-[#F5F7FB]"
-            // The shell already reserves room for the bottom nav (pb-24); 140
-            // on top of it left a screen of empty space under the last card.
-            contentContainerStyle={{ paddingBottom: 24 }}
-            showsVerticalScrollIndicator={false}
-            horizontal={false}
-        >
-            <View className="w-full px-3 sm:px-4 lg:px-6 xl:px-8 bg-[#F5F7FB] pt-3 lg:pt-5 relative overflow-hidden">
-                <View pointerEvents="none" className="absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(15,23,42,0.022)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.02)_1px,transparent_1px)] [background-size:36px_36px]" />
-                <View pointerEvents="none" className="absolute -top-32 -left-16 h-[380px] w-[380px] rounded-full opacity-70" style={{ backgroundImage: 'radial-gradient(circle, rgba(99,91,255,0.1) 0%, rgba(99,91,255,0) 68%)' } as any} />
-                <View pointerEvents="none" className="absolute -top-20 right-0 h-[420px] w-[420px] rounded-full opacity-70" style={{ backgroundImage: 'radial-gradient(circle, rgba(37,99,235,0.09) 0%, rgba(37,99,235,0) 66%)' } as any} />
-
-                {/* Pickers */}
-                <DropdownPicker visible={showLeague} title="Alege Liga" icon="sports-basketball" selectedId={selectedLeague?.id} items={leagues.map((l) => ({ id: l.id, label: l.name }))} onSelect={(id) => handleLeagueSelect(id)} onClose={() => setShowLeague(false)} />
-                <DropdownPicker visible={showSeason} title="Alege Sezonul" icon="date-range" selectedId={selectedSeason?.id} items={seasons.map((s) => ({ id: s.id, label: s.text }))} onSelect={(id) => handleSeasonSelect(id)} onClose={() => setShowSeason(false)} />
-                <DropdownPicker visible={showTeam} title="Alege Echipa" icon="groups" selectedId={selectedTeam?.id} items={teams.map((t) => ({ id: t.id, label: t.name }))} onSelect={(id) => handleTeamSelect(id)} onClose={() => setShowTeam(false)} />
-                <DropdownPicker visible={showMonth} title="Alege Luna" icon="calendar-today" selectedId={String(selectedMonth)} items={MONTHS} onSelect={handleMonthSelect} onClose={() => setShowMonth(false)} />
-
-                <View
-                    className="hidden lg:flex rounded-[20px] px-6 py-4 mb-4 overflow-hidden relative dash-fade-in"
-                    style={{ backgroundImage: dash.gradients.heroInk, backgroundColor: dash.ink } as any}
-                >
-                    <View pointerEvents="none" className="absolute inset-0 opacity-90 [background-image:linear-gradient(rgba(255,255,255,0.028)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] [background-size:30px_30px]" />
-                    <View pointerEvents="none" className="absolute -top-24 -left-10 h-[300px] w-[300px] rounded-full opacity-80" style={{ backgroundImage: 'radial-gradient(circle, rgba(99,91,255,0.32) 0%, rgba(99,91,255,0) 66%)' } as any} />
-                    <View pointerEvents="none" className="absolute -bottom-28 right-10 h-[300px] w-[300px] rounded-full opacity-70" style={{ backgroundImage: 'radial-gradient(circle, rgba(37,99,235,0.28) 0%, rgba(37,99,235,0) 68%)' } as any} />
-                    <View className="relative flex-row items-center justify-between">
-                        <View className="flex-1 pr-6">
-                            <View className="self-start flex-row items-center gap-2 rounded-full px-2.5 py-1 mb-2.5 border" style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.14)' }}>
-                                <View className="w-1.5 h-1.5 rounded-full dash-pulse-dot" style={{ backgroundColor: '#34D399' }} />
-                                <Text className="text-white/90 text-[10px] font-bold uppercase tracking-[0.14em]">Basketball Operations · Live</Text>
-                            </View>
-                            <Text className="text-white text-[24px] font-bold tracking-tight leading-none">Dashboard Admin</Text>
-                            <View className="flex-row items-center gap-4 mt-2.5 flex-wrap">
-                                <View className="flex-row items-center gap-1.5">
-                                    <MaterialIcons name="event" size={14} color="rgba(255,255,255,0.55)" />
-                                    <Text className="text-white/70 text-[13px] font-semibold">{scheduled.length} meciuri viitoare</Text>
-                                </View>
-                                <View className="w-1 h-1 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.25)' }} />
-                                <View className="flex-row items-center gap-1.5">
-                                    <MaterialIcons name="emoji-events" size={14} color="rgba(255,255,255,0.55)" />
-                                    <Text className="text-white/70 text-[13px] font-semibold">{finished.length} rezultate recente</Text>
-                                </View>
-                                <View className="w-1 h-1 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.25)' }} />
-                                <View className="flex-row items-center gap-1.5">
-                                    <MaterialIcons name="warning" size={14} color={expiredCount > 0 ? '#FCA5A5' : 'rgba(255,255,255,0.55)'} />
-                                    <Text className="text-[13px] font-semibold" style={{ color: expiredCount > 0 ? '#FCA5A5' : 'rgba(255,255,255,0.7)' }}>{expiredCount} vize expirate</Text>
-                                </View>
-                            </View>
-                        </View>
-                        <View className="flex-row gap-3">
-                            <View className="rounded-[16px] px-4 py-3 min-w-[140px] border" style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }}>
-                                <View className="flex-row items-center gap-1.5 mb-1.5">
-                                    <MaterialIcons name="groups" size={13} color="rgba(255,255,255,0.5)" />
-                                    <Text className="text-white/50 text-[9px] font-bold uppercase tracking-[0.1em]">Echipă curentă</Text>
-                                </View>
-                                <Text className="text-white text-[15px] font-bold" numberOfLines={1}>
-                                    {selectedTeam?.name ?? 'Se încarcă...'}
-                                </Text>
-                            </View>
-                            <View className="rounded-[16px] px-4 py-3 min-w-[112px] border" style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }}>
-                                <View className="flex-row items-center gap-1.5 mb-1.5">
-                                    <MaterialIcons name="calendar-today" size={13} color="rgba(255,255,255,0.5)" />
-                                    <Text className="text-white/50 text-[9px] font-bold uppercase tracking-[0.1em]">Luna</Text>
-                                </View>
-                                <Text className="text-white text-[15px] font-bold">
-                                    {MONTHS.find((m) => m.id === String(selectedMonth))?.label ?? 'Lună'}
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Mobile: compact swipe stack for the dense dashboard widgets */}
-                <MobileWidgetStack
-                    items={[
-                        {
-                            key: 'health',
-                            label: 'Prezență',
-                            icon: 'monitor-heart',
-                            node: (
-                                <ClubHealthBlock
-                                    attendanceRate={summary?.attendanceRate ?? null}
-                                    presentCount={summary?.presentCount ?? 0}
-                                    totalRecords={summary?.totalAttendanceRecords ?? 0}
-                                    loading={loadingSummary}
-                                    isSmallPhone={isSmallPhone}
-                                />
-                            ),
-                        },
-                        {
-                            key: 'standing',
-                            label: 'Clasament',
-                            icon: 'emoji-events',
-                            node: (
-                                <TeamStandingWidget
-                                    teamName={selectedTeam?.name}
-                                    standing={selectedTeamStanding}
-                                    loading={loadingStandings}
-                                />
-                            ),
-                        },
-                        {
-                            key: 'risk',
-                            label: 'Riscuri',
-                            icon: 'warning-amber',
-                            badge: expiredCount || undefined,
-                            node: (
-                                <RiskManagementBlock
-                                    expiringItems={expiringItems}
-                                    expiredCount={expiredCount}
-                                    loading={loadingSummary}
-                                    onOpenCompliance={openCompliance}
-                                />
-                            ),
-                        },
-                    ]}
+          <View className="gap-5">
+            {/* KPIs */}
+            {loadingSummary ? (
+              <View className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[112px] w-full rounded-[16px]" />)}
+              </View>
+            ) : summary ? (
+              <View className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <StatCard
+                  icon="groups"
+                  tone="brand"
+                  label="Jucători activi"
+                  value={summary.activePlayerCount}
+                  hint={`${summary.teamCount} ${summary.teamCount === 1 ? 'echipă' : 'echipe'}${summary.playerCountChange ? ` · ${summary.playerCountChange > 0 ? '+' : ''}${summary.playerCountChange} noi` : ''}`}
                 />
+                <StatCard
+                  icon="fact-check"
+                  tone={summary.attendanceRate == null ? 'neutral' : summary.attendanceRate >= 75 ? 'success' : summary.attendanceRate >= 60 ? 'warning' : 'danger'}
+                  label="Prezență"
+                  value={summary.attendanceRate == null ? '—' : Math.round(summary.attendanceRate)}
+                  suffix={summary.attendanceRate == null ? undefined : '%'}
+                  hint={summary.attendanceRate == null ? 'Fără date încă' : attendanceDelta == null ? 'Luna asta' : `${attendanceDelta > 0 ? '+' : ''}${attendanceDelta} pp față de luna trecută`}
+                />
+                <StatCard
+                  icon="account-balance-wallet"
+                  tone="success"
+                  label="Încasări"
+                  value={money(summary.monthlyIncome)}
+                  suffix=" RON"
+                  hint={`Luna asta · profit ${money(summary.monthlyProfit)} RON`}
+                />
+                <StatCard
+                  icon="payments"
+                  tone={summary.pendingPaymentsCount > 0 ? 'warning' : 'neutral'}
+                  label="Plăți restante"
+                  value={summary.pendingPaymentsCount}
+                  hint={summary.pendingPaymentsCount > 0 ? 'Vezi în Lot' : 'Toți sunt la zi'}
+                />
+              </View>
+            ) : null}
 
-                {/* Desktop: KPI Cards Row — date reale */}
-                <View className="hidden lg:flex dash-stagger flex-row flex-wrap justify-between gap-4 mb-6 mt-1">
-                    <FinancialSummaryCard
-                        income={summary?.monthlyIncome ?? 0}
-                        expense={summary?.monthlyExpense ?? 0}
-                        profit={summary?.monthlyProfit ?? 0}
-                        profitChangePercent={summary?.profitChangePercent ?? null}
-                        loading={loadingSummary}
-                    />
-                    <StatCard
-                        icon="people"
-                        label="JUCĂTORI ACTIVI"
-                        value={loadingSummary ? '—' : String(summary?.activePlayerCount ?? 0)}
-                        detail={loadingSummary ? '—' : `${summary?.teamCount ?? 0} echipe`}
-                        tone="cyan"
-                        loading={loadingSummary}
-                        trend={
-                            !loadingSummary && summary?.playerCountChange
-                                ? {
-                                      direction: summary.playerCountChange > 0 ? 'up' : 'down',
-                                      label: `${summary.playerCountChange > 0 ? '+' : ''}${summary.playerCountChange} vs. luna trecută`,
-                                  }
-                                : undefined
-                        }
-                    />
-                    <View
-                        className="dash-card dash-card-hover flex-[1.3] min-w-[300px] rounded-[18px] p-4 border flex-row items-center gap-3 overflow-hidden relative dash-fade-in"
-                        style={{ backgroundColor: dash.surface, borderColor: dash.hairline, ...dash.shadow.card }}
-                    >
-                        <View pointerEvents="none" className="absolute top-0 left-0 right-0 h-[3px]" style={{ backgroundImage: 'linear-gradient(90deg, #635BFF, #2563EB)' } as any} />
-                        <View pointerEvents="none" className="absolute inset-0" style={{ backgroundImage: dash.gradients.cardPurple } as any} />
-                        <AttendanceRing
-                            rate={summary?.attendanceRate ?? 0}
-                            loading={loadingSummary}
-                            size={60}
-                            strokeWidth={6}
-                        />
-                        <View className="flex-1 relative">
-                            <View className="flex-row items-center justify-between mb-1">
-                                <Text className="text-[14px] font-bold tracking-tight" style={{ color: dash.ink }}>Prezență Globală</Text>
-                                {!loadingSummary && summary?.attendanceRate != null ? (() => {
-                                    const r = summary.attendanceRate;
-                                    const t = r >= 80 ? dash.trend.up : r >= 60 ? dash.trend.flat : dash.trend.down;
-                                    const lbl = r >= 80 ? 'OPTIMAL' : r >= 60 ? 'MEDIU' : 'SCĂZUT';
-                                    return (
-                                        <View className="flex-row items-center gap-1 px-2 py-1 rounded-full" style={{ backgroundColor: t.bg }}>
-                                            <MaterialIcons name={t.icon} size={12} color={t.fg} />
-                                            <Text className="text-[9px] font-bold tracking-wide" style={{ color: t.fg }}>{lbl}</Text>
-                                        </View>
-                                    );
-                                })() : null}
+            {/* Phones: what needs fixing comes before the schedule. */}
+            <View className="lg:hidden">{attentionCard}</View>
+
+            <View className="flex-col lg:flex-row lg:items-start gap-5">
+              {/* Left: next 7 days */}
+              <View className="flex-1 min-w-0 gap-5">
+                <SectionCard title="Următoarele 7 zile" action={{ label: 'Program', onPress: () => router.push('/admin/schedule' as any) }}>
+                  {!upcoming ? (
+                    <View className="px-4 pb-4 gap-2">
+                      {[0, 1, 2].map((i) => <Skeleton key={i} className="h-[52px] w-full rounded-[10px]" />)}
+                    </View>
+                  ) : upcoming.length === 0 ? (
+                    <View className="px-4 pb-4">
+                      <EmptyState compact icon="event-available" title="Nimic programat" message="Nu sunt antrenamente sau meciuri în următoarele 7 zile." />
+                    </View>
+                  ) : (
+                    <View className="pb-1.5">
+                      {upcoming.map((group) => (
+                        <View key={group.key}>
+                          <Text className="t-eyebrow px-4 pt-2.5 pb-1.5" style={{ color: 'var(--c-muted)', backgroundColor: 'var(--c-surface-2)' } as any}>{group.label}</Text>
+                          {group.items.map((event) => {
+                            const meta = getEventTypeMeta(event.type);
+                            return (
+                              <Pressable
+                                key={event.id}
+                                onPress={() => router.push(`/admin/event/${event.id}` as any)}
+                                accessibilityRole="link"
+                                className="ui-press flex-row items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--c-surface-2)]"
+                                style={{ borderTopWidth: 1, borderTopColor: 'var(--c-border)' } as any}
+                              >
+                                <Text className="t-num text-[13px] font-bold w-[42px] shrink-0" style={{ color: 'var(--c-ink-soft)' }}>{time(event.startTime)}</Text>
+                                <View className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: meta.solid }} />
+                                <View className="flex-1 min-w-0">
+                                  <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{event.title}</Text>
+                                  <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+                                    {[meta.label, event.teamName, event.location].filter(Boolean).join(' · ')}
+                                  </Text>
+                                </View>
+                                <MaterialIcons name="chevron-right" size={18} color="var(--c-faint)" />
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </SectionCard>
+              </View>
+
+              {/* Right: attention + results */}
+              <View className="w-full lg:w-[380px] xl:w-[420px] shrink-0 gap-5">
+                <View className="hidden lg:flex">{attentionCard}</View>
+
+                <SectionCard title="Rezultate recente">
+                  {!results ? (
+                    <View className="px-4 pb-4 gap-2">
+                      {[0, 1, 2].map((i) => <Skeleton key={i} className="h-[44px] w-full rounded-[10px]" />)}
+                    </View>
+                  ) : results.length === 0 ? (
+                    <View className="px-4 pb-4">
+                      <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Niciun rezultat FRB pentru echipele clubului încă.</Text>
+                    </View>
+                  ) : (
+                    <View className="pb-1.5">
+                      {results.map((m, index) => {
+                        const tone = m.result === 'W' ? { bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', label: 'V' }
+                          : m.result === 'L' ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', label: 'Î' }
+                          : { bg: 'var(--c-surface-3)', fg: 'var(--c-muted)', label: '–' };
+                        return (
+                          <View key={`${m.savedTeamName}-${m.date}-${index}`} className="flex-row items-center gap-3 px-4 py-2.5" style={{ borderTopWidth: 1, borderTopColor: 'var(--c-border)' } as any}>
+                            <View className="w-7 h-7 rounded-[8px] items-center justify-center shrink-0" style={{ backgroundColor: tone.bg }} accessibilityLabel={m.result === 'W' ? 'Victorie' : m.result === 'L' ? 'Înfrângere' : 'Rezultat'}>
+                              <Text className="text-[12px] font-bold" style={{ color: tone.fg }}>{tone.label}</Text>
                             </View>
-                            {loadingSummary ? (
-                                <View className="gap-2 mt-1">
-                                    <SkeletonBlock width="80%" height={12} />
-                                    <SkeletonBlock width="55%" height={12} />
-                                </View>
-                            ) : (
-                                <>
-                                    <Text className="text-[12.5px] leading-relaxed pr-2" style={{ color: dash.muted }}>
-                                        {summary?.pendingPaymentsCount
-                                            ? `${summary.pendingPaymentsCount} plăți restante · `
-                                            : ''}
-                                        {summary?.expiredVisasCount
-                                            ? `${summary.expiredVisasCount} vize expirate`
-                                            : 'Fără vize expirate'}
-                                    </Text>
-                                    <View className="flex-row items-center gap-4 mt-3">
-                                        <View className="flex-row items-center gap-1.5">
-                                            <View className="w-2 h-2 rounded-full" style={{ backgroundColor: dash.accent }} />
-                                            <Text className="text-[11px] font-semibold" style={{ color: dash.muted }}>
-                                                Prezenți: {summary?.presentCount ?? 0}
-                                            </Text>
-                                        </View>
-                                        <View className="flex-row items-center gap-1.5">
-                                            <View className="w-2 h-2 rounded-full" style={{ backgroundColor: dash.line }} />
-                                            <Text className="text-[11px] font-semibold" style={{ color: dash.muted }}>
-                                                Absenți: {Math.max(0, (summary?.totalAttendanceRecords ?? 0) - (summary?.presentCount ?? 0))}
-                                            </Text>
-                                        </View>
-                                        {summary?.attendanceChangePoints != null ? (() => {
-                                            const points = summary.attendanceChangePoints as number;
-                                            const t = points > 0 ? dash.trend.up : points < 0 ? dash.trend.down : dash.trend.flat;
-                                            return (
-                                                <View className="flex-row items-center gap-0.5">
-                                                    <MaterialIcons name={t.icon} size={11} color={t.fg} />
-                                                    <Text className="text-[10px] font-bold" style={{ color: t.fg }}>
-                                                        {points > 0 ? '+' : ''}{points}pp
-                                                    </Text>
-                                                </View>
-                                            );
-                                        })() : null}
-                                    </View>
-                                </>
-                            )}
-                        </View>
-                    </View>
-                    <View className="flex-[0.9] min-w-[240px]">
-                        <RiskManagementBlock
-                            expiringItems={expiringItems}
-                            expiredCount={expiredCount}
-                            loading={loadingSummary}
-                            onOpenCompliance={openCompliance}
-                            compact
-                            showHeader={false}
-                        />
-                    </View>
-                </View>
-
-                {/* Main Layout */}
-                <View className="w-full mb-10 mt-2 lg:mt-4">
-
-                    {/* Tab switcher (Desktop): Meciuri & Rezultate vs. Clasament */}
-                    <View className="hidden lg:flex flex-row gap-2 mb-5">
-                        <Pressable
-                            onPress={() => setMainView('matches')}
-                            className="flex-row items-center gap-2 h-10 px-4 rounded-[12px] border transition-all duration-200"
-                            style={{
-                                backgroundColor: mainView === 'matches' ? dash.ink : dash.surface,
-                                borderColor: mainView === 'matches' ? dash.ink : dash.hairline,
-                            }}
-                        >
-                            <MaterialIcons name="sports-basketball" size={16} color={mainView === 'matches' ? 'var(--c-surface)' : dash.faint} />
-                            <Text className="text-[13px] font-semibold" style={{ color: mainView === 'matches' ? 'var(--c-surface)' : dash.inkSoft }}>
-                                Meciuri &amp; Rezultate
-                            </Text>
-                        </Pressable>
-                        <Pressable
-                            onPress={() => setMainView('standings')}
-                            className="flex-row items-center gap-2 h-10 px-4 rounded-[12px] border transition-all duration-200"
-                            style={{
-                                backgroundColor: mainView === 'standings' ? dash.ink : dash.surface,
-                                borderColor: mainView === 'standings' ? dash.ink : dash.hairline,
-                            }}
-                        >
-                            <MaterialIcons name="leaderboard" size={16} color={mainView === 'standings' ? 'var(--c-surface)' : dash.faint} />
-                            <Text className="text-[13px] font-semibold" style={{ color: mainView === 'standings' ? 'var(--c-surface)' : dash.inkSoft }}>
-                                Clasament
-                            </Text>
-                        </Pressable>
-                    </View>
-
-                    {mainView === 'matches' && (
-                        <View className="w-full min-w-0">
-                            <View className="flex-col lg:flex-row lg:justify-between lg:items-center mb-4 px-1 lg:px-0 gap-3 relative z-10">
-                                <View className="flex-row items-center gap-3">
-                                    <View className="w-9 h-9 rounded-[12px] items-center justify-center" style={{ backgroundColor: 'rgba(14,165,233,0.1)' }}>
-                                        <MaterialIcons name="sports-basketball" size={18} color={dash.accentSky} />
-                                    </View>
-                                    <View>
-                                        <Text className="text-lg lg:text-xl font-bold tracking-tight" style={{ color: dash.ink }}>
-                                            Meciuri Viitoare
-                                        </Text>
-                                        <Text className="text-[11px] font-semibold uppercase tracking-[0.06em]" style={{ color: dash.faint }}>
-                                            {scheduled.length} programate
-                                        </Text>
-                                    </View>
-                                </View>
-                                {matchFilterBar}
+                            <View className="flex-1 min-w-0">
+                              <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{m.homeTeam}</Text>
+                              <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{m.awayTeam}</Text>
                             </View>
-
-                            {loading && (
-                                <LoadingState message="Se încarcă meciurile..." />
-                            )}
-
-                            {!loading && matches.length === 0 && selectedTeam && (
-                                <EmptyState
-                                    title="Niciun meci găsit"
-                                    message="Nu există meciuri pentru echipa selectată în această lună."
-                                    icon="sports-basketball"
-                                />
-                            )}
-
-                            {!loading && scheduled.length === 0 && matches.length > 0 && (
-                                <View className="mb-4">
-                                    <EmptyState
-                                        title="Niciun meci programat"
-                                        message="Există rezultate/importuri în lună, dar nimic viitor în calendar."
-                                        icon="event-available"
-                                    />
-                                </View>
-                            )}
-
-                            {!loading && scheduled.length > 0 && (
-                                <View className="dash-stagger gap-4 w-full">
-                                    {scheduled.slice(0, 5).map((game, i) => (
-                                        <ScheduledMatchCard
-                                            key={`scheduled-${game.date}-${game.homeTeam}-${i}`}
-                                            game={game}
-                                            leagueName={selectedLeague?.name ?? ''}
-                                            onPress={game.gameId && selectedSeason
-                                                ? () => navigate(`/admin/match/${game.gameId}?seasonId=${selectedSeason.id}`)
-                                                : undefined}
-                                        />
-                                    ))}
-                                </View>
-                            )}
-
-                            {renderResultsFeed()}
-                        </View>
-                    )}
-
-                    {mainView === 'standings' && (
-                        <View className="hidden lg:flex w-full max-w-[640px]">
-                            <TeamStandingWidget
-                                teamName={selectedTeam?.name}
-                                standing={selectedTeamStanding}
-                                loading={loadingStandings}
-                            />
-                        </View>
-                    )}
-                </View>
-
+                            <View className="items-end shrink-0">
+                              <Text className="t-num text-[13px] font-bold" style={{ color: 'var(--c-ink)' }}>{m.homeScore}</Text>
+                              <Text className="t-num text-[13px] font-bold" style={{ color: 'var(--c-ink)' }}>{m.awayScore}</Text>
+                            </View>
+                            <Text className="t-meta w-[44px] text-right shrink-0" style={{ color: 'var(--c-faint)' }}>{m.date.slice(0, 5)}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+                </SectionCard>
+              </View>
             </View>
-        </ScrollView>
-    );
+          </View>
+        </PageContainer>
+      </ScrollView>
+    </View>
+  );
 }

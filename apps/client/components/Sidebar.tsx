@@ -57,7 +57,7 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS }: SidebarProps) {
                 </View>
                 <View className="flex-col">
                     <Text className="text-[17px] font-black tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }}>BCMS</Text>
-                    <Text className="text-[9px] font-black tracking-widest uppercase mt-1" style={{ color: 'var(--c-brand-fg)' }}>Club Workspace</Text>
+                    <Text className="text-[11.5px] font-semibold mt-0.5 max-w-[160px]" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{session?.clubName ?? 'Clubul tău'}</Text>
                 </View>
             </View>
 
@@ -106,12 +106,6 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS }: SidebarProps) {
                         </View>
                     );
                 })}
-            </View>
-            <View className="m-2.5 p-3 rounded-[12px] border" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
-                <Text className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--c-faint)' }}>Active Workspace</Text>
-                <Text className="text-[12px] font-bold" style={{ color: 'var(--c-ink) ' }} numberOfLines={1}>
-                    {session?.clubName ?? 'Club workspace'}
-                </Text>
             </View>
         </View>
     );

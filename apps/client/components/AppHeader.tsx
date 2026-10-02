@@ -25,6 +25,18 @@ type AppHeaderProps = {
   onOpenMenu?: () => void;
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  superadmin: 'Superadmin',
+  admin: 'Administrator',
+  accountant: 'Contabil',
+  staff: 'Staff',
+  coach: 'Antrenor',
+  player: 'Jucător',
+  parent: 'Părinte',
+};
+
+const roleLabel = (role?: string | null) => (role ? ROLE_LABELS[role] ?? role : 'Cont');
+
 export default function AppHeader({
   title,
   subtitle = 'BCMS',
@@ -135,7 +147,7 @@ export default function AppHeader({
                 className="w-10 h-10 rounded-[12px] overflow-hidden items-center justify-center border"
                 style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-border)' } as any}
                 accessibilityRole="button"
-                accessibilityLabel="Open profile actions"
+                accessibilityLabel="Deschide meniul contului"
               >
                 {avatarUrl ? (
                   <Image source={{ uri: avatarUrl }} className="w-full h-full" />
@@ -256,18 +268,15 @@ export default function AppHeader({
             <View className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--c-sky)' }} />
           ) : null}
         </Pressable>
-        <Pressable className="w-9 h-9 items-center justify-center rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
-          <MaterialIcons name="help-outline" size={19} color={theme.colors.muted} />
-        </Pressable>
         <Pressable
           onPress={() => setProfileMenuOpen(true)}
           className="flex-row items-center pl-4 border-l border-[#DDE7F5] gap-3"
           accessibilityRole="button"
-          accessibilityLabel="Open profile actions"
+          accessibilityLabel="Deschide meniul contului"
         >
           <View className="flex-col items-end">
-            <Text className="text-[12px] font-black tracking-tight text-[#0E2041]">{userName ?? 'Admin Panel'}</Text>
-            <Text className="text-[9px] font-black tracking-widest uppercase text-[#94A3B8]">{role ?? 'Workspace'}</Text>
+            <Text className="text-[12px] font-black tracking-tight text-[#0E2041]">{userName ?? 'Contul meu'}</Text>
+            <Text className="text-[9px] font-black tracking-widest uppercase text-[#94A3B8]">{roleLabel(role)}</Text>
           </View>
           <View className="w-9 h-9 rounded-full bg-[#0B1E3D] items-center justify-center overflow-hidden border-2 border-white">
             {avatarUrl ? (
@@ -349,10 +358,10 @@ function ProfileActionsMenu({
             </View>
             <View className="flex-1 min-w-0">
               <Text className="text-[#0E2041] text-[14px] font-black" numberOfLines={1}>
-                {userName ?? 'Admin Panel'}
+                {userName ?? 'Contul meu'}
               </Text>
               <Text className="text-[#94A3B8] text-[10px] font-black uppercase tracking-widest mt-1" numberOfLines={1}>
-                {role ?? 'Workspace'}
+                {roleLabel(role)}
               </Text>
             </View>
           </View>
