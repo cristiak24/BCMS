@@ -5,8 +5,8 @@ import GlassCard from '../ui/GlassCard';
 import { clubAdminApi, type ClubAdminAccountRole } from '../../services/clubAdminApi';
 
 const ROLE_OPTIONS: { label: string; value: ClubAdminAccountRole; description: string; icon: 'sports' | 'person' }[] = [
-    { label: 'Coach', value: 'coach', description: 'Can help run trainings and club operations.', icon: 'sports' },
-    { label: 'Player', value: 'player', description: 'Can join the club roster and complete registration.', icon: 'person' },
+    { label: 'Antrenor', value: 'coach', description: 'Conduce antrenamente și ajută la organizarea clubului.', icon: 'sports' },
+    { label: 'Jucător', value: 'player', description: 'Intră în lotul clubului și își finalizează înregistrarea.', icon: 'person' },
 ];
 
 type Props = {
@@ -53,12 +53,12 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
 
         const nextErrors: typeof errors = {};
         if (!normalizedLabel) {
-            nextErrors.label = 'Add a label so you can recognise this invite.';
+            nextErrors.label = 'Adaugă o etichetă ca să recunoști invitația.';
         }
         if (!normalizedEmail) {
-            nextErrors.email = 'Email is required.';
+            nextErrors.email = 'Emailul este obligatoriu.';
         } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-            nextErrors.email = 'Enter a valid email address.';
+            nextErrors.email = 'Introdu o adresă de email validă.';
         }
 
         setErrors(nextErrors);
@@ -75,14 +75,14 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                 fullName: normalizedLabel,
                 role,
             });
-            Alert.alert('Invite sent', `${response.invitation.email} will receive the registration invite shortly.`);
+            Alert.alert('Invitație trimisă', `${response.invitation.email} va primi invitația de înregistrare în curând.`);
             setLabel('');
             setEmail('');
             setRole('coach');
             setErrors({});
             onCreated?.();
         } catch (error) {
-            Alert.alert('Invite failed', error instanceof Error ? error.message : 'Could not create the account invite.');
+            Alert.alert('Invitația nu a fost trimisă', error instanceof Error ? error.message : 'Nu am putut crea invitația.');
         } finally {
             setLoading(false);
         }
@@ -93,9 +93,9 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
             <View className="px-5 md:px-6 py-5 border-b" style={{ borderColor: 'var(--c-border)' } as any}>
                 <View className="flex-row items-start justify-between gap-4">
                     <View className="flex-1">
-                        <Text className="text-[18px] font-bold tracking-tight" style={{ color: 'var(--c-ink-strong)' }}>New invite</Text>
+                        <Text className="text-[18px] font-bold tracking-tight" style={{ color: 'var(--c-ink-strong)' }}>Invitație nouă</Text>
                         <Text className="text-[13px] mt-1 leading-5" style={{ color: 'var(--c-muted)' }}>
-                            Send a secure invite for a coach or player inside your club.
+                            Trimite o invitație securizată unui antrenor sau jucător din club.
                         </Text>
                     </View>
                     <View className="w-10 h-10 rounded-[10px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-tint)' } as any}>
@@ -108,8 +108,8 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                 <View className="flex-col md:flex-row gap-4">
                     <View className="flex-1">
                         <Field
-                            label="Label (admins only)"
-                            hint="Only admins see this. The member sets their real name when they create the account."
+                            label="Etichetă (vizibilă doar adminilor)"
+                            hint="Doar administratorii o văd. Membrul își completează numele real la crearea contului."
                             error={errors.label}
                         >
                             <TextInput
@@ -118,7 +118,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                                     setLabel(value);
                                     setErrors((current) => ({ ...current, label: undefined }));
                                 }}
-                                placeholder="e.g. Andrei U14 goalkeeper"
+                                placeholder="ex. Andrei, U14 conducător"
                                 autoCapitalize="sentences"
                                 className="rounded-[10px] border px-3.5 h-11 text-[14px]"
                                 style={inputStyle(Boolean(errors.label))}
@@ -127,14 +127,14 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                         </Field>
                     </View>
                     <View className="flex-1">
-                        <Field label="Email address" error={errors.email}>
+                        <Field label="Email" error={errors.email}>
                             <TextInput
                                 value={email}
                                 onChangeText={(value) => {
                                     setEmail(value);
                                     setErrors((current) => ({ ...current, email: undefined }));
                                 }}
-                                placeholder="name@example.com"
+                                placeholder="nume@exemplu.ro"
                                 autoCapitalize="none"
                                 keyboardType="email-address"
                                 className="rounded-[10px] border px-3.5 h-11 text-[14px]"
@@ -146,7 +146,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                 </View>
 
                 <View className="gap-1.5">
-                    <Text className="text-[12px] font-semibold" style={labelStyle}>Role</Text>
+                    <Text className="text-[12px] font-semibold" style={labelStyle}>Rol</Text>
                     <View className="flex-col md:flex-row gap-3">
                         {ROLE_OPTIONS.map((option) => {
                             const active = role === option.value;
@@ -188,7 +188,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                 <View className="flex-row items-start gap-2.5">
                     <MaterialIcons name="schedule" size={16} color="var(--c-faint)" />
                     <Text className="flex-1 text-[12px] leading-4" style={{ color: 'var(--c-muted)' }}>
-                        Invites expire automatically after 10 minutes and can be revoked from Manage Accounts.
+                        Invitațiile expiră automat după 10 minute și pot fi anulate din Conturi.
                     </Text>
                 </View>
 
@@ -204,7 +204,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                         <>
                             <MaterialIcons name="send" size={16} color="var(--c-on-brand)" />
                             <Text className="font-semibold text-[14px]" style={{ color: 'var(--c-on-brand)' }}>
-                                Send invite
+                                Trimite invitația
                             </Text>
                         </>
                     )}
