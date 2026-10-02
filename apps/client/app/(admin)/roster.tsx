@@ -299,14 +299,14 @@ export default function RosterScreen() {
     () => [
       { label: 'Activ', value: 'active' },
       { label: 'Inactiv', value: 'inactive' },
-      { label: 'Toate', value: 'all' },
+      { label: 'Toți sportivii', value: 'all' },
     ],
     []
   );
 
   const attendanceOptions = useMemo(
     () => [
-      { label: 'Toate pragurile', value: 'all' },
+      { label: 'Orice prezență', value: 'all' },
       { label: '90%+', value: 'high' },
       { label: '75-89%', value: 'medium' },
       { label: 'Sub 75%', value: 'low' },
@@ -316,7 +316,7 @@ export default function RosterScreen() {
 
   const paymentOptions = useMemo(
     () => [
-      { label: 'Toate', value: 'all' },
+      { label: 'Orice plată', value: 'all' },
       { label: 'Plătit', value: 'paid' },
       { label: 'În așteptare', value: 'pending' },
       { label: 'Restanță', value: 'overdue' },

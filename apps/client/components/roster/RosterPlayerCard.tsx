@@ -1,8 +1,7 @@
 import React from 'react';
 import { Image, Pressable, Text, View } from '@/src/web/reactNative';
-import { CheckCircle2, CircleAlert, Pencil } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import { Player } from '../../services/teamsApi';
-import { dash } from '../dashboard/dashboardTheme';
 import AttendanceBar from './AttendanceBar';
 import StatusBadge from './StatusBadge';
 import RosterCheckbox from './RosterCheckbox';
@@ -35,106 +34,65 @@ export default function RosterPlayerCard({
   onEdit,
 }: RosterPlayerCardProps) {
   const fullName = `${player.firstName || 'Necunoscut'} ${player.lastName || 'Sportiv'}`.trim();
-  const teamLabel = player.teamName || player.teamNames?.[0] || 'Neasignat';
+  const teamLabel = player.teamName || player.teamNames?.[0] || 'Fără echipă';
   const initials = `${player.firstName?.[0] || 'P'}${player.lastName?.[0] || ''}`.toUpperCase();
+  const payTone = paymentPaid
+    ? { bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' }
+    : paymentLabel === 'Restanță'
+      ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)' }
+      : { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' };
+  const attendanceTone = attendanceRate >= 75 ? 'var(--c-success-fg)' : attendanceRate >= 60 ? 'var(--c-warning-fg)' : 'var(--c-danger-fg)';
+  const meta = [player.number ? `#${player.number}` : null, player.position, teamLabel].filter(Boolean).join(' · ');
+  void categoryLabel;
 
+  // Two lines per player: identity, then attendance + payment. It used to be
+  // ~190px of labelled sub-cards (POZIȚIE / CATEGORIE / PREZENȚĂ) per player.
   return (
     <Pressable
       onPress={onPress}
-      className="dash-card dash-fade-in rounded-[22px] border p-4"
+      className="rounded-[14px] border px-3 py-3 text-left"
       style={{
-        backgroundColor: dash.surface,
-        borderColor: selected ? 'rgba(37,99,235,0.35)' : dash.hairline,
-        ...dash.shadow.sm,
-      }}
+        backgroundColor: selected ? 'var(--c-surface-tint)' : 'var(--c-surface)',
+        borderColor: selected ? 'var(--c-brand-border)' : 'var(--c-border)',
+      } as any}
     >
-      <View className="flex-row items-center">
-        <View className="mr-3">
-          <RosterCheckbox checked={selected} onToggle={onToggleSelect} accessibilityLabel={`Selectează ${fullName}`} />
-        </View>
-
-        <View
-          className="h-12 w-12 items-center justify-center rounded-[16px] border overflow-hidden"
-          style={{ backgroundColor: 'rgba(37,99,235,0.08)', borderColor: dash.hairline }}
-        >
+      <View className="flex-row items-center gap-3">
+        <RosterCheckbox checked={selected} onToggle={onToggleSelect} accessibilityLabel={`Selectează ${fullName}`} />
+        <View className="h-10 w-10 items-center justify-center rounded-full overflow-hidden shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
           {player.avatarUrl ? (
             <Image source={{ uri: player.avatarUrl }} className="h-full w-full" />
           ) : (
-            <Text className="text-[15px] font-black" style={{ color: dash.accentBlue }}>
-              {initials}
-            </Text>
+            <Text className="text-[13px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{initials}</Text>
           )}
         </View>
-
-        <View className="ml-3 flex-1">
-          <View className="flex-row items-center gap-2">
-            <Text className="text-[15px] font-black" style={{ color: dash.ink }} numberOfLines={1}>
-              {fullName}
-            </Text>
-            {showStatusChip ? <StatusBadge label={isActive ? 'Activ' : 'Inactiv'} tone={isActive ? 'green' : 'gray'} /> : null}
+        <View className="flex-1 min-w-0">
+          <View className="flex-row items-center gap-2 min-w-0">
+            <Text className="text-[14.5px] font-semibold shrink" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{fullName}</Text>
+            {showStatusChip && !isActive ? <StatusBadge label="Inactiv" tone="gray" /> : null}
           </View>
-          <Text className="mt-0.5 text-[12px] font-bold" style={{ color: dash.faint }} numberOfLines={1}>
-            {player.number ? `#${player.number}` : 'Fără tricou'} • {teamLabel}
-          </Text>
+          <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{meta}</Text>
         </View>
-
         <Pressable
           onPress={(event: any) => {
             event.stopPropagation();
             onEdit();
           }}
-          className="h-9 w-9 items-center justify-center rounded-[13px] border"
-          style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}
+          accessibilityRole="button"
+          accessibilityLabel={`Acțiuni pentru ${fullName}`}
+          className="h-8 w-8 items-center justify-center rounded-[9px] shrink-0"
         >
-          <Pencil color={dash.muted} size={16} />
+          <MoreHorizontal color="var(--c-muted)" size={18} />
         </Pressable>
       </View>
 
-      <View className="mt-4 flex-row gap-3">
-        <View className="flex-1 rounded-[16px] p-3" style={{ backgroundColor: dash.surfaceSubtle }}>
-          <Text className="text-[9px] font-black uppercase tracking-[1.1px]" style={{ color: dash.faint }}>
-            Poziție
-          </Text>
-          <Text className="mt-1 text-[13px] font-bold" style={{ color: dash.inkSoft }} numberOfLines={1}>
-            {player.position || 'Sportiv'}
-          </Text>
+      <View className="mt-2.5 flex-row items-center gap-3 pl-[30px]">
+        <Text className="t-num text-[12.5px] font-bold w-[38px]" style={{ color: attendanceTone }}>{attendanceRate}%</Text>
+        <View className="flex-1 min-w-0">
+          <AttendanceBar value={attendanceRate} />
         </View>
-        <View className="flex-1 rounded-[16px] p-3" style={{ backgroundColor: dash.surfaceSubtle }}>
-          <Text className="text-[9px] font-black uppercase tracking-[1.1px]" style={{ color: dash.faint }}>
-            Categorie
-          </Text>
-          <StatusBadge label={categoryLabel} tone="blue" />
-        </View>
-      </View>
-
-      <View className="mt-3 flex-row items-center justify-between gap-3">
-        <View className="flex-1">
-          <Text className="text-[9px] font-black uppercase tracking-[1.1px]" style={{ color: dash.faint }}>
-            Prezență
-          </Text>
-          <Text className="mt-1 text-[13px] font-black" style={{ color: dash.ink }}>
-            {attendanceRate}%
-          </Text>
-          <View className="mt-1.5">
-            <AttendanceBar value={attendanceRate} />
-          </View>
-        </View>
-
-        <View
-          className="flex-row items-center gap-1.5 rounded-full px-3 py-2"
-          style={{ backgroundColor: dash.surfaceSubtle }}
-        >
-          {paymentPaid ? (
-            <CheckCircle2 color={dash.successDeep} size={15} />
-          ) : (
-            <CircleAlert color={dash.dangerDeep} size={15} />
-          )}
-          <Text
-            className="text-[12px] font-black"
-            style={{ color: paymentPaid ? dash.successDeep : dash.dangerDeep }}
-          >
-            {paymentLabel}
-          </Text>
+        <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1 shrink-0" style={{ backgroundColor: payTone.bg }}>
+          <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: payTone.fg }} />
+          <Text className="text-[11.5px] font-semibold" style={{ color: payTone.fg }} numberOfLines={1}>{paymentLabel}</Text>
         </View>
       </View>
     </Pressable>

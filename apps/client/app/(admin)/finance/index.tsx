@@ -469,14 +469,16 @@ export default function FinancialSettingsPage() {
                             icon="account-balance-wallet"
                             tone="purple"
                             label="Cotizație"
-                            value={loadingSettings ? '—' : `${settings?.monthlyPlayerFee ?? 0} RON`}
+                            value={loadingSettings ? '—' : `${settings?.monthlyPlayerFee ?? 0}`}
+                            suffix={loadingSettings ? undefined : ' RON'}
                             hint="per jucător / lună"
                         />
                         <StatCard
                             icon="payment"
                             tone="success"
                             label="Încasări"
-                            value={loadingRecentPayments ? '—' : formatCurrency(financeStats.collectedAmount)}
+                            value={loadingRecentPayments ? '—' : Math.round(financeStats.collectedAmount).toLocaleString('ro-RO')}
+                            suffix={loadingRecentPayments ? undefined : ' RON'}
                             hint={`${recentPayments.length} plăți recente`}
                         />
                         <StatCard

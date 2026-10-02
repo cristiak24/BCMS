@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Pressable, Text, View } from '@/src/web/reactNative';
 import { X } from 'lucide-react';
-import FilterBar from '../dashboard/FilterBar';
-import RosterFilterSheet from './RosterFilterSheet';
-import { dash } from '../dashboard/dashboardTheme';
+import SelectField from '../ui/SelectField';
 
 interface FilterOption {
   label: string;
@@ -27,12 +25,6 @@ interface RosterFiltersProps {
   onResetFilters: () => void;
 }
 
-type SheetKey = 'team' | 'status' | 'attendance' | 'payment' | null;
-
-function labelFor(options: FilterOption[], value: string) {
-  return options.find((option) => option.value === value)?.label ?? options[0]?.label ?? '';
-}
-
 export default function RosterFilters({
   teamOptions,
   statusOptions,
@@ -49,92 +41,30 @@ export default function RosterFilters({
   hasActiveFilters,
   onResetFilters,
 }: RosterFiltersProps) {
-  const [openSheet, setOpenSheet] = useState<SheetKey>(null);
+  const toSelect = (options: FilterOption[]) => options.map((option) => ({ key: option.value, label: option.label }));
 
+  // Native selects: one 36px control per filter (2×2 on phones, one row on
+  // desktop). The old label-over-value tiles were ~60px tall each and wrapped
+  // "Toate pragurile" onto two lines.
   return (
-    <View className="mb-5 flex-row items-center gap-3 flex-wrap">
-      <FilterBar
-        items={[
-          {
-            key: 'team',
-            label: 'Echipă',
-            value: labelFor(teamOptions, selectedTeam),
-            active: selectedTeam !== 'all',
-            onPress: () => setOpenSheet('team'),
-          },
-          {
-            key: 'status',
-            label: 'Status',
-            value: labelFor(statusOptions, selectedStatus),
-            active: selectedStatus !== 'all',
-            onPress: () => setOpenSheet('status'),
-          },
-          {
-            key: 'attendance',
-            label: 'Prezență',
-            value: labelFor(attendanceOptions, selectedAttendance),
-            active: selectedAttendance !== 'all',
-            onPress: () => setOpenSheet('attendance'),
-          },
-          {
-            key: 'payment',
-            label: 'Plată',
-            value: labelFor(paymentOptions, selectedPayment),
-            active: selectedPayment !== 'all',
-            onPress: () => setOpenSheet('payment'),
-          },
-        ]}
-      />
-
-      {hasActiveFilters ? (
-        <Pressable
-          onPress={onResetFilters}
-          className="dash-btn-hover h-10 flex-row items-center gap-1.5 rounded-[11px] px-3.5"
-          style={{ backgroundColor: 'rgba(239,68,68,0.08)' }}
-        >
-          <X color={dash.dangerDeep} size={13} />
-          <Text className="text-[11px] font-bold" style={{ color: dash.dangerDeep }}>
-            Șterge filtrele
-          </Text>
-        </Pressable>
-      ) : null}
-
-      <RosterFilterSheet
-        visible={openSheet === 'team'}
-        title="Alege echipa"
-        icon="groups"
-        items={teamOptions.map((option) => ({ id: option.value, label: option.label }))}
-        selectedId={selectedTeam}
-        onSelect={onTeamChange}
-        onClose={() => setOpenSheet(null)}
-      />
-      <RosterFilterSheet
-        visible={openSheet === 'status'}
-        title="Alege statusul"
-        icon="verified-user"
-        items={statusOptions.map((option) => ({ id: option.value, label: option.label }))}
-        selectedId={selectedStatus}
-        onSelect={onStatusChange}
-        onClose={() => setOpenSheet(null)}
-      />
-      <RosterFilterSheet
-        visible={openSheet === 'attendance'}
-        title="Alege pragul de prezență"
-        icon="fact-check"
-        items={attendanceOptions.map((option) => ({ id: option.value, label: option.label }))}
-        selectedId={selectedAttendance}
-        onSelect={onAttendanceChange}
-        onClose={() => setOpenSheet(null)}
-      />
-      <RosterFilterSheet
-        visible={openSheet === 'payment'}
-        title="Alege statusul plății"
-        icon="payment"
-        items={paymentOptions.map((option) => ({ id: option.value, label: option.label }))}
-        selectedId={selectedPayment}
-        onSelect={onPaymentChange}
-        onClose={() => setOpenSheet(null)}
-      />
+    <View className="mb-4 gap-2">
+      <View className="grid grid-cols-2 lg:flex lg:flex-row lg:items-center gap-2">
+        <SelectField hideIconOnMobile label="Echipă" icon="groups" options={toSelect(teamOptions)} value={selectedTeam} onChange={onTeamChange} className="min-w-0 col-span-2 lg:col-span-1 lg:w-[220px]" />
+        <SelectField hideIconOnMobile label="Status" icon="person" options={toSelect(statusOptions)} value={selectedStatus} onChange={onStatusChange} className="min-w-0 lg:w-[160px]" />
+        <SelectField hideIconOnMobile label="Prezență" icon="fact-check" options={toSelect(attendanceOptions)} value={selectedAttendance} onChange={onAttendanceChange} className="min-w-0 col-span-2 lg:col-span-1 lg:w-[190px] order-last lg:order-none" />
+        <SelectField hideIconOnMobile label="Plată" icon="payments" options={toSelect(paymentOptions)} value={selectedPayment} onChange={onPaymentChange} className="min-w-0 lg:w-[170px]" />
+        {hasActiveFilters ? (
+          <Pressable
+            onPress={onResetFilters}
+            accessibilityRole="button"
+            className="ui-press h-9 flex-row items-center justify-center gap-1.5 rounded-[10px] px-3 col-span-2 lg:col-span-1"
+            style={{ backgroundColor: 'var(--c-danger-bg)' }}
+          >
+            <X color="var(--c-danger-fg)" size={13} />
+            <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>Șterge filtrele</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
