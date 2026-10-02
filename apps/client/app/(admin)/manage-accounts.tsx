@@ -2,25 +2,51 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
-import GlassCard from '../../components/ui/GlassCard';
-import AdminActionButton from '../../components/admin/AdminActionButton';
-import AdminHero, { AdminMetricCard } from '../../components/admin/AdminHero';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { SkeletonList } from '../../components/ui/Skeleton';
+import PageContainer from '../../components/ui/PageContainer';
+import PageHeader from '../../components/ui/PageHeader';
+import Button from '../../components/ui/Button';
+import FilterChips from '../../components/ui/FilterChips';
+import SelectField from '../../components/ui/SelectField';
+import ActionSheet, { type SheetAction } from '../../components/ui/ActionSheet';
+import Pagination from '../../components/ui/Pagination';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/ScreenState';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
 import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../components/HeaderContext';
+import { formatRelativeDate } from '../../components/myclub/teamDisplay';
 import { clubAdminApi, type ClubAdminAccount, type ClubAdminAccountRole } from '../../services/clubAdminApi';
-import { useResponsive } from '../../hooks/useResponsive';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 const FILTERS = ['all', 'coach', 'player', 'parent', 'invite', 'inactive'] as const;
 
+const FILTER_LABEL: Record<(typeof FILTERS)[number], string> = {
+    all: 'Toate',
+    coach: 'Antrenori',
+    player: 'Jucători',
+    parent: 'Părinți',
+    invite: 'Invitații',
+    inactive: 'Dezactivate',
+};
+
+const ROLE_LABEL: Record<string, string> = {
+    coach: 'Antrenor',
+    player: 'Jucător',
+    parent: 'Părinte',
+    admin: 'Administrator',
+    superadmin: 'Superadmin',
+    accountant: 'Contabil',
+    staff: 'Staff',
+};
+
+const roleLabel = (role: string) => ROLE_LABEL[role] ?? role;
+
 const PRIVILEGED_ROLES = new Set(['admin', 'superadmin']);
 
 const SORT_OPTIONS = [
-    { key: 'created', label: 'Created' },
-    { key: 'lastLogin', label: 'Last login' },
-    { key: 'name', label: 'Name' },
+    { key: 'created', label: 'Cele mai noi' },
+    { key: 'lastLogin', label: 'Ultima autentificare' },
+    { key: 'name', label: 'Nume (A–Z)' },
 ] as const;
 type SortKey = (typeof SORT_OPTIONS)[number]['key'];
 
@@ -39,14 +65,13 @@ function isManageableMember(account: ClubAdminAccount) {
     return account.source !== 'invite' && !PRIVILEGED_ROLES.has(account.role);
 }
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 20;
 
-// Role-tinted avatar palette so the list scans by colour instead of reading as a
-// wall of identical white cards.
+// Role-tinted avatars so the list scans by colour.
 const ROLE_VISUAL: Record<string, { tint: string; fg: string }> = {
     coach: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-fg)' },
     player: { tint: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },
-    parent: { tint: 'var(--c-surface-tint)', fg: 'var(--c-purple)' },
+    parent: { tint: 'var(--c-purple-bg)', fg: 'var(--c-purple-fg)' },
     admin: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-strong)' },
     superadmin: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-strong)' },
     accountant: { tint: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' },
@@ -64,66 +89,23 @@ function initialsOf(name: string, email: string) {
     return letters.toUpperCase();
 }
 
-type StatusVisual = { dot: string; bg: string; fg: string; label: string };
+type StatusVisual = { dot: string; fg: string; label: string };
 function statusVisual(account: ClubAdminAccount): StatusVisual {
-    if (account.source === 'invite') {
-        return { dot: 'var(--c-warning)', bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', label: 'Pending invite' };
-    }
-    if (account.status === 'inactive') {
-        return { dot: 'var(--c-danger)', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger)', label: 'Inactive' };
-    }
-    if (account.status === 'pending_registration') {
-        return { dot: 'var(--c-sky)', bg: 'var(--c-surface-tint)', fg: 'var(--c-sky)', label: 'Pending registration' };
-    }
-    return { dot: 'var(--c-success)', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', label: 'Active' };
+    if (account.source === 'invite') return { dot: 'var(--c-warning)', fg: 'var(--c-warning-fg)', label: 'Invitație trimisă' };
+    if (account.status === 'inactive') return { dot: 'var(--c-danger)', fg: 'var(--c-danger-fg)', label: 'Dezactivat' };
+    if (account.status === 'pending_registration') return { dot: 'var(--c-sky)', fg: 'var(--c-sky-fg)', label: 'Înregistrare în curs' };
+    return { dot: 'var(--c-success)', fg: 'var(--c-success-fg)', label: 'Activ' };
 }
-
-function formatDate(value?: string | null) {
-    return value ? new Date(value).toLocaleDateString() : null;
-}
-
-// Compact page list: all pages when few, otherwise first/last + a window around
-// the current page with 'gap' markers for the ellipses.
-function pageWindow(current: number, total: number): (number | 'gap')[] {
-    if (total <= 7) {
-        return Array.from({ length: total }, (_, index) => index + 1);
-    }
-    const wanted = new Set<number>([1, total, current, current - 1, current + 1]);
-    const sorted = [...wanted].filter((page) => page >= 1 && page <= total).sort((a, b) => a - b);
-    const result: (number | 'gap')[] = [];
-    let previous = 0;
-    for (const page of sorted) {
-        if (page - previous > 1) {
-            result.push('gap');
-        }
-        result.push(page);
-        previous = page;
-    }
-    return result;
-}
-
-// Pill styling for the per-row action buttons, keyed by intent.
-const ACTION_STYLE = {
-    coach: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-fg)' },
-    player: { tint: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },
-    parent: { tint: 'var(--c-surface-tint)', fg: 'var(--c-purple)' },
-    resend: { tint: 'var(--c-surface-tint)', fg: 'var(--c-blue-deep)' },
-    reactivate: { tint: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },
-    deactivate: { tint: 'var(--c-danger-bg)', fg: 'var(--c-danger)' },
-    cancel: { tint: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' },
-    delete: { tint: 'transparent', fg: 'var(--c-danger)', border: 'var(--c-danger-border)' },
-} as const;
 
 const ROLE_ACTIONS = [
-    { role: 'coach', icon: 'sports', label: 'Set coach' },
-    { role: 'player', icon: 'sports-basketball', label: 'Set player' },
-    { role: 'parent', icon: 'family-restroom', label: 'Set parent' },
+    { role: 'coach', icon: 'sports', label: 'Schimbă în antrenor' },
+    { role: 'player', icon: 'sports-basketball', label: 'Schimbă în jucător' },
+    { role: 'parent', icon: 'family-restroom', label: 'Schimbă în părinte' },
 ] as const;
 
 export default function ManageAccountsScreen() {
     const router = useRouter();
     const { searchValue, setSearchPlaceholder, setSearchValue, setHeaderActions, setMobileFab } = useHeader();
-    const { isMobile } = useResponsive();
     const { toasts, showToast, dismissToast } = useToasts();
     const debouncedSearch = useDebouncedValue(searchValue, 200);
     const [accounts, setAccounts] = useState<ClubAdminAccount[]>([]);
@@ -137,6 +119,7 @@ export default function ManageAccountsScreen() {
     const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
     const [bulkBusy, setBulkBusy] = useState(false);
     const [page, setPage] = useState(1);
+    const [menuFor, setMenuFor] = useState<ClubAdminAccount | null>(null);
 
     const loadAccounts = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
         if (mode === 'refresh') {
@@ -148,7 +131,7 @@ export default function ManageAccountsScreen() {
             const response = await clubAdminApi.listAccounts();
             setAccounts(response.users);
         } catch (error) {
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not load club accounts.' });
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Nu am putut încărca conturile clubului.' });
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -156,7 +139,7 @@ export default function ManageAccountsScreen() {
     }, [showToast]);
 
     useEffect(() => {
-        setSearchPlaceholder('Search accounts by name, email, or role...');
+        setSearchPlaceholder('Caută după nume sau email…');
         setHeaderActions(null);
         setMobileFab(null);
         return () => {
@@ -278,10 +261,10 @@ export default function ManageAccountsScreen() {
         )));
         try {
             await clubAdminApi.updateUserRole(Number(account.id), role);
-            showToast({ variant: 'success', message: `${account.name} is now a ${role}.` });
+            showToast({ variant: 'success', message: `${account.name} este acum ${roleLabel(role).toLowerCase()}.` });
         } catch (error) {
             setAccounts(previous); // rollback
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not update the user role.' });
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Nu am putut schimba rolul.' });
         } finally {
             setBusyId(null);
         }
@@ -299,10 +282,10 @@ export default function ManageAccountsScreen() {
         ));
         try {
             await clubAdminApi.deactivateAccount(account.id);
-            showToast({ variant: 'success', message: isInvite ? `Invite for ${account.email} cancelled.` : `${account.name} was deactivated.` });
+            showToast({ variant: 'success', message: isInvite ? `Invitația pentru ${account.email} a fost anulată.` : `Contul lui ${account.name} a fost dezactivat.` });
         } catch (error) {
             setAccounts(previous); // rollback
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not update this account.' });
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Nu am putut actualiza contul.' });
         } finally {
             setBusyId(null);
         }
@@ -317,10 +300,10 @@ export default function ManageAccountsScreen() {
         )));
         try {
             await clubAdminApi.reactivateAccount(account.id);
-            showToast({ variant: 'success', message: `${account.name} was reactivated.` });
+            showToast({ variant: 'success', message: `Contul lui ${account.name} a fost reactivat.` });
         } catch (error) {
             setAccounts(previous); // rollback
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not reactivate this account.' });
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Nu am putut reactiva contul.' });
         } finally {
             setBusyId(null);
         }
@@ -339,9 +322,9 @@ export default function ManageAccountsScreen() {
                 next.delete(account.id);
                 return next;
             });
-            showToast({ variant: 'success', message: `${account.name} was permanently deleted.` });
+            showToast({ variant: 'success', message: `Contul lui ${account.name} a fost șters definitiv.` });
         } catch (error) {
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete this account.' });
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Nu am putut șterge contul.' });
         } finally {
             setBusyId(null);
         }
@@ -352,9 +335,9 @@ export default function ManageAccountsScreen() {
         setBusyId(account.id);
         try {
             await clubAdminApi.resendInvitation(account.id);
-            showToast({ variant: 'success', message: `Invitation resent to ${account.email}.` });
+            showToast({ variant: 'success', message: `Invitația a fost retrimisă la ${account.email}.` });
         } catch (error) {
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not resend the invitation.' });
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Nu am putut retrimite invitația.' });
         } finally {
             setBusyId(null);
         }
@@ -376,7 +359,7 @@ export default function ManageAccountsScreen() {
         });
 
         if (eligible.length === 0) {
-            showToast({ variant: 'info', message: 'No selected accounts are eligible for that action.' });
+            showToast({ variant: 'info', message: 'Niciun cont selectat nu se potrivește acțiunii.' });
             return;
         }
 
@@ -414,11 +397,11 @@ export default function ManageAccountsScreen() {
             // Roll back and re-sync from the server so partial failures don't leave
             // the list in an inconsistent optimistic state.
             setAccounts(previous);
-            showToast({ variant: 'error', message: `${failed} of ${eligible.length} account${eligible.length === 1 ? '' : 's'} could not be updated.` });
+            showToast({ variant: 'error', message: `${failed} din ${eligible.length} conturi nu au putut fi actualizate.` });
             void loadAccounts('refresh');
         } else {
-            const skippedSuffix = skipped > 0 ? ` (${skipped} skipped)` : '';
-            showToast({ variant: 'success', message: `${succeeded} account${succeeded === 1 ? '' : 's'} updated${skippedSuffix}.` });
+            const skippedSuffix = skipped > 0 ? ` (${skipped} sărite)` : '';
+            showToast({ variant: 'success', message: `${succeeded === 1 ? '1 cont actualizat' : `${succeeded} conturi actualizate`}${skippedSuffix}.` });
         }
 
         setBulkBusy(false);
@@ -452,52 +435,52 @@ export default function ManageAccountsScreen() {
         }
         if (pending.kind === 'role') {
             return {
-                title: `Set ${pending.account.name} as ${pending.role}?`,
-                message: `Their permissions will change to match the ${pending.role} role immediately.`,
-                confirmLabel: `Set as ${pending.role}`,
+                title: `Schimbi rolul lui ${pending.account.name}?`,
+                message: `Devine ${roleLabel(pending.role).toLowerCase()} și primește imediat permisiunile acestui rol.`,
+                confirmLabel: `Schimbă în ${roleLabel(pending.role).toLowerCase()}`,
                 destructive: false,
             };
         }
         if (pending.kind === 'reactivate') {
             return {
-                title: `Reactivate ${pending.account.name}?`,
-                message: 'They will regain access to the club with their previous role.',
-                confirmLabel: 'Reactivate',
+                title: `Reactivezi contul lui ${pending.account.name}?`,
+                message: 'Își recapătă accesul în club, cu rolul de dinainte.',
+                confirmLabel: 'Reactivează',
                 destructive: false,
             };
         }
         if (pending.kind === 'delete') {
             return {
-                title: `Permanently delete ${pending.account.name}?`,
-                message: `This removes ${pending.account.email}'s account, sign-in and roster record — including attendance, payments and team memberships — for good. It cannot be undone or reactivated; they would need a new invite to rejoin. To only pause access, use Deactivate instead.`,
-                confirmLabel: 'Delete permanently',
+                title: `Ștergi definitiv contul lui ${pending.account.name}?`,
+                message: `Se șterg contul ${pending.account.email}, accesul și fișa din lot — inclusiv prezențe, plăți și echipe. Nu se poate anula; ar avea nevoie de o invitație nouă. Ca doar să oprești accesul, folosește Dezactivează.`,
+                confirmLabel: 'Șterge definitiv',
                 destructive: true,
                 icon: 'delete-forever',
-                requireTypedConfirmation: 'DELETE',
+                requireTypedConfirmation: 'STERGE',
             };
         }
         if (pending.kind === 'resend') {
             return {
-                title: `Resend invite to ${pending.account.email}?`,
-                message: 'A fresh invitation link will be emailed and any previous link will stop working.',
-                confirmLabel: 'Resend invite',
+                title: `Retrimiți invitația la ${pending.account.email}?`,
+                message: 'Se trimite un link nou pe email, iar cel vechi nu mai funcționează.',
+                confirmLabel: 'Retrimite',
                 destructive: false,
             };
         }
         if (pending.kind === 'bulk') {
             const n = pending.ids.length;
             const label = pending.action === 'deactivate'
-                ? 'Deactivate'
+                ? 'Dezactivează'
                 : pending.action === 'reactivate'
-                    ? 'Reactivate'
-                    : `Set as ${pending.action}`;
+                    ? 'Reactivează'
+                    : `Schimbă în ${roleLabel(pending.action).toLowerCase()}`;
             return {
-                title: `${label} ${n} account${n === 1 ? '' : 's'}?`,
+                title: `${label}: ${n === 1 ? '1 cont' : `${n} conturi`}?`,
                 message: pending.action === 'deactivate'
-                    ? 'Selected active members will lose access until reactivated. Others are skipped.'
+                    ? 'Membrii activi selectați pierd accesul până la reactivare. Restul sunt săriți.'
                     : pending.action === 'reactivate'
-                        ? 'Selected deactivated members will regain access. Others are skipped.'
-                        : `Selected active members will be set to ${pending.action}. Others are skipped.`,
+                        ? 'Membrii dezactivați selectați își recapătă accesul. Restul sunt săriți.'
+                        : `Membrii activi selectați devin ${roleLabel(pending.action).toLowerCase()}. Restul sunt săriți.`,
                 confirmLabel: label,
                 destructive: pending.action === 'deactivate',
             };
@@ -505,418 +488,234 @@ export default function ManageAccountsScreen() {
         const isInvite = pending.account.source === 'invite';
         return isInvite
             ? {
-                title: 'Cancel this invite?',
-                message: `The invitation for ${pending.account.email} will be revoked and the link will stop working.`,
-                confirmLabel: 'Cancel invite',
+                title: 'Anulezi invitația?',
+                message: `Invitația pentru ${pending.account.email} se revocă și linkul nu mai funcționează.`,
+                confirmLabel: 'Anulează invitația',
                 destructive: true,
             }
             : {
-                title: `Deactivate ${pending.account.name}?`,
-                message: 'They will lose access to the club until an admin reactivates the account.',
-                confirmLabel: 'Deactivate',
+                title: `Dezactivezi contul lui ${pending.account.name}?`,
+                message: 'Pierde accesul în club până când un administrator îl reactivează.',
+                confirmLabel: 'Dezactivează',
                 destructive: true,
             };
     }, [pending]);
 
+    const sheetActions = useCallback((account: ClubAdminAccount): SheetAction[] => {
+        const isInvite = account.source === 'invite';
+        const isInactive = account.status === 'inactive';
+        const isPrivileged = PRIVILEGED_ROLES.has(account.role);
+        const actions: SheetAction[] = [];
+        if (!isInvite && !isPrivileged && account.status === 'active') {
+            ROLE_ACTIONS.filter((option) => option.role !== account.role).forEach((option) => {
+                actions.push({ key: option.role, label: option.label, icon: option.icon, onPress: () => setPending({ kind: 'role', account, role: option.role }) });
+            });
+        }
+        if (isInvite) actions.push({ key: 'resend', label: 'Retrimite invitația', icon: 'forward-to-inbox', onPress: () => setPending({ kind: 'resend', account }) });
+        if (!isInvite && !isPrivileged && isInactive) actions.push({ key: 'reactivate', label: 'Reactivează', icon: 'restart-alt', onPress: () => setPending({ kind: 'reactivate', account }) });
+        if (!isPrivileged && !isInactive) {
+            actions.push(isInvite
+                ? { key: 'cancel', label: 'Anulează invitația', icon: 'cancel-schedule-send', tone: 'danger', onPress: () => setPending({ kind: 'deactivate', account }) }
+                : { key: 'deactivate', label: 'Dezactivează', icon: 'block', tone: 'danger', hint: 'Oprește accesul, se poate reactiva', onPress: () => setPending({ kind: 'deactivate', account }) });
+        }
+        if (!isInvite && !isPrivileged) actions.push({ key: 'delete', label: 'Șterge definitiv', icon: 'delete-forever', tone: 'danger', onPress: () => setPending({ kind: 'delete', account }) });
+        return actions;
+    }, []);
+
+    const filterCounts = useMemo(() => ({
+        all: accounts.length,
+        coach: accounts.filter((a) => a.role === 'coach' && a.source !== 'invite').length,
+        player: accounts.filter((a) => a.role === 'player' && a.source !== 'invite').length,
+        parent: accounts.filter((a) => a.role === 'parent' && a.source !== 'invite').length,
+        invite: counts.invites,
+        inactive: accounts.filter((a) => a.status === 'inactive').length,
+    }), [accounts, counts.invites]);
+
+    const filterOptions = FILTERS
+        .filter((key) => key === 'all' || filterCounts[key] > 0 || filter === key)
+        .map((key) => ({ key, label: FILTER_LABEL[key], count: filterCounts[key] }));
+
+    const bulkIds = selectedAccounts.map((account) => account.id);
+
     return (
-        <View className="flex-1 bg-[#EDF4FB]">
-            <ScrollView
-                className="flex-1"
-                contentContainerStyle={{
-                    paddingHorizontal: isMobile ? 16 : 32,
-                    paddingTop: isMobile ? 24 : 40,
-                    paddingBottom: 120,
-                }}
-                showsVerticalScrollIndicator={false}
-            >
-                <View className="w-full">
-                    <AdminHero
+        <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
+            <ScrollView className="flex-1" contentContainerClassName="pb-36" showsVerticalScrollIndicator={false}>
+                <PageContainer>
+                    <PageHeader
                         title="Conturi"
-                        subtitle="Caută, invită și administrează conturile clubului tău."
-                        className="md:flex-row md:items-end md:justify-between"
-                    >
-                        <View className="mt-5 md:mt-0 flex-row flex-wrap gap-3">
-                            <AdminMetricCard label="Accounts" value={counts.total} />
-                            <AdminMetricCard label="Pending Invites" value={counts.invites} />
-                            <AdminMetricCard label="Active" value={counts.active} />
-                        </View>
-                    </AdminHero>
+                        subtitle={loading ? undefined : `${counts.active} active · ${counts.invites} ${counts.invites === 1 ? 'invitație în așteptare' : 'invitații în așteptare'}`}
+                        actions={(
+                            <>
+                                <Button icon="refresh" label="Reîncarcă" iconOnlyOnMobile loading={refreshing} disabled={loading} onPress={() => void loadAccounts('refresh')} className="hidden sm:flex" />
+                                <Button icon="verified-user" label="Acces & invitații" iconOnlyOnMobile onPress={() => router.push('/admin/manage-access')} />
+                                <Button icon="person-add-alt-1" label="Cont nou" variant="primary" onPress={() => router.push('/admin/create-account')} />
+                            </>
+                        )}
+                    />
 
-                    <View className="mb-6 flex-row flex-wrap gap-3">
-                        <AdminActionButton
-                            label="Manage Access"
-                            icon="verified-user"
-                            onPress={() => router.push('/admin/manage-access')}
-                        />
-                        <AdminActionButton
-                            label="Create Account"
-                            icon="person-add-alt-1"
-                            onPress={() => router.push('/admin/create-account')}
-                            variant="primary"
-                        />
-                        <AdminActionButton
-                            label={refreshing ? 'Refreshing…' : 'Refresh'}
-                            icon="refresh"
-                            disabled={refreshing || loading}
-                            onPress={() => void loadAccounts('refresh')}
-                        />
-                    </View>
-
-                    <GlassCard className="mb-5">
-                        <Text className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-faint)' }}>Filtre</Text>
-                        <View className="mt-2.5 flex-row flex-wrap gap-1.5">
-                            {FILTERS.map((item) => {
-                                const active = filter === item;
-                                return (
-                                    <Pressable
-                                        key={item}
-                                        onPress={() => setFilter(item)}
-                                        accessibilityRole="button"
-                                        accessibilityState={{ selected: active }}
-                                        className="px-3 h-8 items-center justify-center rounded-[9px] border"
-                                        style={active
-                                            ? { backgroundColor: 'var(--c-brand-surface)', borderColor: 'transparent' }
-                                            : { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}
-                                    >
-                                        <Text className="font-semibold text-[12px] capitalize" style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>
-                                            {item === 'all' ? 'Toate' : item}
-                                        </Text>
-                                    </Pressable>
-                                );
-                            })}
+                    <View className="gap-3">
+                        <View className="flex-col lg:flex-row lg:items-center gap-2">
+                            <View className="flex-1 min-w-0">
+                                <FilterChips label="Tip cont" options={filterOptions} value={filter} onChange={setFilter} />
+                            </View>
+                            <SelectField
+                                label="Sortare"
+                                icon="sort"
+                                options={SORT_OPTIONS.map((o) => ({ key: o.key, label: o.label }))}
+                                value={sortKey}
+                                onChange={(next) => { setSortKey(next); setSortDesc(next !== 'name'); }}
+                                className="w-full lg:w-[230px]"
+                            />
                         </View>
 
-                        <View className="mt-3 pt-3 border-t flex-row flex-wrap items-center gap-1.5" style={{ borderColor: 'var(--c-border-soft)' }}>
-                            <Text className="text-[10px] font-semibold uppercase tracking-wider mr-1" style={{ color: 'var(--c-faint)' }}>Sortare</Text>
-                            {SORT_OPTIONS.map((option) => {
-                                const active = sortKey === option.key;
-                                return (
-                                    <Pressable
-                                        key={option.key}
-                                        onPress={() => {
-                                            if (active) {
-                                                setSortDesc((value) => !value);
-                                            } else {
-                                                setSortKey(option.key);
-                                                setSortDesc(true);
-                                            }
-                                        }}
-                                        accessibilityRole="button"
-                                        accessibilityState={{ selected: active }}
-                                        className="px-3 h-8 flex-row items-center gap-1 rounded-[9px] border"
-                                        style={active
-                                            ? { backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' }
-                                            : { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}
-                                    >
-                                        <Text className="font-semibold text-[12px]" style={{ color: active ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)' }}>{option.label}</Text>
-                                        {active ? (
-                                            <MaterialIcons name={sortDesc ? 'arrow-downward' : 'arrow-upward'} size={13} color="var(--c-brand-fg)" />
-                                        ) : null}
-                                    </Pressable>
-                                );
-                            })}
-
-                            {selectableAccounts.length > 0 ? (
-                                <Pressable
-                                    onPress={toggleSelectAll}
-                                    accessibilityRole="button"
-                                    className="ml-auto px-3 h-8 flex-row items-center gap-1.5 rounded-[9px] border"
-                                    style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
-                                >
-                                    <MaterialIcons
-                                        name={allSelectableSelected ? 'check-box' : 'check-box-outline-blank'}
-                                        size={16}
-                                        color="var(--c-brand-fg)"
-                                    />
-                                    <Text className="font-semibold text-[12px]" style={{ color: 'var(--c-ink-soft)' }}>
-                                        {allSelectableSelected ? 'Deselectează' : `Toate (${selectableAccounts.length})`}
-                                    </Text>
-                                </Pressable>
-                            ) : null}
-                        </View>
-                    </GlassCard>
-
-                    {selectedAccounts.length > 0 ? (
-                        <View className="mb-6 flex-col sm:flex-row sm:items-center gap-2.5 bg-[#EBF1FF] border border-[#BFDBFE] rounded-2xl px-4 py-3">
-                            <View className="flex-row items-center gap-2">
-                                <Text className="text-[#1D3E90] text-[13px] font-black">
-                                    {selectedAccounts.length} selected
+                        {selectedAccounts.length > 0 ? (
+                            <View className="flex-col sm:flex-row sm:items-center gap-2 rounded-[12px] px-3.5 py-2.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+                                <Text className="text-[13px] font-semibold sm:mr-auto" style={{ color: 'var(--c-brand-fg)' }}>
+                                    {selectedAccounts.length === 1 ? '1 cont selectat' : `${selectedAccounts.length} conturi selectate`}
                                 </Text>
-                                <Pressable onPress={clearSelection} className="w-7 h-7 rounded-full items-center justify-center hover:bg-[var(--c-surface-3)]">
-                                    <MaterialIcons name="close" size={16} color="var(--c-brand-fg)" />
-                                </Pressable>
+                                <View className="flex-row flex-wrap items-center gap-1.5">
+                                    {(['coach', 'player', 'parent'] as ClubAdminAccountRole[]).map((role) => (
+                                        <Button key={role} size="sm" label={roleLabel(role)} disabled={bulkBusy} onPress={() => setPending({ kind: 'bulk', action: role, ids: bulkIds })} />
+                                    ))}
+                                    <Button size="sm" label="Reactivează" disabled={bulkBusy} onPress={() => setPending({ kind: 'bulk', action: 'reactivate', ids: bulkIds })} />
+                                    <Button size="sm" variant="danger" label="Dezactivează" disabled={bulkBusy} onPress={() => setPending({ kind: 'bulk', action: 'deactivate', ids: bulkIds })} />
+                                    <Button size="sm" variant="ghost" label="Renunță" onPress={clearSelection} />
+                                </View>
                             </View>
-                            <View className="flex-row flex-wrap items-center gap-2 sm:ml-auto">
-                                {(['coach', 'player', 'parent'] as ClubAdminAccountRole[]).map((role) => (
-                                    <Pressable
-                                        key={role}
-                                        disabled={bulkBusy}
-                                        onPress={() => setPending({ kind: 'bulk', action: role, ids: selectedAccounts.map((account) => account.id) })}
-                                        className={`px-3 py-2 rounded-full border border-[#1D3E90] bg-[var(--c-surface)] ${bulkBusy ? 'opacity-60' : ''}`}
-                                    >
-                                        <Text className="text-[#1D3E90] text-[11.5px] font-bold capitalize">Set {role}</Text>
-                                    </Pressable>
-                                ))}
-                                <Pressable
-                                    disabled={bulkBusy}
-                                    onPress={() => setPending({ kind: 'bulk', action: 'reactivate', ids: selectedAccounts.map((account) => account.id) })}
-                                    className={`px-3 py-2 rounded-full border border-emerald-300 bg-[var(--c-surface)] ${bulkBusy ? 'opacity-60' : ''}`}
-                                >
-                                    <Text className="text-emerald-700 text-[11.5px] font-bold">Reactivate</Text>
-                                </Pressable>
-                                <Pressable
-                                    disabled={bulkBusy}
-                                    onPress={() => setPending({ kind: 'bulk', action: 'deactivate', ids: selectedAccounts.map((account) => account.id) })}
-                                    className={`px-3 py-2 rounded-full border border-rose-300 bg-[var(--c-surface)] ${bulkBusy ? 'opacity-60' : ''}`}
-                                >
-                                    <Text className="text-rose-700 text-[11.5px] font-bold">Deactivate</Text>
-                                </Pressable>
+                        ) : null}
+
+                        {loading ? (
+                            <View className="gap-2" accessibilityRole="progressbar" accessibilityLabel="Se încarcă conturile">
+                                {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-[60px] w-full rounded-[12px]" />)}
                             </View>
-                        </View>
-                    ) : null}
-
-                    {loading ? (
-                        <SkeletonList count={4} />
-                    ) : filteredAccounts.length === 0 ? (
-                        <GlassCard className="items-center py-12">
-                            <MaterialIcons name="group-off" size={42} color="var(--c-muted)" />
-                            <Text className="font-bold text-lg mt-3" style={{ color: 'var(--c-ink)' }}>No accounts found</Text>
-                            <Text className="text-center mt-2" style={{ color: 'var(--c-muted)' }}>
-                                Try another search or create a new invite for your club.
-                            </Text>
-                        </GlassCard>
-                    ) : (
-                        <>
-                            <View className="gap-3">
-                                {pagedAccounts.map((account) => {
-                                    const isBusy = busyId === account.id;
-                                    const isInvite = account.source === 'invite';
-                                    const isInactive = account.status === 'inactive';
-                                    // Admin/superadmin accounts are read-only here — role changes and
-                                    // deactivation are blocked server-side to prevent admin lockout, so
-                                    // their controls are hidden (this also covers the current admin's
-                                    // own card, since they are privileged).
-                                    const isPrivileged = PRIVILEGED_ROLES.has(account.role);
-                                    const canChangeRole = !isInvite && !isPrivileged && account.status === 'active';
-                                    const canReactivate = !isInvite && !isPrivileged && isInactive;
-                                    const canDeactivate = !isPrivileged && !isInactive;
-                                    const canResend = isInvite;
-                                    const canDelete = !isInvite && !isPrivileged;
-                                    const roleActions = canChangeRole ? ROLE_ACTIONS.filter((option) => option.role !== account.role) : [];
-                                    const hasActions = roleActions.length > 0 || canReactivate || canDeactivate || canResend || canDelete;
-                                    const isSelectable = isManageableMember(account);
-                                    const isSelected = selectedIds.has(account.id);
-                                    const rv = roleVisual(account.role);
-                                    const sv = statusVisual(account);
-                                    const created = formatDate(account.createdAt);
-                                    const lastLogin = formatDate(account.lastLoginAt);
-
-                                    return (
-                                        <View
-                                            key={`${account.source}-${account.id}`}
-                                            className={`flex-col bg-[var(--c-surface)] rounded-[20px] border p-4 md:p-5 transition-all duration-150 ${
-                                                isSelected
-                                                    ? 'border-[#1D3E90] shadow-[0_0_0_3px_rgba(29,62,144,0.10)]'
-                                                    : 'border-[#E3E9F2] shadow-[0_1px_2px_rgba(16,24,40,0.04)] hover:border-[#CBD8EC] hover:shadow-[0_8px_24px_rgba(16,24,40,0.08)]'
-                                            } ${isInactive ? 'opacity-70' : ''}`}
+                        ) : filteredAccounts.length === 0 ? (
+                            <EmptyState
+                                compact
+                                icon="group-off"
+                                title="Niciun cont găsit"
+                                message={debouncedSearch.trim() ? `Nimic pentru „${debouncedSearch.trim()}”.` : 'Încearcă alt filtru sau invită pe cineva în club.'}
+                            />
+                        ) : (
+                            <>
+                                <View className="rounded-[14px] border overflow-hidden" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
+                                    <View className="hidden md:flex flex-row items-center px-3 py-2 border-b" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}>
+                                        <Pressable
+                                            onPress={toggleSelectAll}
+                                            disabled={selectableAccounts.length === 0}
+                                            accessibilityRole="checkbox"
+                                            accessibilityState={{ checked: allSelectableSelected }}
+                                            accessibilityLabel="Selectează toate"
+                                            className="w-8 h-8 items-center justify-center"
                                         >
-                                            <View className="flex-row items-center gap-3">
+                                            <MaterialIcons name={allSelectableSelected ? 'check-box' : 'check-box-outline-blank'} size={19} color={allSelectableSelected ? 'var(--c-brand-fg)' : 'var(--c-border-strong)'} />
+                                        </Pressable>
+                                        <Text className="t-eyebrow flex-[2.2] pl-2" style={{ color: 'var(--c-faint)' }}>Cont</Text>
+                                        <Text className="t-eyebrow flex-1" style={{ color: 'var(--c-faint)' }}>Rol</Text>
+                                        <Text className="t-eyebrow flex-1" style={{ color: 'var(--c-faint)' }}>Stare</Text>
+                                        <Text className="t-eyebrow flex-1" style={{ color: 'var(--c-faint)' }}>Ultima autentificare</Text>
+                                        <View className="w-9" />
+                                    </View>
+
+                                    {pagedAccounts.map((account, index) => {
+                                        const isBusy = busyId === account.id;
+                                        const isInvite = account.source === 'invite';
+                                        const isSelectable = isManageableMember(account);
+                                        const isSelected = selectedIds.has(account.id);
+                                        const rv = roleVisual(account.role);
+                                        const sv = statusVisual(account);
+                                        const actions = sheetActions(account);
+                                        const lastSeen = isInvite
+                                            ? `Invitat ${formatRelativeDate(account.createdAt)}`
+                                            : account.lastLoginAt ? formatRelativeDate(account.lastLoginAt) : 'Niciodată';
+
+                                        return (
+                                            <View
+                                                key={`${account.source}-${account.id}`}
+                                                className="flex-row items-center px-3 py-2.5"
+                                                style={{
+                                                    borderTopWidth: index > 0 ? 1 : 0,
+                                                    borderTopColor: 'var(--c-border)',
+                                                    backgroundColor: isSelected ? 'var(--c-surface-tint)' : 'transparent',
+                                                    opacity: account.status === 'inactive' ? 0.7 : 1,
+                                                } as any}
+                                            >
                                                 {isSelectable ? (
                                                     <Pressable
                                                         onPress={() => toggleSelected(account.id)}
                                                         accessibilityRole="checkbox"
                                                         accessibilityState={{ checked: isSelected }}
-                                                        className="flex-none w-6 h-6 items-center justify-center"
+                                                        accessibilityLabel={`Selectează ${account.name}`}
+                                                        className="w-8 h-8 items-center justify-center shrink-0"
                                                     >
-                                                        <MaterialIcons
-                                                            name={isSelected ? 'check-box' : 'check-box-outline-blank'}
-                                                            size={22}
-                                                            color={isSelected ? 'var(--c-brand-fg)' : 'var(--c-border-strong)'}
-                                                        />
+                                                        <MaterialIcons name={isSelected ? 'check-box' : 'check-box-outline-blank'} size={19} color={isSelected ? 'var(--c-brand-fg)' : 'var(--c-border-strong)'} />
                                                     </Pressable>
-                                                ) : (
-                                                    <View className="flex-none w-6" />
-                                                )}
+                                                ) : <View className="w-8 shrink-0" />}
 
-                                                <View
-                                                    className="w-12 h-12 rounded-2xl items-center justify-center flex-none"
-                                                    style={{ backgroundColor: isInvite ? 'var(--c-warning-bg)' : rv.tint }}
-                                                >
-                                                    {isInvite ? (
-                                                        <MaterialIcons name="mail-outline" size={20} color="var(--c-warning-fg)" />
-                                                    ) : (
-                                                        <Text className="text-[15px] font-black" style={{ color: rv.fg }}>
-                                                            {initialsOf(account.name, account.email)}
-                                                        </Text>
-                                                    )}
+                                                <View className="flex-1 md:flex-[2.2] min-w-0 flex-row items-center gap-3 pl-1 md:pl-2">
+                                                    <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: isInvite ? 'var(--c-warning-bg)' : rv.tint }}>
+                                                        {isInvite
+                                                            ? <MaterialIcons name="mail-outline" size={17} color="var(--c-warning-fg)" />
+                                                            : <Text className="text-[12px] font-bold" style={{ color: rv.fg }}>{initialsOf(account.name, account.email)}</Text>}
+                                                    </View>
+                                                    <View className="flex-1 min-w-0">
+                                                        <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{account.name || account.email}</Text>
+                                                        <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{account.email}</Text>
+                                                        {/* Phones: role + status under the email. */}
+                                                        <View className="md:hidden flex-row items-center gap-1.5 mt-0.5">
+                                                            <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sv.dot }} />
+                                                            <Text className="t-meta font-semibold" style={{ color: 'var(--c-ink-soft)' }} numberOfLines={1}>
+                                                                {roleLabel(account.role)} · <Text style={{ color: sv.fg }}>{sv.label}</Text>
+                                                            </Text>
+                                                        </View>
+                                                    </View>
                                                 </View>
 
-                                                <View className="flex-1 min-w-0">
-                                                    <View className="flex-row items-center flex-wrap gap-2">
-                                                        <Text className="text-[15px] md:text-[16px] font-black text-[#0E2041]" numberOfLines={1}>
-                                                            {account.name}
-                                                        </Text>
-                                                        <View className="rounded-full px-2.5 py-0.5" style={{ backgroundColor: rv.tint }}>
-                                                            <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: rv.fg }}>
-                                                                {account.role}
-                                                            </Text>
-                                                        </View>
-                                                        {isBusy ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : null}
+                                                <View className="hidden md:flex flex-1 min-w-0">
+                                                    <View className="self-start rounded-full px-2.5 py-1" style={{ backgroundColor: rv.tint }}>
+                                                        <Text className="text-[11.5px] font-semibold" style={{ color: rv.fg }}>{roleLabel(account.role)}</Text>
                                                     </View>
-                                                    <Text className="text-[12.5px] font-semibold text-[#94A3B8] mt-0.5" numberOfLines={1}>
-                                                        {account.email}
-                                                    </Text>
-                                                    <View className="flex-row items-center flex-wrap gap-x-3 gap-y-1 mt-2">
-                                                        <View className="flex-row items-center gap-1.5 rounded-full px-2 py-0.5" style={{ backgroundColor: sv.bg }}>
-                                                            <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sv.dot }} />
-                                                            <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: sv.fg }}>
-                                                                {sv.label}
-                                                            </Text>
-                                                        </View>
-                                                        {created ? (
-                                                            <View className="flex-row items-center gap-1">
-                                                                <MaterialIcons name="event" size={12} color="var(--c-faint)" />
-                                                                <Text className="text-[11px] font-semibold text-[#94A3B8]">{created}</Text>
-                                                            </View>
-                                                        ) : null}
-                                                        {lastLogin ? (
-                                                            <View className="flex-row items-center gap-1">
-                                                                <MaterialIcons name="login" size={12} color="var(--c-faint)" />
-                                                                <Text className="text-[11px] font-semibold text-[#94A3B8]">{lastLogin}</Text>
-                                                            </View>
-                                                        ) : null}
-                                                    </View>
+                                                </View>
+                                                <View className="hidden md:flex flex-1 min-w-0 flex-row items-center gap-1.5">
+                                                    <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sv.dot }} />
+                                                    <Text className="text-[13px] font-medium" style={{ color: sv.fg }} numberOfLines={1}>{sv.label}</Text>
+                                                </View>
+                                                <View className="hidden md:flex flex-1 min-w-0">
+                                                    <Text className="text-[13px]" style={{ color: 'var(--c-ink-soft)' }} numberOfLines={1}>{lastSeen}</Text>
+                                                </View>
+
+                                                <View className="w-9 items-end shrink-0">
+                                                    {isBusy ? (
+                                                        <ActivityIndicator size="small" color="var(--c-brand-fg)" />
+                                                    ) : actions.length > 0 ? (
+                                                        <Pressable
+                                                            onPress={() => setMenuFor(account)}
+                                                            accessibilityRole="button"
+                                                            accessibilityLabel={`Acțiuni pentru ${account.name}`}
+                                                            className="ui-press w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[var(--c-surface-3)]"
+                                                        >
+                                                            <MaterialIcons name="more-horiz" size={20} color="var(--c-muted)" />
+                                                        </Pressable>
+                                                    ) : null}
                                                 </View>
                                             </View>
+                                        );
+                                    })}
+                                </View>
 
-                                            {hasActions ? (
-                                                <View className="mt-3.5 pt-3.5 border-t border-[#F1F5F9] flex-row flex-wrap gap-2">
-                                                    {roleActions.map((option) => {
-                                                        const v = ACTION_STYLE[option.role];
-                                                        return (
-                                                            <Pressable
-                                                                key={option.role}
-                                                                onPress={() => setPending({ kind: 'role', account, role: option.role })}
-                                                                disabled={isBusy}
-                                                                className={`flex-row items-center gap-1.5 rounded-full px-3.5 py-2 min-h-[36px] ${isBusy ? 'opacity-60' : ''}`}
-                                                                style={{ backgroundColor: v.tint }}
-                                                            >
-                                                                <MaterialIcons name={option.icon} size={14} color={v.fg} />
-                                                                <Text className="text-[12px] font-bold" style={{ color: v.fg }}>{option.label}</Text>
-                                                            </Pressable>
-                                                        );
-                                                    })}
-
-                                                    {canResend ? (
-                                                        <Pressable
-                                                            onPress={() => setPending({ kind: 'resend', account })}
-                                                            disabled={isBusy}
-                                                            className={`flex-row items-center gap-1.5 rounded-full px-3.5 py-2 min-h-[36px] ${isBusy ? 'opacity-60' : ''}`}
-                                                            style={{ backgroundColor: ACTION_STYLE.resend.tint }}
-                                                        >
-                                                            <MaterialIcons name="mail" size={14} color={ACTION_STYLE.resend.fg} />
-                                                            <Text className="text-[12px] font-bold" style={{ color: ACTION_STYLE.resend.fg }}>Resend invite</Text>
-                                                        </Pressable>
-                                                    ) : null}
-
-                                                    {canReactivate ? (
-                                                        <Pressable
-                                                            onPress={() => setPending({ kind: 'reactivate', account })}
-                                                            disabled={isBusy}
-                                                            className={`flex-row items-center gap-1.5 rounded-full px-3.5 py-2 min-h-[36px] ${isBusy ? 'opacity-60' : ''}`}
-                                                            style={{ backgroundColor: ACTION_STYLE.reactivate.tint }}
-                                                        >
-                                                            <MaterialIcons name="restart-alt" size={14} color={ACTION_STYLE.reactivate.fg} />
-                                                            <Text className="text-[12px] font-bold" style={{ color: ACTION_STYLE.reactivate.fg }}>Reactivate</Text>
-                                                        </Pressable>
-                                                    ) : null}
-
-                                                    {canDeactivate ? (
-                                                        <Pressable
-                                                            onPress={() => setPending({ kind: 'deactivate', account })}
-                                                            disabled={isBusy}
-                                                            className={`flex-row items-center gap-1.5 rounded-full px-3.5 py-2 min-h-[36px] ${isBusy ? 'opacity-60' : ''}`}
-                                                            style={{ backgroundColor: isInvite ? ACTION_STYLE.cancel.tint : ACTION_STYLE.deactivate.tint }}
-                                                        >
-                                                            <MaterialIcons
-                                                                name={isInvite ? 'close' : 'block'}
-                                                                size={14}
-                                                                color={isInvite ? ACTION_STYLE.cancel.fg : ACTION_STYLE.deactivate.fg}
-                                                            />
-                                                            <Text
-                                                                className="text-[12px] font-bold"
-                                                                style={{ color: isInvite ? ACTION_STYLE.cancel.fg : ACTION_STYLE.deactivate.fg }}
-                                                            >
-                                                                {isInvite ? 'Cancel invite' : 'Deactivate'}
-                                                            </Text>
-                                                        </Pressable>
-                                                    ) : null}
-
-                                                    {canDelete ? (
-                                                        <Pressable
-                                                            onPress={() => setPending({ kind: 'delete', account })}
-                                                            disabled={isBusy}
-                                                            accessibilityLabel={`Delete ${account.name} permanently`}
-                                                            className={`flex-row items-center gap-1.5 rounded-full border px-3.5 py-2 min-h-[36px] ${isBusy ? 'opacity-60' : ''}`}
-                                                            style={{ backgroundColor: ACTION_STYLE.delete.tint, borderColor: ACTION_STYLE.delete.border } as any}
-                                                        >
-                                                            <MaterialIcons name="delete-forever" size={14} color={ACTION_STYLE.delete.fg} />
-                                                            <Text className="text-[12px] font-bold" style={{ color: ACTION_STYLE.delete.fg }}>Delete permanently</Text>
-                                                        </Pressable>
-                                                    ) : null}
-                                                </View>
-                                            ) : null}
-                                        </View>
-                                    );
-                                })}
-                            </View>
-
-                            <View className="mt-6 flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                <Text className="text-[12px] font-semibold text-[#64748B]">
-                                    Showing {rangeStart}–{rangeEnd} of {filteredAccounts.length}
-                                </Text>
-                                {totalPages > 1 ? (
-                                    <View className="flex-row items-center gap-1.5">
-                                        <Pressable
-                                            onPress={() => setPage((current) => Math.max(1, current - 1))}
-                                            disabled={page === 1}
-                                            accessibilityLabel="Previous page"
-                                            className={`w-9 h-9 rounded-xl items-center justify-center border ${page === 1 ? 'border-[#E4EAF7] opacity-50' : 'border-[#CBD8EC] bg-[var(--c-surface)] hover:border-blue-200'}`}
-                                        >
-                                            <MaterialIcons name="chevron-left" size={20} color="var(--c-brand-fg)" />
-                                        </Pressable>
-
-                                        {pageWindow(page, totalPages).map((item, index) => (
-                                            item === 'gap' ? (
-                                                <Text key={`gap-${index}`} className="px-1 text-[#94A3B8] font-bold">…</Text>
-                                            ) : (
-                                                <Pressable
-                                                    key={item}
-                                                    onPress={() => setPage(item)}
-                                                    accessibilityRole="button"
-                                                    accessibilityState={{ selected: item === page }}
-                                                    className={`min-w-[36px] h-9 px-2 rounded-xl items-center justify-center border ${item === page ? 'bg-[#123A97] border-[#123A97]' : 'border-[#CBD8EC] bg-[var(--c-surface)] hover:border-blue-200'}`}
-                                                >
-                                                    <Text className={`text-[13px] font-bold ${item === page ? 'text-white' : 'text-[#56627F]'}`}>{item}</Text>
-                                                </Pressable>
-                                            )
-                                        ))}
-
-                                        <Pressable
-                                            onPress={() => setPage((current) => Math.min(totalPages, current + 1))}
-                                            disabled={page === totalPages}
-                                            accessibilityLabel="Next page"
-                                            className={`w-9 h-9 rounded-xl items-center justify-center border ${page === totalPages ? 'border-[#E4EAF7] opacity-50' : 'border-[#CBD8EC] bg-[var(--c-surface)] hover:border-blue-200'}`}
-                                        >
-                                            <MaterialIcons name="chevron-right" size={20} color="var(--c-brand-fg)" />
-                                        </Pressable>
-                                    </View>
-                                ) : null}
-                            </View>
-                        </>
-                    )}
-                </View>
+                                <Pagination page={page} totalPages={totalPages} onPageChange={setPage} rangeStart={rangeStart} rangeEnd={rangeEnd} total={filteredAccounts.length} itemNoun="conturi" />
+                            </>
+                        )}
+                    </View>
+                </PageContainer>
             </ScrollView>
+
+            <ActionSheet
+                visible={menuFor != null}
+                title={menuFor?.name || menuFor?.email || ''}
+                subtitle={menuFor ? `${roleLabel(menuFor.role)} · ${menuFor.email}` : undefined}
+                actions={menuFor ? sheetActions(menuFor) : []}
+                onClose={() => setMenuFor(null)}
+            />
 
             <ConfirmDialog
                 visible={pending != null}
