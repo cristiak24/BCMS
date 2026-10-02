@@ -496,7 +496,7 @@ export default function RosterScreen() {
   // a fraction of the vertical space, plus the payment-reminder action inline.
   const statCells: { label: string; value: string; tone?: 'default' | 'danger'; bar?: number }[] = [
     { label: 'Prezență generală', value: `${attendanceValue.toFixed(1)}%` },
-    { label: 'Pregătirea lotului', value: `${rosterReadiness}%`, bar: rosterReadiness },
+    { label: 'Plăți la zi', value: `${rosterReadiness}%`, bar: rosterReadiness },
     { label: 'Sportivi în lot', value: String(players.length) },
     { label: 'Plăți restante', value: String(pendingPayments), tone: pendingPayments > 0 ? 'danger' : 'default' },
   ];
@@ -764,13 +764,15 @@ const styles = StyleSheet.create({
   tableArea: {
     width: '100%',
     minWidth: ROSTER_TABLE_WIDTH,
+    borderWidth: 1,
+    borderColor: 'var(--c-border)',
+    borderRadius: 14,
+    overflow: 'hidden',
   },
   rowsWrap: {
-    paddingTop: 12,
+    marginBottom: -1,
   },
-  rowSpacer: {
-    marginBottom: 12,
-  },
+  rowSpacer: {},
   mobileFab: {
     position: 'absolute',
     bottom: 96,

@@ -1,8 +1,7 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from '@/src/web/reactNative';
-import { CheckCircle2, CircleAlert, Pencil } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import { Player } from '../../services/teamsApi';
-import { dash } from '../dashboard/dashboardTheme';
 import AttendanceBar from './AttendanceBar';
 import StatusBadge from './StatusBadge';
 import RosterCheckbox from './RosterCheckbox';
@@ -39,8 +38,22 @@ export default function PlayerRow({
   const subtitle = `${player.number ? `#${player.number}` : 'Fără tricou'} • ${player.teamName || player.teamNames?.[0] || 'Neasignat'}`;
   const initials = `${player.firstName?.[0] || 'P'}${player.lastName?.[0] || ''}`.toUpperCase();
 
+  const payTone = paymentPaid
+    ? { bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' }
+    : paymentLabel === 'Restanță'
+      ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)' }
+      : { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' };
+  const attendanceTone = attendanceRate >= 75 ? 'var(--c-success-fg)' : attendanceRate >= 60 ? 'var(--c-warning-fg)' : 'var(--c-danger-fg)';
+  const unassigned = !categoryLabel || /neasignat/i.test(categoryLabel);
+
+  // A table row, not a floating card: the list used to be eight separate
+  // 22px-radius cards with "ROL" / "SĂPTĂMÂNAL" captions over every value.
   return (
-    <Pressable onPress={onPress} className="dash-card dash-card-hover" style={[styles.card, selected && styles.cardSelected]}>
+    <Pressable
+      onPress={onPress}
+      className="hover:bg-[var(--c-surface-2)]"
+      style={[styles.row, selected && { backgroundColor: 'var(--c-surface-tint)' }] as any}
+    >
       <View style={styles.mainRow}>
         <View style={styles.selectCell}>
           <RosterCheckbox checked={selected} onToggle={onToggleSelect} accessibilityLabel={`Selectează ${fullName}`} />
@@ -54,79 +67,62 @@ export default function PlayerRow({
               <Text style={styles.initials}>{initials}</Text>
             )}
           </View>
-
           <View style={styles.playerTextWrap}>
-            <View className="flex-row items-center gap-2">
-              <Text style={styles.name} numberOfLines={1}>
-                {fullName}
-              </Text>
-              {showStatusChip ? <StatusBadge label={isActive ? 'Activ' : 'Inactiv'} tone={isActive ? 'green' : 'gray'} /> : null}
+            <View className="flex-row items-center gap-2 min-w-0">
+              <Text style={styles.name} numberOfLines={1}>{fullName}</Text>
+              {showStatusChip && !isActive ? <StatusBadge label="Inactiv" tone="gray" /> : null}
             </View>
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {subtitle}
-            </Text>
+            <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
           </View>
         </View>
 
         <View style={styles.positionCell}>
-          <Text style={styles.cellLabel}>Rol</Text>
-          <Text style={styles.position} numberOfLines={2}>
-            {player.position || 'Sportiv'}
-          </Text>
+          <Text style={styles.position} numberOfLines={1}>{player.position || '—'}</Text>
         </View>
 
         <View style={styles.categoryCell}>
-          <StatusBadge label={categoryLabel} tone="blue" />
+          {unassigned ? <Text style={styles.muted}>—</Text> : <StatusBadge label={categoryLabel} tone="blue" />}
         </View>
 
         <View style={styles.attendanceCell}>
-          <Text style={styles.cellLabel}>Săptămânal</Text>
-          <Text style={styles.attendanceText}>{attendanceRate}% prezență</Text>
+          <Text style={[styles.attendanceText, { color: attendanceTone }] as any}>{attendanceRate}%</Text>
           <View style={styles.barWrap}>
             <AttendanceBar value={attendanceRate} />
           </View>
         </View>
 
         <View style={styles.paymentCell}>
-          <View style={styles.paymentRow}>
-            {paymentPaid ? (
-              <CheckCircle2 color={dash.successDeep} size={16} />
-            ) : (
-              <CircleAlert color={dash.dangerDeep} size={16} />
-            )}
-            <Text style={[styles.paymentText, paymentPaid ? styles.paymentPaid : styles.paymentPending]}>
-              {paymentLabel}
-            </Text>
+          <View style={[styles.paymentPill, { backgroundColor: payTone.bg }] as any}>
+            <View style={[styles.dot, { backgroundColor: payTone.fg }] as any} />
+            <Text style={[styles.paymentText, { color: payTone.fg }] as any} numberOfLines={1}>{paymentLabel}</Text>
           </View>
         </View>
 
-        <Pressable
-          onPress={(event: any) => {
-            event.stopPropagation();
-            onEdit();
-          }}
-          style={styles.editButton}
-        >
-          <Pencil color={dash.muted} size={18} />
-        </Pressable>
+        <View style={styles.actionsCell}>
+          <Pressable
+            onPress={(event: any) => {
+              event.stopPropagation();
+              onEdit();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Acțiuni pentru ${fullName}`}
+            className="ui-press hover:bg-[var(--c-surface-3)]"
+            style={styles.editButton}
+          >
+            <MoreHorizontal color="var(--c-muted)" size={18} />
+          </Pressable>
+        </View>
       </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: dash.surface,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: dash.hairline,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    ...dash.shadow.sm,
-  },
-  cardSelected: {
-    borderColor: 'rgba(37,99,235,0.35)',
-    backgroundColor: 'rgba(37,99,235,0.03)',
+  row: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'var(--c-border)',
   },
   mainRow: {
     width: '100%',
@@ -149,47 +145,42 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
+    width: 36,
+    height: 36,
+    borderRadius: 999,
     overflow: 'hidden',
-    backgroundColor: 'rgba(37,99,235,0.08)',
+    backgroundColor: 'var(--c-surface-tint)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: dash.hairline,
   },
   avatarImage: {
     width: '100%',
     height: '100%',
   },
   initials: {
-    color: dash.accentBlue,
-    fontSize: 16,
-    fontWeight: '900',
+    color: 'var(--c-brand-fg)',
+    fontSize: 12,
+    fontWeight: '700',
   },
   playerTextWrap: {
     marginLeft: 12,
     flex: 1,
+    minWidth: 0,
   },
   name: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: dash.ink,
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'var(--c-ink)',
   },
   subtitle: {
-    marginTop: 2,
+    marginTop: 1,
     fontSize: 12,
-    color: dash.faint,
-    fontWeight: '700',
+    color: 'var(--c-muted)',
+    fontWeight: '500',
   },
-  cellLabel: {
-    marginBottom: 3,
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    color: dash.faint,
+  muted: {
+    fontSize: 13,
+    color: 'var(--c-faint)',
   },
   positionCell: {
     minWidth: ROSTER_COLUMN_WIDTHS.position,
@@ -200,10 +191,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   position: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: dash.inkSoft,
-    lineHeight: 20,
+    fontSize: 13,
+    fontWeight: '500',
+    color: 'var(--c-ink-soft)',
   },
   categoryCell: {
     minWidth: ROSTER_COLUMN_WIDTHS.category,
@@ -223,49 +213,48 @@ const styles = StyleSheet.create({
   },
   attendanceText: {
     fontSize: 13,
-    fontWeight: '900',
-    color: dash.ink,
+    fontWeight: '700',
   },
   barWrap: {
-    marginTop: 6,
+    marginTop: 5,
   },
   paymentCell: {
     minWidth: ROSTER_COLUMN_WIDTHS.payment,
     flexGrow: ROSTER_COLUMN_FLEX.payment,
     flexBasis: 0,
     flexShrink: 0,
-    paddingRight: 22,
+    paddingRight: 12,
     justifyContent: 'center',
   },
-  paymentRow: {
+  paymentPill: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 7,
-    backgroundColor: dash.surfaceSubtle,
+    paddingVertical: 4,
+    gap: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
   },
   paymentText: {
-    marginLeft: 6,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  paymentPaid: {
-    color: dash.successDeep,
-  },
-  paymentPending: {
-    color: dash.dangerDeep,
+    fontSize: 12,
+    fontWeight: '600',
+    whiteSpace: 'nowrap',
+  } as any,
+  actionsCell: {
+    minWidth: ROSTER_COLUMN_WIDTHS.actions,
+    width: ROSTER_COLUMN_WIDTHS.actions,
+    flexShrink: 0,
+    alignItems: 'flex-end',
   },
   editButton: {
-    minWidth: ROSTER_COLUMN_WIDTHS.actions,
-    width: 44,
-    flexShrink: 0,
-    height: 40,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: dash.hairline,
-    backgroundColor: dash.surfaceSubtle,
+    width: 32,
+    height: 32,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },

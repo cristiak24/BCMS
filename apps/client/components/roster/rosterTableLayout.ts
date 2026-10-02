@@ -4,8 +4,8 @@ export const ROSTER_COLUMN_WIDTHS = {
   position: 120,
   category: 150,
   attendance: 156,
-  payment: 116,
-  actions: 84,
+  payment: 132,
+  actions: 48,
 } as const;
 
 export const ROSTER_COLUMN_FLEX = {

@@ -71,7 +71,7 @@ export default function RosterTableHeader({
       <View style={styles.paymentCell}>
         <SortableLabel label="Plată" column="payment" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </View>
-      <Text style={[styles.label, styles.actionsCell]}>Acțiuni</Text>
+      <View style={styles.actionsCell} />
     </View>
   );
 }
@@ -83,17 +83,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 9,
     borderBottomWidth: 1,
     borderBottomColor: dash.hairline,
-    backgroundColor: dash.surfaceSubtle,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    backgroundColor: 'var(--c-surface-2)',
   },
   label: {
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.2,
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: dash.faint,
   },
