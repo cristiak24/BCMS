@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
-import { l12Api, type L12Event, type L12Lineup, type L12Overview, type L12Team } from '../../services/l12Api';
+import { l12Api, type L12Event, type L12Lineup, type L12Overview, type L12OverviewMatch, type L12Team } from '../../services/l12Api';
 import { teamsApi, type Player } from '../../services/teamsApi';
 import PageContainer from '../ui/PageContainer';
 import PageHeader from '../ui/PageHeader';
@@ -12,6 +12,7 @@ import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
 import SelectField from '../ui/SelectField';
+import FilterChips from '../ui/FilterChips';
 import Pagination, { usePagination } from '../ui/Pagination';
 import L12Editor, { EMPTY_LINEUP, L12_MIN_PLAYERS, lineupForRoster, resolveTeamGender, sortLineupPlayers, validateLineup } from './L12Editor';
 import Button from '../ui/Button';
@@ -50,8 +51,13 @@ function snapshot(lineup: L12Lineup | null) {
   });
 }
 
+/** "Amical: A vs B" / "Meci amical A vs B" → "A vs B" — the kind is shown as a badge. */
+function stripKindPrefix(title: string) {
+  return title.replace(/^\s*(meci\s+)?(amical|municipal)\s*[:·–-]?\s*/i, '');
+}
+
 function splitTeams(title: string, teamName: string) {
-  const parts = title.split(/\s+vs\.?\s+/i);
+  const parts = stripKindPrefix(title).split(/\s+vs\.?\s+/i);
   if (parts.length === 2) return { homeTeam: parts[0].trim(), awayTeam: parts[1].trim() };
   return { homeTeam: teamName, awayTeam: title };
 }
@@ -162,6 +168,47 @@ function Segmented<T extends string>({ value, onChange, options }: { value: T; o
   );
 }
 
+type MatchKind = 'frb' | 'amical' | 'municipal';
+
+/**
+ * Official national fixtures reach the calendar through the FRB sync; anything
+ * added by hand is a friendly, unless the team plays the municipal league (or
+ * the event says so).
+ */
+function matchKind(match: L12OverviewMatch): MatchKind {
+  const text = `${match.title} ${match.location ?? ''}`.toLowerCase();
+  if (match.source === 'frb') return 'frb';
+  if (/amical/.test(text)) return 'amical';
+  if (match.teamLevel === 'municipal' || /municipal/.test(text)) return 'municipal';
+  return 'amical';
+}
+
+const KIND_META: Record<MatchKind, { label: string; plural: string; fg: string; bg: string }> = {
+  frb: { label: 'Oficial FRB', plural: 'Oficiale FRB', fg: 'var(--c-brand-fg)', bg: 'var(--c-surface-tint)' },
+  amical: { label: 'Amical', plural: 'Amicale', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)' },
+  municipal: { label: 'Municipal', plural: 'Municipale', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)' },
+};
+
+const monthKeyOf = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+function monthLabel(key: string) {
+  const [y, m] = key.split('-').map(Number);
+  const label = new Date(y, m - 1, 1).toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function KindBadge({ kind }: { kind: MatchKind }) {
+  const meta = KIND_META[kind];
+  return (
+    <View className="self-start rounded-[6px] px-1.5 py-[2px]" style={{ backgroundColor: meta.bg }}>
+      <Text className="text-[11px] font-semibold" style={{ color: meta.fg }}>{meta.label}</Text>
+    </View>
+  );
+}
+
 export function L12HomeScreen() {
   const router = useRouter();
   const base = useL12Base();
@@ -170,6 +217,8 @@ export function L12HomeScreen() {
   const [tab, setTab] = useState<HomeTab>('matches');
   const [teamFilter, setTeamFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [monthFilter, setMonthFilter] = useState<string>('upcoming');
+  const [kindFilter, setKindFilter] = useState<'all' | MatchKind>('all');
 
   const load = useCallback(async () => {
     try {
@@ -184,27 +233,66 @@ export function L12HomeScreen() {
     load();
   }, [load]);
 
+  // Cancelled fixtures never need a sheet.
+  const liveMatches = useMemo(() => (data?.matches ?? []).filter((m) => m.status !== 'cancelled'), [data]);
+  const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }, []);
+  const isUpcoming = useCallback((m: L12OverviewMatch) => new Date(m.startTime).getTime() >= todayStart, [todayStart]);
+
   const teamScopedMatches = useMemo(() => {
-    if (!data) return [];
-    if (teamFilter === 'all') return data.matches;
-    return data.matches.filter((match) => String(match.teamId) === teamFilter);
-  }, [data, teamFilter]);
+    if (teamFilter === 'all') return liveMatches;
+    return liveMatches.filter((match) => String(match.teamId) === teamFilter);
+  }, [liveMatches, teamFilter]);
+
+  const monthOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    teamScopedMatches.forEach((m) => counts.set(monthKeyOf(m.startTime), (counts.get(monthKeyOf(m.startTime)) ?? 0) + 1));
+    const current = monthKeyOf(new Date().toISOString());
+    return [
+      { key: 'upcoming', label: 'Următoarele meciuri', count: teamScopedMatches.filter(isUpcoming).length },
+      ...[...counts.keys()].sort().map((key) => ({
+        key,
+        label: `${monthLabel(key)}${key === current ? ' · luna asta' : ''}`,
+        count: counts.get(key)!,
+      })),
+    ];
+  }, [teamScopedMatches, isUpcoming]);
+
+  const monthScopedMatches = useMemo(() => teamScopedMatches.filter((m) => (
+    monthFilter === 'upcoming' ? isUpcoming(m) : monthKeyOf(m.startTime) === monthFilter
+  )), [teamScopedMatches, monthFilter, isUpcoming]);
+
+  const kindOptions = useMemo(() => {
+    const count = (kind: MatchKind) => monthScopedMatches.filter((m) => matchKind(m) === kind).length;
+    return [
+      { key: 'all' as const, label: 'Toate', count: monthScopedMatches.length },
+      ...(['frb', 'amical', 'municipal'] as const).map((kind) => ({ key: kind, label: KIND_META[kind].plural, dot: KIND_META[kind].fg, count: count(kind) })),
+    ];
+  }, [monthScopedMatches]);
+
+  const kindScopedMatches = useMemo(
+    () => (kindFilter === 'all' ? monthScopedMatches : monthScopedMatches.filter((m) => matchKind(m) === kindFilter)),
+    [monthScopedMatches, kindFilter],
+  );
 
   const statusOptions = useMemo(() => [
     { key: 'all' as const, label: 'Toate' },
-    { key: 'unset' as const, label: 'Nesetate', count: teamScopedMatches.filter((m) => !m.hasLineup).length },
-    { key: 'set' as const, label: 'Setate', count: teamScopedMatches.filter((m) => m.hasLineup).length },
-  ], [teamScopedMatches]);
+    { key: 'unset' as const, label: 'Nesetate', count: kindScopedMatches.filter((m) => !m.hasLineup).length },
+    { key: 'set' as const, label: 'Setate', count: kindScopedMatches.filter((m) => m.hasLineup).length },
+  ], [kindScopedMatches]);
 
   const filteredMatches = useMemo(() => {
-    if (statusFilter === 'all') return teamScopedMatches;
-    return teamScopedMatches.filter((m) => (statusFilter === 'set' ? m.hasLineup : !m.hasLineup));
-  }, [teamScopedMatches, statusFilter]);
+    if (statusFilter === 'all') return kindScopedMatches;
+    return kindScopedMatches.filter((m) => (statusFilter === 'set' ? m.hasLineup : !m.hasLineup));
+  }, [kindScopedMatches, statusFilter]);
+
+  const upcomingCount = useMemo(() => liveMatches.filter(isUpcoming).length, [liveMatches, isUpcoming]);
+  const filtersActive = teamFilter !== 'all' || monthFilter !== 'upcoming' || kindFilter !== 'all' || statusFilter !== 'all';
+  const resetFilters = () => { setTeamFilter('all'); setMonthFilter('upcoming'); setKindFilter('all'); setStatusFilter('all'); };
 
   const { page, totalPages, pageItems: pagedMatches, setPage, rangeStart, rangeEnd, total } = usePagination(
     filteredMatches,
     MATCHES_PAGE_SIZE,
-    `${teamFilter}:${statusFilter}`,
+    `${teamFilter}:${monthFilter}:${kindFilter}:${statusFilter}`,
   );
 
   // A page of matches split into day groups, so the list reads as a schedule
@@ -223,14 +311,14 @@ export function L12HomeScreen() {
   const teamOptions = useMemo(() => {
     if (!data) return [];
     return [
-      { key: 'all', label: 'Toate echipele', count: data.matches.length },
+      { key: 'all', label: 'Toate echipele', count: liveMatches.length },
       ...data.teams.map((team) => ({
         key: String(team.id),
         label: team.name,
-        count: data.matches.filter((m) => m.teamId === team.id).length,
+        count: liveMatches.filter((m) => m.teamId === team.id).length,
       })),
     ];
-  }, [data]);
+  }, [data, liveMatches]);
 
   const teamsSet = data ? data.teams.filter((t) => t.hasTemplate).length : 0;
 
@@ -252,32 +340,48 @@ export function L12HomeScreen() {
             value={tab}
             onChange={setTab}
             options={[
-              { key: 'matches', label: 'Meciuri', count: data.matches.length },
+              { key: 'matches', label: 'Meciuri', count: upcomingCount },
               { key: 'teams', label: 'L12 constant', count: data.teams.length },
             ]}
           />
 
           {tab === 'matches' ? (
-            data.matches.length === 0 ? (
-              <EmptyState compact icon="sports-basketball" title="Niciun meci programat" message="Meciurile din program (inclusiv cele sincronizate de la FRB) apar aici." />
+            liveMatches.length === 0 ? (
+              <EmptyState compact icon="sports-basketball" title="Niciun meci programat" message="Meciurile oficiale FRB, amicalele și meciurile municipale din Program apar aici." />
             ) : (
               <View className="gap-4">
-                <View className="flex-col sm:flex-row sm:items-center gap-2">
-                  {data.teams.length > 1 ? (
-                    <SelectField
-                      label="Echipă"
-                      icon="groups"
-                      options={teamOptions}
-                      value={teamFilter}
-                      onChange={setTeamFilter}
-                      className="w-full sm:w-[300px]"
-                    />
-                  ) : null}
-                  <Segmented value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
+                <View className="gap-2.5">
+                  <View className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-row lg:items-center gap-2">
+                    {data.teams.length > 1 ? (
+                      <SelectField label="Echipă" icon="groups" options={teamOptions} value={teamFilter} onChange={setTeamFilter} className="min-w-0 lg:w-[280px]" />
+                    ) : null}
+                    <SelectField label="Lună" icon="calendar-month" options={monthOptions} value={monthFilter} onChange={setMonthFilter} className="min-w-0 lg:w-[250px]" />
+                    <View className="lg:ml-auto">
+                      <Segmented value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
+                    </View>
+                  </View>
+                  <View className="flex-row items-center gap-2">
+                    <View className="flex-1 min-w-0">
+                      <FilterChips label="Tip meci" options={kindOptions} value={kindFilter} onChange={setKindFilter} />
+                    </View>
+                    {filtersActive ? (
+                      <Pressable onPress={resetFilters} accessibilityRole="button" className="ui-press h-8 px-2.5 rounded-[9px] flex-row items-center gap-1 shrink-0">
+                        <MaterialIcons name="close" size={14} color="var(--c-muted)" />
+                        <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Resetează</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
                 </View>
 
                 {filteredMatches.length === 0 ? (
-                  <EmptyState compact icon="search-off" title="Niciun meci pentru acest filtru" message="Încearcă altă echipă sau altă stare." />
+                  <EmptyState
+                    compact
+                    icon="search-off"
+                    title="Niciun meci pentru aceste filtre"
+                    message={monthFilter === 'upcoming' ? 'Nu sunt meciuri viitoare pentru selecția asta. Alege o lună din listă ca să vezi și meciurile trecute.' : 'Încearcă altă lună, echipă sau alt tip de meci.'}
+                    actionLabel={filtersActive ? 'Resetează filtrele' : undefined}
+                    onAction={filtersActive ? resetFilters : undefined}
+                  />
                 ) : (
                   <>
                     <View className="gap-5">
@@ -286,8 +390,9 @@ export function L12HomeScreen() {
                           <Text className="text-[12px] font-bold uppercase tracking-[0.06em]" style={{ color: 'var(--c-muted)' }}>{group.label}</Text>
                           <View className="rounded-[14px] border overflow-hidden" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
                             {group.matches.map((match, index) => {
-                              const sides = match.title.split(/\s+vs\.?\s+/i).map((part) => part.trim());
-                              const [homeTeam, awayTeam] = sides.length === 2 ? sides : [match.title, null];
+                              const cleanTitle = stripKindPrefix(match.title);
+                              const sides = cleanTitle.split(/\s+vs\.?\s+/i).map((part) => part.trim());
+                              const [homeTeam, awayTeam] = sides.length === 2 ? sides : [cleanTitle, null];
                               // The club's team is usually one of the two sides already.
                               const showTeam = teamFilter === 'all' && match.teamName && !sides.includes(match.teamName);
                               return (
@@ -308,9 +413,11 @@ export function L12HomeScreen() {
                                         {awayTeam}
                                       </Text>
                                     ) : null}
-                                    {showTeam ? (
-                                      <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{match.teamName}</Text>
-                                    ) : null}
+                                    <View className="flex-row flex-wrap items-center gap-1.5 mt-1">
+                                      <KindBadge kind={matchKind(match)} />
+                                      {showTeam ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{match.teamName}</Text> : null}
+                                      {!isUpcoming(match) ? <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>· jucat</Text> : null}
+                                    </View>
                                   </View>
                                   <View className="shrink-0"><StatusChip set={match.hasLineup} label={match.hasLineup ? `${match.playerCount}/12` : 'Nesetat'} /></View>
                                   <View className="hidden sm:flex shrink-0"><MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" /></View>

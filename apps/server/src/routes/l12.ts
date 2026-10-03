@@ -141,7 +141,9 @@ router.get('/overview', async (req: AuthenticatedRequest, res) => {
             return;
         }
 
-        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        // About four months back, so the L12 page can filter past months too
+        // (a sheet is often reprinted after the game).
+        const since = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString();
         const [lineups, matchRows] = await Promise.all([
             db.select({ teamId: l12Lineups.teamId, eventId: l12Lineups.eventId, players: l12Lineups.players, updatedAt: l12Lineups.updatedAt })
                 .from(l12Lineups)
@@ -149,7 +151,7 @@ router.get('/overview', async (req: AuthenticatedRequest, res) => {
             db.select().from(events)
                 .where(and(inArray(events.teamId, teamIds), eq(events.type, 'match'), gte(events.startTime, since)))
                 .orderBy(asc(events.startTime))
-                .limit(300),
+                .limit(600),
         ]);
 
         const coachIds = Array.from(new Set(teamRows.map((t) => t.coachId).filter((id): id is number => id != null)));
@@ -161,6 +163,7 @@ router.get('/overview', async (req: AuthenticatedRequest, res) => {
         const templates = new Map(lineups.filter((l) => l.eventId == null).map((l) => [l.teamId, l]));
         const byEvent = new Map(lineups.filter((l) => l.eventId != null).map((l) => [l.eventId!, l]));
         const teamName = new Map(teamRows.map((t) => [t.id, t.name]));
+        const teamLevel = new Map(teamRows.map((t) => [t.id, t.level ?? null]));
 
         res.json({
             teams: teamRows.map((team) => {
@@ -169,6 +172,7 @@ router.get('/overview', async (req: AuthenticatedRequest, res) => {
                     id: team.id,
                     name: team.name,
                     leagueName: team.leagueName,
+                    level: team.level ?? null,
                     coachName: team.coachId != null ? coachName.get(team.coachId) ?? null : null,
                     hasTemplate: Boolean(template),
                     templatePlayerCount: Array.isArray(template?.players) ? template!.players.length : 0,
@@ -184,6 +188,11 @@ router.get('/overview', async (req: AuthenticatedRequest, res) => {
                     location: event.location,
                     teamId: event.teamId,
                     teamName: event.teamId != null ? teamName.get(event.teamId) ?? null : null,
+                    teamLevel: event.teamId != null ? teamLevel.get(event.teamId) ?? null : null,
+                    // FRB sync tags its rows in the description (see eventsController sync-frb);
+                    // everything else was added by hand: friendlies, municipal games, tournaments.
+                    source: /FRB/i.test(event.description ?? '') ? 'frb' : 'manual',
+                    status: event.status ?? 'scheduled',
                     hasLineup: Boolean(lineup),
                     playerCount: Array.isArray(lineup?.players) ? lineup!.players.length : 0,
                 };

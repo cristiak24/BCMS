@@ -50,9 +50,25 @@ export type L12Team = { id: number; name: string; leagueName: string; seasonName
 
 export type L12Event = { id: number; title: string; type: string; startTime: string; endTime: string; location: string | null };
 
+export type L12OverviewMatch = {
+    eventId: number;
+    title: string;
+    startTime: string;
+    location: string | null;
+    teamId: number | null;
+    teamName: string | null;
+    /** Team level ('national' | 'municipal' | 'initiere'); older servers omit it. */
+    teamLevel?: string | null;
+    /** 'frb' = synced from the federation; 'manual' = friendlies, municipal games, tournaments. */
+    source?: 'frb' | 'manual';
+    status?: string;
+    hasLineup: boolean;
+    playerCount: number;
+};
+
 export type L12Overview = {
-    teams: { id: number; name: string; leagueName: string; coachName: string | null; hasTemplate: boolean; templatePlayerCount: number; templateUpdatedAt: string | null }[];
-    matches: { eventId: number; title: string; startTime: string; location: string | null; teamId: number | null; teamName: string | null; hasLineup: boolean; playerCount: number }[];
+    teams: { id: number; name: string; leagueName: string; level?: string | null; coachName: string | null; hasTemplate: boolean; templatePlayerCount: number; templateUpdatedAt: string | null }[];
+    matches: L12OverviewMatch[];
 };
 
 export const l12Api = {
