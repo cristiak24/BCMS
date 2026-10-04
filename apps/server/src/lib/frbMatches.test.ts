@@ -46,3 +46,25 @@ test('parseMatchesWidget: reads fixtures and results from the widget payload', (
     assert.equal(fixture.league, 'LNBM');
     assert.equal(fixture.gameId, ''); // no game_id in this row's markup
 });
+
+test('parseMatchesWidget: without team_id links, an away win is still a win (side inferred by name)', () => {
+    const html = [
+        '<table><tbody>',
+        '<tr><td>03.10.2026 18:00</td><td>CS Rapid Bucuresti</td><td>62 - 87</td><td>CS Dinamo Bucuresti</td></tr>',
+        '<tr><td>27.09.2026 18:00</td><td>CS Dinamo Bucuresti</td><td>70 - 75</td><td>CSO Voluntari</td></tr>',
+        '<tr><td>20.09.2026 18:00</td><td>SCMU Craiova</td><td>-</td><td>CS Dinamo Bucuresti</td></tr>',
+        '</tbody></table>',
+    ].join('');
+    const raw = `MBT.API.update('w1', '${html.replace(/\//g, '\\/')}');`;
+
+    const byDate = Object.fromEntries(parseMatchesWidget(raw, '77').map((m) => [m.date, m]));
+    assert.equal(byDate['03.10.2026'].result, 'W'); // away, 87 > 62
+    assert.equal(byDate['27.09.2026'].result, 'L'); // home, 70 < 75
+    assert.equal(byDate['20.09.2026'].result, 'N/A'); // not played
+});
+
+test('parseMatchesWidget: unknown side gives N/A, never a guessed result', () => {
+    const html = '<table><tbody><tr><td>03.10.2026 18:00</td><td>A</td><td>62 - 87</td><td>B</td></tr></tbody></table>';
+    const raw = `MBT.API.update('w1', '${html.replace(/\//g, '\\/')}');`;
+    assert.equal(parseMatchesWidget(raw, '77')[0].result, 'N/A');
+});

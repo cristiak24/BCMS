@@ -54,48 +54,55 @@ function determineStatus(homeScore: string, awayScore: string): MatchStatus {
     return 'finished';
 }
 
-/**
- * Determină rezultatul W/L/D/N/A față de echipa cu teamId-ul dat.
- * trackingTeamId = ID-ul echipei urmărite (din query param).
- * Dacă nu putem determina → N/A.
- */
-function determineResult(
-    homeTeamRawHtml: string,
-    awayTeamRawHtml: string,
-    homeScore: string,
-    awayScore: string,
-    trackingTeamId: string
-): 'W' | 'L' | 'D' | 'N/A' {
-    if (!homeScore || !awayScore) return 'N/A';
+type Side = 'home' | 'away';
 
+/** Which side of a row the tracked team is on, from the team_id in its links. */
+function sideFromLinks(homeTeamRawHtml: string, awayTeamRawHtml: string, trackingTeamId: string): Side | null {
+    const linksTo = (html: string) => html.includes(`team_id=${trackingTeamId}`) || html.includes(`team_id="${trackingTeamId}"`);
+    if (linksTo(homeTeamRawHtml)) return 'home';
+    if (linksTo(awayTeamRawHtml)) return 'away';
+    return null;
+}
+
+/** W/L/D for the tracked team; N/A when the score or the side is unknown. */
+function determineResult(homeScore: string, awayScore: string, side: Side | null): 'W' | 'L' | 'D' | 'N/A' {
+    if (!homeScore || !awayScore || !side) return 'N/A';
     const h = parseInt(homeScore, 10);
     const a = parseInt(awayScore, 10);
     if (isNaN(h) || isNaN(a)) return 'N/A';
-
-    // Încearcă să identifice echipa urmărită prin team_id în link-ul HTML brut
-    // Dacă linkul HTML al echipei conține teamId-ul, știm care echipă e a noastră
-    const isHome = homeTeamRawHtml.includes(`team_id=${trackingTeamId}`) ||
-                   homeTeamRawHtml.includes(`team_id="${trackingTeamId}"`);
-    const isAway = awayTeamRawHtml.includes(`team_id=${trackingTeamId}`) ||
-                   awayTeamRawHtml.includes(`team_id="${trackingTeamId}"`);
-
-    if (!isHome && !isAway) {
-        // Fallback: prima echipă listată e gazda → tratăm din perspectiva gazdei
-        if (h > a) return 'W';
-        if (h < a) return 'L';
-        return 'D';
-    }
-
-    if (isHome) {
-        if (h > a) return 'W';
-        if (h < a) return 'L';
-        return 'D';
-    }
-
-    // isAway
-    if (a > h) return 'W';
-    if (a < h) return 'L';
+    const ours = side === 'home' ? h : a;
+    const theirs = side === 'home' ? a : h;
+    if (ours > theirs) return 'W';
+    if (ours < theirs) return 'L';
     return 'D';
+}
+
+/**
+ * The tracked team's name as this widget spells it: the one name present in
+ * (nearly) every row of a team's schedule. Used when the rows carry no
+ * team_id links — the old fallback assumed the home side, which flipped every
+ * away result (e.g. Rapid 62 – Dinamo 87 shown as a Dinamo loss).
+ */
+export function inferTrackedTeamName(rows: { homeTeam: string; awayTeam: string }[]): string | null {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+        for (const name of [row.homeTeam, row.awayTeam]) {
+            counts.set(name, (counts.get(name) ?? 0) + 1);
+        }
+    }
+    let best: string | null = null;
+    let max = 0;
+    let tie = false;
+    for (const [name, count] of counts) {
+        if (count > max) {
+            best = name;
+            max = count;
+            tie = false;
+        } else if (count === max) {
+            tie = true;
+        }
+    }
+    return best && max >= 2 && !tie ? best : null;
 }
 
 /**
@@ -136,6 +143,7 @@ export function parseMatchesWidget(raw: string, teamId: string): ParsedMatch[] {
     // Parsăm rândurile tabelului HTML
     const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
     const matches: ParsedMatch[] = [];
+    const sides: (Side | null)[] = [];
 
     let rowMatch: RegExpExecArray | null;
     while ((rowMatch = rowRegex.exec(html)) !== null) {
@@ -188,9 +196,8 @@ export function parseMatchesWidget(raw: string, teamId: string): ParsedMatch[] {
         if (!homeTeam || !awayTeam) continue;
 
         const status = determineStatus(homeScore, awayScore);
-        const result = status === 'finished'
-            ? determineResult(homeTeamRaw, awayTeamRaw, homeScore, awayScore, teamId)
-            : 'N/A';
+        const side = sideFromLinks(homeTeamRaw, awayTeamRaw, teamId);
+        sides.push(side);
 
         matches.push({
             date: normalizedDateStr,
@@ -199,17 +206,25 @@ export function parseMatchesWidget(raw: string, teamId: string): ParsedMatch[] {
             awayTeam,
             homeScore,
             awayScore,
-            result,
             status,
             league,
             gameId,
+            result: status === 'finished' ? determineResult(homeScore, awayScore, side) : 'N/A',
+        });
+    }
+
+    // Rows without team_id links: place the tracked team by name instead.
+    if (sides.some((side) => side === null)) {
+        const tracked = inferTrackedTeamName(matches);
+        matches.forEach((match, index) => {
+            if (sides[index] !== null || match.status !== 'finished' || !tracked) return;
+            const side: Side | null = match.homeTeam === tracked ? 'home' : match.awayTeam === tracked ? 'away' : null;
+            match.result = determineResult(match.homeScore, match.awayScore, side);
         });
     }
 
     // Sortare cronologică: scheduled → viitoare (asc), finished → trecute (desc)
     // Returnăm în ordine crescătoare a datei — UI-ul va decide afișarea
-    matches.sort((a, b) => parseDateToTimestamp(a.date) - parseDateToTimestamp(b.date));
-
     matches.sort((a, b) => parseDateToTimestamp(a.date) - parseDateToTimestamp(b.date));
     return matches;
 }
