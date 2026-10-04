@@ -35,7 +35,7 @@ import { teamsApi, type Team as SavedTeam } from '../../services/teamsApi';
 
 const DAY = 86400000;
 
-type RecentResult = Match & { savedTeamName: string };
+type RecentResult = Match & { savedTeamName: string; frbSeasonId: string };
 
 type Tone = 'danger' | 'warning' | 'brand' | 'success' | 'sky' | 'purple';
 
@@ -80,6 +80,14 @@ function dayLabel(date: Date) {
   if (date.toDateString() === tomorrow.toDateString()) return 'Mâine';
   const label = date.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' });
   return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+/** "azi" / "mâine" / "pe sâmbătă, 10 octombrie" — for running text. */
+function dayPhrase(date: Date) {
+  const label = dayLabel(date);
+  if (label === 'Azi') return 'azi';
+  if (label === 'Mâine') return 'mâine';
+  return `pe ${label.charAt(0).toLowerCase()}${label.slice(1)}`;
 }
 
 /** "în 2 zile" / "în 5 h" / "în 40 min" / "acum". */
@@ -330,8 +338,11 @@ function NextEventPanel({ event, onPress }: { event: CalendarEvent | null | unde
   );
 }
 
-/** Seven day columns with one dot per event — "how busy is the week". */
-function WeekStrip({ events }: { events: CalendarEvent[] }) {
+/**
+ * Seven day columns with one dot per event — "how busy is the week". Tapping
+ * a day narrows the list below to it; tapping it again shows the whole week.
+ */
+function WeekStrip({ events, selected, onSelect }: { events: CalendarEvent[]; selected: string | null; onSelect: (key: string | null) => void }) {
   const days = useMemo(() => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
@@ -353,25 +364,31 @@ function WeekStrip({ events }: { events: CalendarEvent[] }) {
 
   return (
     <View className="grid grid-cols-7 gap-1.5 sm:gap-2 px-4 md:px-5 pb-3.5 ui-stagger">
-      {days.map((day) => (
-        <View
-          key={day.key}
-          className="items-center rounded-[10px] border py-2.5 gap-1.5"
-          style={{
-            backgroundColor: day.isToday ? 'var(--c-brand-surface)' : day.events.length ? 'var(--c-surface-2)' : 'transparent',
-            borderColor: day.isToday ? 'var(--c-brand-surface)' : 'var(--c-border-soft)',
-          } as any}
-          accessibilityLabel={`${day.weekday} ${day.date}: ${day.events.length} evenimente`}
-        >
-          <Text className="text-[11px] font-semibold capitalize" style={{ color: day.isToday ? 'var(--c-on-brand)' : 'var(--c-muted)', opacity: day.isToday ? 0.8 : 1 }}>{day.weekday}</Text>
-          <Text className="t-num text-[17px] font-bold leading-none" style={{ color: day.isToday ? 'var(--c-on-brand)' : 'var(--c-ink)' }}>{day.date}</Text>
-          <View className="flex-row gap-1 h-1.5 items-center">
-            {day.events.slice(0, 3).map((event) => (
-              <View key={event.id} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: day.isToday ? 'var(--c-on-brand)' : getEventTypeMeta(event.type).solid }} />
-            ))}
-          </View>
-        </View>
-      ))}
+      {days.map((day) => {
+        const active = selected === day.key;
+        return (
+          <Pressable
+            key={day.key}
+            onPress={() => onSelect(active ? null : day.key)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={`${day.weekday} ${day.date}: ${day.events.length} ${day.events.length === 1 ? 'eveniment' : 'evenimente'}`}
+            className="ui-press items-center rounded-[10px] border py-2.5 gap-1.5 hover:bg-[var(--c-surface-3)]"
+            style={{
+              backgroundColor: active ? 'var(--c-brand-surface)' : day.events.length ? 'var(--c-surface-2)' : 'transparent',
+              borderColor: active ? 'var(--c-brand-surface)' : day.isToday ? 'var(--c-brand-fg)' : 'var(--c-border-soft)',
+            } as any}
+          >
+            <Text className="text-[11px] font-semibold capitalize" style={{ color: active ? 'var(--c-on-brand)' : day.isToday ? 'var(--c-brand-fg)' : 'var(--c-muted)', opacity: active ? 0.8 : 1 }}>{day.weekday}</Text>
+            <Text className="t-num text-[17px] font-bold leading-none" style={{ color: active ? 'var(--c-on-brand)' : day.isToday ? 'var(--c-brand-fg)' : 'var(--c-ink)' }}>{day.date}</Text>
+            <View className="flex-row gap-1 h-1.5 items-center">
+              {day.events.slice(0, 3).map((event) => (
+                <View key={event.id} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active ? 'var(--c-on-brand)' : getEventTypeMeta(event.type).solid }} />
+              ))}
+            </View>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -386,6 +403,8 @@ export default function Dashboard() {
   const [l12, setL12] = useState<L12Overview | null>(null);
   const [pendingRequests, setPendingRequests] = useState(0);
   const [results, setResults] = useState<RecentResult[] | null>(null);
+
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const go = useCallback((href: string) => router.push(href as any), [router]);
 
@@ -402,7 +421,7 @@ export default function Dashboard() {
       }));
       const seen = new Set<string>();
       const flat = perTeam
-        .flatMap(({ team, matches }) => matches.filter((m) => m.status === 'finished').map((m) => ({ ...m, savedTeamName: team.name })))
+        .flatMap(({ team, matches }) => matches.filter((m) => m.status === 'finished').map((m) => ({ ...m, savedTeamName: team.name, frbSeasonId: team.frbSeasonId })))
         .filter((m) => {
           const key = `${m.savedTeamName}|${m.date}|${m.homeTeam}|${m.awayTeam}`;
           if (seen.has(key)) return false;
@@ -446,7 +465,8 @@ export default function Dashboard() {
   const upcoming = useMemo(() => {
     if (!weekEvents) return null;
     const groups: { key: string; label: string; items: CalendarEvent[] }[] = [];
-    for (const event of weekEvents) {
+    const shown = selectedDay ? weekEvents.filter((e) => new Date(e.startTime).toDateString() === selectedDay) : weekEvents;
+    for (const event of shown) {
       const date = new Date(event.startTime);
       const key = date.toDateString();
       const last = groups[groups.length - 1];
@@ -454,7 +474,7 @@ export default function Dashboard() {
       else groups.push({ key, label: dayLabel(date), items: [event] });
     }
     return groups;
-  }, [weekEvents]);
+  }, [weekEvents, selectedDay]);
 
   const attention = useMemo<AttentionItem[]>(() => {
     const items: AttentionItem[] = [];
@@ -667,14 +687,25 @@ export default function Dashboard() {
                     tone="brand"
                     action={{ label: 'Program', onPress: () => go('/admin/schedule') }}
                   >
-                    {weekEvents ? <WeekStrip events={weekEvents} /> : null}
+                    {weekEvents ? <WeekStrip events={weekEvents} selected={selectedDay} onSelect={setSelectedDay} /> : null}
                     {!upcoming ? (
                       <View className="px-4 md:px-5 pb-4 gap-2">
                         {[0, 1, 2].map((i) => <Skeleton key={i} className="h-[60px] w-full rounded-[14px]" />)}
                       </View>
                     ) : upcoming.length === 0 ? (
                       <View className="px-4 pb-4">
-                        <EmptyState compact icon="event-available" title="Nimic programat" message="Nu sunt antrenamente sau meciuri în următoarele 7 zile." />
+                        {selectedDay ? (
+                          <EmptyState
+                            compact
+                            icon="event-available"
+                            title="Nimic programat"
+                            message={`Nu sunt antrenamente sau meciuri ${dayPhrase(new Date(selectedDay))}.`}
+                            actionLabel="Toată săptămâna"
+                            onAction={() => setSelectedDay(null)}
+                          />
+                        ) : (
+                          <EmptyState compact icon="event-available" title="Nimic programat" message="Nu sunt antrenamente sau meciuri în următoarele 7 zile." />
+                        )}
                       </View>
                     ) : (
                       <View className="px-3 md:px-4 pb-3.5 gap-3">
@@ -749,10 +780,16 @@ export default function Dashboard() {
                             const win = m.result === 'W';
                             const loss = m.result === 'L';
                             const tone = win ? ACCENT.success : loss ? ACCENT.danger : null;
+                            // FRB only exposes a match sheet for rows that carry a game id.
+                            const open = m.gameId && m.frbSeasonId
+                              ? () => go(`/admin/match/${m.gameId}?seasonId=${encodeURIComponent(m.frbSeasonId)}`)
+                              : undefined;
+                            const Row: any = open ? Pressable : View;
                             return (
-                              <View
+                              <Row
                                 key={`${m.savedTeamName}-${m.date}-${index}`}
-                                className="flex-row items-center gap-3 rounded-[12px] border px-3 py-2.5"
+                                {...(open ? { onPress: open, accessibilityRole: 'link', accessibilityLabel: `Detalii meci: ${m.homeTeam} – ${m.awayTeam}` } : {})}
+                                className={`flex-row items-center gap-3 rounded-[12px] border pl-3 ${open ? 'pr-2 home-row ui-press text-left hover:bg-[var(--c-surface-2)]' : 'pr-3'} py-2.5`}
                                 style={{ borderColor: 'var(--c-border-soft)' } as any}
                               >
                                 <View
@@ -771,7 +808,8 @@ export default function Dashboard() {
                                   <Text className="t-num text-[14px] font-extrabold" style={{ color: 'var(--c-ink)' }}>{m.awayScore}</Text>
                                 </View>
                                 <Text className="t-meta w-[40px] text-right shrink-0" style={{ color: 'var(--c-faint)' }}>{m.date.slice(0, 5)}</Text>
-                              </View>
+                                {open ? <View className="home-arrow"><MaterialIcons name="chevron-right" size={18} color="var(--c-faint)" /></View> : null}
+                              </Row>
                             );
                           })}
                         </View>
