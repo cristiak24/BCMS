@@ -337,6 +337,40 @@
   }
 }
 
+/* ── Admin home cards (app/(admin)/dashboard.tsx) ──────────────────────
+   Quiet hover: a 2px lift, a neutral deeper shadow and a slightly stronger
+   border. No coloured glow — colour on this page is reserved for small
+   accents. Transform only on :hover, never at rest (see the dashFadeIn note). */
+.home-card {
+  transition:
+    transform var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) ease,
+    border-color var(--dur-base) ease;
+}
+.home-card .home-arrow,
+.home-row .home-arrow {
+  transition: transform 0.2s var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .home-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--e-lg) !important;
+    border-color: color-mix(in srgb, var(--c-ink) 14%, var(--c-border)) !important;
+  }
+  .home-card:hover .home-arrow,
+  .home-row:hover .home-arrow {
+    transform: translateX(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-card:hover,
+  .home-card:hover .home-arrow,
+  .home-row:hover .home-arrow {
+    transform: none !important;
+  }
+}
+
 /* ── Route progress (components/ui/RouteProgress.tsx) ─────────────────── */
 .route-progress {
   position: fixed;
