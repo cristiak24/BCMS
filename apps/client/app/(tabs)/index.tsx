@@ -28,6 +28,7 @@ import { PLAYER_FEATURE_FLAGS } from '../../config/playerFeatureFlags';
 import SectionHeader from '../../components/ui/SectionHeader';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
 import { PlayerEventDetailModal } from '../../components/schedule/player/PlayerEventDetailModal';
+import TeamStandingsCard from '../../components/standings/TeamStandingsCard';
 
 type HubEvent = CalendarEvent & {
   source?: 'internal' | 'frb';
@@ -920,6 +921,7 @@ function PlayerHomeScreen() {
   const [attendanceRecords, setAttendanceRecords] = useState<PlayerAttendanceRecord[]>([]);
   const [events, setEvents] = useState<HubEvent[]>([]);
   const [playerTeamNames, setPlayerTeamNames] = useState<Set<string>>(new Set());
+  const [standingTeams, setStandingTeams] = useState<Team[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -976,10 +978,11 @@ function PlayerHomeScreen() {
           .filter((event) => event.type === 'match' && /FRB/i.test(event.description ?? ''))
           .map((event) => Number(event.teamId)),
       );
-      const scopedTeams = savedTeams
+      const ownFrbTeams = savedTeams
         .filter(hasFrbIds)
-        .filter((team) => isPlayerTeam(team, teamIds, teamNames))
-        .filter((team) => !syncedTeamIds.has(Number(team.id)));
+        .filter((team) => isPlayerTeam(team, teamIds, teamNames));
+      setStandingTeams(ownFrbTeams);
+      const scopedTeams = ownFrbTeams.filter((team) => !syncedTeamIds.has(Number(team.id)));
 
       const frbEventGroups = await Promise.all(
         scopedTeams.map(async (team) => {
@@ -1311,6 +1314,10 @@ function PlayerHomeScreen() {
               ) : (
                 <EmptyState icon="scoreboard" compact title="Niciun rezultat disponibil încă" message="Rezultatele meciurilor jucate apar aici." />
               )}
+            </View>
+
+            <View className="w-full xl:max-w-[640px]">
+              <TeamStandingsCard teams={standingTeams} onOpenTeam={(id) => router.push(`/team/${id}` as any)} />
             </View>
           </View>
         )}

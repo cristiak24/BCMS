@@ -13,6 +13,7 @@ import { AttendanceRate, Chip, CoachPlayerRow, SessionRow, StatTile } from '../.
 import { attendanceRateColor, getPlayerBadge } from '../../../components/coach/coachDisplay';
 import { formatCoachDate, getEventTimestamp, isUpcoming } from '../../../components/coach/coachUtils';
 import BulkAddPlayersDialog from '../../../components/family/BulkAddPlayersDialog';
+import TeamStandingsCard from '../../../components/standings/TeamStandingsCard';
 
 /**
  * A coach's own squad in full — the roster TeamCard on /coach/teams only
@@ -217,6 +218,8 @@ export default function CoachTeamDetailScreen() {
                 upcomingEvents.map((event) => <SessionRow key={event.id} event={event} />)
               )}
             </View>
+
+            <TeamStandingsCard teams={team ? [team] : null} full />
           </View>
         )}
       </PageContainer>

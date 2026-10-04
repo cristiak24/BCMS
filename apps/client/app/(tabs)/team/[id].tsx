@@ -9,6 +9,7 @@ import PageContainer from '../../../components/ui/PageContainer';
 import PageHeader from '../../../components/ui/PageHeader';
 import { teamsApi, MyTeamDetail, MyTeamEvent, MyTeamPastEvent } from '../../../services/teamsApi';
 import { GENDER_LABELS, LEVEL_LABELS } from '../../../components/myclub/teamDisplay';
+import TeamStandingsCard from '../../../components/standings/TeamStandingsCard';
 import {
   attendanceRateColor,
   attendanceStatusTone,
@@ -28,12 +29,13 @@ import {
  * data belonging to anyone else).
  */
 
-type TabKey = 'roster' | 'events' | 'attendance';
+type TabKey = 'roster' | 'events' | 'attendance' | 'standings';
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: 'roster', label: 'Lot', icon: 'groups' },
   { key: 'events', label: 'Evenimente', icon: 'event' },
   { key: 'attendance', label: 'Prezența mea', icon: 'fact-check' },
+  { key: 'standings', label: 'Clasament', icon: 'leaderboard' },
 ];
 
 function StatTile({ label, value, hint, color }: { label: string; value: string; hint?: string; color?: string }) {
@@ -381,6 +383,8 @@ export default function PlayerTeamDetailScreen() {
                 )}
               </View>
             ) : null}
+
+            {tab === 'standings' ? <TeamStandingsCard teamId={team.id} full showWhenEmpty /> : null}
           </View>
         )}
       </PageContainer>

@@ -10,6 +10,7 @@ import PageContainer from '../../components/ui/PageContainer';
 import SectionHeader from '../../components/ui/SectionHeader';
 import StatCard from '../../components/ui/StatCard';
 import ProgressRing from '../../components/ui/ProgressRing';
+import TeamStandingsCard from '../../components/standings/TeamStandingsCard';
 import HeroBanner, { formatToday, getGreeting, HeroButton, HeroChip } from '../../components/ui/HeroBanner';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
@@ -350,6 +351,12 @@ export default function CoachDashboardScreen() {
 
   const teamIds = new Set(scopedEvents.map((event) => event.teamId).filter((id): id is number => id != null));
   const visibleTeamsCount = teamIds.size || teams.length;
+  // Same scope as /coach/teams: the teams of the coach's sessions, else all.
+  const teamIdKey = [...teamIds].sort((a, b) => a - b).join(',');
+  const coachTeams = useMemo(() => {
+    const ids = new Set(teamIdKey ? teamIdKey.split(',').map(Number) : []);
+    return ids.size ? teams.filter((team) => ids.has(team.id)) : teams;
+  }, [teams, teamIdKey]);
 
   const ratedPlayers = players.filter((player) => player.attendanceRate != null);
   const averageAttendance = ratedPlayers.length
@@ -452,8 +459,9 @@ export default function CoachDashboardScreen() {
 
               {/* Fixed rail from xl up, full width below — at 1280px a shared
                   row keeps both lists above the fold. */}
-              <View className="w-full xl:w-[380px] shrink-0">
+              <View className="w-full xl:w-[380px] shrink-0 gap-4">
                 <SquadHealth players={players} onManage={goToAttendance} />
+                <TeamStandingsCard teams={coachTeams} onOpenTeam={(id) => router.push(`/coach/team/${id}` as any)} />
               </View>
             </View>
           </View>
