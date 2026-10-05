@@ -150,7 +150,7 @@ function KpiCard({
   return (
     <Shell
       {...(onPress ? { onPress, accessibilityRole: 'link' } : {})}
-      className="home-card relative overflow-hidden rounded-[16px] border p-4 md:p-5 min-w-0 h-full flex flex-col text-left"
+      className="home-card relative overflow-hidden rounded-[14px] border p-3.5 md:p-4 min-w-0 h-full flex flex-col text-left"
       style={CARD as any}
     >
       <View className="flex-row items-center justify-between gap-2 min-w-0">
@@ -159,13 +159,13 @@ function KpiCard({
           <View className="w-[3px] h-3 rounded-full shrink-0" style={{ backgroundColor: accent.solid }} />
           <Text className="t-eyebrow flex-1 min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
         </View>
-        <View className="hidden sm:flex w-8 h-8 rounded-[9px] items-center justify-center shrink-0" style={{ backgroundColor: accent.bg }}>
-          <MaterialIcons name={icon} size={16} color={accent.fg} />
+        <View className="hidden sm:flex w-7 h-7 rounded-[9px] items-center justify-center shrink-0" style={{ backgroundColor: accent.bg }}>
+          <MaterialIcons name={icon} size={15} color={accent.fg} />
         </View>
       </View>
 
-      <View className="flex-row items-baseline gap-1 mt-3 min-w-0">
-        <Text className="t-num text-[26px] md:text-[32px] font-bold leading-none" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any} numberOfLines={1}>
+      <View className="flex-row items-baseline gap-1 mt-2.5 min-w-0">
+        <Text className="f-display t-num text-[24px] md:text-[28px] font-extrabold leading-none" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any} numberOfLines={1}>
           {shown == null || shown === '' ? '—' : shown}
         </Text>
         {suffix && shown != null ? (
@@ -174,14 +174,14 @@ function KpiCard({
       </View>
 
       {progress != null ? (
-        <View className="h-1 rounded-full overflow-hidden mt-3" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+        <View className="h-1 rounded-full overflow-hidden mt-2.5" style={{ backgroundColor: 'var(--c-surface-3)' }}>
           <View className="ui-bar h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, progress))}%`, backgroundColor: accent.solid }} />
         </View>
       ) : null}
 
       {/* Spacer pins the footer to the bottom so footers line up across a row. */}
-      <View className="flex-1 min-h-3" />
-      <View className="flex-row items-center gap-2 pt-3 min-w-0" style={{ borderTopWidth: 1, borderTopColor: 'var(--c-border-soft)' } as any}>
+      <View className="flex-1 min-h-2" />
+      <View className="flex-row items-center gap-2 pt-2.5 min-w-0" style={{ borderTopWidth: 1, borderTopColor: 'var(--c-border-soft)' } as any}>
         {delta ? (
           <View className="flex-row items-center gap-0.5 rounded-full px-1.5 py-0.5 shrink-0" style={{ backgroundColor: DELTA_TONE[delta.direction].bg }}>
             <MaterialIcons name={DELTA_TONE[delta.direction].icon} size={11} color={DELTA_TONE[delta.direction].fg} />
@@ -201,14 +201,14 @@ function QuickAction({ icon, tone, label, detail, onPress }: { icon: string; ton
       onPress={onPress}
       accessibilityRole="link"
       accessibilityLabel={label}
-      className="home-card rounded-[14px] border px-3 py-3 sm:px-3.5 flex-row items-center gap-2.5 sm:gap-3 min-w-0 text-left"
+      className="home-card rounded-[14px] border px-3 py-2.5 flex-row items-center gap-2.5 min-w-0 text-left"
       style={CARD as any}
     >
-      <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: accent.bg }}>
-        <MaterialIcons name={icon} size={18} color={accent.fg} />
+      <View className="w-8 h-8 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: accent.bg }}>
+        <MaterialIcons name={icon} size={17} color={accent.fg} />
       </View>
       <View className="flex-1 min-w-0">
-        <Text className="text-[13.5px] sm:text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{label}</Text>
+        <Text className="f-display text-[13.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{label}</Text>
         <Text className="t-meta hidden sm:flex" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{detail}</Text>
       </View>
       <View className="home-arrow hidden sm:flex">
@@ -235,13 +235,13 @@ function SectionCard({
 }) {
   const accent = ACCENT[tone];
   return (
-    <View className="rounded-[16px] border overflow-hidden" style={CARD as any}>
-      <View className="flex-row items-center gap-3 px-4 md:px-5 py-3.5 mb-3" style={{ borderBottomWidth: 1, borderBottomColor: 'var(--c-border-soft)' } as any}>
+    <View className="rounded-[14px] border overflow-hidden" style={CARD as any}>
+      <View className="flex-row items-center gap-3 px-4 md:px-5 py-3 mb-3" style={{ borderBottomWidth: 1, borderBottomColor: 'var(--c-border-soft)' } as any}>
         <View className="w-8 h-8 rounded-[9px] items-center justify-center shrink-0" style={{ backgroundColor: accent.bg }}>
           <MaterialIcons name={icon} size={16} color={accent.fg} />
         </View>
         <View className="flex-1 min-w-0">
-          <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-ink)', letterSpacing: '-0.01em' } as any} numberOfLines={1}>{title}</Text>
+          <Text className="f-display text-[15px] font-bold" style={{ color: 'var(--c-ink)', letterSpacing: '-0.015em' } as any} numberOfLines={1}>{title}</Text>
           {subtitle ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{subtitle}</Text> : null}
         </View>
         {action ? (
@@ -297,10 +297,10 @@ function HeaderChip({ icon, label, tone }: { icon: string; label: string; tone?:
 
 /** Header aside: the very next event, with a live dot and a countdown. */
 function NextEventPanel({ event, onPress }: { event: CalendarEvent | null | undefined; onPress: (id: CalendarEvent['id']) => void }) {
-  const panel = { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any;
+  const panel = { boxShadow: 'var(--e-md)' } as any;
   if (!event) {
     return (
-      <View className="rounded-[12px] border px-4 py-4 md:w-[320px]" style={panel}>
+      <View className="glass rounded-[14px] px-4 py-3.5 md:w-[300px]" style={panel}>
         <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Următorul eveniment</Text>
         <Text className="text-[14px] font-medium mt-2" style={{ color: 'var(--c-ink-soft)' }}>
           {event === undefined ? 'Se încarcă…' : 'Nimic programat în 7 zile.'}
@@ -314,7 +314,7 @@ function NextEventPanel({ event, onPress }: { event: CalendarEvent | null | unde
       onPress={() => onPress(event.id)}
       accessibilityRole="link"
       accessibilityLabel={`Următorul eveniment: ${event.title}`}
-      className="home-row ui-press relative overflow-hidden rounded-[12px] border pl-4 pr-3.5 py-3.5 md:w-[320px] text-left hover:bg-[var(--c-surface-3)]"
+      className="glass home-row ui-press ui-lift relative overflow-hidden rounded-[14px] pl-4 pr-3.5 py-3 md:w-[300px] text-left"
       style={panel}
     >
       <View pointerEvents="none" className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: meta.solid }} />
@@ -325,7 +325,7 @@ function NextEventPanel({ event, onPress }: { event: CalendarEvent | null | unde
         </View>
         <Text className="t-num text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{countdown(event.startTime)}</Text>
       </View>
-      <Text className="text-[16px] font-semibold mt-2 leading-snug" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{event.title}</Text>
+      <Text className="f-display text-[16px] font-bold mt-1.5 leading-snug" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{event.title}</Text>
       <Text className="t-meta mt-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
         {[`${dayLabel(new Date(event.startTime))}, ${time(event.startTime)}`, meta.label, event.teamName].filter(Boolean).join(' · ')}
       </Text>
@@ -587,15 +587,16 @@ export default function Dashboard() {
       <ScrollView className="flex-1" contentContainerClassName="pb-36" showsVerticalScrollIndicator={false}>
         <View>
           <PageContainer>
-            <View className="gap-5">
+            <View className="gap-4">
               {/* Welcome panel */}
               <View className="ui-rise relative overflow-hidden rounded-[16px] border" style={CARD as any}>
+                <View pointerEvents="none" className="absolute rounded-full" style={{ width: 300, height: 300, right: -70, top: -130, backgroundColor: 'var(--c-surface-tint)', opacity: 0.85 }} />
                 <CourtLines />
-                <View className="relative flex-col md:flex-row md:items-center gap-5 p-5 md:p-6">
+                <View className="relative flex-col md:flex-row md:items-center gap-4 p-4 md:p-5">
                   <View className="flex-1 min-w-0">
                     <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{formatToday()}</Text>
                     <Text
-                      className="text-[24px] md:text-[30px] font-bold mt-1.5 leading-tight"
+                      className="f-display text-[22px] md:text-[28px] font-extrabold mt-1 leading-tight"
                       style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.035em' } as any}
                       numberOfLines={2}
                     >
@@ -604,7 +605,7 @@ export default function Dashboard() {
                     <Text className="text-[14px] mt-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
                       {session?.clubName ?? 'Clubul tău'}
                     </Text>
-                    <View className="flex-row flex-wrap gap-1.5 mt-4">
+                    <View className="flex-row flex-wrap gap-1.5 mt-3">
                       <HeaderChip icon="event" label={weekEvents ? `${weekEvents.length} ${weekEvents.length === 1 ? 'eveniment' : 'evenimente'} în 7 zile` : 'Se încarcă…'} />
                       {matchesThisWeek ? <HeaderChip icon="sports-basketball" label={`${matchesThisWeek} ${matchesThisWeek === 1 ? 'meci' : 'meciuri'}`} /> : null}
                       {!loadingSummary ? (
@@ -613,7 +614,7 @@ export default function Dashboard() {
                           : <HeaderChip icon="verified" tone="success" label="Totul la zi" />
                       ) : null}
                     </View>
-                    <View className="flex-row flex-wrap gap-2 mt-4">
+                    <View className="flex-row flex-wrap gap-2 mt-3">
                       <Button variant="primary" icon="calendar-month" label="Program" onPress={() => go('/admin/schedule')} />
                       <Button icon="groups" label="Lot" onPress={() => go('/admin/roster')} className="hidden sm:flex" />
                     </View>
@@ -625,10 +626,10 @@ export default function Dashboard() {
               {/* KPIs */}
               {loadingSummary ? (
                 <View className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                  {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[150px] w-full rounded-[16px]" />)}
+                  {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[120px] w-full rounded-[14px]" />)}
                 </View>
               ) : summary ? (
-                <View className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 ui-stagger">
+                <View className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 ui-stagger">
                   <KpiCard
                     icon="groups"
                     tone="brand"
@@ -670,8 +671,8 @@ export default function Dashboard() {
               ) : null}
 
               {/* Quick actions */}
-              <View className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 ui-stagger">
-                <QuickAction icon="calendar-month" tone="brand" label="Program" detail="Antrenamente și meciuri" onPress={() => go('/admin/schedule')} />
+              <View className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 ui-stagger">
+                <QuickAction icon="calendar-month" tone="brand" label="Program" detail="Antrenamente, meciuri" onPress={() => go('/admin/schedule')} />
                 <QuickAction icon="assignment" tone="sky" label="Liste L12" detail="Loturile pentru meciuri" onPress={() => go('/admin/l12')} />
                 <QuickAction icon="verified-user" tone="success" label="Conformitate" detail="Vize și documente" onPress={() => go('/admin/compliance')} />
                 {canSeeFinance ? (
@@ -684,7 +685,7 @@ export default function Dashboard() {
               {/* Phones: what needs fixing comes before the schedule. */}
               <View className="lg:hidden ui-rise">{attentionCard}</View>
 
-              <View className="flex-col lg:flex-row lg:items-start gap-5">
+              <View className="flex-col lg:flex-row lg:items-start gap-4">
                 {/* Left: next 7 days */}
                 <View className="flex-1 min-w-0 gap-5 ui-rise">
                   <SectionCard

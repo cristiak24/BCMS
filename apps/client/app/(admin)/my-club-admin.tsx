@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from '@/src/web/reactNative';
 import { useRouter } from '@/src/web/expoRouter';
-import { RefreshCw, Plus } from 'lucide-react';
-import AdminHero from '../../components/admin/AdminHero';
+import { useSession } from '../../context/AuthContext';
 import { basketballApi } from '../../services/basketballApi';
 import { teamsApi, Team, Coach } from '../../services/teamsApi';
 import { useTeamFilters } from '../../hooks/useTeamFilters';
 import { isFrbTeam } from '../../components/myclub/teamDisplay';
-import MyClubKpiStrip from '../../components/myclub/MyClubKpiStrip';
+import MyClubHero from '../../components/myclub/MyClubHero';
 import MyClubSkeleton from '../../components/myclub/MyClubSkeleton';
 import TeamFiltersBar from '../../components/myclub/TeamFiltersBar';
 import BulkActionBar from '../../components/myclub/BulkActionBar';
@@ -35,6 +34,7 @@ async function syncFrbTeam(team: Team): Promise<Team | null> {
 
 export default function MyClubAdmin() {
     const router = useRouter();
+    const { session } = useSession() as any;
 
     const [teams, setTeams] = useState<Team[]>([]);
     const [coaches, setCoaches] = useState<Coach[]>([]);
@@ -294,32 +294,15 @@ export default function MyClubAdmin() {
     );
 
     return (
-        <View className="flex-1 w-full mx-auto bg-[#EDF4FB] pb-20">
-            <ScrollView className="flex-1 w-full px-4 md:px-8 xl:px-12 pt-8 md:pt-10" showsVerticalScrollIndicator={false}>
+        <View className="flex-1 w-full mx-auto pb-20" style={{ backgroundColor: 'var(--c-bg)' }}>
+            <ScrollView className="flex-1 w-full px-4 md:px-8 xl:px-12 pt-5 md:pt-7" showsVerticalScrollIndicator={false}>
 
-                <AdminHero
-                    title="Clubul meu"
-                    subtitle="Administrarea echipelor clubului"
-                >
-                    <View className="flex-row gap-2">
-                        <Pressable
-                            onPress={() => openWizard('frb')}
-                            className="flex-row items-center gap-2 h-10 px-3.5 rounded-[10px] border"
-                            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
-                        >
-                            <RefreshCw size={14} color="var(--c-brand-fg)" />
-                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Importă din FRB</Text>
-                        </Pressable>
-                        <Pressable
-                            onPress={() => openWizard()}
-                            className="flex-row items-center gap-2 h-10 px-3.5 rounded-[10px]"
-                            style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)' } as any}
-                        >
-                            <Plus size={14} color="var(--c-on-brand)" />
-                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-on-brand)' }}>Creează echipă</Text>
-                        </Pressable>
-                    </View>
-                </AdminHero>
+                <MyClubHero
+                    teams={teams}
+                    clubName={session?.clubName}
+                    onImport={() => openWizard('frb')}
+                    onCreate={() => openWizard()}
+                />
 
                 {loading ? (
                     <MyClubSkeleton />
@@ -327,8 +310,6 @@ export default function MyClubAdmin() {
                     <NoTeamsEmptyState onImport={() => openWizard('frb')} onCreate={() => openWizard()} />
                 ) : (
                     <>
-                        <MyClubKpiStrip teams={teams} />
-
                         <TeamFiltersBar
                             filters={filters}
                             setFilter={setFilter}
@@ -356,11 +337,11 @@ export default function MyClubAdmin() {
                         />
 
                         <View className="flex-row items-center justify-between gap-3 mb-3">
-                            <Text className="text-[12px] font-bold text-[#64748B]">{filteredTeams.length} din {teams.length} echipe</Text>
+                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>{filteredTeams.length} din {teams.length} echipe</Text>
                             {filteredTeams.length > 0 && (
                                 <Pressable onPress={toggleSelectAll} className="flex-row items-center gap-2 px-1 py-1">
                                     <ThemedCheckbox checked={allFilteredSelected} onToggle={toggleSelectAll} ariaLabel={selectAllLabel} size={17} />
-                                    <Text className="text-[12px] font-bold text-[#475569]">{selectAllLabel}</Text>
+                                    <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{selectAllLabel}</Text>
                                 </Pressable>
                             )}
                         </View>
@@ -368,7 +349,7 @@ export default function MyClubAdmin() {
                         {filteredTeams.length === 0 ? (
                             <NoResultsEmptyState onReset={resetFilters} />
                         ) : view === 'grid' ? (
-                            <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 w-full">
+                            <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 w-full ui-stagger">
                                 {filteredTeams.map((team) => (
                                     <TeamCard
                                         key={team.id}
