@@ -26,7 +26,7 @@ import { AddEventModal } from '../../components/schedule/admin/AddEventModal';
 import { DayScheduleModal } from '../../components/schedule/admin/DayScheduleModal';
 import { EventAttendanceModal } from '../../components/schedule/admin/EventAttendanceModal';
 import { FilterModal } from '../../components/schedule/admin/FilterModal';
-import PageHeader from '../../components/ui/PageHeader';
+import PageHero from '../../components/admin/PageHero';
 import Button from '../../components/ui/Button';
 import TeamMedicalVisaModal from '../../components/schedule/admin/TeamMedicalVisaModal';
 import TeamPaymentsReportModal from '../../components/schedule/admin/TeamPaymentsReportModal';
@@ -522,47 +522,58 @@ export default function ScheduleScreen() {
     </View>
   );
 
+  const topTabs = (
+    <View
+      className="flex-row items-center self-start rounded-[10px] p-[3px] gap-[2px] shrink min-w-0"
+      style={{ backgroundColor: 'var(--c-surface-3)' }}
+      accessibilityRole={'tablist' as any}
+    >
+      {(['Monthly', 'Attendance', 'Grade'] as const).map((tab) => (
+        <TouchableOpacity
+          key={tab}
+          onPress={() => setActiveTab(tab)}
+          accessibilityRole={'tab' as any}
+          accessibilityState={{ selected: activeTab === tab }}
+          className="px-2.5 h-8 rounded-[8px] justify-center"
+          style={activeTab === tab ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
+        >
+          <Text
+            numberOfLines={1}
+            className="text-[12.5px] font-semibold"
+            style={{ color: activeTab === tab ? 'var(--c-ink)' : 'var(--c-muted)' }}
+          >
+            {TOP_TAB_LABELS[tab]}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
   return (
     <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
-      <PageHeader
-        title="Program"
-        className="px-6 xl:px-8 pt-4 !mb-0"
-        actionsOnMobile={false}
-        actions={<Button icon="add" label="Adaugă eveniment" variant="primary" onPress={() => { setAddEventDate(null); setShowAddModal(true); }} />}
-      />
+      {isMobile ? null : (
+        <View className="px-6 xl:px-8 pt-4">
+          <PageHero
+            eyebrow="Program"
+            title="Calendarul clubului"
+            subtitle="Antrenamente, meciuri și evenimente, într-un singur loc."
+            className="mb-0"
+            actions={<Button icon="add" label="Adaugă eveniment" variant="primary" onPress={() => { setAddEventDate(null); setShowAddModal(true); }} />}
+          >
+            {topTabs}
+          </PageHero>
+        </View>
+      )}
       {/* Lunar / Prezență / Notare share one row with the calendar view icons
           (on phones the view icons sit at the right of the same row). */}
-      {(
-        <View className={`flex-row items-center justify-between gap-2 ${isMobile ? 'px-4 pt-3' : 'px-6 xl:px-8 pt-3'}`}>
-          <View
-            className="flex-row items-center rounded-[10px] p-[3px] gap-[2px] shrink min-w-0"
-            style={{ backgroundColor: 'var(--c-surface-3)' }}
-            accessibilityRole={'tablist' as any}
-          >
-            {(['Monthly', 'Attendance', 'Grade'] as const).map((tab) => (
-              <TouchableOpacity
-                key={tab}
-                onPress={() => setActiveTab(tab)}
-                accessibilityRole={'tab' as any}
-                accessibilityState={{ selected: activeTab === tab }}
-                className="px-2.5 h-8 rounded-[8px] justify-center"
-                style={activeTab === tab ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
-              >
-                <Text
-                  numberOfLines={1}
-                  className="text-[12.5px] font-semibold"
-                  style={{ color: activeTab === tab ? 'var(--c-ink)' : 'var(--c-muted)' }}
-                >
-                  {TOP_TAB_LABELS[tab]}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {activeTab === 'Monthly' && !isDesktop ? (
+      {isMobile ? (
+        <View className="flex-row items-center justify-between gap-2 px-4 pt-3">
+          {topTabs}
+          {activeTab === 'Monthly' ? (
             <ScheduleViewSwitcher view={scheduleView} onViewChange={changeView} iconOnly />
           ) : null}
         </View>
-      )}
+      ) : null}
       {activeTab === 'Monthly' && (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 132 }}>
           {renderMonthlyBody()}

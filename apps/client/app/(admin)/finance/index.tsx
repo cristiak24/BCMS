@@ -6,8 +6,7 @@ import { financeApi, FinancialSettings, FinancialDocument, StripeAdminConfig, Ad
 import { useResponsive } from '../../../hooks/useResponsive';
 import { buildServerUrl, resolveDocumentUrl } from '../../../config/serverUrl';
 import { apiFetch } from '../../../services/apiClient';
-import AdminHero from '../../../components/admin/AdminHero';
-import StatCard from '../../../components/ui/StatCard';
+import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import { EmptyState, SkeletonBlock } from '../../../components/dashboard/ScreenStates';
 import { dash } from '../../../components/dashboard/dashboardTheme';
 
@@ -122,7 +121,7 @@ function SectionHeader({ icon, iconBg, iconFg, title, subtitle }: {
                 <MaterialIcons name={icon} size={18} color={iconFg} />
             </View>
             <View className="flex-1 min-w-0">
-                <Text className="text-[16px] font-bold" style={{ color: dash.ink }}>{title}</Text>
+                <Text className="f-display text-[16px] font-bold" style={{ color: dash.ink, letterSpacing: '-0.015em' } as any}>{title}</Text>
                 <Text className="t-meta mt-0.5" style={{ color: dash.muted }}>{subtitle}</Text>
             </View>
         </View>
@@ -430,72 +429,69 @@ export default function FinancialSettingsPage() {
         >
 
             {/* ──────────── HEADER + TABS ──────────── */}
-            <AdminHero
-                title="Finanțe"
-                subtitle="Facturare, plăți și documente contabile."
-                className={`${isMobile ? 'gap-5' : 'flex-row items-end justify-between'} mb-6`}
+            <PageHero
+                eyebrow="Finanțe"
+                title="Finanțele clubului"
+                subtitle="Cotizații, plăți și documente contabile."
+                className="mb-4"
+                actions={
+                    <View
+                        className="flex-row gap-[2px] rounded-[10px] p-[3px] self-start"
+                        style={{ backgroundColor: 'var(--c-surface-3)' }}
+                    >
+                        {TABS.map(tab => {
+                            const active = activeTab === tab;
+                            return (
+                                <Pressable
+                                    key={tab}
+                                    onPress={() => setActiveTab(tab)}
+                                    className="rounded-[8px] px-3.5 h-8 justify-center"
+                                    style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
+                                >
+                                    <Text className="text-[12px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>{TAB_LABELS[tab] ?? tab}</Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                }
             >
-                {/* Segmented control on the page surface (was a white-on-navy
-                    bar that turned invisible once the hero stopped being navy). */}
-                <View
-                    className={`gap-[2px] rounded-[10px] p-[3px] ${isMobile ? 'flex-row flex-wrap self-start' : 'flex-row'}`}
-                    style={{ backgroundColor: 'var(--c-surface-3)' }}
-                >
-                    {TABS.map(tab => {
-                        const active = activeTab === tab;
-                        return (
-                            <Pressable
-                                key={tab}
-                                onPress={() => setActiveTab(tab)}
-                                className="rounded-[8px] px-3.5 h-8 justify-center"
-                                style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
-                            >
-                                <Text className="text-[12px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>{TAB_LABELS[tab] ?? tab}</Text>
-                            </Pressable>
-                        );
-                    })}
-                </View>
-            </AdminHero>
+                {activeTab === 'Finances' ? (
+                    <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
+                        <GlassStat
+                            dot="var(--c-purple)"
+                            label="Cotizație"
+                            hint="per jucător / lună"
+                            value={loadingSettings ? '—' : `${settings?.monthlyPlayerFee ?? 0}`}
+                            suffix={loadingSettings ? undefined : 'RON'}
+                        />
+                        <GlassStat
+                            dot="var(--c-success)"
+                            label="Încasări"
+                            hint={`${recentPayments.length} plăți recente`}
+                            value={loadingRecentPayments ? '—' : Math.round(financeStats.collectedAmount).toLocaleString('ro-RO')}
+                            suffix={loadingRecentPayments ? undefined : 'RON'}
+                        />
+                        <GlassStat
+                            dot="var(--c-warning)"
+                            label="De verificat"
+                            hint={loadingDocuments ? undefined : formatCurrency(financeStats.pendingAmount)}
+                            value={loadingDocuments ? '—' : financeStats.pendingCount}
+                        />
+                        <GlassStat
+                            dot="var(--c-sky)"
+                            label="Documente"
+                            hint={loadingDocuments ? undefined : `${formatCurrency(financeStats.approvedAmount)} aprobat`}
+                            value={loadingDocuments ? '—' : uploads.length}
+                        />
+                    </View>
+                ) : null}
+            </PageHero>
 
             {/* ═══════════════════════════════════════════════════════
                TAB: Finances
                ═══════════════════════════════════════════════════════ */}
             {activeTab === 'Finances' && (
                 <View className="mb-20">
-
-                    {/* ── Overview KPIs: 2×2 on phones, one row on desktop ── */}
-                    <View className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-                        <StatCard
-                            icon="account-balance-wallet"
-                            tone="purple"
-                            label="Cotizație"
-                            value={loadingSettings ? '—' : `${settings?.monthlyPlayerFee ?? 0}`}
-                            suffix={loadingSettings ? undefined : ' RON'}
-                            hint="per jucător / lună"
-                        />
-                        <StatCard
-                            icon="payment"
-                            tone="success"
-                            label="Încasări"
-                            value={loadingRecentPayments ? '—' : Math.round(financeStats.collectedAmount).toLocaleString('ro-RO')}
-                            suffix={loadingRecentPayments ? undefined : ' RON'}
-                            hint={`${recentPayments.length} plăți recente`}
-                        />
-                        <StatCard
-                            icon="schedule"
-                            tone="warning"
-                            label="De verificat"
-                            value={loadingDocuments ? '—' : financeStats.pendingCount}
-                            hint={loadingDocuments ? undefined : formatCurrency(financeStats.pendingAmount)}
-                        />
-                        <StatCard
-                            icon="receipt-long"
-                            tone="sky"
-                            label="Documente"
-                            value={loadingDocuments ? '—' : uploads.length}
-                            hint={loadingDocuments ? undefined : `${formatCurrency(financeStats.approvedAmount)} aprobat`}
-                        />
-                    </View>
 
                     {/* ── Row: Monthly Fee + Upload ─────────────────── */}
                     <View className={`gap-4 mb-5 ${isMobile ? '' : 'flex-row'}`}>

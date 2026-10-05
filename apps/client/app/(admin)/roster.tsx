@@ -7,7 +7,7 @@ import { useResponsive } from '../../hooks/useResponsive';
 import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../components/HeaderContext';
 import { dash } from '../../components/dashboard/dashboardTheme';
 import { EmptyState, ErrorState, SkeletonBlock } from '../../components/dashboard/ScreenStates';
-import AdminHero from '../../components/admin/AdminHero';
+import PageHero, { GlassStat } from '../../components/admin/PageHero';
 import PlayerRow from '../../components/roster/PlayerRow';
 import RosterPlayerCard from '../../components/roster/RosterPlayerCard';
 import RosterFilters from '../../components/roster/RosterFilters';
@@ -490,54 +490,13 @@ export default function RosterScreen() {
     );
   }
 
-  // One compact stat band replaces both the old white-on-navy readiness panel
-  // (which turned into an invisible "ghost card" once AdminHero stopped being a
-  // navy slab) and the two oversized 42px summary cards. Same four numbers,
-  // a fraction of the vertical space, plus the payment-reminder action inline.
-  const statCells: { label: string; value: string; tone?: 'default' | 'danger'; bar?: number }[] = [
-    { label: 'Prezență generală', value: `${attendanceValue.toFixed(1)}%` },
-    { label: 'Plăți la zi', value: `${rosterReadiness}%`, bar: rosterReadiness },
-    { label: 'Sportivi în lot', value: String(players.length) },
-    { label: 'Plăți restante', value: String(pendingPayments), tone: pendingPayments > 0 ? 'danger' : 'default' },
-  ];
-
-  const statBand = (
-    <View
-      className="grid grid-cols-2 xl:grid-cols-4 rounded-[14px] border overflow-hidden mb-4 w-full"
-      style={{ backgroundColor: dash.surface, borderColor: dash.hairlineStrong }}
-    >
-      {statCells.map((cell, i) => (
-        <View
-          key={cell.label}
-          className="px-4 py-3.5 border-b xl:border-b-0 border-r"
-          style={{
-            borderColor: dash.hairline,
-            borderRightWidth: (i % 2 === 1 && i >= 2) || i === 3 ? 0 : 1,
-          } as any}
-        >
-          <Text className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: dash.faint }} numberOfLines={1}>
-            {cell.label}
-          </Text>
-          <Text
-            className="text-[22px] font-bold leading-none mt-1.5 tabular"
-            style={{ color: cell.tone === 'danger' ? dash.danger : dash.ink }}
-          >
-            {cell.value}
-          </Text>
-          {typeof cell.bar === 'number' ? (
-            <View className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: dash.surfaceSubtle }}>
-              <View className="h-full rounded-full" style={{ width: `${cell.bar}%`, backgroundColor: 'var(--c-brand-surface)' }} />
-            </View>
-          ) : null}
-        </View>
-      ))}
-    </View>
-  );
-
   const headerContent = (
     <>
-      <AdminHero title="Lot de jucători" subtitle="Prezență, echipe și plăți, într-o singură vedere.">
-        {pendingPayments > 0 ? (
+      <PageHero
+        eyebrow="Lot"
+        title="Lotul de jucători"
+        subtitle="Prezență, echipe și plăți, într-o singură vedere."
+        actions={pendingPayments > 0 ? (
           <TouchableOpacity
             onPress={handleSendReminders}
             disabled={sendingReminders}
@@ -549,15 +508,20 @@ export default function RosterScreen() {
               {sendingReminders ? 'Se trimite...' : `Trimite mementouri (${pendingPayments})`}
             </Text>
           </TouchableOpacity>
-        ) : null}
-      </AdminHero>
-
-      {statBand}
+        ) : undefined}
+      >
+        <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
+          <GlassStat dot="var(--c-brand-fg)" value={`${attendanceValue.toFixed(1)}%`} label="Prezență generală" />
+          <GlassStat dot="var(--c-success)" value={`${rosterReadiness}%`} label="Plăți la zi" bar={rosterReadiness} />
+          <GlassStat dot="var(--c-muted)" value={players.length} label="Sportivi în lot" />
+          <GlassStat dot={pendingPayments > 0 ? 'var(--c-danger)' : 'var(--c-success)'} danger={pendingPayments > 0} value={pendingPayments} label="Plăți restante" />
+        </View>
+      </PageHero>
 
       <View className="rounded-[16px] p-4 border" style={{ backgroundColor: dash.surface, borderColor: dash.hairlineStrong, ...dash.shadow.sm }}>
         <View className={`mb-4 ${isMobile ? 'gap-3' : 'flex-row items-center justify-between'}`}>
           <View>
-            <Text className="text-[17px] font-bold" style={{ color: dash.ink }}>
+            <Text className="f-display text-[17px] font-bold" style={{ color: dash.ink, letterSpacing: '-0.015em' } as any}>
               Sportivi
             </Text>
             <Text className="mt-0.5 text-[13px]" style={{ color: dash.muted }}>
