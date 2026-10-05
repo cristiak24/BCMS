@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
+import { useFocusEffect } from '@/src/web/reactNavigationNative';
 import { eventsApi, CalendarEvent } from '../../services/eventsApi';
 import { basketballApi, Match } from '../../services/basketballApi';
 import { teamsApi, Player, Team } from '../../services/teamsApi';
@@ -1012,9 +1013,9 @@ function PlayerHomeScreen() {
     }
   }, [session]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  // Refetches on mount AND when the app/tab resumes after a while in the
+  // background, instead of leaving a stale or failed load on screen.
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const filteredEvents = useMemo(
     () => events.filter((event) => sessionMatchesSearch(event, searchValue)),

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
+import { useFocusEffect } from '@/src/web/reactNavigationNative';
 import { CalendarEvent, eventsApi } from '../../services/eventsApi';
 import { teamsApi, type Player, type Team } from '../../services/teamsApi';
 import { useSession } from '../../context/AuthContext';
@@ -335,9 +336,9 @@ export default function CoachDashboardScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  // Refetches on mount AND when the app/tab resumes after a while in the
+  // background, instead of leaving a stale or failed load on screen.
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const scopedEvents = useMemo(() => getCoachScopedEvents(events, session), [events, session]);
   const upcomingEvents = useMemo(

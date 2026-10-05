@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
+import { useFocusEffect } from '@/src/web/reactNavigationNative';
 import { useSession } from '../../context/AuthContext';
 import PageContainer from '../../components/ui/PageContainer';
 import { formatToday, getGreeting } from '../../components/ui/HeroBanner';
@@ -434,11 +435,12 @@ export default function Dashboard() {
     }
   }, []);
 
-  useEffect(() => {
+  const loadDashboard = useCallback(() => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     const end = new Date(start.getTime() + 8 * DAY);
 
+    setSummaryFailed(false);
     dashboardApi.getSummary().then(setSummary).catch(() => setSummaryFailed(true));
     eventsApi.getEvents({ start: start.toISOString(), end: end.toISOString() })
       .then((rows) => setEvents(rows.filter((e) => e.status !== 'cancelled')))
@@ -452,6 +454,11 @@ export default function Dashboard() {
     });
     loadResults();
   }, [loadResults]);
+
+  // Refetches on mount AND when the app/tab resumes after a while in the
+  // background — otherwise a phone left backgrounded for a day reopens to
+  // whatever (or nothing) loaded on the last successful mount.
+  useFocusEffect(loadDashboard);
 
   const weekEvents = useMemo(() => {
     if (!events) return null;
