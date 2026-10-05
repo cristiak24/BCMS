@@ -61,7 +61,7 @@ export function isOwnSide(side: string | null, teamName: string | null) {
   return a === b || a.includes(b) || b.includes(a);
 }
 
-export function TeamAvatar({ name, mine, size = 24 }: { name: string; mine?: boolean; size?: number }) {
+export function TeamAvatar({ name, mine, size = 22 }: { name: string; mine?: boolean; size?: number }) {
   return (
     <View
       className="items-center justify-center rounded-full shrink-0"
@@ -132,16 +132,16 @@ function DateBlock({ iso, kind, played }: { iso: string; kind: MatchKind; played
   const valid = !Number.isNaN(date.getTime());
   return (
     <View
-      className="w-[62px] sm:w-[72px] items-center justify-center py-3 shrink-0"
+      className="w-[50px] sm:w-[56px] items-center justify-center py-2 shrink-0"
       style={{ backgroundColor: meta.bg, opacity: played ? 0.7 : 1 }}
     >
-      <Text className="text-[11px] font-semibold capitalize" style={{ color: meta.fg, opacity: 0.85 }}>
+      <Text className="text-[10px] font-semibold capitalize" style={{ color: meta.fg, opacity: 0.85 }}>
         {valid ? date.toLocaleDateString('ro-RO', { weekday: 'short' }).replace('.', '') : ''}
       </Text>
-      <Text className="f-display text-[24px] sm:text-[26px] font-extrabold leading-none mt-0.5" style={{ color: meta.fg }}>
+      <Text className="f-display text-[20px] font-extrabold leading-none mt-0.5" style={{ color: meta.fg }}>
         {valid ? date.getDate() : '–'}
       </Text>
-      <Text className="text-[11px] font-semibold mt-0.5" style={{ color: meta.fg, opacity: 0.85 }}>
+      <Text className="text-[10px] font-semibold mt-0.5" style={{ color: meta.fg, opacity: 0.85 }}>
         {valid ? date.toLocaleDateString('ro-RO', { month: 'short' }).replace('.', '') : ''}
       </Text>
     </View>
@@ -177,17 +177,17 @@ export function MatchTicket({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`L12 pentru ${match.title}`}
-      className="ui-lift ui-press home-row flex-row items-stretch overflow-hidden rounded-[16px] border text-left"
+      className="ui-lift ui-press home-row flex-row items-stretch overflow-hidden rounded-[14px] border text-left"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}
     >
       <DateBlock iso={match.startTime} kind={kind} played={played} />
 
-      <View className="flex-1 min-w-0 px-3.5 py-3 gap-2 justify-center">
-        <View className="gap-1.5">
+      <View className="flex-1 min-w-0 px-3 py-2 gap-1.5 justify-center">
+        <View className="gap-1">
           {sides.map((side) => (
             <View key={side} className="flex-row items-center gap-2 min-w-0">
               <TeamAvatar name={side} mine={isOwnSide(side, match.teamName)} />
-              <Text className="f-display text-[14.5px] font-semibold flex-1 min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{side}</Text>
+              <Text className="f-display text-[13.5px] font-semibold flex-1 min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{side}</Text>
             </View>
           ))}
         </View>
@@ -207,7 +207,7 @@ export function MatchTicket({
         </View>
       </View>
 
-      <View className="hidden sm:flex items-end justify-center pr-4 pl-2 shrink-0">
+      <View className="hidden sm:flex items-end justify-center pr-3 pl-2 shrink-0">
         <LineupStatus set={match.hasLineup} count={match.playerCount} />
       </View>
     </Pressable>
@@ -234,13 +234,13 @@ export function TeamTile({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`L12 constant pentru ${name}`}
-      className="ui-lift ui-press home-row rounded-[16px] border p-3.5 gap-3 text-left"
+      className="ui-lift ui-press home-row rounded-[14px] border p-3 gap-2.5 text-left"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}
     >
       <View className="flex-row items-center gap-3 min-w-0">
-        <TeamAvatar name={name} mine size={40} />
+        <TeamAvatar name={name} mine size={34} />
         <View className="flex-1 min-w-0">
-          <Text className="f-display text-[15px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{name}</Text>
+          <Text className="f-display text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{name}</Text>
           <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{subtitle}</Text>
         </View>
       </View>
@@ -287,12 +287,12 @@ function CourtLines() {
 
 function StatTile({ value, label, tone }: { value: string | number; label: string; tone: string }) {
   return (
-    <View className="glass flex-1 min-w-0 rounded-[14px] px-3 sm:px-3.5 py-3">
+    <View className="glass flex-1 min-w-0 rounded-[12px] px-3 py-2">
       <View className="flex-row items-center gap-1.5">
         <View className="w-[3px] h-3 rounded-full" style={{ backgroundColor: tone }} />
         <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
       </View>
-      <Text className="f-display t-num text-[26px] font-extrabold leading-none mt-2" style={{ color: 'var(--c-ink-strong)' }}>{value}</Text>
+      <Text className="f-display t-num text-[20px] font-extrabold leading-none mt-1.5" style={{ color: 'var(--c-ink-strong)' }}>{value}</Text>
     </View>
   );
 }
@@ -323,7 +323,7 @@ export function L12Hero({
       : 'Când apar meciuri în Program, lista lor se pregătește de aici.';
 
   return (
-    <View className="ui-rise relative overflow-hidden rounded-[20px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
+    <View className="ui-rise relative overflow-hidden rounded-[16px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
       <View
         pointerEvents="none"
         className="absolute rounded-full"
@@ -331,17 +331,17 @@ export function L12Hero({
       />
       <CourtLines />
 
-      <View className="relative flex-col lg:flex-row lg:items-center gap-5 p-4 sm:p-5 md:p-6">
-        <View className="flex-1 min-w-0 gap-4">
+      <View className="relative flex-col lg:flex-row lg:items-center gap-3.5 p-3.5 sm:p-4 md:p-5">
+        <View className="flex-1 min-w-0 gap-3">
           <View>
             <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Liste de joc · L12</Text>
-            <Text className="f-display text-[24px] md:text-[30px] font-extrabold leading-tight mt-1.5" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any}>
+            <Text className="f-display text-[20px] md:text-[24px] font-extrabold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any}>
               {title}
             </Text>
-            <Text className="text-[14px] mt-1.5 max-w-[520px]" style={{ color: 'var(--c-muted)' }}>{subtitle}</Text>
+            <Text className="text-[13px] mt-1 max-w-[520px]" style={{ color: 'var(--c-muted)' }}>{subtitle}</Text>
           </View>
 
-          <View className="flex-row flex-wrap gap-2.5">
+          <View className="flex-row gap-2">
             <StatTile value={unset} label="Fără L12" tone="var(--c-warning)" />
             <StatTile value={ready} label="Gata" tone="var(--c-success)" />
             <StatTile value={`${teamsSet}/${teamsTotal}`} label="Loturi" tone="var(--c-brand-fg)" />
@@ -349,7 +349,7 @@ export function L12Hero({
         </View>
 
         {next ? (
-          <View className="glass rounded-[16px] p-4 gap-3 lg:w-[330px]" style={{ boxShadow: 'var(--e-md)' } as any}>
+          <View className="glass rounded-[14px] p-3 gap-2.5 lg:w-[300px]" style={{ boxShadow: 'var(--e-md)' } as any}>
             <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{unset > 0 ? 'Următorul meci fără listă' : 'Următorul meci'}</Text>
             <View className="gap-1.5">
               {[next.home, next.away].filter((side): side is string => Boolean(side)).map((side) => (

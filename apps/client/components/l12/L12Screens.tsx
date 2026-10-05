@@ -381,11 +381,11 @@ export function L12HomeScreen() {
                   />
                 ) : (
                   <>
-                    <View className="gap-6">
+                    <View className="grid grid-cols-1 xl:grid-cols-2 gap-x-4 gap-y-4 items-start">
                       {dayGroups.map((group) => (
-                        <View key={group.key + group.label} className="gap-2.5">
+                        <View key={group.key + group.label} className="gap-2">
                           <DayHeading label={group.label} count={group.matches.length} />
-                          <View className="gap-2.5 ui-stagger">
+                          <View className="gap-2 ui-stagger">
                             {group.matches.map((match) => {
                               const [home, away] = sidesOf(match.title);
                               // The club's team is usually one of the two sides already.
@@ -416,7 +416,7 @@ export function L12HomeScreen() {
           ) : (
             <View className="gap-3">
               <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{teamsSet} din {data.teams.length} echipe au L12 constant setat.</Text>
-              <View className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2.5 ui-stagger">
+              <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 ui-stagger">
                 {data.teams.map((team) => (
                   <TeamTile
                     key={team.id}
