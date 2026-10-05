@@ -371,6 +371,35 @@
   }
 }
 
+/* ── Display face + glass (L12, components/l12/L12Visuals.tsx) ─────────
+   .f-display is the friendlier heading/numeral face; body copy stays Inter.
+   .glass is a translucent panel for small surfaces that sit over artwork —
+   never an ancestor of a position:fixed child (backdrop-filter traps them). */
+.f-display {
+  font-family: "Plus Jakarta Sans Variable", "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif;
+}
+.glass {
+  background: color-mix(in srgb, var(--c-surface) 68%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-border) 75%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: var(--c-surface); }
+}
+
+/* A lineup pip pops in when its row appears. No transform in `to` (see dashFadeIn). */
+.l12-pip {
+  animation: l12PipIn 0.4s var(--ease-out) both;
+}
+@keyframes l12PipIn {
+  from { opacity: 0; transform: scale(0.3); }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .l12-pip { animation: none; }
+}
+
 /* ── Route progress (components/ui/RouteProgress.tsx) ─────────────────── */
 .route-progress {
   position: fixed;

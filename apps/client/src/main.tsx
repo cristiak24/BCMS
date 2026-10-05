@@ -4,6 +4,8 @@ import { createRoot } from 'react-dom/client';
 // Bundled rather than pulled from Google Fonts so no visitor IP leaves for a
 // third-party CDN, and the face is identical on macOS, Windows and Android.
 import '@fontsource-variable/inter';
+// Display face for headings and big numerals (L12 so far): rounder and warmer than Inter.
+import '@fontsource-variable/plus-jakarta-sans';
 import './theme/tokens.css';
 import './web/styles.css';
 import '../global.css';

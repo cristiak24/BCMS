@@ -19,6 +19,7 @@ import Button from '../ui/Button';
 import ActionSheet from '../ui/ActionSheet';
 import { downloadL12Word, printL12, type L12DocumentInput } from './l12Document';
 import { StatusChip, useL12Base } from './L12MatchLink';
+import { DayHeading, KIND_META, L12Hero, MatchTicket, TeamTile, matchKind, type HeroNext, type MatchKind } from './L12Visuals';
 
 /**
  * L12 area, shared by admins (/admin/l12…) and coaches (/coach/l12…):
@@ -54,6 +55,13 @@ function snapshot(lineup: L12Lineup | null) {
 /** "Amical: A vs B" / "Meci amical A vs B" → "A vs B" — the kind is shown as a badge. */
 function stripKindPrefix(title: string) {
   return title.replace(/^\s*(meci\s+)?(amical|municipal)\s*[:·–-]?\s*/i, '');
+}
+
+/** "Amical: A vs B" → ['A', 'B']; a title without "vs" is one side. */
+function sidesOf(title: string): [string, string | null] {
+  const clean = stripKindPrefix(title);
+  const sides = clean.split(/\s+vs\.?\s+/i).map((part) => part.trim());
+  return sides.length === 2 ? [sides[0], sides[1]] : [clean, null];
 }
 
 function splitTeams(title: string, teamName: string) {
@@ -145,7 +153,7 @@ function timeLabel(iso: string) {
 
 function Segmented<T extends string>({ value, onChange, options }: { value: T; onChange: (next: T) => void; options: { key: T; label: string; count?: number }[] }) {
   return (
-    <View className="p-[3px] rounded-[10px] flex-row self-start" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+    <View className="glass p-[3px] rounded-[12px] flex-row self-start">
       {options.map((option) => {
         const active = option.key === value;
         return (
@@ -154,8 +162,8 @@ function Segmented<T extends string>({ value, onChange, options }: { value: T; o
             onPress={() => onChange(option.key)}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
-            className="px-3 h-[30px] rounded-[8px] flex-row items-center gap-1.5"
-            style={active ? ({ backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any) : undefined}
+            className="ui-press px-3.5 h-[32px] rounded-[9px] flex-row items-center gap-1.5"
+            style={active ? ({ backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any) : undefined}
           >
             <Text className="text-[12.5px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>{option.label}</Text>
             {option.count != null ? (
@@ -168,27 +176,6 @@ function Segmented<T extends string>({ value, onChange, options }: { value: T; o
   );
 }
 
-type MatchKind = 'frb' | 'amical' | 'municipal';
-
-/**
- * Official national fixtures reach the calendar through the FRB sync; anything
- * added by hand is a friendly, unless the team plays the municipal league (or
- * the event says so).
- */
-function matchKind(match: L12OverviewMatch): MatchKind {
-  const text = `${match.title} ${match.location ?? ''}`.toLowerCase();
-  if (match.source === 'frb') return 'frb';
-  if (/amical/.test(text)) return 'amical';
-  if (match.teamLevel === 'municipal' || /municipal/.test(text)) return 'municipal';
-  return 'amical';
-}
-
-const KIND_META: Record<MatchKind, { label: string; plural: string; fg: string; bg: string }> = {
-  frb: { label: 'Oficial FRB', plural: 'Oficiale FRB', fg: 'var(--c-brand-fg)', bg: 'var(--c-surface-tint)' },
-  amical: { label: 'Amical', plural: 'Amicale', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)' },
-  municipal: { label: 'Municipal', plural: 'Municipale', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)' },
-};
-
 const monthKeyOf = (iso: string) => {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -198,15 +185,6 @@ function monthLabel(key: string) {
   const [y, m] = key.split('-').map(Number);
   const label = new Date(y, m - 1, 1).toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
   return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
-function KindBadge({ kind }: { kind: MatchKind }) {
-  const meta = KIND_META[kind];
-  return (
-    <View className="self-start rounded-[6px] px-1.5 py-[2px]" style={{ backgroundColor: meta.bg }}>
-      <Text className="text-[11px] font-semibold" style={{ color: meta.fg }}>{meta.label}</Text>
-    </View>
-  );
 }
 
 export function L12HomeScreen() {
@@ -322,10 +300,20 @@ export function L12HomeScreen() {
 
   const teamsSet = data ? data.teams.filter((t) => t.hasTemplate).length : 0;
 
+  const upcomingMatches = useMemo(
+    () => liveMatches.filter(isUpcoming).sort((a, b) => a.startTime.localeCompare(b.startTime)),
+    [liveMatches, isUpcoming],
+  );
+  const unsetUpcoming = useMemo(() => upcomingMatches.filter((m) => !m.hasLineup), [upcomingMatches]);
+  const heroNext = useMemo<HeroNext | null>(() => {
+    const match = unsetUpcoming[0] ?? upcomingMatches[0];
+    if (!match) return null;
+    const [home, away] = sidesOf(match.title);
+    return { match, home, away };
+  }, [unsetUpcoming, upcomingMatches]);
+
   return (
     <PageShell>
-      <PageHeader title="L12" />
-
       {error ? (
         <ErrorState title="Nu am putut încărca L12" message={error} actionLabel="Reîncearcă" onAction={load} />
       ) : !data ? (
@@ -335,7 +323,16 @@ export function L12HomeScreen() {
           <Skeleton className="h-[64px] w-full rounded-[14px]" />
         </View>
       ) : (
-        <View className="gap-4">
+        <View className="gap-5">
+          <L12Hero
+            unset={unsetUpcoming.length}
+            ready={upcomingMatches.length - unsetUpcoming.length}
+            teamsSet={teamsSet}
+            teamsTotal={data.teams.length}
+            next={heroNext}
+            onOpenNext={(eventId) => router.push(`${base}/match/${eventId}` as any)}
+          />
+
           <Segmented
             value={tab}
             onChange={setTab}
@@ -384,44 +381,25 @@ export function L12HomeScreen() {
                   />
                 ) : (
                   <>
-                    <View className="gap-5">
+                    <View className="gap-6">
                       {dayGroups.map((group) => (
-                        <View key={group.key + group.label} className="gap-2">
-                          <Text className="text-[12px] font-bold uppercase tracking-[0.06em]" style={{ color: 'var(--c-muted)' }}>{group.label}</Text>
-                          <View className="rounded-[14px] border overflow-hidden" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
-                            {group.matches.map((match, index) => {
-                              const cleanTitle = stripKindPrefix(match.title);
-                              const sides = cleanTitle.split(/\s+vs\.?\s+/i).map((part) => part.trim());
-                              const [homeTeam, awayTeam] = sides.length === 2 ? sides : [cleanTitle, null];
+                        <View key={group.key + group.label} className="gap-2.5">
+                          <DayHeading label={group.label} count={group.matches.length} />
+                          <View className="gap-2.5 ui-stagger">
+                            {group.matches.map((match) => {
+                              const [home, away] = sidesOf(match.title);
                               // The club's team is usually one of the two sides already.
-                              const showTeam = teamFilter === 'all' && match.teamName && !sides.includes(match.teamName);
+                              const showTeam = teamFilter === 'all' && Boolean(match.teamName) && ![home, away].includes(match.teamName);
                               return (
-                                <Pressable
+                                <MatchTicket
                                   key={match.eventId}
+                                  match={match}
+                                  home={home}
+                                  away={away}
+                                  showTeam={showTeam}
+                                  played={!isUpcoming(match)}
                                   onPress={() => router.push(`${base}/match/${match.eventId}` as any)}
-                                  accessibilityRole="button"
-                                  accessibilityLabel={`L12 pentru ${match.title}`}
-                                  className="ui-press px-3.5 sm:px-4 py-3 flex-row items-center gap-3 sm:gap-4 text-left hover:bg-[var(--c-surface-2)]"
-                                  style={index > 0 ? ({ borderTopWidth: 1, borderTopColor: 'var(--c-border)' } as any) : undefined}
-                                >
-                                  <Text className="t-num text-[13px] font-bold w-[42px] shrink-0" style={{ color: 'var(--c-ink-soft)' }}>{timeLabel(match.startTime)}</Text>
-                                  <View className="flex-1 min-w-0 gap-0.5">
-                                    <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{homeTeam}</Text>
-                                    {awayTeam ? (
-                                      <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
-                                        <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>vs </Text>
-                                        {awayTeam}
-                                      </Text>
-                                    ) : null}
-                                    <View className="flex-row flex-wrap items-center gap-1.5 mt-1">
-                                      <KindBadge kind={matchKind(match)} />
-                                      {showTeam ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{match.teamName}</Text> : null}
-                                      {!isUpcoming(match) ? <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>· jucat</Text> : null}
-                                    </View>
-                                  </View>
-                                  <View className="shrink-0"><StatusChip set={match.hasLineup} label={match.hasLineup ? `${match.playerCount}/12` : 'Nesetat'} /></View>
-                                  <View className="hidden sm:flex shrink-0"><MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" /></View>
-                                </Pressable>
+                                />
                               );
                             })}
                           </View>
@@ -438,27 +416,16 @@ export function L12HomeScreen() {
           ) : (
             <View className="gap-3">
               <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{teamsSet} din {data.teams.length} echipe au L12 constant setat.</Text>
-              <View className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2.5">
+              <View className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2.5 ui-stagger">
                 {data.teams.map((team) => (
-                  <Pressable
+                  <TeamTile
                     key={team.id}
+                    name={team.name}
+                    subtitle={[team.leagueName, team.coachName].filter(Boolean).join(' · ') || '—'}
+                    set={team.hasTemplate}
+                    count={team.templatePlayerCount}
                     onPress={() => router.push(`${base}/team/${team.id}` as any)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`L12 constant pentru ${team.name}`}
-                    className="ui-lift ui-press rounded-[14px] border px-4 py-3 flex-row items-center gap-3 text-left"
-                    style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}
-                  >
-                    <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-                      <MaterialIcons name="groups" size={18} color="var(--c-brand-fg)" />
-                    </View>
-                    <View className="flex-1 min-w-0">
-                      <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{team.name}</Text>
-                      <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-                        {[team.leagueName, team.coachName].filter(Boolean).join(' · ') || '—'}
-                      </Text>
-                    </View>
-                    <View className="shrink-0"><StatusChip set={team.hasTemplate} label={team.hasTemplate ? `${team.templatePlayerCount}/12` : 'Nesetat'} /></View>
-                  </Pressable>
+                  />
                 ))}
               </View>
             </View>
