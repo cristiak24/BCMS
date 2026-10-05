@@ -19,7 +19,7 @@ import Button from '../ui/Button';
 import ActionSheet from '../ui/ActionSheet';
 import { downloadL12Word, printL12, type L12DocumentInput } from './l12Document';
 import { StatusChip, useL12Base } from './L12MatchLink';
-import { DayHeading, KIND_META, L12Hero, MatchTicket, TeamTile, matchKind, type HeroNext, type MatchKind } from './L12Visuals';
+import { DayHeading, KIND_META, L12Hero, MatchTicket, TeamAvatar, TeamTile, isOwnSide, matchKind, type HeroNext, type MatchKind } from './L12Visuals';
 
 /**
  * L12 area, shared by admins (/admin/l12…) and coaches (/coach/l12…):
@@ -663,15 +663,25 @@ export function L12MatchScreen() {
           <StatusChip set={Boolean(saved)} label={saved ? 'Setat pentru meci' : 'Nesetat'} />
         </View>
 
-        <View className="rounded-[18px] border p-4 md:p-5 gap-4" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
-          <View className="flex-col lg:flex-row lg:items-start gap-4">
+        <View className="ui-rise relative overflow-hidden rounded-[16px] border p-3.5 md:p-4 gap-3" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
+          <View pointerEvents="none" className="absolute rounded-full" style={{ width: 220, height: 220, right: -50, top: -100, backgroundColor: 'var(--c-surface-tint)', opacity: 0.8 }} />
+          <View className="relative flex-col lg:flex-row lg:items-start gap-3">
             <View className="flex-1 min-w-0">
               <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Formular L-12 · {team.name}</Text>
-              <View className="mt-1.5 gap-0.5">
-                <Text className="text-[20px] md:text-[24px] font-bold leading-tight" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.4px' } as any} numberOfLines={2}>{homeTeam}</Text>
-                <Text className="text-[20px] md:text-[24px] font-bold leading-tight" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.4px' } as any} numberOfLines={2}>
-                  <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-faint)' }}>vs </Text>{awayTeam}
-                </Text>
+              <View className="mt-2 flex-col md:flex-row md:items-center gap-x-3 gap-y-1.5">
+                <View className="flex-row items-center gap-2 min-w-0">
+                  <TeamAvatar name={homeTeam} mine={isOwnSide(homeTeam, team.name)} size={30} />
+                  <Text className="f-display text-[17px] md:text-[19px] font-extrabold leading-tight shrink" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any} numberOfLines={2}>{homeTeam}</Text>
+                </View>
+                {awayTeam ? (
+                  <>
+                    <Text className="f-display text-[12px] font-bold uppercase" style={{ color: 'var(--c-faint)', letterSpacing: '0.08em' } as any}>vs</Text>
+                    <View className="flex-row items-center gap-2 min-w-0">
+                      <TeamAvatar name={awayTeam} mine={isOwnSide(awayTeam, team.name)} size={30} />
+                      <Text className="f-display text-[17px] md:text-[19px] font-extrabold leading-tight shrink" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any} numberOfLines={2}>{awayTeam}</Text>
+                    </View>
+                  </>
+                ) : null}
               </View>
               <View className="flex-row flex-wrap gap-1.5 mt-3">
                 <MetaChip icon="event" label={formatDate(event.startTime, true)} />
@@ -863,14 +873,18 @@ export function L12TemplateScreen() {
           <StatusChip set={Boolean(saved)} label={saved ? 'Salvat' : 'Nesetat'} />
         </View>
 
-        <View className="rounded-[18px] border p-4 md:p-5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
-          <View className="flex-col lg:flex-row lg:items-start gap-4">
+        <View className="ui-rise relative overflow-hidden rounded-[16px] border p-3.5 md:p-4" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
+          <View pointerEvents="none" className="absolute rounded-full" style={{ width: 220, height: 220, right: -50, top: -100, backgroundColor: 'var(--c-surface-tint)', opacity: 0.8 }} />
+          <View className="relative flex-col lg:flex-row lg:items-start gap-3">
             <View className="flex-1 min-w-0">
               <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>L12 constant</Text>
-              <Text className="text-[20px] md:text-[24px] font-bold leading-tight mt-1.5" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.4px' } as any} numberOfLines={2}>
-                {team.name}
-              </Text>
-              <Text className="text-[13px] font-medium mt-1" style={{ color: 'var(--c-muted)' }}>
+              <View className="flex-row items-center gap-2.5 mt-2 min-w-0">
+                <TeamAvatar name={team.name} mine size={34} />
+                <Text className="f-display text-[17px] md:text-[19px] font-extrabold leading-tight shrink" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any} numberOfLines={2}>
+                  {team.name}
+                </Text>
+              </View>
+              <Text className="text-[13px] mt-1.5" style={{ color: 'var(--c-muted)' }}>
                 Formula de bază a echipei. Fiecare meci nou pornește de aici.
               </Text>
               <View className="flex-row flex-wrap gap-1.5 mt-3">

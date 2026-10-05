@@ -4,6 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import type { Player } from '../../services/teamsApi';
 import { L12_MAX_PLAYERS, L12_STAFF_ROLES, type L12Lineup, type L12Player, type L12StaffRole } from '../../services/l12Api';
 import { medicalStatus } from '../myclub/teamDisplay';
+import { TeamAvatar } from './L12Visuals';
 
 /**
  * The L-12 sheet editor shared by the match screen and the team's "L12
@@ -86,14 +87,14 @@ const isForeign = (player: L12Player) => {
 
 function Card({ title, meta, actions, children, padded = true }: { title: string; meta?: ReactNode; actions?: ReactNode; children: ReactNode; padded?: boolean }) {
   return (
-    <View className="rounded-[16px] border overflow-hidden" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
-      <View className="flex-row items-center gap-2 px-4 md:px-5 pt-4 pb-3 min-w-0">
-        <Text className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
+    <View className="rounded-[14px] border overflow-hidden" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
+      <View className="flex-row items-center gap-2 px-3.5 md:px-4 pt-3 pb-2.5 min-w-0">
+        <Text className="f-display text-[14.5px] font-bold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
         {meta}
         <View className="flex-1" />
         {actions}
       </View>
-      <View className={padded ? 'px-4 md:px-5 pb-4 md:pb-5' : ''}>{children}</View>
+      <View className={padded ? 'px-3.5 md:px-4 pb-3.5 md:pb-4' : ''}>{children}</View>
     </View>
   );
 }
@@ -242,7 +243,9 @@ function SheetRow({
     </View>
   );
   const nameBlock = (
-    <View className="flex-1 min-w-0">
+    <View className="flex-1 min-w-0 flex-row items-center gap-2">
+      <View className="md:hidden xl:flex"><TeamAvatar name={name} mine={captain} size={28} /></View>
+      <View className="flex-1 min-w-0">
       <View className="flex-row items-center gap-1.5 min-w-0">
         <Text className="text-[14px] font-semibold shrink" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{name}</Text>
         {captain ? (
@@ -252,6 +255,7 @@ function SheetRow({
         ) : null}
       </View>
       <Flags flags={flags} />
+      </View>
     </View>
   );
   const remove = (
@@ -553,7 +557,7 @@ export default function L12Editor({
                 style={{ opacity: full ? 0.45 : 1 } as any}
               >
                 <View className="w-8 h-8 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-3)' }}>
-                  <Text className="t-num text-[12px] font-bold" style={{ color: 'var(--c-ink-soft)' }}>{player.number ?? '—'}</Text>
+                  <Text className="f-display t-num text-[12px] font-bold" style={{ color: 'var(--c-ink-soft)' }}>{player.number ?? '—'}</Text>
                 </View>
                 <View className="flex-1 min-w-0">
                   <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{player.lastName} {player.firstName}</Text>
@@ -573,10 +577,10 @@ export default function L12Editor({
   const emptySlots = Math.max(0, L12_MAX_PLAYERS - count);
 
   return (
-    <View className="flex-col xl:flex-row xl:items-start gap-4">
+    <View className="flex-col 2xl:flex-row 2xl:items-start gap-4">
       <View className="flex-1 min-w-0 gap-4">
         {/* Phones/tablets: the checklist comes first — it says what is left. */}
-        <View className="xl:hidden">{renderChecklist(true)}</View>
+        <View className="2xl:hidden">{renderChecklist(true)}</View>
 
         {showMatchDetails ? (
           <Card title="Detalii joc">
@@ -643,16 +647,16 @@ export default function L12Editor({
           ) : null}
           {emptySlots > 0 ? (
             <View className="px-3 md:px-4 py-3" style={{ borderTopWidth: count > 0 ? 1 : 0, borderTopColor: 'var(--c-border)' } as any}>
-              <View className="rounded-[12px] border border-dashed px-4 py-4 flex-row items-center gap-3" style={{ borderColor: 'var(--c-border-strong)' } as any}>
+              <View className="rounded-[12px] border border-dashed px-3.5 py-3 flex-row items-center gap-3" style={{ borderColor: 'var(--c-border-strong)' } as any}>
                 <View className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
                   <MaterialIcons name="person-add" size={18} color="var(--c-brand-fg)" />
                 </View>
                 <View className="flex-1 min-w-0">
                   <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>
-                    {count === 0 ? 'Foaia e goală' : `${emptySlots} ${emptySlots === 1 ? 'loc liber' : 'locuri libere'}`}
+                    {count === 0 ? 'Hai să alegem jucătorii' : `${emptySlots} ${emptySlots === 1 ? 'loc liber' : 'locuri libere'}`}
                   </Text>
                   <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
-                    {count === 0 ? 'Alege jucători din lot sau folosește „Completează automat”.' : 'Adaugă din lotul echipei.'}
+                    {count === 0 ? 'Apasă pe cei din lot sau lasă „Completează automat” să o facă.' : 'Adaugă din lotul echipei.'}
                   </Text>
                 </View>
                 {!rosterLoading && roster.some((p) => !chosen.has(p.id)) ? (
@@ -667,7 +671,7 @@ export default function L12Editor({
         </Card>
 
         {/* Phones/tablets: the picker sits right under the sheet it fills. */}
-        <View className="xl:hidden">{rosterPanel}</View>
+        <View className="2xl:hidden">{rosterPanel}</View>
 
         <Card title="Staff tehnic" meta={<Text className="t-num text-[13px] font-semibold" style={{ color: 'var(--c-faint)' }}>{staffFilled}/{L12_STAFF_ROLES.length}</Text>}>
           <View className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3">
@@ -695,7 +699,7 @@ export default function L12Editor({
         </Card>
       </View>
 
-      <View className="hidden xl:flex w-[340px] shrink-0 gap-4 xl:sticky xl:top-4">
+      <View className="hidden 2xl:flex w-[340px] shrink-0 gap-4 2xl:sticky 2xl:top-4">
         {renderChecklist(false)}
         {rosterPanel}
       </View>
