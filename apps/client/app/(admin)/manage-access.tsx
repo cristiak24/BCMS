@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
-import PageHeader from '../../components/ui/PageHeader';
+import PageHero from '../../components/admin/PageHero';
 import PageContainer from '../../components/ui/PageContainer';
 import FilterChips from '../../components/ui/FilterChips';
 import InviteLinkGenerator from '../../components/manage-access/InviteLinkGenerator';
@@ -194,11 +194,12 @@ export default function ManageAccessScreen() {
         <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
             <ScrollView
                 className="flex-1"
-                contentContainerStyle={{ paddingTop: 16, paddingBottom: 120 }}
+                contentContainerStyle={{ paddingBottom: 120 }}
                 showsVerticalScrollIndicator={false}
             >
                 <PageContainer>
-                    <PageHeader
+                    <PageHero
+                        eyebrow="Acces"
                         title="Acces & invitații"
                         subtitle="Invită membri noi și aprobă cererile de înscriere."
                         actions={(
@@ -207,38 +208,38 @@ export default function ManageAccessScreen() {
                                 <HeaderButton icon="person-add-alt-1" label="Cont nou" primary onPress={() => router.push('/admin/create-account')} />
                             </>
                         )}
-                    />
-
-                    <View
-                        className="flex-row p-[3px] rounded-[12px] mb-2 sm:self-start"
-                        style={{ backgroundColor: 'var(--c-surface-3)' }}
-                        accessibilityRole={'tablist' as any}
                     >
-                        {TABS.map((item) => {
-                            const active = item.key === tab;
-                            const badge = item.key === 'requests' ? pendingCount + familyCount : 0;
-                            return (
-                                <Pressable
-                                    key={item.key}
-                                    onPress={() => setTab(item.key)}
-                                    accessibilityRole={'tab' as any}
-                                    accessibilityState={{ selected: active }}
-                                    className="flex-1 sm:flex-none min-w-0 h-10 sm:px-5 rounded-[9px] flex-row items-center justify-center gap-1.5"
-                                    style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
-                                >
-                                    <MaterialIcons name={item.icon} size={16} color={active ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
-                                    <Text className="text-[13.5px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>
-                                        {item.label}
-                                    </Text>
-                                    {badge > 0 ? (
-                                        <View className="min-w-[18px] h-[18px] px-1 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-danger)' }}>
-                                            <Text className="text-[10.5px] font-bold t-num" style={{ color: '#FFFFFF' }}>{badge > 99 ? '99+' : badge}</Text>
-                                        </View>
-                                    ) : null}
-                                </Pressable>
-                            );
-                        })}
-                    </View>
+                        <View
+                            className="flex-row p-[3px] rounded-[12px] sm:self-start"
+                            style={{ backgroundColor: 'var(--c-surface-3)' }}
+                            accessibilityRole={'tablist' as any}
+                        >
+                            {TABS.map((item) => {
+                                const active = item.key === tab;
+                                const badge = item.key === 'requests' ? pendingCount + familyCount : 0;
+                                return (
+                                    <Pressable
+                                        key={item.key}
+                                        onPress={() => setTab(item.key)}
+                                        accessibilityRole={'tab' as any}
+                                        accessibilityState={{ selected: active }}
+                                        className="flex-1 sm:flex-none min-w-0 h-10 sm:px-5 rounded-[9px] flex-row items-center justify-center gap-1.5"
+                                        style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
+                                    >
+                                        <MaterialIcons name={item.icon} size={16} color={active ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
+                                        <Text className="text-[13.5px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>
+                                            {item.label}
+                                        </Text>
+                                        {badge > 0 ? (
+                                            <View className="min-w-[18px] h-[18px] px-1 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-danger)' }}>
+                                                <Text className="text-[10.5px] font-bold t-num" style={{ color: '#FFFFFF' }}>{badge > 99 ? '99+' : badge}</Text>
+                                            </View>
+                                        ) : null}
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+                    </PageHero>
 
                     {activeTab.blurb ? (
                         <Text className="t-meta mb-3 px-0.5" style={{ color: 'var(--c-muted)' }}>{activeTab.blurb}</Text>

@@ -4,8 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
 import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../../components/HeaderContext';
 import PageContainer from '../../../components/ui/PageContainer';
-import PageHeader from '../../../components/ui/PageHeader';
-import StatCard from '../../../components/ui/StatCard';
+import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import Button from '../../../components/ui/Button';
 import FilterChips from '../../../components/ui/FilterChips';
 import SelectField from '../../../components/ui/SelectField';
@@ -202,26 +201,25 @@ export default function ComplianceScreen() {
     <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
       <ScrollView className="flex-1" contentContainerClassName="pb-36" showsVerticalScrollIndicator={false}>
         <PageContainer>
-          <PageHeader title="Conformitate" subtitle="Vizele medicale ale sportivilor din club." />
+          <PageHero eyebrow="Conformitate" title="Vizele medicale" subtitle="Vizele medicale ale sportivilor din club.">
+            {players && !error ? (
+              <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
+                <GlassStat dot="var(--c-success)" value={metrics.valid} label="Valabile" hint={`${metrics.securePercent}% din lot`} />
+                <GlassStat dot="var(--c-warning)" value={metrics.dueSoon} label="Expiră în 30 zile" hint="De reînnoit curând" />
+                <GlassStat dot="var(--c-danger)" danger={metrics.expired > 0} value={metrics.expired} label="Expirate" hint="Nu pot juca" />
+                <GlassStat dot="var(--c-muted)" value={metrics.missing} label="Fără viză" hint="Nicio dată înregistrată" />
+              </View>
+            ) : null}
+          </PageHero>
 
           {error ? (
             <ErrorState title="Nu am putut încărca vizele" message={error} actionLabel="Reîncearcă" onAction={load} />
           ) : !players ? (
             <View className="gap-3" accessibilityRole="progressbar" accessibilityLabel="Se încarcă vizele">
-              <View className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[104px] w-full rounded-[16px]" />)}
-              </View>
-              <Skeleton className="h-[360px] w-full rounded-[16px]" />
+                            <Skeleton className="h-[360px] w-full rounded-[16px]" />
             </View>
           ) : (
             <View className="gap-5">
-              <View className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <StatCard icon="verified" tone="success" label="Valabile" value={metrics.valid} hint={`${metrics.securePercent}% din lot`} />
-                <StatCard icon="schedule" tone="warning" label="Expiră în 30 zile" value={metrics.dueSoon} hint="De reînnoit curând" />
-                <StatCard icon="error-outline" tone="danger" label="Expirate" value={metrics.expired} hint="Nu pot juca" />
-                <StatCard icon="help-outline" tone="neutral" label="Fără viză" value={metrics.missing} hint="Nicio dată înregistrată" />
-              </View>
-
               <View className="gap-3">
                 <View className="flex-col lg:flex-row lg:items-center gap-2">
                   {teamOptions.length > 2 ? (

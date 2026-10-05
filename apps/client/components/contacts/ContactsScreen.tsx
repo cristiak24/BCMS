@@ -4,7 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { contactsApi, type ContactsResponse, type PlayerContact, type PlayerContactUpdate, type StaffContact } from '../../services/contactsApi';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../HeaderContext';
 import PageContainer from '../ui/PageContainer';
-import PageHeader from '../ui/PageHeader';
+import PageHero from '../admin/PageHero';
 import SelectField from '../ui/SelectField';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
@@ -133,7 +133,7 @@ function PlayerCard({
 
   return (
     <View
-      className="rounded-[14px] border p-4 gap-3 min-w-0"
+      className="ui-lift rounded-[14px] border p-3.5 gap-3 min-w-0"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: editing ? 'var(--c-brand-fg)' : 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
       <View className="flex-row items-center gap-3 min-w-0">
@@ -143,7 +143,7 @@ function PlayerCard({
           </Text>
         </View>
         <View className="flex-1 min-w-0">
-          <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{name}</Text>
+          <Text className="f-display text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.01em' } as any} numberOfLines={1}>{name}</Text>
           <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{teamNames || 'Fără echipă'}</Text>
         </View>
         {!editing ? (
@@ -226,7 +226,7 @@ function PlayerCard({
 function StaffCard({ person, showMissing }: { person: StaffContact; showMissing?: boolean }) {
   return (
     <View
-      className="rounded-[14px] border p-4 gap-3 min-w-0"
+      className="ui-lift rounded-[14px] border p-3.5 gap-3 min-w-0"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: person.ownTeam ? 'color-mix(in srgb, var(--c-brand-fg) 45%, var(--c-border))' : 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
       <View className="flex-row items-center gap-3 min-w-0">
@@ -236,7 +236,7 @@ function StaffCard({ person, showMissing }: { person: StaffContact; showMissing?
           </Text>
         </View>
         <View className="flex-1 min-w-0">
-          <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{person.name}</Text>
+          <Text className="f-display text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.01em' } as any} numberOfLines={1}>{person.name}</Text>
           <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
             {[ROLE_LABEL[person.role] ?? person.role, person.teams.map((t) => t.name).join(', ')].filter(Boolean).join(' · ')}
           </Text>
@@ -320,12 +320,34 @@ export default function ContactsScreen() {
     <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
       <ScrollView className="flex-1" contentContainerClassName="pb-32" showsVerticalScrollIndicator={false}>
         <PageContainer>
-          <PageHeader
-            title={isStaffView || !data ? 'Agendă' : 'Contacte'}
+          <PageHero
+            eyebrow={isStaffView || !data ? 'Agendă' : 'Contacte'}
+            title={isStaffView || !data ? 'Agenda clubului' : 'Contactele clubului'}
             subtitle={isStaffView || !data
               ? 'Telefoanele jucătorilor, părinților și ale staff-ului — la un tap distanță.'
               : 'Antrenorii și administratorii clubului.'}
-          />
+          >
+            {data?.mode === 'staff' ? (
+              <View className="flex-row p-[3px] rounded-[12px] sm:self-start" style={{ backgroundColor: 'var(--c-surface-3)' }} accessibilityRole={'tablist' as any}>
+                {([['players', 'Jucători și părinți', data.players.length], ['staff', 'Staff', data.staff.length]] as const).map(([key, label, count]) => {
+                  const active = tab === key;
+                  return (
+                    <Pressable
+                      key={key}
+                      onPress={() => setTab(key)}
+                      accessibilityRole={'tab' as any}
+                      accessibilityState={{ selected: active }}
+                      className="flex-1 sm:flex-none h-10 sm:px-5 rounded-[9px] flex-row items-center justify-center gap-1.5"
+                      style={{ backgroundColor: active ? 'var(--c-surface)' : 'transparent', boxShadow: active ? 'var(--e-sm)' : 'none' } as any}
+                    >
+                      <Text className="text-[13.5px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>{label}</Text>
+                      <Text className="t-num text-[12px] font-semibold" style={{ color: 'var(--c-faint)' }}>{count}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+          </PageHero>
 
           {error ? (
             <ErrorState title="Nu am putut încărca agenda" message={error} actionLabel="Reîncearcă" onAction={load} />
@@ -346,7 +368,7 @@ export default function ContactsScreen() {
               <View className="gap-5">
                 {staff.some((s) => s.ownTeam) ? (
                   <View>
-                    <Text className="text-[15px] font-bold mb-2.5" style={{ color: 'var(--c-ink)' }}>Antrenorii echipei tale</Text>
+                    <Text className="f-display text-[15px] font-bold mb-2.5" style={{ color: 'var(--c-ink-strong)' }}>Antrenorii echipei tale</Text>
                     <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5 ui-stagger">
                       {staff.filter((s) => s.ownTeam).map((s) => <StaffCard key={s.id} person={s} />)}
                     </View>
@@ -354,7 +376,7 @@ export default function ContactsScreen() {
                 ) : null}
                 {staff.some((s) => !s.ownTeam) ? (
                   <View>
-                    <Text className="text-[15px] font-bold mb-2.5" style={{ color: 'var(--c-ink)' }}>
+                    <Text className="f-display text-[15px] font-bold mb-2.5" style={{ color: 'var(--c-ink-strong)' }}>
                       {staff.some((s) => s.ownTeam) ? 'Restul clubului' : 'Staff-ul clubului'}
                     </Text>
                     <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5 ui-stagger">
@@ -366,25 +388,6 @@ export default function ContactsScreen() {
             )
           ) : (
             <>
-              <View className="flex-row p-[3px] rounded-[12px] mb-3 sm:self-start" style={{ backgroundColor: 'var(--c-surface-3)' }} accessibilityRole={'tablist' as any}>
-                {([['players', 'Jucători și părinți', data.players.length], ['staff', 'Staff', data.staff.length]] as const).map(([key, label, count]) => {
-                  const active = tab === key;
-                  return (
-                    <Pressable
-                      key={key}
-                      onPress={() => setTab(key)}
-                      accessibilityRole={'tab' as any}
-                      accessibilityState={{ selected: active }}
-                      className="flex-1 sm:flex-none h-10 sm:px-5 rounded-[9px] flex-row items-center justify-center gap-1.5"
-                      style={{ backgroundColor: active ? 'var(--c-surface)' : 'transparent', boxShadow: active ? 'var(--e-sm)' : 'none' } as any}
-                    >
-                      <Text className="text-[13.5px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>{label}</Text>
-                      <Text className="t-num text-[12px] font-semibold" style={{ color: 'var(--c-faint)' }}>{count}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
               {tab === 'players' ? (
                 <View className="gap-3">
                   {data.teams.length > 1 ? (

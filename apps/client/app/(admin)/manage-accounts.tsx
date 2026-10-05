@@ -4,7 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import PageContainer from '../../components/ui/PageContainer';
-import PageHeader from '../../components/ui/PageHeader';
+import PageHero, { GlassStat } from '../../components/admin/PageHero';
 import Button from '../../components/ui/Button';
 import FilterChips from '../../components/ui/FilterChips';
 import SelectField from '../../components/ui/SelectField';
@@ -541,8 +541,9 @@ export default function ManageAccountsScreen() {
         <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
             <ScrollView className="flex-1" contentContainerClassName="pb-36" showsVerticalScrollIndicator={false}>
                 <PageContainer>
-                    <PageHeader
-                        title="Conturi"
+                    <PageHero
+                        eyebrow="Conturi"
+                        title="Conturile clubului"
                         subtitle={loading ? undefined : `${counts.active} active · ${counts.invites} ${counts.invites === 1 ? 'invitație în așteptare' : 'invitații în așteptare'}`}
                         actions={(
                             <>
@@ -551,7 +552,17 @@ export default function ManageAccountsScreen() {
                                 <Button icon="person-add-alt-1" label="Cont nou" variant="primary" onPress={() => router.push('/admin/create-account')} />
                             </>
                         )}
-                    />
+                    >
+                        {!loading ? (
+                            <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
+                                <GlassStat dot="var(--c-success)" value={counts.active} label="Conturi active" />
+                                <GlassStat dot="var(--c-brand-fg)" value={filterCounts.coach} label="Antrenori" />
+                                <GlassStat dot="var(--c-sky)" value={filterCounts.player} label="Jucători" />
+                                <GlassStat dot="var(--c-purple)" value={filterCounts.parent} label="Părinți" />
+                            </View>
+                        ) : null}
+                    </PageHero>
+
 
                     <View className="gap-3">
                         <View className="flex-col lg:flex-row lg:items-center gap-2">

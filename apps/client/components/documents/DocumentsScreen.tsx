@@ -4,7 +4,8 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { clubDocumentsApi, type ClubDocument, type ClubDocumentList, type ClubDocumentVisibility } from '../../services/clubDocumentsApi';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../HeaderContext';
 import PageContainer from '../ui/PageContainer';
-import PageHeader from '../ui/PageHeader';
+import PageHero, { GlassStat } from '../admin/PageHero';
+import Button from '../ui/Button';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
@@ -157,7 +158,7 @@ function DocumentCard({
   const meta = [formatBytes(doc.sizeBytes), formatDate(doc.createdAt), doc.uploaderName].filter(Boolean).join(' · ');
   return (
     <View
-      className="rounded-[14px] border p-3.5 flex-row items-center gap-3 min-w-0"
+      className="ui-lift rounded-[14px] border p-3 flex-row items-center gap-3 min-w-0"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
       <Pressable
@@ -170,7 +171,7 @@ function DocumentCard({
           {busy ? <ActivityIndicator size="small" color="var(--c-danger-fg)" /> : <MaterialIcons name="picture-as-pdf" size={20} color="var(--c-danger-fg)" />}
         </View>
         <View className="flex-1 min-w-0">
-          <Text className="text-[14.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{doc.title}</Text>
+          <Text className="f-display text-[14.5px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.01em' } as any} numberOfLines={2}>{doc.title}</Text>
           <View className="flex-row items-center gap-2 mt-0.5 min-w-0">
             {doc.visibility === 'staff' ? (
               <View className="rounded-full px-2 py-px shrink-0" style={{ backgroundColor: 'var(--c-purple-bg)' }}>
@@ -315,22 +316,26 @@ export default function DocumentsScreen() {
     <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
       <ScrollView className="flex-1" contentContainerClassName="pb-32" showsVerticalScrollIndicator={false}>
         <PageContainer>
-          <PageHeader
-            title="Documente"
+          <PageHero
+            eyebrow="Documente"
+            title="Biblioteca clubului"
             subtitle="Regulamente, formulare și alte PDF-uri ale clubului."
-            actions={canUpload ? (
-              <Pressable
-                onPress={pickFile}
-                accessibilityRole="button"
-                accessibilityLabel="Încarcă PDF"
-                className="ui-press h-10 px-3.5 rounded-[10px] flex-row items-center gap-1.5"
-                style={{ backgroundColor: 'var(--c-brand-surface)' }}
-              >
-                <MaterialIcons name="upload-file" size={17} color="var(--c-on-brand)" />
-                <Text className="text-[13px] font-bold" style={{ color: 'var(--c-on-brand)' }}>Încarcă PDF</Text>
-              </Pressable>
-            ) : undefined}
-          />
+            actions={canUpload ? <Button label="Încarcă PDF" icon="upload-file" variant="primary" onPress={pickFile} /> : undefined}
+          >
+            {data ? (
+              <View className="grid grid-cols-2 gap-2 max-w-[440px] ui-stagger">
+                <GlassStat value={data.documents.length} label={data.documents.length === 1 ? 'document' : 'documente'} dot="var(--c-brand-fg)" />
+                {canUpload ? (
+                  <GlassStat
+                    value={formatBytes(data.usedBytes)}
+                    label={`din ${formatBytes(data.quotaBytes)}`}
+                    dot={usedPercent > 85 ? 'var(--c-warning)' : 'var(--c-success)'}
+                    bar={usedPercent}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+          </PageHero>
 
           {/* Native picker; the visible button above opens it. */}
           <input ref={inputRef} type="file" accept="application/pdf,.pdf" onChange={onFileChosen} style={{ display: 'none' }} aria-hidden="true" />
@@ -358,17 +363,6 @@ export default function DocumentsScreen() {
             </View>
           ) : (
             <>
-              {canUpload ? (
-                <View className="flex-row items-center gap-3 mb-4">
-                  <View className="flex-1 max-w-[320px] h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--c-surface-3)' }}>
-                    <View className="h-full rounded-full" style={{ width: `${usedPercent}%`, backgroundColor: usedPercent > 85 ? 'var(--c-warning)' : 'var(--c-brand-fg)' } as any} />
-                  </View>
-                  <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
-                    {formatBytes(data.usedBytes)} din {formatBytes(data.quotaBytes)} · PDF până la {formatBytes(data.maxFileBytes)}
-                  </Text>
-                </View>
-              ) : null}
-
               {data.documents.length === 0 ? (
                 <View className="rounded-[16px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
                   <EmptyState
