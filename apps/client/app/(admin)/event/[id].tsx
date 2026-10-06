@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { eventsApi, CalendarEvent } from '../../../services/eventsApi';
 import { teamsApi, Team } from '../../../services/teamsApi';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../../components/HeaderContext';
+import PageHero from '../../../components/admin/PageHero';
 import PageContainer from '../../../components/ui/PageContainer';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import { Skeleton } from '../../../components/ui/Skeleton';
@@ -292,11 +293,19 @@ export default function EventDetailScreen() {
         <View className="max-w-[920px] w-full self-center">
           {backButton}
 
-          {/* Header */}
-          <View className="mb-5">
-            <View className="flex-row flex-wrap items-center gap-2 mb-3">
+          <PageHero
+            eyebrow="Eveniment"
+            title={scoreMatch && sides.length === 2 ? `${sides[0]} – ${sides[1]}` : event.title}
+            subtitle={description || undefined}
+            className="mb-4"
+            leading={(
+              <View className="w-12 h-12 md:w-14 md:h-14 rounded-[14px] items-center justify-center shrink-0" style={{ backgroundColor: meta.soft }}>
+                <MaterialIcons name={TYPE_ICON[event.type] ?? 'event'} size={24} color={meta.onSoft} />
+              </View>
+            )}
+          >
+            <View className="flex-row flex-wrap items-center gap-2">
               <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: meta.soft }}>
-                <MaterialIcons name={TYPE_ICON[event.type] ?? 'event'} size={13} color={meta.onSoft} />
                 <Text className="text-[12px] font-bold" style={{ color: meta.onSoft }}>{meta.label}</Text>
               </View>
               <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: statusChip.bg }}>
@@ -312,29 +321,18 @@ export default function EventDetailScreen() {
             </View>
 
             {scoreMatch && sides.length === 2 ? (
-              <View
-                className="rounded-[16px] border p-4 flex-row items-center gap-3"
-                style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
-              >
-                <Text className="flex-1 text-[15px] md:text-[17px] font-bold text-right leading-tight" style={{ color: 'var(--c-ink)' }}>{sides[0]}</Text>
-                <View className="rounded-[12px] px-4 py-2 items-center" style={{ backgroundColor: 'var(--c-surface-2)' }}>
-                  <Text className="t-num text-[28px] font-bold leading-none" style={{ color: 'var(--c-ink-strong)' }}>
+              <View className="glass rounded-[14px] px-4 py-3 flex-row items-center gap-3" style={{ boxShadow: 'var(--e-sm)' } as any}>
+                <Text className="f-display flex-1 text-[14px] md:text-[16px] font-bold text-right leading-tight" style={{ color: 'var(--c-ink-strong)' }}>{sides[0]}</Text>
+                <View className="items-center">
+                  <Text className="f-display t-num text-[28px] font-extrabold leading-none" style={{ color: 'var(--c-ink-strong)' }}>
                     {scoreMatch[1]}<Text style={{ color: 'var(--c-faint)' }}> : </Text>{scoreMatch[2]}
                   </Text>
                   <Text className="text-[10.5px] font-semibold mt-1 uppercase tracking-[0.06em]" style={{ color: 'var(--c-faint)' }}>Final</Text>
                 </View>
-                <Text className="flex-1 text-[15px] md:text-[17px] font-bold leading-tight" style={{ color: 'var(--c-ink)' }}>{sides[1]}</Text>
+                <Text className="f-display flex-1 text-[14px] md:text-[16px] font-bold leading-tight" style={{ color: 'var(--c-ink-strong)' }}>{sides[1]}</Text>
               </View>
-            ) : (
-              <Text className="text-[24px] md:text-[28px] font-bold leading-tight" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.5px' } as any}>
-                {event.title}
-              </Text>
-            )}
-
-            {description ? (
-              <Text className="text-[14px] font-medium mt-2.5 leading-5" style={{ color: 'var(--c-muted)' }}>{description}</Text>
             ) : null}
-          </View>
+          </PageHero>
 
           {error ? (
             <View className="mb-4 rounded-[12px] border px-4 py-3 flex-row items-center gap-2.5" style={{ backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-border)' } as any}>

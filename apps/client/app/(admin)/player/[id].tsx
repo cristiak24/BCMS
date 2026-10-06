@@ -4,6 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { teamsApi, type Player } from '../../../services/teamsApi';
 import PageContainer from '../../../components/ui/PageContainer';
+import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import Button from '../../../components/ui/Button';
 import SelectField from '../../../components/ui/SelectField';
 import { FormField } from '../../../components/ui/FormField';
@@ -24,24 +25,15 @@ const PAID = ['paid', 'processed', 'succeeded', 'success'];
 
 function Card({ title, icon, right, children }: { title: string; icon: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <View className="rounded-[16px] border p-4 md:p-5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
+    <View className="ui-rise rounded-[16px] border p-4 md:p-5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
       <View className="flex-row items-center gap-2.5 mb-4">
         <View className="w-8 h-8 rounded-[9px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
           <MaterialIcons name={icon} size={17} color="var(--c-brand-fg)" />
         </View>
-        <Text className="flex-1 text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
+        <Text className="f-display flex-1 text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{title}</Text>
         {right}
       </View>
       {children}
-    </View>
-  );
-}
-
-function Fact({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <View className="flex-1 min-w-[130px] px-4 py-3">
-      <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{label}</Text>
-      <Text className="text-[15px] font-bold mt-1" style={{ color: tone ?? 'var(--c-ink)' }} numberOfLines={1}>{value}</Text>
     </View>
   );
 }
@@ -181,51 +173,60 @@ export default function PlayerProfile() {
     <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
       <ScrollView className="flex-1" contentContainerClassName="pb-36" showsVerticalScrollIndicator={false}>
         <PageContainer>
-          <View className="flex-row items-center justify-between gap-3 mb-4">
+          <View className="mb-3 self-start">
             <Button icon="chevron-left" label="Înapoi" size="sm" onPress={handleGoBack} />
-            <Button
-              icon="check"
-              label={saving ? 'Se salvează…' : dirty ? 'Salvează' : 'Salvat'}
-              variant={dirty ? 'primary' : 'secondary'}
-              disabled={!dirty || !!numberError || !!yearError}
-              loading={saving}
-              onPress={handleSave}
-            />
           </View>
 
-          {/* Identity */}
-          <View className="rounded-[18px] border overflow-hidden mb-5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
-            <View className="flex-row items-center gap-4 p-4 md:p-5">
-              <View className="w-16 h-16 md:w-[72px] md:h-[72px] rounded-[18px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-                <Text className="text-[22px] md:text-[24px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{initials}</Text>
+          <PageHero
+            eyebrow="Jucător"
+            title={`${firstName} ${lastName}`.trim() || 'Jucător fără nume'}
+            subtitle={[player.position, teams.join(', ') || 'Fără echipă'].filter(Boolean).join(' · ')}
+            className="mb-5"
+            leading={(
+              <View className="w-14 h-14 md:w-16 md:h-16 rounded-[16px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+                <Text className="f-display text-[20px] md:text-[22px] font-extrabold" style={{ color: 'var(--c-brand-fg)' }}>{initials}</Text>
               </View>
-              <View className="flex-1 min-w-0">
-                <Text className="text-[22px] md:text-[26px] font-bold leading-tight" style={{ color: 'var(--c-ink)', letterSpacing: '-0.5px' } as any} numberOfLines={2}>
-                  {`${firstName} ${lastName}`.trim() || 'Jucător fără nume'}
-                </Text>
-                <Text className="text-[13px] font-medium mt-1" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
-                  {[player.position, teams.join(', ') || 'Fără echipă'].filter(Boolean).join(' · ')}
-                </Text>
-                <View className="flex-row flex-wrap gap-1.5 mt-2">
-                  <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: isActive ? 'var(--c-success-bg)' : 'var(--c-surface-3)' }}>
-                    <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isActive ? 'var(--c-success)' : 'var(--c-faint)' }} />
-                    <Text className="text-[11.5px] font-semibold" style={{ color: isActive ? 'var(--c-success-fg)' : 'var(--c-muted)' }}>{isActive ? 'Activ' : 'Inactiv'}</Text>
-                  </View>
-                  {player.category ? (
-                    <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: 'var(--c-surface-3)' }}>
-                      <Text className="text-[11.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{player.category}</Text>
-                    </View>
-                  ) : null}
+            )}
+            actions={(
+              <Button
+                icon="check"
+                label={saving ? 'Se salvează…' : dirty ? 'Salvează' : 'Salvat'}
+                variant={dirty ? 'primary' : 'secondary'}
+                disabled={!dirty || !!numberError || !!yearError}
+                loading={saving}
+                onPress={handleSave}
+              />
+            )}
+          >
+            <View className="flex-row flex-wrap gap-1.5">
+              <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: isActive ? 'var(--c-success-bg)' : 'var(--c-surface-3)' }}>
+                <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isActive ? 'var(--c-success)' : 'var(--c-faint)' }} />
+                <Text className="text-[11.5px] font-semibold" style={{ color: isActive ? 'var(--c-success-fg)' : 'var(--c-muted)' }}>{isActive ? 'Activ' : 'Inactiv'}</Text>
+              </View>
+              {player.category ? (
+                <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+                  <Text className="text-[11.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{player.category}</Text>
                 </View>
-              </View>
+              ) : null}
             </View>
-            <View className="flex-row flex-wrap border-t" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' }}>
-              <Fact label="Tricou" value={number ? `#${number}` : '—'} />
-              <Fact label="Prezență" value={attendance != null ? `${Math.round(attendance)}%` : '—'} tone={attendance != null && attendance < 60 ? 'var(--c-danger-fg)' : undefined} />
-              <Fact label="Viză medicală" value={medMeta.label} tone={medMeta.fg} />
-              <Fact label="Plată" value={paid ? 'La zi' : amountDue > 0 ? `Restanță ${money(amountDue)}` : 'În așteptare'} tone={paid ? 'var(--c-success-fg)' : 'var(--c-warning-fg)'} />
+            <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
+              <GlassStat value={number ? `#${number}` : '—'} label="Tricou" dot="var(--c-purple)" />
+              <GlassStat
+                value={attendance != null ? Math.round(attendance) : '—'}
+                suffix={attendance != null ? '%' : undefined}
+                label="Prezență"
+                dot={attendance == null ? 'var(--c-faint)' : attendance < 60 ? 'var(--c-danger)' : attendance < 75 ? 'var(--c-warning)' : 'var(--c-success)'}
+                bar={attendance ?? undefined}
+              />
+              <GlassStat value={medMeta.label} label="Viză medicală" dot={medMeta.fg} />
+              <GlassStat
+                value={paid ? 'La zi' : amountDue > 0 ? money(amountDue) : 'În așteptare'}
+                label={amountDue > 0 ? 'Restanță' : 'Plată'}
+                dot={paid ? 'var(--c-success)' : amountDue > 0 ? 'var(--c-danger)' : 'var(--c-warning)'}
+                danger={amountDue > 0}
+              />
             </View>
-          </View>
+          </PageHero>
 
           <View className="flex-col lg:flex-row lg:items-start gap-5">
             <View className="flex-1 min-w-0 gap-5">
