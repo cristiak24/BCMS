@@ -506,11 +506,12 @@ export default function FinancialSettingsPage() {
                                 subtitle="Gestionează taxa lunară per jucător"
                             />
 
-                            <View className="rounded-[12px] p-4 border mb-4" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
-                                <View className="flex-row justify-between items-center mb-4">
-                                    <Text className="font-bold text-[11px] uppercase tracking-wider" style={{ color: dash.muted }}>Taxa curentă</Text>
+                            <View className={`${isMobile ? '' : 'flex-row gap-3'} mb-3`}>
+                            <View className={`rounded-[12px] p-3.5 border flex-1 ${isMobile ? 'mb-3' : ''}`} style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
+                                <View className="flex-row justify-between items-center mb-3">
+                                    <Text className="font-bold text-[11px] uppercase tracking-wider shrink" style={{ color: dash.muted }}>Cotizație</Text>
                                     {!editingFee && (
-                                        <Pressable onPress={() => setEditingFee(true)} className="flex-row items-center gap-1 px-3 py-1.5 rounded-[10px]" style={{ backgroundColor: 'rgba(99,91,255,0.08)' }}>
+                                        <Pressable onPress={() => setEditingFee(true)} className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-[10px] shrink-0" style={{ backgroundColor: 'rgba(99,91,255,0.08)' }}>
                                             <MaterialIcons name="edit" size={12} color={dash.accent} />
                                             <Text className="text-[12px] font-bold" style={{ color: dash.accent }}>Modifică</Text>
                                         </Pressable>
@@ -570,11 +571,11 @@ export default function FinancialSettingsPage() {
                             </View>
 
                             {/* Payment due day */}
-                            <View className="rounded-[12px] p-4 border mb-4" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
+                            <View className="rounded-[12px] p-3.5 border flex-1" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
                                 <View className="flex-row justify-between items-center mb-3">
-                                    <Text className="font-bold text-[11px] uppercase tracking-wider" style={{ color: dash.muted }}>Zi limită de plată</Text>
+                                    <Text className="font-bold text-[11px] uppercase tracking-wider" style={{ color: dash.muted }}>Zi limită</Text>
                                     {!editingDueDay && (
-                                        <Pressable onPress={() => setEditingDueDay(true)} className="flex-row items-center gap-1 px-3 py-1.5 rounded-[10px]" style={{ backgroundColor: 'rgba(99,91,255,0.08)' }}>
+                                        <Pressable onPress={() => setEditingDueDay(true)} className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-[10px] shrink-0" style={{ backgroundColor: 'rgba(99,91,255,0.08)' }}>
                                             <MaterialIcons name="edit" size={12} color={dash.accent} />
                                             <Text className="text-[12px] font-bold" style={{ color: dash.accent }}>Modifică</Text>
                                         </Pressable>
@@ -632,6 +633,7 @@ export default function FinancialSettingsPage() {
                                     )
                                 )}
                             </View>
+                            </View>
 
                             <View className="flex-row items-center p-3 rounded-[11px]" style={{ backgroundColor: 'rgba(37,99,235,0.06)' }}>
                                 <MaterialIcons name="info-outline" size={16} color={dash.accentBlue} style={{ marginRight: 8 }} />
@@ -651,11 +653,11 @@ export default function FinancialSettingsPage() {
                                 subtitle="Cheltuieli și facturi"
                             />
 
-                            <View className="flex-row gap-3">
+                            <View className={`flex-row gap-3 ${isMobile ? '' : 'flex-1'}`}>
                                 <Pressable
                                     onPress={() => handleStartUpload('expense')}
                                     disabled={pickingFile === 'expense'}
-                                    className="flex-1 ui-press rounded-[14px] border-2 border-dashed items-center justify-center py-5 px-3"
+                                    className="flex-1 ui-press rounded-[14px] border-[1.5px] border-dashed items-center justify-center py-5 px-3"
                                     style={{ backgroundColor: 'rgba(245,158,11,0.05)', borderColor: 'rgba(245,158,11,0.3)' }}
                                 >
                                     {pickingFile === 'expense' ? (
@@ -674,7 +676,7 @@ export default function FinancialSettingsPage() {
                                 <Pressable
                                     onPress={() => handleStartUpload('invoice')}
                                     disabled={pickingFile === 'invoice'}
-                                    className="flex-1 ui-press rounded-[14px] border-2 border-dashed items-center justify-center py-5 px-3"
+                                    className="flex-1 ui-press rounded-[14px] border-[1.5px] border-dashed items-center justify-center py-5 px-3"
                                     style={{ backgroundColor: 'rgba(37,99,235,0.05)', borderColor: 'rgba(37,99,235,0.25)' }}
                                 >
                                     {pickingFile === 'invoice' ? (
@@ -698,7 +700,7 @@ export default function FinancialSettingsPage() {
 
                         {/* Documents Ledger */}
                         <View className={`w-full rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in ${isMobile ? '' : 'xl:flex-[3]'}`} style={cardStyle}>
-                            <View className="flex-row items-start justify-between mb-5 flex-wrap gap-3">
+                            <View className="flex-row items-start justify-between mb-1 flex-wrap gap-3">
                                 <SectionHeader
                                     icon="receipt-long"
                                     iconBg="rgba(37,99,235,0.1)"
