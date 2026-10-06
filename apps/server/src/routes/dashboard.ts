@@ -13,7 +13,7 @@ import {
 } from '../db/schema';
 import { and, eq, gte, inArray } from 'drizzle-orm';
 import { getRequestUser } from '../lib/requestContext';
-import { normalizeRole } from '../lib/requestAuth';
+import { dashboardSettingsRowId, resolveDashboardClubScope, type DashboardClubScope } from '../lib/dashboardScope';
 import { authenticate, requireRoles } from '../middleware/auth';
 
 const router = Router();
@@ -52,32 +52,46 @@ async function getFirestoreDocs(_collectionName: string) {
     return [] as Array<{ data: () => Record<string, unknown> }>;
 }
 
-async function getDashboardFinancialSettings(_clubId: number | null) {
-    const rows = await db.select().from(pgFinancialSettings).where(eq(pgFinancialSettings.id, 1)).limit(1);
+async function getDashboardFinancialSettings(clubScope: DashboardClubScope) {
+    const rowId = dashboardSettingsRowId(clubScope);
+    if (rowId == null) {
+        return null;
+    }
+    const rows = await db.select().from(pgFinancialSettings).where(eq(pgFinancialSettings.id, rowId)).limit(1);
     return rows[0] ?? null;
 }
 
 async function resolveDashboardScope(req: Request) {
-    const user = await getRequestUser(req);
-    const role = normalizeRole(user?.role);
+    const clubScope = resolveDashboardClubScope(await getRequestUser(req));
 
-    if (!user || role === 'superadmin' || user.clubId == null) {
-        return { clubId: null as number | null, teamIds: null as number[] | null };
+    if (clubScope.kind === 'all') {
+        return { clubScope, clubId: null as number | null, teamIds: null as number[] | null };
     }
 
-    const clubId = Number(user.clubId);
+    if (clubScope.kind === 'none') {
+        return { clubScope, clubId: null as number | null, teamIds: [] as number[] };
+    }
+
+    const { clubId } = clubScope;
     const teamRows = await db.select({ id: pgTeams.id }).from(pgTeams).where(eq(pgTeams.clubId, clubId));
 
     return {
+        clubScope,
         clubId,
         teamIds: teamRows.map((team) => team.id),
     };
 }
 
-async function getScopedPostgresPlayers(clubId: number | null, teamIds: number[] | null) {
-    if (clubId == null) {
+async function getScopedPostgresPlayers(clubScope: DashboardClubScope, teamIds: number[] | null) {
+    if (clubScope.kind === 'all') {
         return db.select().from(pgPlayers);
     }
+
+    if (clubScope.kind === 'none') {
+        return [] as Array<typeof pgPlayers.$inferSelect>;
+    }
+
+    const { clubId } = clubScope;
 
     const playersById = new Map<number, typeof pgPlayers.$inferSelect>();
 
@@ -114,7 +128,7 @@ router.get('/summary', async (req, res) => {
         const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
         const scope = await resolveDashboardScope(req);
-        const scopedPlayers = await getScopedPostgresPlayers(scope.clubId, scope.teamIds);
+        const scopedPlayers = await getScopedPostgresPlayers(scope.clubScope, scope.teamIds);
         const scopedPlayerIds = scopedPlayers.map((player) => player.id);
 
         const [playerDocs, teamDocs, financialDocDocs, paymentDocs, attendanceDocs] = await Promise.all([
@@ -130,7 +144,11 @@ router.get('/summary', async (req, res) => {
         // stops this from loading the club's whole attendance history.
         const attendanceSince = new Date(startOfPrevMonth.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
         const [pgFinancialDocs, pgPaymentRows, pgAttendanceRows] = await Promise.all([
-            db.select().from(pgFinancialDocuments),
+            scope.clubScope.kind === 'all'
+                ? db.select().from(pgFinancialDocuments)
+                : scope.clubId != null
+                    ? db.select().from(pgFinancialDocuments).where(eq(pgFinancialDocuments.clubId, scope.clubId))
+                    : [],
             scopedPlayerIds.length
                 ? db.select().from(pgPlayerPayments).where(inArray(pgPlayerPayments.playerId, scopedPlayerIds))
                 : [],
@@ -363,7 +381,7 @@ router.get('/summary', async (req, res) => {
                 };
             });
 
-        const financialSettings = await getDashboardFinancialSettings(scope.clubId);
+        const financialSettings = await getDashboardFinancialSettings(scope.clubScope);
         const hasRecurringFees = financialSettings != null && (
             Number(financialSettings.monthlyPlayerFee ?? 0) > 0 ||
             Number(financialSettings.trainingLevy ?? 0) > 0 ||
