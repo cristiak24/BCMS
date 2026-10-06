@@ -6,7 +6,7 @@ import { CalendarEvent, eventsApi } from '../../services/eventsApi';
 import { teamsApi, type Player, type Team } from '../../services/teamsApi';
 import { useSession } from '../../context/AuthContext';
 import PageContainer from '../../components/ui/PageContainer';
-import PageHeader from '../../components/ui/PageHeader';
+import PageHero, { GlassStat } from '../../components/admin/PageHero';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
 import { GENDER_LABELS, LEVEL_LABELS } from '../../components/myclub/teamDisplay';
@@ -56,31 +56,31 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Vezi echipa ${team.name}`}
-      className="ui-lift ui-press relative overflow-hidden rounded-[16px] border p-5 gap-4 min-w-0 text-left w-full"
+      className="ui-lift ui-press relative overflow-hidden rounded-[16px] border p-4 gap-3.5 min-w-0 text-left w-full"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
       {/* Brand edge — a thin gradient cap so squads read as distinct objects
           rather than another grey panel. */}
       <View
         className="absolute left-0 right-0 top-0 h-[3px]"
-        style={{ background: 'linear-gradient(90deg, var(--c-hero-via), var(--c-hero-to), var(--c-sky))' } as any}
+        style={{ background: 'linear-gradient(90deg, var(--c-brand-surface), var(--c-sky-fg))', opacity: 0.85 } as any}
       />
 
       <View className="flex-row items-center gap-3.5">
         <View
-          className="w-12 h-12 rounded-[14px] items-center justify-center shrink-0"
-          style={{ background: 'linear-gradient(135deg, var(--c-hero-via), var(--c-hero-to))', boxShadow: 'var(--e-brand)' } as any}
+          className="w-11 h-11 rounded-[13px] border items-center justify-center shrink-0"
+          style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' } as any}
         >
-          <MaterialIcons name="shield" size={22} color="#FFFFFF" />
+          <MaterialIcons name="shield" size={21} color="var(--c-brand-fg)" />
         </View>
         <View className="flex-1 min-w-0">
-          <Text className="text-[18px] font-bold leading-tight" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{team.name}</Text>
+          <Text className="f-display text-[17px] font-extrabold leading-tight" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any} numberOfLines={2}>{team.name}</Text>
           {team.leagueName ? (
             <Text className="t-meta mt-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{team.leagueName}</Text>
           ) : null}
         </View>
-        <ProgressRing value={average} size={56} stroke={6} color={attendanceRateColor(average)} label={average == null ? 'Fără prezență marcată' : `Prezență medie ${average}%`}>
-          <Text className="t-num text-[12.5px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{average == null ? '—' : `${average}%`}</Text>
+        <ProgressRing value={average} size={52} stroke={6} color={attendanceRateColor(average)} label={average == null ? 'Fără prezență marcată' : `Prezență medie ${average}%`}>
+          <Text className="f-display t-num text-[12.5px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>{average == null ? '—' : `${average}%`}</Text>
         </ProgressRing>
       </View>
 
@@ -102,11 +102,11 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
       </View>
 
       {team.players.length ? (
-        <View className="gap-2.5">
+        <View className="gap-2">
           <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>
             Prezența cea mai scăzută
           </Text>
-          <View className="gap-2 ui-stagger">
+          <View className="gap-1.5 ui-stagger">
             {preview.map((player) => (
               <CoachPlayerRow
                 key={player.id}
@@ -136,7 +136,7 @@ function TeamsSkeleton() {
   return (
     <View className="grid grid-cols-1 xl:grid-cols-2 gap-3" accessibilityRole="progressbar" accessibilityLabel="Se încarcă echipele">
       {Array.from({ length: 2 }).map((_, index) => (
-        <Skeleton key={index} className="h-[420px] w-full rounded-[16px]" />
+        <Skeleton key={index} className="h-[380px] w-full rounded-[16px]" />
       ))}
     </View>
   );
@@ -211,6 +211,12 @@ export default function CoachTeamsScreen() {
     });
   }, [playersByTeam, scopedEvents, scopedTeamIds, teams]);
 
+  const totalPlayers = visibleTeams.reduce((sum, team) => sum + team.players.length, 0);
+  const teamsRated = visibleTeams.flatMap((team) => team.players).filter((player) => player.attendanceRate != null);
+  const teamsAverage = teamsRated.length
+    ? Math.round(teamsRated.reduce((sum, player) => sum + (player.attendanceRate ?? 0), 0) / teamsRated.length)
+    : null;
+
   const subtitle = visibleTeams.length
     ? `${visibleTeams.length} ${visibleTeams.length === 1 ? 'echipă' : 'echipe'} · ${session?.clubName ?? 'Clubul tău'}`
     : 'Loturile și activitatea lor viitoare.';
@@ -218,14 +224,14 @@ export default function CoachTeamsScreen() {
   return (
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
       <PageContainer>
-        <PageHeader
-          actionsOnMobile={false}
-          title="Echipe"
+        <PageHero
+          eyebrow="Echipe"
+          title="Echipele mele"
           subtitle={subtitle}
           actions={
             <Pressable
               onPress={() => loadData(true)}
-              className="w-9 h-9 rounded-[10px] border items-center justify-center"
+              className="ui-press hidden sm:flex w-10 h-10 rounded-[11px] border items-center justify-center"
               style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
               accessibilityRole="button"
               accessibilityLabel="Reîmprospătează"
@@ -233,7 +239,21 @@ export default function CoachTeamsScreen() {
               {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
             </Pressable>
           }
-        />
+        >
+          {!loading && !error && visibleTeams.length ? (
+            <View className="grid grid-cols-3 gap-2 ui-stagger">
+              <GlassStat dot="var(--c-brand-fg)" label="Echipe" value={visibleTeams.length} />
+              <GlassStat dot="var(--c-purple)" label="Jucători" value={totalPlayers} />
+              <GlassStat
+                dot={teamsAverage == null ? 'var(--c-faint)' : attendanceRateColor(teamsAverage)}
+                label="Prezență"
+                value={teamsAverage ?? '—'}
+                suffix={teamsAverage == null ? undefined : '%'}
+                bar={teamsAverage ?? undefined}
+              />
+            </View>
+          ) : null}
+        </PageHero>
 
         {loading ? (
           <TeamsSkeleton />
@@ -253,7 +273,7 @@ export default function CoachTeamsScreen() {
         ) : (
           // Two columns only from xl: the cards carry a roster list, so at 1024px
           // a second column squeezed every player name to an ellipsis.
-          <View className="grid grid-cols-1 xl:grid-cols-2 gap-4 ui-stagger">
+          <View className="grid grid-cols-1 xl:grid-cols-2 gap-3 ui-stagger">
             {visibleTeams.map((team) => (
               <TeamCard key={team.id} team={team} onPress={() => router.push(`/coach/team/${team.id}` as any)} />
             ))}

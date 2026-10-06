@@ -63,7 +63,7 @@ export function StatTile({
 
   return (
     <View
-      className="rounded-[14px] border px-3 sm:px-3.5 py-3 flex-1 min-w-0"
+      className="rounded-[12px] border px-3 py-2.5 flex-1 min-w-0"
       style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
     >
       <View className="flex-row items-center gap-1.5 min-w-0">
@@ -79,7 +79,7 @@ export function StatTile({
         </Text>
       </View>
       <Text
-        className="t-num text-[20px] sm:text-[22px] font-bold mt-1.5 leading-tight"
+        className="f-display t-num text-[19px] sm:text-[20px] font-extrabold mt-1 leading-tight"
         style={{ color: color ?? toneColors?.fg ?? 'var(--c-ink-strong)' }}
         numberOfLines={1}
       >
@@ -129,7 +129,7 @@ export function SessionRow({
 
       <View className="flex-1 min-w-0">
         <View className="flex-row items-center gap-2 min-w-0">
-          <Text className="text-[14.5px] font-bold flex-1 min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+          <Text className="f-display text-[14.5px] font-bold flex-1 min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
             {event.title}
           </Text>
           {relative && !compact ? (
@@ -171,7 +171,7 @@ export function SessionRow({
   } as any;
 
   if (!onPress) {
-    return <View className="ui-lift rounded-[14px] border px-3.5 py-3" style={style}>{body}</View>;
+    return <View className="ui-lift rounded-[14px] border px-3 py-2.5" style={style}>{body}</View>;
   }
 
   return (
@@ -180,7 +180,7 @@ export function SessionRow({
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       accessibilityLabel={`${event.title}, ${formatCoachDay(event.startTime)} ${formatCoachTimeRange(event.startTime, event.endTime)}`}
-      className={`ui-lift ui-press rounded-[14px] border text-left w-full ${compact ? 'px-3 py-2.5' : 'px-3.5 py-3'}`}
+      className={`ui-lift ui-press rounded-[14px] border text-left w-full ${compact ? 'px-3 py-2' : 'px-3 py-2.5'}`}
       style={style}
     >
       {body}
@@ -224,11 +224,11 @@ export function CoachPlayerRow({
 }) {
   return (
     <View
-      className={`flex-row items-center gap-3 min-w-0 ${bare ? '' : 'rounded-[12px] border px-3 py-2.5'}`}
+      className={`flex-row items-center gap-3 min-w-0 ${bare ? '' : 'rounded-[12px] border px-3 py-2'}`}
       style={bare ? undefined : ({ borderColor: 'var(--c-border-soft)', backgroundColor: 'var(--c-surface-2)' } as any)}
     >
       <View
-        className="h-10 w-10 rounded-full items-center justify-center shrink-0 border"
+        className="h-9 w-9 rounded-full items-center justify-center shrink-0 border"
         style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'color-mix(in srgb, var(--c-brand-fg) 22%, transparent)' } as any}
       >
         <Text className="text-[12.5px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>
@@ -237,7 +237,7 @@ export function CoachPlayerRow({
       </View>
 
       <View className="flex-1 min-w-0">
-        <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+        <Text className="f-display text-[14px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
           {firstName} {lastName}
         </Text>
         {meta ? (

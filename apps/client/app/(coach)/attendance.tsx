@@ -7,10 +7,11 @@ import { useSession } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import GlassCard from '../../components/ui/GlassCard';
 import PageContainer from '../../components/ui/PageContainer';
-import PageHeader from '../../components/ui/PageHeader';
+import PageHero, { GlassStat } from '../../components/admin/PageHero';
+import Button from '../../components/ui/Button';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
-import { CoachPlayerRow, SessionRow, StatTile } from '../../components/coach/CoachPrimitives';
+import { CoachPlayerRow, SessionRow } from '../../components/coach/CoachPrimitives';
 import ProgressRing from '../../components/ui/ProgressRing';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { attendanceRateColor, attendanceStatusTone, eventTypeMeta, getPlayerBadge, isPresentStatus } from '../../components/coach/coachDisplay';
@@ -108,7 +109,7 @@ function AttendanceRow({
 
   return (
     <View
-      className="relative overflow-hidden rounded-[14px] border pl-4 pr-3.5 py-3 gap-3 flex-col md:flex-row md:items-center md:gap-4"
+      className="relative overflow-hidden rounded-[14px] border pl-4 pr-3.5 py-2.5 gap-2.5 flex-col md:flex-row md:items-center md:gap-4"
       style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any}
     >
       {/* Status rail: the row's state is readable from the left edge alone,
@@ -322,22 +323,62 @@ export default function CoachAttendanceScreen() {
   return (
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
       <PageContainer>
-        <PageHeader
-          actionsOnMobile={false}
-          title="Prezență"
-          subtitle="Marchează disponibilitatea jucătorilor pentru sesiunile tale."
-          actions={
-            <Pressable
-              onPress={() => loadEvents()}
-              className="w-9 h-9 rounded-[10px] border items-center justify-center"
-              style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
-              accessibilityRole="button"
-              accessibilityLabel="Reîmprospătează"
+        <PageHero
+          eyebrow={selectedMeta ? `Prezență · ${selectedMeta.label}` : 'Prezență'}
+          title={selectedEvent?.title ?? 'Prezență'}
+          subtitle={selectedEvent
+            ? `${selectedEvent.teamName ?? 'Echipă'} · ${formatCoachDate(selectedEvent.startTime)} · ${formatCoachTimeRange(selectedEvent.startTime, selectedEvent.endTime)}`
+            : 'Alege o sesiune și marchează disponibilitatea jucătorilor.'}
+          leading={
+            <ProgressRing
+              value={players.length ? markedPercent : null}
+              size={56}
+              stroke={6}
+              color={markedPercent === 100 ? 'var(--c-success)' : 'var(--c-brand-fg)'}
+              label={`${markedCount} din ${players.length} marcați`}
             >
-              {loadingEvents ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
-            </Pressable>
+              {markedPercent === 100 ? (
+                <MaterialIcons name="check" size={20} color="var(--c-success-fg)" />
+              ) : (
+                <Text className="t-num text-[13px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{markedPercent}%</Text>
+              )}
+            </ProgressRing>
           }
-        />
+          actions={
+            <>
+              {unmarkedCount > 0 && players.length > 0 ? (
+                <Button
+                  variant="primary"
+                  icon="check-circle"
+                  label={`Restul prezenți (${unmarkedCount})`}
+                  loading={bulkSaving}
+                  onPress={() => setBulkConfirmOpen(true)}
+                />
+              ) : null}
+              <Pressable
+                onPress={() => loadEvents()}
+                className="ui-press w-10 h-10 rounded-[11px] border items-center justify-center"
+                style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+                accessibilityRole="button"
+                accessibilityLabel="Reîmprospătează"
+              >
+                {loadingEvents ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
+              </Pressable>
+            </>
+          }
+        >
+          <View className="grid grid-cols-3 gap-2 ui-stagger">
+            <GlassStat dot="var(--c-brand-fg)" label="Marcați" value={`${markedCount}/${players.length}`} hint="din lot" />
+            <GlassStat dot="var(--c-success)" label="Prezenți" value={presentCount} hint="jucători" />
+            <GlassStat
+              dot={presentRate == null ? 'var(--c-faint)' : attendanceRateColor(presentRate)}
+              label="Rată"
+              value={presentRate ?? '—'}
+              suffix={presentRate == null ? undefined : '%'}
+              bar={presentRate ?? undefined}
+            />
+          </View>
+        </PageHero>
 
         {error ? (
           <View className="mb-4">
@@ -356,7 +397,7 @@ export default function CoachAttendanceScreen() {
           <View className="w-full xl:w-[360px] shrink-0">
             <GlassCard className="gap-3">
               <View>
-                <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Sesiuni</Text>
+                <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Sesiuni</Text>
                 <Text className="text-[12.5px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }}>
                   Alege sesiunea de marcat.
                 </Text>
@@ -409,72 +450,6 @@ export default function CoachAttendanceScreen() {
           </View>
 
           <View className="flex-1 min-w-0 gap-4">
-            <GlassCard className="gap-4">
-              <View className="flex-row items-center gap-4">
-                <ProgressRing
-                  value={players.length ? markedPercent : null}
-                  size={64}
-                  stroke={7}
-                  color={markedPercent === 100 ? 'var(--c-success)' : 'var(--c-brand-fg)'}
-                  label={`${markedCount} din ${players.length} marcați`}
-                >
-                  {markedPercent === 100 ? (
-                    <MaterialIcons name="check" size={22} color="var(--c-success-fg)" />
-                  ) : (
-                    <Text className="t-num text-[14px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{markedPercent}%</Text>
-                  )}
-                </ProgressRing>
-              <View className="flex-1 min-w-0">
-                {selectedMeta ? (
-                  <View className="flex-row items-center gap-1.5 mb-1">
-                    <MaterialIcons name={selectedMeta.icon} size={13} color={selectedMeta.fg} />
-                    <Text className="t-eyebrow" style={{ color: selectedMeta.fg }}>{selectedMeta.label}</Text>
-                  </View>
-                ) : null}
-                <Text className="text-[18px] font-bold leading-snug" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
-                  {selectedEvent?.title ?? 'Selectează o sesiune'}
-                </Text>
-                <Text className="text-[12.5px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
-                  {selectedEvent
-                    ? `${selectedEvent.teamName ?? 'Echipă'} · ${formatCoachDate(selectedEvent.startTime)} · ${formatCoachTimeRange(selectedEvent.startTime, selectedEvent.endTime)}`
-                    : 'Lista de prezență apare aici.'}
-                </Text>
-              </View>
-              </View>
-
-              <View className="flex-row gap-2 sm:gap-2.5">
-                <StatTile icon="fact-check" label="Marcați" value={`${markedCount}/${players.length}`} hint="din lot" />
-                <StatTile icon="check-circle" tone="success" label="Prezenți" value={presentCount} hint="jucători" />
-                <StatTile
-                  icon="trending-up"
-                  label="Rată"
-                  value={presentRate == null ? '—' : `${presentRate}%`}
-                  hint={markedCount ? 'din marcați' : 'nemarcată'}
-                  color={presentRate == null ? undefined : attendanceRateColor(presentRate)}
-                />
-              </View>
-
-              {unmarkedCount > 0 && players.length > 0 ? (
-                <Pressable
-                  onPress={() => setBulkConfirmOpen(true)}
-                  disabled={bulkSaving}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Marchează restul prezenți (${unmarkedCount})`}
-                  className="ui-press h-11 rounded-[12px] px-4 flex-row items-center justify-center gap-2 border"
-                  style={{ backgroundColor: 'var(--c-success-bg)', borderColor: 'var(--c-success-border)', opacity: bulkSaving ? 0.7 : 1 } as any}
-                >
-                  {bulkSaving ? (
-                    <ActivityIndicator size="small" color="var(--c-success-fg)" />
-                  ) : (
-                    <MaterialIcons name="check-circle" size={17} color="var(--c-success-fg)" />
-                  )}
-                  <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-success-fg)' }}>
-                    Marchează restul prezenți ({unmarkedCount})
-                  </Text>
-                </Pressable>
-              ) : null}
-            </GlassCard>
-
             {loadingAttendance ? (
               <View className="gap-2.5" accessibilityRole="progressbar" accessibilityLabel="Se încarcă prezența">
                 {Array.from({ length: 5 }).map((_, index) => (

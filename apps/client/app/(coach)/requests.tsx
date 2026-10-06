@@ -1,6 +1,6 @@
 import { ScrollView } from '@/src/web/reactNative';
 import PageContainer from '../../components/ui/PageContainer';
-import PageHeader from '../../components/ui/PageHeader';
+import PageHero from '../../components/admin/PageHero';
 import FamilyRequestsPanel from '../../components/family/FamilyRequestsPanel';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
 
@@ -13,7 +13,7 @@ export default function CoachRequestsScreen() {
   return (
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-32">
       <PageContainer>
-        <PageHeader title="Cereri" subtitle="Părinți și jucători care s-au înscris cu codul echipei tale." />
+        <PageHero eyebrow="Înscrieri" title="Cereri" subtitle="Părinți și jucători care s-au înscris cu codul echipei tale." />
         <FamilyRequestsPanel onNotify={showToast} />
       </PageContainer>
       <ToastHost toasts={toasts} onDismiss={dismissToast} />

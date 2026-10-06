@@ -7,15 +7,16 @@ import { CalendarEvent, eventsApi } from '../../services/eventsApi';
 import { teamsApi, type Player, type Team } from '../../services/teamsApi';
 import { useSession } from '../../context/AuthContext';
 import GlassCard from '../../components/ui/GlassCard';
+import Button from '../../components/ui/Button';
+import PageHero, { GlassStat } from '../../components/admin/PageHero';
 import PageContainer from '../../components/ui/PageContainer';
 import SectionHeader from '../../components/ui/SectionHeader';
-import StatCard from '../../components/ui/StatCard';
 import ProgressRing from '../../components/ui/ProgressRing';
 import TeamStandingsCard from '../../components/standings/TeamStandingsCard';
-import HeroBanner, { formatToday, getGreeting, HeroButton, HeroChip } from '../../components/ui/HeroBanner';
+import { formatToday, getGreeting } from '../../components/ui/HeroBanner';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
-import { AttendanceRate, CoachPlayerRow, SessionRow } from '../../components/coach/CoachPrimitives';
+import { AttendanceRate, Chip, CoachPlayerRow, SessionRow } from '../../components/coach/CoachPrimitives';
 import { attendanceRateColor, eventTypeMeta, formatRelativeDay } from '../../components/coach/coachDisplay';
 import {
   formatCoachTimeRange,
@@ -59,16 +60,14 @@ function formatCountdown(value: string, now = Date.now()) {
   return days === 1 ? 'în 1 zi' : `în ${days} zile`;
 }
 
-/** Glass card inside the hero: what's next and when. */
+/** Glass tile inside the hero: what's next and when. */
 function NextSessionPanel({ event, onPress }: { event: CalendarEvent | null; onPress: () => void }) {
+  const panel = { boxShadow: 'var(--e-md)' } as any;
   if (!event) {
     return (
-      <View
-        className="rounded-[16px] border px-4 py-4"
-        style={{ backgroundColor: 'var(--c-hero-chip)', borderColor: 'var(--c-hero-chip-border)' } as any}
-      >
-        <Text className="t-eyebrow" style={{ color: 'var(--c-hero-muted)' }}>Următoarea sesiune</Text>
-        <Text className="text-[15px] font-semibold mt-2" style={{ color: 'var(--c-hero-fg)' }}>Nimic programat încă.</Text>
+      <View className="glass rounded-[14px] px-4 py-3.5 lg:w-[320px]" style={panel}>
+        <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Următoarea sesiune</Text>
+        <Text className="text-[14px] font-medium mt-2" style={{ color: 'var(--c-ink-soft)' }}>Nimic programat încă.</Text>
       </View>
     );
   }
@@ -81,28 +80,29 @@ function NextSessionPanel({ event, onPress }: { event: CalendarEvent | null; onP
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Următoarea sesiune: ${event.title}`}
-      className="ui-press rounded-[16px] border px-4 py-4 md:min-w-[280px] text-left"
-      style={{ backgroundColor: 'var(--c-hero-chip)', borderColor: 'var(--c-hero-chip-border)', backdropFilter: 'blur(6px)' } as any}
+      className="glass ui-press ui-lift relative overflow-hidden rounded-[14px] pl-4 pr-3.5 py-3 lg:w-[320px] text-left"
+      style={panel}
     >
+      <View pointerEvents="none" className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: meta.fg }} />
       <View className="flex-row items-center justify-between gap-3">
         <View className="flex-row items-center gap-2">
-          <View className="ui-ping w-2 h-2 rounded-full" style={{ backgroundColor: '#4ADE80' }} />
-          <Text className="t-eyebrow" style={{ color: 'var(--c-hero-muted)' }}>Următoarea sesiune</Text>
+          <View className="ui-ping w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--c-success)' }} />
+          <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Următoarea sesiune</Text>
         </View>
-        <Text className="text-[12px] font-bold" style={{ color: 'var(--c-hero-fg)' }}>{formatCountdown(event.startTime)}</Text>
+        <Text className="t-num text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{formatCountdown(event.startTime)}</Text>
       </View>
-      <Text className="text-[17px] font-bold mt-2 leading-snug" style={{ color: 'var(--c-hero-fg)' }} numberOfLines={2}>
+      <Text className="f-display text-[16px] font-bold mt-1.5 leading-snug" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
         {event.title}
       </Text>
-      <View className="flex-row items-center gap-1.5 mt-1.5">
-        <MaterialIcons name="schedule" size={14} color="var(--c-hero-muted)" />
-        <Text className="text-[13px] font-medium" style={{ color: 'var(--c-hero-muted)' }} numberOfLines={1}>
+      <View className="flex-row items-center gap-1.5 mt-1">
+        <MaterialIcons name="schedule" size={13} color="var(--c-faint)" />
+        <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
           {[relative, formatCoachTimeRange(event.startTime, event.endTime)].filter(Boolean).join(' · ')}
         </Text>
       </View>
-      <View className="flex-row items-center gap-1.5 mt-1">
-        <MaterialIcons name={meta.icon} size={14} color="var(--c-hero-muted)" />
-        <Text className="text-[13px] font-medium flex-1 min-w-0" style={{ color: 'var(--c-hero-muted)' }} numberOfLines={1}>
+      <View className="flex-row items-center gap-1.5 mt-0.5">
+        <MaterialIcons name={meta.icon} size={13} color={meta.fg} />
+        <Text className="t-meta flex-1 min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
           {[meta.label, event.teamName, event.location].filter(Boolean).join(' · ')}
         </Text>
       </View>
@@ -138,10 +138,10 @@ function WeekStrip({ events }: { events: CalendarEvent[] }) {
   const total = days.reduce((sum, day) => sum + day.events.length, 0);
 
   return (
-    <GlassCard className="ui-rise gap-4">
+    <GlassCard className="ui-rise gap-3.5">
       <View className="flex-row items-center justify-between gap-3">
         <View>
-          <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Săptămâna ta</Text>
+          <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Săptămâna ta</Text>
           <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
             {total === 0 ? 'Nicio sesiune în următoarele 7 zile' : `${total} ${total === 1 ? 'sesiune' : 'sesiuni'} în următoarele 7 zile`}
           </Text>
@@ -155,7 +155,7 @@ function WeekStrip({ events }: { events: CalendarEvent[] }) {
         {days.map((day) => (
           <View
             key={day.key}
-            className="items-center rounded-[12px] border py-2.5 gap-1.5"
+            className="items-center rounded-[12px] border py-2 gap-1"
             style={{
               backgroundColor: day.isToday ? 'var(--c-brand-surface)' : day.events.length ? 'var(--c-surface-2)' : 'transparent',
               borderColor: day.isToday ? 'var(--c-brand-surface)' : 'var(--c-border-soft)',
@@ -165,7 +165,7 @@ function WeekStrip({ events }: { events: CalendarEvent[] }) {
             <Text className="text-[11px] font-semibold capitalize" style={{ color: day.isToday ? 'var(--c-on-brand)' : 'var(--c-muted)' }}>
               {day.weekday}
             </Text>
-            <Text className="t-num text-[16px] font-bold leading-none" style={{ color: day.isToday ? 'var(--c-on-brand)' : 'var(--c-ink)' }}>
+            <Text className="f-display t-num text-[16px] font-extrabold leading-none" style={{ color: day.isToday ? 'var(--c-on-brand)' : 'var(--c-ink)' }}>
               {day.date}
             </Text>
             <View className="flex-row gap-1 h-1.5 items-center">
@@ -212,10 +212,10 @@ function SquadHealth({ players, onManage }: { players: Player[]; onManage: () =>
     .slice(0, FOCUS_LIMIT);
 
   return (
-    <GlassCard className="ui-rise gap-4">
+    <GlassCard className="ui-rise gap-3.5">
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1 min-w-0">
-          <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Sănătate lot</Text>
+          <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Sănătate lot</Text>
           <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Prezența recentă a jucătorilor tăi</Text>
         </View>
         <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
@@ -225,9 +225,9 @@ function SquadHealth({ players, onManage }: { players: Player[]; onManage: () =>
 
       {rated.length ? (
         <>
-          <View className="flex-row items-center gap-4 rounded-[14px] border p-3.5" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}>
-            <ProgressRing value={average} size={76} stroke={8} color={attendanceRateColor(average)} label={`Prezență medie ${average}%`}>
-              <Text className="t-num text-[18px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{average}%</Text>
+          <View className="flex-row items-center gap-4 rounded-[12px] border p-3" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}>
+            <ProgressRing value={average} size={68} stroke={7} color={attendanceRateColor(average)} label={`Prezență medie ${average}%`}>
+              <Text className="f-display t-num text-[17px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>{average}%</Text>
             </ProgressRing>
             <View className="flex-1 min-w-0 gap-1.5">
               {buckets.map((bucket) => (
@@ -265,16 +265,7 @@ function SquadHealth({ players, onManage }: { players: Player[]; onManage: () =>
         />
       )}
 
-      <Pressable
-        onPress={onManage}
-        accessibilityRole="button"
-        accessibilityLabel="Gestionează prezența"
-        className="ui-press h-11 rounded-[12px] px-4 flex-row items-center justify-center gap-2"
-        style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)' } as any}
-      >
-        <MaterialIcons name="fact-check" size={17} color="var(--c-on-brand)" />
-        <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-on-brand)' }}>Gestionează prezența</Text>
-      </Pressable>
+      <Button variant="primary" icon="fact-check" label="Gestionează prezența" onPress={onManage} />
     </GlassCard>
   );
 }
@@ -282,17 +273,12 @@ function SquadHealth({ players, onManage }: { players: Player[]; onManage: () =>
 function HomeSkeleton() {
   return (
     <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă panoul">
-      <Skeleton className="h-[176px] w-full rounded-[20px]" />
-      <View className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <Skeleton key={index} className="h-[118px] w-full rounded-[16px]" />
-        ))}
-      </View>
+      <Skeleton className="h-[230px] w-full rounded-[16px]" />
       <View className="flex-col xl:flex-row gap-4">
         <View className="flex-1 gap-2.5">
           <Skeleton className="h-[170px] w-full rounded-[16px]" />
           {Array.from({ length: 3 }).map((_, index) => (
-            <Skeleton key={index} className="h-[72px] w-full rounded-[14px]" />
+            <Skeleton key={index} className="h-[64px] w-full rounded-[14px]" />
           ))}
         </View>
         <Skeleton className="w-full xl:w-[380px] h-[440px] rounded-[16px]" />
@@ -382,54 +368,55 @@ export default function CoachDashboardScreen() {
           />
         ) : (
           <View className="gap-4">
-            <HeroBanner
+            <PageHero
+              className=""
               eyebrow={formatToday()}
               title={`${getGreeting()}, ${getFirstName(session?.name, session?.firstName)}`}
               // The scope ("assigned sessions" vs "the club's sessions") changes
               // what every number below counts, so it is stated up front.
               subtitle={`${getCoachScopeLabel(events, session)} · ${session?.clubName ?? 'Club'}`}
-              chips={
-                <>
-                  <HeroChip icon="event" label={`${thisWeekEvents.length} ${thisWeekEvents.length === 1 ? 'sesiune' : 'sesiuni'} săptămâna asta`} />
-                  {thisWeekMatches ? <HeroChip icon="sports-basketball" label={`${thisWeekMatches} ${thisWeekMatches === 1 ? 'meci' : 'meciuri'}`} /> : null}
-                  <HeroChip icon="groups" label={`${visibleTeamsCount} ${visibleTeamsCount === 1 ? 'echipă' : 'echipe'}`} />
-                </>
-              }
               actions={
                 <>
-                  <HeroButton label="Marchează prezența" icon="fact-check" onPress={goToAttendance} />
+                  <Button variant="primary" icon="fact-check" label="Marchează prezența" onPress={goToAttendance} />
                   {/* Schedule is already a bottom-nav tab on phones; hiding it there
                       keeps the hero actions on one line at 375px. */}
-                  <HeroButton label="Program" icon="calendar-today" variant="ghost" onPress={goToSchedule} className="hidden sm:flex" />
+                  <Button icon="calendar-today" label="Program" onPress={goToSchedule} className="hidden sm:flex" />
                   <Pressable
                     onPress={() => loadData(true)}
                     accessibilityRole="button"
                     accessibilityLabel="Reîmprospătează"
                     className="ui-press hidden sm:flex h-10 w-10 rounded-[11px] border items-center justify-center"
-                    style={{ backgroundColor: 'var(--c-hero-chip)', borderColor: 'var(--c-hero-chip-border)' } as any}
+                    style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
                   >
-                    {refreshing ? <ActivityIndicator size="small" color="#FFFFFF" /> : <MaterialIcons name="refresh" size={18} color="var(--c-hero-fg)" />}
+                    {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={18} color="var(--c-ink-soft)" />}
                   </Pressable>
                 </>
               }
-              aside={<NextSessionPanel event={nextEvent} onPress={goToAttendance} />}
-            />
+            >
+              <View className="flex-row flex-wrap gap-1.5">
+                <Chip icon="event" label={`${thisWeekEvents.length} ${thisWeekEvents.length === 1 ? 'sesiune' : 'sesiuni'} săptămâna asta`} />
+                {thisWeekMatches ? <Chip icon="sports-basketball" label={`${thisWeekMatches} ${thisWeekMatches === 1 ? 'meci' : 'meciuri'}`} /> : null}
+                <Chip icon="groups" label={`${visibleTeamsCount} ${visibleTeamsCount === 1 ? 'echipă' : 'echipe'}`} />
+              </View>
 
-            {/* Two columns at 375px rather than four: four tiles across a phone
-                left ~80px each and ellipsised every label. */}
-            <View className="grid grid-cols-2 lg:grid-cols-4 gap-3 ui-stagger">
-              <StatCard icon="event-available" tone="brand" label="Sesiuni" value={upcomingEvents.length} hint="programate" />
-              <StatCard icon="date-range" tone="sky" label="7 zile" value={thisWeekEvents.length} hint="săptămâna asta" />
-              <StatCard icon="groups" tone="purple" label="Jucători" value={players.length} hint={`în ${visibleTeamsCount} ${visibleTeamsCount === 1 ? 'echipă' : 'echipe'}`} />
-              <StatCard
-                icon="insights"
-                tone={averageAttendance == null ? 'neutral' : averageAttendance >= 75 ? 'success' : averageAttendance >= 50 ? 'warning' : 'danger'}
-                label="Prezență"
-                value={averageAttendance}
-                suffix="%"
-                hint="media lotului"
-              />
-            </View>
+              {/* Two columns at 375px rather than four: four tiles across a phone
+                  left ~80px each and ellipsised every label. */}
+              <View className="flex-col lg:flex-row gap-2.5">
+                <NextSessionPanel event={nextEvent} onPress={goToAttendance} />
+                <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 flex-1 min-w-0 ui-stagger">
+                  <GlassStat dot="var(--c-brand-fg)" label="Sesiuni" value={upcomingEvents.length} hint="programate" />
+                  <GlassStat dot="var(--c-sky-fg)" label="7 zile" value={thisWeekEvents.length} hint="săptămâna asta" />
+                  <GlassStat dot="var(--c-purple)" label="Jucători" value={players.length} hint={`în ${visibleTeamsCount} ${visibleTeamsCount === 1 ? 'echipă' : 'echipe'}`} />
+                  <GlassStat
+                    dot={averageAttendance == null ? 'var(--c-faint)' : averageAttendance >= 75 ? 'var(--c-success)' : averageAttendance >= 50 ? 'var(--c-warning)' : 'var(--c-danger)'}
+                    label="Prezență"
+                    value={averageAttendance ?? '—'}
+                    suffix={averageAttendance == null ? undefined : '%'}
+                    bar={averageAttendance ?? undefined}
+                  />
+                </View>
+              </View>
+            </PageHero>
 
             <View className="flex-col xl:flex-row gap-4">
               <View className="flex-1 min-w-0 gap-4">
