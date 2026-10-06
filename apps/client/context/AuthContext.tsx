@@ -12,8 +12,8 @@ import { ClerkProvider, useAuth, useClerk, useUser } from '@clerk/react';
 import { CLERK_PUBLISHABLE_KEY, setClerkInstance } from '../config/clerk';
 import {
   clearAuthSession,
-  getCachedAuthSession,
   readAuthSession,
+  readAuthSessionSync,
   saveAuthSession,
   setCachedAuthSession,
   type AuthUser,
@@ -146,8 +146,19 @@ function AuthBridge({ children }: PropsWithChildren) {
   const clerk = useClerk();
   const { isLoaded, isSignedIn, userId, getToken } = useAuth();
   const { user: clerkUser } = useUser();
-  const [session, setSession] = useState<AuthUser | null>(getCachedAuthSession());
-  const [initializing, setInitializing] = useState(true);
+  // Stale-while-revalidate: a session persisted on this device renders the
+  // shell on the very first frame. Waiting for Clerk's script + handshake AND
+  // the /auth/me round trip before showing anything cost a returning user
+  // several seconds on a phone; both now run in the background and only
+  // replace the session if it actually changed (or drop it if it's gone).
+  const [session, setSession] = useState<AuthUser | null>(() => {
+    const persisted = readAuthSessionSync();
+    setCachedAuthSession(persisted);
+    return persisted;
+  });
+  const [initializing, setInitializing] = useState(() => session == null);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
   const authRequestId = useRef(0);
 
   // Keyed on primitives, not the `clerkUser` object: Clerk hands back a new
@@ -196,6 +207,13 @@ function AuthBridge({ children }: PropsWithChildren) {
         return;
       }
 
+      // A cached session for a different account must not render while we
+      // load the right one.
+      if (sessionRef.current && sessionRef.current.uid !== currentUser.uid) {
+        setSession(null);
+        setInitializing(true);
+      }
+
       try {
         let nextSession: AuthUser;
         try {
@@ -218,7 +236,11 @@ function AuthBridge({ children }: PropsWithChildren) {
         setCachedAuthSession(nextSession);
         await saveAuthSession(nextSession);
         if (mounted && requestId === authRequestId.current) {
-          setSession(nextSession);
+          // Keep the optimistic object when nothing changed, so revalidation
+          // doesn't re-render every session consumer for no reason.
+          setSession((previous) => (
+            previous && JSON.stringify(previous) === JSON.stringify(nextSession) ? previous : nextSession
+          ));
         }
       } catch (error) {
         if (error instanceof DeadSessionError) {
@@ -323,7 +345,10 @@ function AuthBridge({ children }: PropsWithChildren) {
 
 export function AuthProvider({ children }: PropsWithChildren) {
   return (
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+    // prefetchUI={false}: we drive Clerk headlessly (custom login/signup
+    // forms), so its prebuilt UI bundle (~220 kB over four requests, fetched
+    // on every cold start) was pure overhead on the critical path.
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} prefetchUI={false} telemetry={false}>
       <AuthBridge>{children}</AuthBridge>
     </ClerkProvider>
   );

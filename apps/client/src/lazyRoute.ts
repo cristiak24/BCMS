@@ -1,4 +1,4 @@
-import { lazy, useSyncExternalStore, type ComponentType } from 'react';
+import { createElement, lazy, useSyncExternalStore, type ComponentType } from 'react';
 
 /**
  * Route-level code splitting that survives deploys and gives instant feedback.
@@ -64,12 +64,17 @@ export function reloadForStaleChunk() {
 }
 
 const loaded = new WeakMap<Factory<unknown>, Promise<unknown>>();
+/** Modules whose import already settled, so they can render synchronously. */
+const resolved = new WeakMap<Factory<unknown>, unknown>();
 
 function load<T>(factory: Factory<T>): Promise<{ default: T }> {
   const cached = loaded.get(factory as Factory<unknown>);
   if (cached) return cached as Promise<{ default: T }>;
 
-  const promise = factory().catch((error) => {
+  const promise = factory().then((module) => {
+    resolved.set(factory as Factory<unknown>, module.default);
+    return module;
+  }, (error) => {
     // Allow a later retry instead of caching the failure.
     loaded.delete(factory as Factory<unknown>);
     throw error;
@@ -78,8 +83,15 @@ function load<T>(factory: Factory<T>): Promise<{ default: T }> {
   return promise;
 }
 
+/** Start loading route chunks right now (not in idle time); errors are ignored. */
+export function preloadRoutes(factories: Factory<unknown>[]) {
+  factories.forEach((factory) => {
+    load(factory).catch(() => undefined);
+  });
+}
+
 export function lazyRoute<T extends ComponentType<any>>(factory: Factory<T>) {
-  return lazy(() => track(
+  const Lazy = lazy(() => track(
     load(factory).catch((error) => {
       if (isChunkLoadError(error) && reloadForStaleChunk()) {
         // Keep the Suspense fallback up while the page reloads.
@@ -88,6 +100,15 @@ export function lazyRoute<T extends ComponentType<any>>(factory: Factory<T>) {
       throw error;
     }),
   ));
+
+  // React.lazy suspends on its first render even when the chunk was already
+  // prefetched, which flashed the loading fallback on every first visit to a
+  // screen. Render an already-loaded module directly instead.
+  function LazyRoute(props: any) {
+    const Loaded = resolved.get(factory as Factory<unknown>) as ComponentType<any> | undefined;
+    return createElement(Loaded ?? Lazy, props);
+  }
+  return LazyRoute as unknown as T;
 }
 
 /** Warm chunks in idle time; failures are ignored (the real navigation retries). */

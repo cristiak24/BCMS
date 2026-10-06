@@ -6,15 +6,14 @@ import { LoadingScreen } from '../components/ui/ScreenState';
 
 export default function Landing() {
   const router = useRouter();
-  const { session, initializing } = useSession();
+  const { session } = useSession();
 
   useEffect(() => {
-    if (initializing) {
-      return;
-    }
-
+    // No waiting on Clerk here: without a cached session, /login renders
+    // immediately and forwards to the home screen itself if Clerk turns up a
+    // session after all.
     router.replace(session ? getHomeRouteForRole(normalizeRole(session.role)) : '/login');
-  }, [initializing, router, session]);
+  }, [router, session]);
 
   return <LoadingScreen message="Opening BCMS..." backgroundColor="var(--c-surface)" color="var(--c-blue)" />;
 }

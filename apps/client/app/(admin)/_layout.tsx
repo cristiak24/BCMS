@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { ContentLoading } from '../../components/ui/ScreenState';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar, { ADMIN_MENU_ITEMS } from '../../components/Sidebar';
 import { HeaderProvider, useHeader } from '../../components/HeaderContext';
@@ -156,7 +157,9 @@ function AdminLayoutContent() {
                 {/* ── Main Content ────────────────────────────────── */}
                 <div className="flex-1 min-w-0 overflow-auto overflow-x-hidden flex flex-col relative h-full">
                     <div className="flex-1 min-w-0 pb-24 lg:pb-0 relative w-full flex flex-col">
-                        <Outlet />
+                        <Suspense fallback={<ContentLoading />}>
+                            <Outlet />
+                        </Suspense>
                     </div>
                 </div>
 

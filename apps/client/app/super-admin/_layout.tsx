@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useWindowDimensions, View } from '@/src/web/reactNative';
 import { Slot, useRouter } from '@/src/web/expoRouter';
 import { useSafeAreaInsets } from '@/src/web/safeArea';
@@ -6,7 +6,7 @@ import SuperAdminHeader from '../../components/super-admin/SuperAdminHeader';
 import SuperAdminSidebar from '../../components/super-admin/SuperAdminSidebar';
 import { getHomeRouteForRole, isSuperadmin } from '../../utils/authSession';
 import { useSession } from '../../context/AuthContext';
-import { LoadingScreen } from '../../components/ui/ScreenState';
+import { ContentLoading, LoadingScreen } from '../../components/ui/ScreenState';
 
 export default function SuperAdminLayout() {
   const router = useRouter();
@@ -57,7 +57,9 @@ export default function SuperAdminLayout() {
           onMenuPress={isDesktop ? undefined : () => setSidebarVisible(true)}
         />
         <View className="flex-1 min-h-0">
-          <Slot />
+          <Suspense fallback={<ContentLoading />}>
+            <Slot />
+          </Suspense>
         </View>
       </View>
     </View>

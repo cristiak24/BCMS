@@ -8,7 +8,6 @@ import {
 import { getHomeRouteForRole } from '../utils/authSession';
 import { useLogin } from '../hooks/useLogin';
 import { useSession } from '../context/AuthContext';
-import { LoadingScreen } from '../components/ui/ScreenState';
 import {
     AuthCard,
     AuthHeading,
@@ -234,10 +233,6 @@ export default function Login() {
             navigate(getHomeRouteForRole(session.role), { replace: true });
         }
     }, [initializing, navigate, session]);
-
-    if (initializing) {
-        return <LoadingScreen message="Verificam sesiunea..." backgroundColor="var(--c-surface)" color="var(--c-blue)" />;
-    }
 
     return (
         <main className="relative isolate min-h-screen overflow-hidden text-slate-950">

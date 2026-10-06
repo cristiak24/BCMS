@@ -88,14 +88,33 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
 type SessionTokenGetter = () => Promise<string | null>;
 
 let sessionTokenGetter: SessionTokenGetter | null = null;
+let notifyGetterReady: (() => void) | null = null;
+let getterReady = new Promise<void>((resolve) => {
+  notifyGetterReady = resolve;
+});
+const GETTER_WAIT_MS = 3000;
 
 /** Registered once by AuthContext with Clerk's session.getToken(). */
 export function setSessionTokenGetter(getter: SessionTokenGetter | null) {
   sessionTokenGetter = getter;
+  if (getter) {
+    notifyGetterReady?.();
+  } else {
+    getterReady = new Promise<void>((resolve) => {
+      notifyGetterReady = resolve;
+    });
+  }
 }
 
 /** Get the current session token, or null if not logged in */
 async function getSessionToken(): Promise<string | null> {
+  if (!sessionTokenGetter) {
+    // The shell now renders from the cached session before AuthContext's
+    // effect registers the getter (child effects run first), so a screen's
+    // first request can arrive here early. Sending it without a token would
+    // 401 and sign the user out — wait briefly for the registration instead.
+    await Promise.race([getterReady, new Promise((resolve) => setTimeout(resolve, GETTER_WAIT_MS))]);
+  }
   if (!sessionTokenGetter) return null;
   try {
     return await sessionTokenGetter();

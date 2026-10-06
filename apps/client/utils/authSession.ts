@@ -133,6 +133,25 @@ export async function readAuthSession(): Promise<AuthUser | null> {
   }
 }
 
+/**
+ * Synchronous read of the persisted session, for first render: lets a returning
+ * user's shell paint immediately while Clerk and /auth/me revalidate it in the
+ * background (AuthContext), instead of sitting on a spinner for both.
+ */
+export function readAuthSessionSync(): AuthUser | null {
+  if (inMemorySession) {
+    return inMemorySession;
+  }
+
+  try {
+    const raw = localStorage.getItem(AUTH_SESSION_KEY);
+    const parsed = raw ? (JSON.parse(raw) as AuthUser) : null;
+    return parsed && typeof parsed.uid === 'string' && parsed.role ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function clearAuthSession() {
   inMemorySession = null;
   await AsyncStorage.removeItem(AUTH_SESSION_KEY);

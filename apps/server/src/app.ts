@@ -55,6 +55,10 @@ export function createServerApp() {
         // checked against their own links, never an identity claim.
         allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-BCMS-Child'],
         exposedHeaders: ['Content-Length', 'Content-Type'],
+        // Every API call carries Authorization, so each one needs a preflight;
+        // without a max-age browsers re-send it after ~5s, doubling the round
+        // trips of nearly every request. (Chrome caps this at 2h.)
+        maxAge: 2 * 60 * 60,
     }));
     app.post('/api/finance/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);
     app.use(express.json());

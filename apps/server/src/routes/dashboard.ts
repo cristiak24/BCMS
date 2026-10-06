@@ -11,7 +11,7 @@ import {
     teams as pgTeams,
     users as pgUsers,
 } from '../db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, gte, inArray } from 'drizzle-orm';
 import { getRequestUser } from '../lib/requestContext';
 import { normalizeRole } from '../lib/requestAuth';
 import { authenticate, requireRoles } from '../middleware/auth';
@@ -81,19 +81,22 @@ async function getScopedPostgresPlayers(clubId: number | null, teamIds: number[]
 
     const playersById = new Map<number, typeof pgPlayers.$inferSelect>();
 
-    if (teamIds?.length) {
-        const directPlayers = await db.select().from(pgPlayers).where(inArray(pgPlayers.teamId, teamIds));
-        const relationRows = await db
-            .select({ player: pgPlayers })
-            .from(pgPlayersToTeams)
-            .innerJoin(pgPlayers, eq(pgPlayersToTeams.playerId, pgPlayers.id))
-            .where(inArray(pgPlayersToTeams.teamId, teamIds));
+    // Independent lookups: run them together instead of one round trip each.
+    const [directPlayers, relationRows, clubUserRows] = await Promise.all([
+        teamIds?.length ? db.select().from(pgPlayers).where(inArray(pgPlayers.teamId, teamIds)) : [],
+        teamIds?.length
+            ? db
+                .select({ player: pgPlayers })
+                .from(pgPlayersToTeams)
+                .innerJoin(pgPlayers, eq(pgPlayersToTeams.playerId, pgPlayers.id))
+                .where(inArray(pgPlayersToTeams.teamId, teamIds))
+            : [],
+        db.select({ email: pgUsers.email }).from(pgUsers).where(eq(pgUsers.clubId, clubId)),
+    ]);
 
-        directPlayers.forEach((player) => playersById.set(player.id, player));
-        relationRows.forEach((row) => playersById.set(row.player.id, row.player));
-    }
+    directPlayers.forEach((player) => playersById.set(player.id, player));
+    relationRows.forEach((row) => playersById.set(row.player.id, row.player));
 
-    const clubUserRows = await db.select({ email: pgUsers.email }).from(pgUsers).where(eq(pgUsers.clubId, clubId));
     const clubUserEmails = clubUserRows.map((user) => user.email.trim().toLowerCase());
     if (clubUserEmails.length) {
         const userPlayers = await db.select().from(pgPlayers).where(inArray(pgPlayers.email, clubUserEmails));
@@ -122,13 +125,22 @@ router.get('/summary', async (req, res) => {
             getFirestoreDocs('attendance'),
         ]);
 
-        const pgFinancialDocs = await db.select().from(pgFinancialDocuments);
-        const pgPaymentRows = scopedPlayerIds.length
-            ? await db.select().from(pgPlayerPayments).where(inArray(pgPlayerPayments.playerId, scopedPlayerIds))
-            : [];
-        const pgAttendanceRows = scopedPlayerIds.length
-            ? await db.select().from(pgAttendance).where(inArray(pgAttendance.playerId, scopedPlayerIds))
-            : [];
+        // Only this month and last month of attendance are read below; the
+        // SQL bound (a couple of days early, so timezone edges stay inside)
+        // stops this from loading the club's whole attendance history.
+        const attendanceSince = new Date(startOfPrevMonth.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
+        const [pgFinancialDocs, pgPaymentRows, pgAttendanceRows] = await Promise.all([
+            db.select().from(pgFinancialDocuments),
+            scopedPlayerIds.length
+                ? db.select().from(pgPlayerPayments).where(inArray(pgPlayerPayments.playerId, scopedPlayerIds))
+                : [],
+            scopedPlayerIds.length
+                ? db.select().from(pgAttendance).where(and(
+                    inArray(pgAttendance.playerId, scopedPlayerIds),
+                    gte(pgAttendance.date, attendanceSince),
+                ))
+                : [],
+        ]);
 
         const postgresActivePlayerCount = scopedPlayers.filter((player) => normalizeStatus(player.status ?? 'active') === 'active').length;
         const firestoreActivePlayerCount = playerDocs.filter((docSnap) => normalizeStatus((docSnap.data() as { status?: string }).status ?? 'active') === 'active').length;

@@ -66,8 +66,7 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res: any) => {
         }
 
         const user = req.user;
-        const clubName = await findClubName(user.clubId);
-        const teamIds = await findSelfTeamIds(req);
+        const [clubName, teamIds] = await Promise.all([findClubName(user.clubId), findSelfTeamIds(req)]);
 
         res.json({
             success: true,

@@ -1,7 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import type { ReactElement } from 'react';
 import { useSession } from '../../context/AuthContext';
-import { LoadingScreen } from '../ui/ScreenState';
 import { getHomeRouteForRole } from '../../utils/authSession';
 
 interface PublicRouteProps {
@@ -9,12 +8,11 @@ interface PublicRouteProps {
 }
 
 export default function PublicRoute({ children }: PublicRouteProps) {
-  const { initializing, session } = useSession();
+  const { session } = useSession();
 
-  if (initializing) {
-    return <LoadingScreen message="Checking your session..." backgroundColor="var(--c-surface)" color="var(--c-blue)" />;
-  }
-
+  // No spinner while Clerk loads: a visitor with no cached session is almost
+  // always signed out, so show the page now. If Clerk does find a session, the
+  // profile load sets `session` and this redirects.
   if (session) {
     return <Navigate to={getHomeRouteForRole(session.role)} replace />;
   }

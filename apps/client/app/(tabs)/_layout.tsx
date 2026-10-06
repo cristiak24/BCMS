@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { ContentLoading } from '../../components/ui/ScreenState';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
 import { HeaderProvider, useHeader } from '../../components/HeaderContext';
@@ -137,7 +138,9 @@ function PlayerTabsLayoutContent() {
                     <div className="flex-1 min-w-0 pb-24 lg:pb-0 relative w-full flex flex-col">
                         {isParent ? <ChildSwitcher /> : null}
                         {!isCoach ? <AssignedGamesBanner /> : null}
-                        <Outlet />
+                        <Suspense fallback={<ContentLoading />}>
+                            <Outlet />
+                        </Suspense>
                     </div>
                 </div>
 

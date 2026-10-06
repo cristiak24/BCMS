@@ -29,6 +29,23 @@ type EmptyStateProps = {
   compact?: boolean;
 };
 
+/**
+ * In-shell placeholder while a screen's code chunk loads. Used as the Suspense
+ * fallback inside the layouts, so header and navigation stay put instead of the
+ * whole app being swapped for a full-screen spinner on every first visit.
+ */
+export function ContentLoading() {
+  return (
+    <View
+      className="flex-1 items-center justify-center py-24"
+      accessibilityRole="progressbar"
+      accessibilityLabel="Se încarcă…"
+    >
+      <ActivityIndicator size="small" color="var(--c-brand-fg)" />
+    </View>
+  );
+}
+
 export function LoadingScreen({
   message = 'Se încarcă…',
   backgroundColor = 'var(--c-bg)',

@@ -1,5 +1,6 @@
 import { createClerkClient, verifyToken } from '@clerk/backend';
 import { loadServerEnv } from './loadEnv';
+import { getOrCompute } from './microCache';
 
 loadServerEnv();
 
@@ -33,13 +34,22 @@ export async function verifyBearerToken(token: string): Promise<ClerkAuthUser> {
         return { uid, email: claimedEmail };
     }
 
-    const clerkUser = await clerkClient.users.getUser(uid);
-    const email = clerkUser.primaryEmailAddress?.emailAddress
-        ?? clerkUser.emailAddresses[0]?.emailAddress
-        ?? null;
+    // This ran on EVERY authenticated request — a round trip to Clerk's API
+    // (and against its rate limit) before any route work started, several
+    // times over when a screen loads its data in parallel. The email is only
+    // used to link a first sign-in to an existing row, so a short-lived cache
+    // is plenty; concurrent requests share one lookup.
+    const email = await getOrCompute(`clerk-email:${uid}`, CLERK_EMAIL_TTL_MS, async () => {
+        const clerkUser = await clerkClient.users.getUser(uid);
+        return clerkUser.primaryEmailAddress?.emailAddress
+            ?? clerkUser.emailAddresses[0]?.emailAddress
+            ?? null;
+    });
 
     return { uid, email };
 }
+
+const CLERK_EMAIL_TTL_MS = 10 * 60 * 1000;
 
 /**
  * Deletes a Clerk user (their sign-in). A 404 is treated as success — legacy

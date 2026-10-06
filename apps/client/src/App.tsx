@@ -1,13 +1,13 @@
 import { Suspense, useEffect } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, matchPath, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
-import { lazyRoute, prefetchRoutes } from './lazyRoute';
+import { lazyRoute, preloadRoutes, prefetchRoutes } from './lazyRoute';
 import RouteProgress from '../components/ui/RouteProgress';
 import { InstallBanner } from '../components/pwa/InstallApp';
 import { useSession } from '../context/AuthContext';
-import { normalizeRole } from '../utils/authSession';
+import { getHomeRouteForRole, normalizeRole, readAuthSessionSync } from '../utils/authSession';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import PublicRoute from '../components/auth/PublicRoute';
@@ -58,14 +58,22 @@ const loadCoachAttendance = () => import('../app/(coach)/attendance');
 const CoachAttendance = lazyRoute(loadCoachAttendance);
 const loadCoachTeamDetail = () => import('../app/(coach)/team/[id]');
 const CoachTeamDetail = lazyRoute(loadCoachTeamDetail);
-const CoachL12 = lazyRoute(() => import('../app/(coach)/l12/index'));
-const CoachRequests = lazyRoute(() => import('../app/(coach)/requests'));
-const CoachGameStats = lazyRoute(() => import('../app/(coach)/stats/[id]'));
-const MemberGameStats = lazyRoute(() => import('../app/(tabs)/stats/[id]'));
-const MemberDocuments = lazyRoute(() => import('../app/(tabs)/documents'));
-const MemberContacts = lazyRoute(() => import('../app/(tabs)/contacts'));
-const CoachL12Match = lazyRoute(() => import('../app/(coach)/l12/match/[id]'));
-const CoachL12Team = lazyRoute(() => import('../app/(coach)/l12/team/[id]'));
+const loadCoachL12 = () => import('../app/(coach)/l12/index');
+const CoachL12 = lazyRoute(loadCoachL12);
+const loadCoachRequests = () => import('../app/(coach)/requests');
+const CoachRequests = lazyRoute(loadCoachRequests);
+const loadCoachGameStats = () => import('../app/(coach)/stats/[id]');
+const CoachGameStats = lazyRoute(loadCoachGameStats);
+const loadMemberGameStats = () => import('../app/(tabs)/stats/[id]');
+const MemberGameStats = lazyRoute(loadMemberGameStats);
+const loadMemberDocuments = () => import('../app/(tabs)/documents');
+const MemberDocuments = lazyRoute(loadMemberDocuments);
+const loadMemberContacts = () => import('../app/(tabs)/contacts');
+const MemberContacts = lazyRoute(loadMemberContacts);
+const loadCoachL12Match = () => import('../app/(coach)/l12/match/[id]');
+const CoachL12Match = lazyRoute(loadCoachL12Match);
+const loadCoachL12Team = () => import('../app/(coach)/l12/team/[id]');
+const CoachL12Team = lazyRoute(loadCoachL12Team);
 
 const loadAdminLayout = () => import('../app/(admin)/_layout');
 const AdminLayout = lazyRoute(loadAdminLayout);
@@ -99,14 +107,18 @@ const loadAdminEventDetails = () => import('../app/(admin)/event/[id]');
 const AdminEventDetails = lazyRoute(loadAdminEventDetails);
 const loadAdminMatchDetails = () => import('../app/(admin)/match/[id]');
 const AdminMatchDetails = lazyRoute(loadAdminMatchDetails);
-const AdminL12 = lazyRoute(() => import('../app/(admin)/l12/index'));
+const loadAdminL12 = () => import('../app/(admin)/l12/index');
+const AdminL12 = lazyRoute(loadAdminL12);
 const loadAdminDocuments = () => import('../app/(admin)/documents');
 const AdminDocuments = lazyRoute(loadAdminDocuments);
 const loadAdminContacts = () => import('../app/(admin)/contacts');
 const AdminContacts = lazyRoute(loadAdminContacts);
-const AdminGameStats = lazyRoute(() => import('../app/(admin)/stats/[id]'));
-const AdminL12Match = lazyRoute(() => import('../app/(admin)/l12/match/[id]'));
-const AdminL12Team = lazyRoute(() => import('../app/(admin)/l12/team/[id]'));
+const loadAdminGameStats = () => import('../app/(admin)/stats/[id]');
+const AdminGameStats = lazyRoute(loadAdminGameStats);
+const loadAdminL12Match = () => import('../app/(admin)/l12/match/[id]');
+const AdminL12Match = lazyRoute(loadAdminL12Match);
+const loadAdminL12Team = () => import('../app/(admin)/l12/team/[id]');
+const AdminL12Team = lazyRoute(loadAdminL12Team);
 const loadAdminAttendanceDetails = () => import('../app/(admin)/attendance/[id]');
 const AdminAttendanceDetails = lazyRoute(loadAdminAttendanceDetails);
 const loadAdminPlayerDetails = () => import('../app/(admin)/player/[id]');
@@ -136,6 +148,92 @@ const loadSuperAdminSettings = () => import('../app/super-admin/settings');
 const SuperAdminSettings = lazyRoute(loadSuperAdminSettings);
 const loadSuperAdminInviteRedirect = () => import('../app/super-admin/invite/[token]');
 const SuperAdminInviteRedirect = lazyRoute(loadSuperAdminInviteRedirect);
+
+type Loader = () => Promise<{ default: unknown }>;
+
+/**
+ * Chunks each URL needs. A nested route renders its layout first and only then
+ * discovers the page, so on a cold load the two chunks used to download one
+ * after the other (after the auth check, too). Starting both up front, in
+ * parallel with Clerk, takes that waterfall off the critical path.
+ */
+const ROUTE_CHUNKS: Array<[string, Loader[]]> = [
+  ['/profile', [loadProfile]],
+  ['/signup', [loadSignup]],
+  ['/invite/:token', [loadInviteRegistration]],
+  ['/myclub', [loadPlayerLayout, loadPlayerHome]],
+  ['/account', [loadPlayerLayout, loadPlayerAccount]],
+  ['/attendance', [loadPlayerLayout, loadPlayerAttendance]],
+  ['/documents', [loadPlayerLayout, loadMemberDocuments]],
+  ['/contacts', [loadPlayerLayout, loadMemberContacts]],
+  ['/stats/:id', [loadPlayerLayout, loadMemberGameStats]],
+  ['/payments', [loadPlayerLayout, loadPlayerPayments]],
+  ['/schedule', [loadPlayerLayout, loadPlayerSchedule]],
+  ['/team', [loadPlayerLayout, loadPlayerTeam]],
+  ['/team/:id', [loadPlayerLayout, loadPlayerTeamDetail]],
+  ['/coach', [loadPlayerLayout, loadCoachDashboard]],
+  ['/coach/dashboard', [loadPlayerLayout, loadCoachDashboard]],
+  ['/coach/teams', [loadPlayerLayout, loadCoachTeams]],
+  ['/coach/team/:id', [loadPlayerLayout, loadCoachTeamDetail]],
+  ['/coach/attendance', [loadPlayerLayout, loadCoachAttendance]],
+  ['/coach/l12', [loadPlayerLayout, loadCoachL12]],
+  ['/coach/requests', [loadPlayerLayout, loadCoachRequests]],
+  ['/coach/stats/:id', [loadPlayerLayout, loadCoachGameStats]],
+  ['/coach/l12/match/:id', [loadPlayerLayout, loadCoachL12Match]],
+  ['/coach/l12/team/:id', [loadPlayerLayout, loadCoachL12Team]],
+  ['/admin', [loadAdminLayout, loadAdminDashboard]],
+  ['/admin/dashboard', [loadAdminLayout, loadAdminDashboard]],
+  ['/admin/roster', [loadAdminLayout, loadAdminRoster]],
+  ['/admin/schedule', [loadAdminLayout, loadAdminSchedule]],
+  ['/admin/requests', [loadAdminLayout, loadAdminRequests]],
+  ['/admin/user-access', [loadAdminLayout, loadAdminUserAccess]],
+  ['/admin/create-club-admin', [loadAdminLayout, loadAdminCreateClubAdmin]],
+  ['/admin/create-account', [loadAdminLayout, loadAdminCreateAccount]],
+  ['/admin/manage-access', [loadAdminLayout, loadAdminManageAccess]],
+  ['/admin/manage-accounts', [loadAdminLayout, loadAdminManageAccounts]],
+  ['/admin/my-club-admin', [loadAdminLayout, loadAdminMyClubAdmin]],
+  ['/admin/myclub', [loadAdminLayout, loadAdminMyClubAdmin]],
+  ['/admin/finance', [loadAdminLayout, loadAdminFinance]],
+  ['/admin/compliance', [loadAdminLayout, loadAdminCompliance]],
+  ['/admin/team/:id', [loadAdminLayout, loadAdminTeamDetails]],
+  ['/admin/event/:id', [loadAdminLayout, loadAdminEventDetails]],
+  ['/admin/match/:id', [loadAdminLayout, loadAdminMatchDetails]],
+  ['/admin/l12', [loadAdminLayout, loadAdminL12]],
+  ['/admin/documents', [loadAdminLayout, loadAdminDocuments]],
+  ['/admin/contacts', [loadAdminLayout, loadAdminContacts]],
+  ['/admin/stats/:id', [loadAdminLayout, loadAdminGameStats]],
+  ['/admin/l12/match/:id', [loadAdminLayout, loadAdminL12Match]],
+  ['/admin/l12/team/:id', [loadAdminLayout, loadAdminL12Team]],
+  ['/admin/attendance/:id', [loadAdminLayout, loadAdminAttendanceDetails]],
+  ['/admin/player/:id', [loadAdminLayout, loadAdminPlayerDetails]],
+  ['/admin/users', [loadAdminLayout, loadAdminUsers]],
+  ['/admin/users/:id', [loadAdminLayout, loadAdminUserDetails]],
+  ['/super-admin', [loadSuperAdminLayout, loadSuperAdminIndex]],
+  ['/super-admin/dashboard', [loadSuperAdminLayout, loadSuperAdminDashboard]],
+  ['/super-admin/clubs', [loadSuperAdminLayout, loadSuperAdminClubs]],
+  ['/super-admin/users', [loadSuperAdminLayout, loadSuperAdminUsers]],
+  ['/super-admin/create-user', [loadSuperAdminLayout, loadSuperAdminCreateUser]],
+  ['/super-admin/roles', [loadSuperAdminLayout, loadSuperAdminRoles]],
+  ['/super-admin/audit-logs', [loadSuperAdminLayout, loadSuperAdminAuditLogs]],
+  ['/super-admin/settings', [loadSuperAdminLayout, loadSuperAdminSettings]],
+  ['/super-admin/invite/:token', [loadSuperAdminLayout, loadSuperAdminInviteRedirect]],
+];
+
+function preloadCurrentRoute() {
+  if (typeof window === 'undefined') return;
+  let pathname = window.location.pathname;
+  // "/" (the PWA start URL) and /login forward a signed-in user to their home
+  // screen, so warm that one instead.
+  if (pathname === '/' || pathname === '/login') {
+    const cached = readAuthSessionSync();
+    if (!cached) return;
+    pathname = getHomeRouteForRole(cached.role);
+  }
+  const match = ROUTE_CHUNKS.find(([pattern]) => matchPath(pattern, pathname));
+  if (match) preloadRoutes(match[1]);
+}
+
+preloadCurrentRoute();
 
 /**
  * Once the session is known, warm the chunks of the screens this role actually
