@@ -2,11 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
-import GlassCard from '../../../components/ui/GlassCard';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../../components/ui/ScreenState';
 import PageContainer from '../../../components/ui/PageContainer';
-import PageHeader from '../../../components/ui/PageHeader';
+import PageHero from '../../../components/admin/PageHero';
 import { teamsApi, MyTeamSummary, Player } from '../../../services/teamsApi';
 import { GENDER_LABELS, LEVEL_LABELS } from '../../../components/myclub/teamDisplay';
 import { useSession } from '../../../context/AuthContext';
@@ -38,23 +37,21 @@ function MyStatusCard({ player }: { player: Player }) {
     : null;
 
   return (
-    <GlassCard>
-      <View className="flex-row items-center gap-3">
-        <View className="w-10 h-10 rounded-[12px] items-center justify-center shrink-0" style={{ backgroundColor: status.bg }}>
-          <MaterialIcons name={status.icon} size={19} color={status.fg} />
-        </View>
-        <View className="flex-1 min-w-0">
-          <Text className="text-[10px] font-bold uppercase tracking-[0.09em]" style={{ color: 'var(--c-muted)' }}>Statusul meu</Text>
-          <Text className="text-[15px] font-bold mt-0.5" style={{ color: 'var(--c-ink)' }}>Vizită medicală</Text>
-          {expiryLabel ? (
-            <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }}>Valabilă până la {expiryLabel}</Text>
-          ) : null}
-        </View>
-        <View className="rounded-full px-3 py-1.5 shrink-0" style={{ backgroundColor: status.bg }}>
-          <Text className="text-[11px] font-bold" style={{ color: status.fg }}>{status.label}</Text>
-        </View>
+    <View className="glass rounded-[14px] px-3.5 py-3 flex-row items-center gap-3" style={{ boxShadow: 'var(--e-sm)' } as any}>
+      <View className="w-9 h-9 rounded-[11px] items-center justify-center shrink-0" style={{ backgroundColor: status.bg }}>
+        <MaterialIcons name={status.icon} size={18} color={status.fg} />
       </View>
-    </GlassCard>
+      <View className="flex-1 min-w-0">
+        <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Statusul meu</Text>
+        <Text className="f-display text-[14.5px] font-bold mt-0.5" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.015em' } as any}>Vizită medicală</Text>
+        {expiryLabel ? (
+          <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }}>Valabilă până la {expiryLabel}</Text>
+        ) : null}
+      </View>
+      <View className="rounded-full px-2.5 py-1 shrink-0" style={{ backgroundColor: status.bg }}>
+        <Text className="text-[11px] font-bold" style={{ color: status.fg }}>{status.label}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -92,7 +89,7 @@ function TeamCard({ team, onOpen }: { team: MyTeamSummary; onOpen: () => void })
       onPress={onOpen}
       accessibilityRole="button"
       accessibilityLabel={`Deschide echipa ${team.name}`}
-      className="rounded-[16px] border p-5 gap-4 text-left w-full"
+      className="ui-lift rounded-[16px] border p-4 gap-3 text-left w-full"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
       <View className="flex-row items-start gap-3">
@@ -101,7 +98,7 @@ function TeamCard({ team, onOpen }: { team: MyTeamSummary; onOpen: () => void })
         </View>
 
         <View className="flex-1 min-w-0">
-          <Text className="text-[17px] font-bold leading-tight" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
+          <Text className="f-display text-[17px] font-extrabold leading-tight" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.025em' } as any} numberOfLines={2}>
             {team.name}
           </Text>
           {team.leagueName ? (
@@ -131,9 +128,9 @@ function TeamCard({ team, onOpen }: { team: MyTeamSummary; onOpen: () => void })
       {/* Own attendance for this squad — the only number on the card that is
           about the player rather than the team. */}
       <View className="flex-row items-center justify-between gap-3 pt-3 border-t" style={{ borderColor: 'var(--c-border)' } as any}>
-        <Text className="text-[11px] font-bold uppercase tracking-[0.09em]" style={{ color: 'var(--c-faint)' }}>Prezența mea</Text>
+        <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Prezența mea</Text>
         <View className="flex-row items-baseline gap-1.5">
-          <Text className="text-[18px] font-bold" style={{ color: attendanceRateColor(team.attendance.rate) }}>
+          <Text className="f-display t-num text-[18px] font-extrabold" style={{ color: attendanceRateColor(team.attendance.rate) }}>
             {team.attendance.rate == null ? '—' : `${team.attendance.rate}%`}
           </Text>
           {team.attendance.total ? (
@@ -151,7 +148,7 @@ function TeamListSkeleton() {
   return (
     <View className="grid grid-cols-1 lg:grid-cols-2 gap-3" accessibilityRole="progressbar" accessibilityLabel="Se încarcă echipele">
       {Array.from({ length: 2 }).map((_, index) => (
-        <Skeleton key={index} className="h-[230px] w-full rounded-[16px]" />
+        <Skeleton key={index} className="h-[210px] w-full rounded-[16px]" />
       ))}
     </View>
   );
@@ -195,14 +192,14 @@ export default function TeamScreen() {
   return (
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
       <PageContainer>
-        <PageHeader
-          actionsOnMobile={false}
-          title="Echipa mea"
+        <PageHero
+          eyebrow="Echipa mea"
+          title="Echipele mele"
           subtitle={subtitle}
           actions={
             <Pressable
               onPress={() => loadData(true)}
-              className="w-9 h-9 rounded-[10px] border items-center justify-center"
+              className="ui-press hidden sm:flex w-10 h-10 rounded-[11px] border items-center justify-center"
               style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
               accessibilityRole="button"
               accessibilityLabel="Reîmprospătează"
@@ -210,11 +207,11 @@ export default function TeamScreen() {
               {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
             </Pressable>
           }
-        />
+        >
+          {!loading && myRecord ? <MyStatusCard player={myRecord} /> : null}
+        </PageHero>
 
         <View className="gap-4">
-          {!loading && myRecord ? <MyStatusCard player={myRecord} /> : null}
-
           {loading ? (
             <TeamListSkeleton />
           ) : error ? (

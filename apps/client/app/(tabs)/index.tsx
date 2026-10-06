@@ -21,7 +21,10 @@ import { Navigate } from 'react-router-dom';
 import GlassCard from '../../components/ui/GlassCard';
 import { Skeleton } from '../../components/ui/Skeleton';
 import PageContainer from '../../components/ui/PageContainer';
-import HeroBanner, { formatToday, getGreeting, HeroButton, HeroChip } from '../../components/ui/HeroBanner';
+import { formatToday, getGreeting } from '../../components/ui/HeroBanner';
+import Button from '../../components/ui/Button';
+import PageHero from '../../components/admin/PageHero';
+import { Chip } from '../../components/coach/CoachPrimitives';
 import { useActiveChild } from '../../components/family/useActiveChild';
 import ProgressRing from '../../components/ui/ProgressRing';
 import DateTile from '../../components/ui/DateTile';
@@ -484,20 +487,19 @@ function getAttendanceTrend(countedDescending: PlayerAttendanceRecord[], chunkSi
 }
 
 function getAttendanceTone(rate: number | null) {
-  // heroColor: ring colour on the dark hero, bright enough in both themes.
   if (rate == null) {
-    return { label: 'În așteptare', color: 'var(--c-muted)', heroColor: '#FFFFFF' };
+    return { label: 'În așteptare', color: 'var(--c-muted)' };
   }
 
   if (rate >= 90) {
-    return { label: 'Ritm de elită', color: palette.green, heroColor: '#4ADE80' };
+    return { label: 'Ritm de elită', color: palette.green };
   }
 
   if (rate >= 80) {
-    return { label: 'Pe drumul bun', color: 'var(--c-brand-fg)', heroColor: '#A5B4FC' };
+    return { label: 'Pe drumul bun', color: 'var(--c-brand-fg)' };
   }
 
-  return { label: 'Necesită atenție', color: 'var(--c-warning-fg)', heroColor: '#FBBF24' };
+  return { label: 'Necesită atenție', color: 'var(--c-warning-fg)' };
 }
 
 function MetaRow({ icon, text }: { icon: keyof typeof MaterialIcons.glyphMap; text: string }) {
@@ -542,10 +544,7 @@ function CardLabel({
   );
 }
 
-/**
- * Attendance ring for the hero panel. Lives on the always-dark indigo field,
- * so the ring track and text use the fixed hero tokens, not theme ink.
- */
+/** Glass tile in the hero: attendance ring plus a one-word verdict. */
 function HeroAttendance({
   playerAttendance,
   attendanceRate,
@@ -556,26 +555,22 @@ function HeroAttendance({
   const tone = getAttendanceTone(attendanceRate);
 
   return (
-    <View
-      className="flex-row items-center gap-4 rounded-[16px] border px-4 py-3.5"
-      style={{ backgroundColor: 'var(--c-hero-chip)', borderColor: 'var(--c-hero-chip-border)' } as any}
-    >
+    <View className="glass flex-row items-center gap-3.5 rounded-[14px] px-4 py-3 lg:w-[320px]" style={{ boxShadow: 'var(--e-md)' } as any}>
       <ProgressRing
         value={attendanceRate}
-        size={78}
-        stroke={8}
-        color={tone.heroColor}
-        track="rgba(255, 255, 255, 0.16)"
+        size={60}
+        stroke={7}
+        color={tone.color}
         label={attendanceRate == null ? 'Rată prezență indisponibilă' : `Rată prezență ${attendanceRate}%`}
       >
-        <Text className="t-num text-[19px] font-bold" style={{ color: 'var(--c-hero-fg)' }}>
+        <Text className="f-display t-num text-[15px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>
           {attendanceRate == null ? '--' : `${attendanceRate}%`}
         </Text>
       </ProgressRing>
       <View className="min-w-0 flex-1">
-        <Text className="t-eyebrow" style={{ color: 'var(--c-hero-muted)' }}>Rată prezență</Text>
-        <Text className="text-[16px] font-bold mt-1" style={{ color: 'var(--c-hero-fg)' }}>{tone.label}</Text>
-        <Text className="text-[12.5px] font-medium mt-0.5" style={{ color: 'var(--c-hero-muted)' }}>
+        <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Rată prezență</Text>
+        <Text className="f-display text-[15px] font-bold mt-0.5" style={{ color: tone.color }}>{tone.label}</Text>
+        <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
           {playerAttendance?.total
             ? `${playerAttendance.present}/${playerAttendance.total} sesiuni recente`
             : 'Nicio prezență marcată încă'}
@@ -628,12 +623,12 @@ function NextEventCard({
         ) : null}
       </View>
       {event ? (
-        <View className="mt-3 flex-1">
-          <Text className="text-[15.5px] font-bold leading-5" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
+        <View className="mt-2.5 flex-1">
+          <Text className="f-display text-[15px] font-bold leading-5" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
             {event.title}
           </Text>
           {score ? (
-            <Text className="t-num text-[22px] font-bold mt-1.5" style={{ color: accent }}>{score.label}</Text>
+            <Text className="f-display t-num text-[22px] font-extrabold mt-1.5" style={{ color: accent }}>{score.label}</Text>
           ) : null}
           <View className="mt-2.5 gap-1">
             <MetaRow icon="calendar-today" text={formatDate(event.startTime)} />
@@ -654,12 +649,12 @@ function NextEventCard({
   if (event && onPress) {
     return (
       <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${label}${relative ? ` ${relative.toLowerCase()}` : ''}: ${event.title}`} className="ui-press h-full text-left">
-        <GlassCard className="ui-lift md:min-h-[150px] h-full">{body}</GlassCard>
+        <GlassCard className="ui-lift md:min-h-[128px] h-full">{body}</GlassCard>
       </Pressable>
     );
   }
 
-  return <GlassCard className="md:min-h-[150px] h-full">{body}</GlassCard>;
+  return <GlassCard className="md:min-h-[128px] h-full">{body}</GlassCard>;
 }
 
 function EventRow({
@@ -685,7 +680,7 @@ function EventRow({
       onPress={onDetails}
       accessibilityRole="button"
       accessibilityLabel={`${isMatch ? 'Fișă meci' : 'Detalii'}: ${event.title}`}
-      className="ui-lift ui-press rounded-[14px] border px-3.5 md:px-4 py-3.5 flex-row items-center gap-3.5 md:gap-4 text-left"
+      className="ui-lift ui-press rounded-[14px] border px-3.5 md:px-4 py-3 flex-row items-center gap-3.5 md:gap-4 text-left"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
       <DateTile value={event.startTime} fg={accent} bg={accentBg} />
@@ -707,7 +702,7 @@ function EventRow({
             </View>
           ) : null}
         </View>
-        <Text className="text-[15.5px] font-bold leading-5 mt-1" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
+        <Text className="f-display text-[15px] font-bold leading-5 mt-1" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
           {event.title}
         </Text>
         <View className={`${isMobile ? 'gap-1' : 'flex-row flex-wrap gap-x-5 gap-y-1'} mt-1.5`}>
@@ -740,7 +735,7 @@ function ResultCard({ event, outcome }: { event: HubEvent; outcome: MatchOutcome
     .find((value) => value && normalizeTeamName(value) !== ownTeam) ?? '';
 
   return (
-    <GlassCard className="ui-lift md:min-h-[150px] h-full justify-between">
+    <GlassCard className="ui-lift md:min-h-[128px] h-full justify-between">
       {/* Outcome rail across the top — win/loss is readable before the score. */}
       <View className="absolute left-0 right-0 top-0 h-[3px]" style={{ backgroundColor: meta ? meta.color : 'var(--c-border-strong)' }} />
       <View className="flex-row items-center justify-between gap-2">
@@ -753,14 +748,14 @@ function ResultCard({ event, outcome }: { event: HubEvent; outcome: MatchOutcome
       </View>
 
       <View className="mt-3 gap-1">
-        <Text className="text-[13px] font-bold leading-5" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+        <Text className="f-display text-[13px] font-bold leading-5" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
           {teams.home}
         </Text>
-        <Text className="t-num text-[24px] font-bold leading-none py-0.5" style={{ color: meta ? meta.color : 'var(--c-brand-fg)' }}>
+        <Text className="f-display t-num text-[24px] font-extrabold leading-none py-0.5" style={{ color: meta ? meta.color : 'var(--c-brand-fg)' }}>
           {score?.label ?? getStatusCopy(event)}
         </Text>
         {teams.away ? (
-          <Text className="text-[13px] font-bold leading-5" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+          <Text className="f-display text-[13px] font-bold leading-5" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
             {teams.away}
           </Text>
         ) : null}
@@ -838,7 +833,7 @@ function PlayerFormStats({
     <GlassCard className="ui-rise">
       <View className="flex-row items-center justify-between gap-3 mb-4">
         <View>
-          <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Forma ta</Text>
+          <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Forma ta</Text>
           <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Consistență, rezultate și volum de lucru</Text>
         </View>
         <View className="w-9 h-9 rounded-[10px] items-center justify-center" style={{ backgroundColor: 'var(--c-success-bg)' }}>
@@ -895,7 +890,7 @@ function PlayerFormStats({
         </FormColumn>
 
         <FormColumn icon="calendar-month" label="Volum lunar">
-          <Text className="t-num text-[28px] font-bold leading-none" style={{ color: 'var(--c-ink-strong)' }}>{monthCount}</Text>
+          <Text className="f-display t-num text-[28px] font-extrabold leading-none" style={{ color: 'var(--c-ink-strong)' }}>{monthCount}</Text>
           <Text className="text-[13px] font-semibold mt-1.5" style={{ color: 'var(--c-ink-soft)' }}>sesiuni luna aceasta</Text>
           {lastMonthCount > 0 ? (
             <Text className="text-[12px] font-semibold mt-1" style={{ color: monthDelta >= 0 ? 'var(--c-success-fg)' : 'var(--c-muted)' }}>
@@ -1119,7 +1114,7 @@ function PlayerHomeScreen() {
       showsVerticalScrollIndicator={false}
     >
       <PageContainer>
-        <HeroBanner
+        <PageHero
           eyebrow={formatToday()}
           title={session?.name?.trim() ? `${getGreeting()}, ${getFirstName(session)}` : getGreeting()}
           // A parent is greeted by their own name, but everything below is the
@@ -1127,41 +1122,45 @@ function PlayerHomeScreen() {
           subtitle={isParent
             ? (activeChild ? [`Pentru ${activeChild.firstName}`, ...activeChild.teams].join(' · ') : 'Adaugă copilul ca să-i vezi programul')
             : [session?.clubName, session?.teamName].filter(Boolean).join(' · ') || 'Spațiul tău de jucător'}
-          // Chips wait for data — "0 antrenamente" flashing during the load
-          // reads as a real (and alarming) number.
-          chips={loading ? null : (
-            <>
-              <HeroChip icon="fitness-center" label={`${weekTrainingCount} ${weekTrainingCount === 1 ? 'antrenament' : 'antrenamente'} în 7 zile`} />
-              {weekMatchCount ? <HeroChip icon="sports-basketball" label={`${weekMatchCount} ${weekMatchCount === 1 ? 'meci' : 'meciuri'}`} /> : null}
-              {attendanceStreak > 1 ? <HeroChip icon="bolt" label={`${attendanceStreak} prezențe la rând`} /> : null}
-            </>
-          )}
+          className="mb-4"
           actions={
             <>
-              <HeroButton label={isParent ? 'Programul copilului' : 'Programul meu'} icon="calendar-today" onPress={goToSchedule} />
+              <Button variant="primary" icon="calendar-today" label={isParent ? 'Programul copilului' : 'Programul meu'} onPress={goToSchedule} />
               {PLAYER_FEATURE_FLAGS.teammatesView ? (
-                <HeroButton label="Echipa mea" icon="groups" variant="ghost" onPress={() => router.push('/team' as any)} className="hidden sm:flex" />
+                <Button icon="groups" label="Echipa mea" onPress={() => router.push('/team' as any)} className="hidden sm:flex" />
               ) : null}
               <Pressable
                 onPress={() => loadData(true)}
                 accessibilityRole="button"
                 accessibilityLabel="Reîmprospătează"
-                className="ui-press h-10 w-10 rounded-[11px] border items-center justify-center"
-                style={{ backgroundColor: 'var(--c-hero-chip)', borderColor: 'var(--c-hero-chip-border)' } as any}
+                className="ui-press hidden sm:flex h-10 w-10 rounded-[11px] border items-center justify-center"
+                style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
               >
-                {refreshing ? <ActivityIndicator size="small" color="#FFFFFF" /> : <MaterialIcons name="refresh" size={18} color="var(--c-hero-fg)" />}
+                {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={18} color="var(--c-ink-soft)" />}
               </Pressable>
             </>
           }
-          aside={<HeroAttendance playerAttendance={playerAttendance} attendanceRate={attendanceRate} />}
-        />
+        >
+          {/* Chips wait for data — "0 antrenamente" flashing during the load
+              reads as a real (and alarming) number. */}
+          <View className="flex-col lg:flex-row lg:items-center gap-2.5">
+            <HeroAttendance playerAttendance={playerAttendance} attendanceRate={attendanceRate} />
+            {loading ? null : (
+              <View className="flex-row flex-wrap gap-1.5 flex-1 min-w-0">
+                <Chip icon="fitness-center" label={`${weekTrainingCount} ${weekTrainingCount === 1 ? 'antrenament' : 'antrenamente'} în 7 zile`} />
+                {weekMatchCount ? <Chip icon="sports-basketball" label={`${weekMatchCount} ${weekMatchCount === 1 ? 'meci' : 'meciuri'}`} /> : null}
+                {attendanceStreak > 1 ? <Chip icon="bolt" label={`${attendanceStreak} prezențe la rând`} /> : null}
+              </View>
+            )}
+          </View>
+        </PageHero>
 
         {/* Real grid, not flex-wrap: with `basis-[220px] grow` a row broke into
             ragged remainders at intermediate widths. Fixed column counts keep
             every row full. Attendance moved up into the hero, so three cards. */}
         {/* Phones: one swipeable row with the next card peeking (the three
             cards stacked filled a whole screen before any list). md+: grid. */}
-        <View className="m-scroller mb-5 ui-stagger">
+        <View className="m-scroller ui-stagger">
           <NextEventCard
             event={nextTraining}
             accent={palette.royal}
@@ -1213,7 +1212,7 @@ function PlayerHomeScreen() {
             onAction={() => loadData(true)}
           />
         ) : (
-          <View className="gap-6">
+          <View className="gap-5">
             {attendanceWarning ? (
               <View className="rounded-[14px] border px-4 py-3 flex-row items-center gap-3" style={{ backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-border)' } as any}>
                 <MaterialIcons name="info-outline" size={18} color="var(--c-warning)" />

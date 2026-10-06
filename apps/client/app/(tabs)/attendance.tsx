@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import GlassCard from '../../components/ui/GlassCard';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
 import PageContainer from '../../components/ui/PageContainer';
-import PageHeader from '../../components/ui/PageHeader';
+import PageHero, { GlassStat } from '../../components/admin/PageHero';
 import Pagination, { usePagination } from '../../components/ui/Pagination';
 import ProgressRing from '../../components/ui/ProgressRing';
 import DateTile from '../../components/ui/DateTile';
-import StatCard from '../../components/ui/StatCard';
 import { eventTypeMeta } from '../../components/coach/coachDisplay';
 import {
   isCountedAttendanceStatus,
@@ -95,14 +93,14 @@ function AttendanceRow({ record }: { record: PlayerAttendanceRecord }) {
 
   return (
     <View
-      className="relative overflow-hidden rounded-[14px] border pl-4 pr-3.5 py-3"
+      className="relative overflow-hidden rounded-[14px] border pl-4 pr-3.5 py-2.5"
       style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any}
     >
       <View className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: meta?.bar ?? 'var(--c-border-strong)' }} />
       <View className="flex-row items-center gap-3">
         <DateTile value={record.event.startTime} fg={type.fg} bg={type.bg} size={46} />
         <View className="flex-1 min-w-0">
-          <Text className="text-[14.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+          <Text className="f-display text-[14.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
             {record.event.title}
           </Text>
           <View className="flex-row items-center gap-1.5 mt-1 min-w-0">
@@ -198,31 +196,56 @@ function PlayerAttendanceScreen() {
   return (
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
       <PageContainer>
-        <PageHeader
-          actionsOnMobile={false}
+        <PageHero
+          eyebrow="Prezență"
           title="Prezența mea"
-          subtitle="Istoricul sesiunilor la care antrenorul ți-a marcat prezența."
-          actions={
-            <Pressable
-              onPress={() => loadData(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Reîmprospătează"
-              className="ui-press w-9 h-9 rounded-[10px] border items-center justify-center"
-              style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+          subtitle={loading || error
+            ? 'Istoricul sesiunilor la care antrenorul ți-a marcat prezența.'
+            : `${tone.label} · ${summary.total ? `${summary.present} din ${summary.total} sesiuni` : 'nicio sesiune marcată încă'}`}
+          leading={loading || error ? undefined : (
+            <ProgressRing
+              value={summary.rate}
+              size={60}
+              stroke={7}
+              color={tone.color}
+              label={summary.rate == null ? 'Rată prezență indisponibilă' : `Rată prezență ${summary.rate}%`}
             >
-              {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
-            </Pressable>
+              <Text className="f-display t-num text-[15px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>
+                {summary.rate == null ? '—' : `${summary.rate}%`}
+              </Text>
+            </ProgressRing>
+          )}
+          actions={
+            <>
+              {!loading && !error && streak > 1 ? (
+                <View className="flex-row items-center gap-1 rounded-full px-2.5 py-1" style={{ backgroundColor: 'var(--c-success-bg)' }}>
+                  <MaterialIcons name="bolt" size={13} color="var(--c-success-fg)" />
+                  <Text className="text-[12px] font-bold" style={{ color: 'var(--c-success-fg)' }}>{streak} la rând</Text>
+                </View>
+              ) : null}
+              <Pressable
+                onPress={() => loadData(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Reîmprospătează"
+                className="ui-press hidden sm:flex w-10 h-10 rounded-[11px] border items-center justify-center"
+                style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+              >
+                {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
+              </Pressable>
+            </>
           }
-        />
+        >
+          {loading || error ? null : (
+            <View className="grid grid-cols-3 gap-2 ui-stagger">
+              <GlassStat dot="var(--c-success)" label="Prezent" value={counts.present} hint="sesiuni" />
+              <GlassStat dot="var(--c-danger)" label="Absent" value={counts.absent} hint="sesiuni" />
+              <GlassStat dot="var(--c-warning)" label="Motivat" value={counts.excused} hint="sesiuni" />
+            </View>
+          )}
+        </PageHero>
 
         {loading ? (
           <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă prezența">
-            <View className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-              <Skeleton className="h-[150px] w-full rounded-[16px] lg:col-span-1" />
-              <View className="grid grid-cols-3 gap-3 lg:col-span-2">
-                {Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-[150px] w-full rounded-[16px]" />)}
-              </View>
-            </View>
             {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-[72px] w-full rounded-[14px]" />)}
           </View>
         ) : error ? (
@@ -234,45 +257,10 @@ function PlayerAttendanceScreen() {
           />
         ) : (
           <View className="gap-5">
-            <View className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-              <GlassCard className="ui-rise flex-row items-center gap-4">
-                <ProgressRing
-                  value={summary.rate}
-                  size={88}
-                  stroke={9}
-                  color={tone.color}
-                  label={summary.rate == null ? 'Rată prezență indisponibilă' : `Rată prezență ${summary.rate}%`}
-                >
-                  <Text className="t-num text-[21px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>
-                    {summary.rate == null ? '—' : `${summary.rate}%`}
-                  </Text>
-                </ProgressRing>
-                <View className="flex-1 min-w-0">
-                  <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Rată prezență</Text>
-                  <Text className="text-[17px] font-bold mt-1" style={{ color: tone.color }}>{tone.label}</Text>
-                  <Text className="t-meta mt-1" style={{ color: 'var(--c-muted)' }}>
-                    {summary.total ? `${summary.present} din ${summary.total} sesiuni` : 'Nicio sesiune marcată încă'}
-                  </Text>
-                  {streak > 1 ? (
-                    <View className="flex-row items-center gap-1 mt-2 self-start rounded-full px-2 py-0.5" style={{ backgroundColor: 'var(--c-success-bg)' }}>
-                      <MaterialIcons name="bolt" size={12} color="var(--c-success-fg)" />
-                      <Text className="text-[11.5px] font-bold" style={{ color: 'var(--c-success-fg)' }}>{streak} la rând</Text>
-                    </View>
-                  ) : null}
-                </View>
-              </GlassCard>
-
-              <View className="grid grid-cols-3 gap-3 lg:col-span-2 ui-stagger">
-                <StatCard icon="check-circle" tone="success" label="Prezent" value={counts.present} hint="sesiuni" />
-                <StatCard icon="cancel" tone="danger" label="Absent" value={counts.absent} hint="sesiuni" />
-                <StatCard icon="medical-services" tone="warning" label="Motivat" value={counts.excused} hint="sesiuni" />
-              </View>
-            </View>
-
             <View>
               <View className="flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
                 <View>
-                  <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Istoric</Text>
+                  <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Istoric</Text>
                   <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
                     Ultimele {markedRecords.length} sesiuni marcate
                   </Text>

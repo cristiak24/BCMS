@@ -8,7 +8,8 @@ import { Navigate } from 'react-router-dom';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
 import PageContainer from '../../components/ui/PageContainer';
-import PageHeader from '../../components/ui/PageHeader';
+import PageHero from '../../components/admin/PageHero';
+import Button from '../../components/ui/Button';
 import SectionHeader from '../../components/ui/SectionHeader';
 import Pagination, { usePagination } from '../../components/ui/Pagination';
 import { useResponsive } from '../../hooks/useResponsive';
@@ -483,8 +484,8 @@ function PlayerPaymentsScreen() {
   return (
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-20">
       <PageContainer>
-        <PageHeader
-          actionsOnMobile={false}
+        <PageHero
+          eyebrow="Cotizații"
           title="Plăți"
           subtitle="Cotizații, carduri salvate și istoricul plăților."
           actions={
@@ -492,13 +493,55 @@ function PlayerPaymentsScreen() {
               onPress={() => loadSummary(true)}
               accessibilityRole="button"
               accessibilityLabel="Reîmprospătează"
-              className="w-9 h-9 rounded-[10px] border items-center justify-center"
+              className="ui-press hidden sm:flex w-10 h-10 rounded-[11px] border items-center justify-center"
               style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
             >
               {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
             </Pressable>
           }
-        />
+        >
+          <View className="glass rounded-[14px] px-4 py-3.5 flex-col md:flex-row md:items-center gap-3.5 md:gap-6" style={{ boxShadow: 'var(--e-md)' } as any}>
+            <View className="flex-1 min-w-0">
+              <View className="flex-row items-center gap-2.5">
+                <View
+                  className="rounded-full px-2.5 py-1"
+                  style={{ backgroundColor: summary?.outstandingAmount ? 'var(--c-danger-bg)' : 'var(--c-success-bg)' }}
+                >
+                  <Text
+                    className="text-[11px] font-semibold"
+                    style={{ color: summary?.outstandingAmount ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}
+                  >
+                    {summary?.dueLabel ?? 'Achitat'}
+                  </Text>
+                </View>
+                <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-muted)' }}>
+                  {summary?.billingCycle ?? 'Ciclu curent'}
+                </Text>
+              </View>
+
+              {/* One accent on this page: ink for the figure, indigo only on
+                  the action. */}
+              <Text className="t-eyebrow mt-3" style={{ color: 'var(--c-muted)' }}>Sold restant</Text>
+              <Text className="f-display t-num text-[28px] font-extrabold mt-0.5 leading-tight" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any}>
+                {formatCurrency(summary?.outstandingAmount ?? 0, summary?.currency ?? 'ron')}
+              </Text>
+            </View>
+
+            <View className="w-full md:w-[240px]">
+              <Button
+                variant="primary"
+                icon="payments"
+                label="Plătește tot"
+                loading={actionTarget === 'all'}
+                disabled={!payableFees.length || actionTarget === 'all' || !summary?.stripe.configured}
+                onPress={() => startCheckout()}
+              />
+              <Text className="t-meta mt-2 text-center" style={{ color: 'var(--c-muted)' }}>
+                {summary?.autoPayNote ?? 'Stripe Checkout'}
+              </Text>
+            </View>
+          </View>
+        </PageHero>
 
         {error ? (
           <View className="mb-4 rounded-[14px] border px-4 py-3 flex-row items-center gap-3" style={{ backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-border)' } as any} accessibilityRole="alert">
@@ -523,66 +566,10 @@ function PlayerPaymentsScreen() {
           </View>
         ) : null}
 
-        <View className="flex-col xl:flex-row gap-4 mb-6">
-          <View
-            className="flex-1 rounded-[16px] border p-5 justify-center"
-            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
-          >
-            <View className="flex-col md:flex-row md:items-center gap-6">
-              <View className="flex-1">
-                <View className="flex-row items-center gap-3">
-                  <View
-                    className="rounded-full px-2.5 py-1"
-                    style={{ backgroundColor: summary?.outstandingAmount ? 'var(--c-danger-bg)' : 'var(--c-success-bg)' }}
-                  >
-                    <Text
-                      className="text-[11px] font-semibold"
-                      style={{ color: summary?.outstandingAmount ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}
-                    >
-                      {summary?.dueLabel ?? 'Achitat'}
-                    </Text>
-                  </View>
-                  <Text className="text-[13px] font-medium" style={{ color: 'var(--c-muted)' }}>
-                    {summary?.billingCycle ?? 'Ciclu curent'}
-                  </Text>
-                </View>
-
-                {/* One accent on this page. The amount used to be cyan while the
-                    primary button was indigo, so the screen carried two
-                    competing brand colours. Ink for the figure, indigo only on
-                    the action. */}
-                <Text className="text-[11px] font-bold uppercase tracking-[0.07em] mt-5" style={{ color: 'var(--c-faint)' }}>
-                  Sold restant
-                </Text>
-                <Text className="text-[30px] font-bold tracking-tight mt-1" style={{ color: 'var(--c-ink)' }}>
-                  {formatCurrency(summary?.outstandingAmount ?? 0, summary?.currency ?? 'ron')}
-                </Text>
-              </View>
-
-              <View className="w-full md:w-[240px]">
-                <Pressable
-                  onPress={() => startCheckout()}
-                  disabled={!payableFees.length || actionTarget === 'all' || !summary?.stripe.configured}
-                  accessibilityRole="button"
-                  className={`h-10 rounded-[10px] items-center justify-center ${(!payableFees.length || !summary?.stripe.configured) ? 'opacity-50' : ''}`}
-                  style={{ backgroundColor: 'var(--c-brand-surface)' }}
-                >
-                  {actionTarget === 'all' ? (
-                    <ActivityIndicator size="small" color="var(--c-on-brand)" />
-                  ) : (
-                    <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-on-brand)' }}>Plătește tot</Text>
-                  )}
-                </Pressable>
-                <Text className="text-[12px] font-medium mt-2.5 text-center" style={{ color: 'var(--c-muted)' }}>
-                  {summary?.autoPayNote ?? 'Stripe Checkout'}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View className="w-full xl:w-[340px]">
+        <View className="mb-6">
+          <View className="w-full">
             <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>Metode de plată</Text>
+              <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any}>Metode de plată</Text>
               <Pressable
                 onPress={addPaymentMethod}
                 disabled={actionTarget === 'setup' || !summary?.stripe.configured}

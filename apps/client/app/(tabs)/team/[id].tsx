@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
-import GlassCard from '../../../components/ui/GlassCard';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../../components/ui/ScreenState';
 import PageContainer from '../../../components/ui/PageContainer';
-import PageHeader from '../../../components/ui/PageHeader';
+import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import { teamsApi, MyTeamDetail, MyTeamEvent, MyTeamPastEvent } from '../../../services/teamsApi';
 import { GENDER_LABELS, LEVEL_LABELS } from '../../../components/myclub/teamDisplay';
 import TeamStandingsCard from '../../../components/standings/TeamStandingsCard';
@@ -38,25 +37,12 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: 'standings', label: 'Clasament', icon: 'leaderboard' },
 ];
 
-function StatTile({ label, value, hint, color }: { label: string; value: string; hint?: string; color?: string }) {
-  return (
-    <View
-      className="rounded-[14px] border px-3 sm:px-4 py-3 flex-1 min-w-0"
-      style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
-    >
-      <Text className="text-[9.5px] sm:text-[10px] font-bold uppercase tracking-[0.06em] sm:tracking-[0.09em]" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
-      <Text className="text-[19px] sm:text-[22px] font-bold mt-1" style={{ color: color ?? 'var(--c-ink)' }} numberOfLines={1}>{value}</Text>
-      {hint ? <Text className="text-[11px] sm:text-[11.5px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{hint}</Text> : null}
-    </View>
-  );
-}
-
 function EventRow({ event, trailing, note }: { event: MyTeamEvent; trailing?: React.ReactNode; note?: string | null }) {
   const meta = eventTypeMeta(event.type);
 
   return (
     <View
-      className="rounded-[14px] border px-4 py-3 gap-2"
+      className="rounded-[14px] border px-3.5 py-2.5 gap-2 ui-lift"
       style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any}
     >
       <View className="flex-row items-center gap-3">
@@ -68,7 +54,7 @@ function EventRow({ event, trailing, note }: { event: MyTeamEvent; trailing?: Re
         </View>
 
         <View className="flex-1 min-w-0">
-          <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{event.title}</Text>
+          <Text className="f-display text-[14px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.01em' } as any} numberOfLines={1}>{event.title}</Text>
           <View className="flex-row items-center gap-1.5 mt-0.5">
             <MaterialIcons name={meta.icon} size={13} color="var(--c-faint)" />
             <Text className="text-[12px] font-medium flex-1 min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
@@ -102,14 +88,14 @@ function StatusBadge({ status }: { status: string | null }) {
 function TeammateTile({ player }: { player: MyTeamDetail['roster'][number] }) {
   return (
     <View
-      className="flex-row items-center gap-3 rounded-[12px] border px-3.5 py-3 min-w-0"
+      className="flex-row items-center gap-3 rounded-[12px] border px-3 py-2.5 min-w-0"
       style={{
         borderColor: player.isMe ? 'var(--c-brand-fg)' : 'var(--c-border)',
         backgroundColor: player.isMe ? 'var(--c-surface-tint)' : 'var(--c-surface-2)',
       } as any}
     >
-      <View className="h-11 w-11 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-        <Text className="text-[13px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{getInitials(player.firstName, player.lastName)}</Text>
+      <View className="h-9 w-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+        <Text className="text-[12px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{getInitials(player.firstName, player.lastName)}</Text>
       </View>
 
       <View className="flex-1 min-w-0 flex-row items-center gap-2">
@@ -135,8 +121,7 @@ function TeammateTile({ player }: { player: MyTeamDetail['roster'][number] }) {
 function DetailSkeleton() {
   return (
     <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă echipa">
-      <Skeleton className="h-[168px] w-full rounded-[16px]" />
-      <Skeleton className="h-11 w-full rounded-[12px]" />
+            <Skeleton className="h-11 w-full rounded-[12px]" />
       <View className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
         {Array.from({ length: 6 }).map((_, index) => (
           <Skeleton key={index} className="h-[68px] w-full rounded-[12px]" />
@@ -201,15 +186,14 @@ export default function PlayerTeamDetailScreen() {
           <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Echipele mele</Text>
         </Pressable>
 
-        <PageHeader
-          keepTitleOnMobile
-          actionsOnMobile={false}
+        <PageHero
+          eyebrow="Echipa mea"
           title={team?.name || 'Echipă'}
-          subtitle={team ? [team.leagueName, team.seasonName].filter(Boolean).join(' · ') : 'Se încarcă...'}
+          subtitle={team ? team.leagueName || 'Echipa ta' : 'Se încarcă...'}
           actions={
             <Pressable
               onPress={() => loadData(true)}
-              className="w-9 h-9 rounded-[10px] border items-center justify-center"
+              className="ui-press hidden sm:flex w-10 h-10 rounded-[11px] border items-center justify-center"
               style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
               accessibilityRole="button"
               accessibilityLabel="Reîmprospătează"
@@ -217,35 +201,20 @@ export default function PlayerTeamDetailScreen() {
               {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
             </Pressable>
           }
-        />
-
-        {loading ? (
-          <DetailSkeleton />
-        ) : error ? (
-          <ErrorState
-            title="Nu am putut încărca echipa"
-            message={error}
-            actionLabel="Reîncearcă"
-            onAction={() => loadData(true)}
-          />
-        ) : !team ? (
-          <EmptyState icon="groups" title="Echipa nu este disponibilă" message="Întoarce-te la lista echipelor tale." />
-        ) : (
-          <View className="gap-4">
-            {/* Coach + squad size + own attendance, the three things a player
-                opens a squad for. */}
-            <GlassCard className="gap-4">
+        >
+          {team && !loading && !error ? (
+            <>
               {/* Chips sit beside the coach on desktop and drop below on
                   mobile — kept in the same row at 375px they squeeze the coach
                   name down to a couple of characters. */}
-              <View className="flex-col sm:flex-row sm:items-center gap-3">
-                <View className="flex-row items-center gap-3 flex-1 min-w-0">
-                  <View className="w-11 h-11 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-                    <MaterialIcons name="sports" size={20} color="var(--c-brand-fg)" />
+              <View className="flex-col sm:flex-row sm:items-center gap-2.5">
+                <View className="glass rounded-[12px] px-3 py-2.5 flex-row items-center gap-2.5 flex-1 min-w-0" style={{ boxShadow: 'var(--e-sm)' } as any}>
+                  <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+                    <MaterialIcons name="sports" size={17} color="var(--c-brand-fg)" />
                   </View>
                   <View className="flex-1 min-w-0">
-                    <Text className="text-[10px] font-bold uppercase tracking-[0.09em]" style={{ color: 'var(--c-muted)' }}>Antrenor</Text>
-                    <Text className="text-[15px] font-bold mt-0.5" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+                    <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Antrenor</Text>
+                    <Text className="f-display text-[14.5px] font-bold mt-0.5" style={{ color: 'var(--c-ink-strong)' }} numberOfLines={1}>
                       {team.coach?.name || 'Nealocat'}
                     </Text>
                   </View>
@@ -261,27 +230,40 @@ export default function PlayerTeamDetailScreen() {
                 ) : null}
               </View>
 
-              {/* Three short numbers, so they stay side by side even at 375px —
-                  stacked they pushed the tab strip below the fold. */}
-              <View className="flex-row gap-2 sm:gap-2.5">
-                <StatTile label="Lot" value={String(team.playerCount)} hint={team.playerCount === 1 ? 'jucător' : 'jucători'} />
-                {/* Labels and hints stay short enough to survive a ~100px
-                    column at 375px — "Prezența mea" and "niciun eveniment"
-                    both ellipsised there. */}
-                <StatTile
-                  label="Prezență"
-                  value={team.attendance.rate == null ? '—' : `${team.attendance.rate}%`}
-                  hint={team.attendance.total ? `${team.attendance.present}/${team.attendance.total} sesiuni` : 'nemarcată'}
-                  color={attendanceRateColor(team.attendance.rate)}
+              {/* Three short numbers stay side by side even at 375px. */}
+              <View className="grid grid-cols-3 gap-2 sm:gap-2.5">
+                <GlassStat value={team.playerCount} label={team.playerCount === 1 ? 'Jucător în lot' : 'Jucători în lot'} dot="var(--c-brand-surface)" />
+                <GlassStat
+                  value={team.attendance.rate == null ? '—' : team.attendance.rate}
+                  suffix={team.attendance.rate == null ? undefined : '%'}
+                  label="Prezența mea"
+                  dot={attendanceRateColor(team.attendance.rate)}
+                  bar={team.attendance.rate == null ? undefined : team.attendance.rate}
                 />
-                <StatTile
-                  label="Urmează"
-                  value={String(team.upcomingEvents.length)}
-                  hint={team.upcomingEvents[0] ? team.upcomingEvents[0].title : '—'}
+                <GlassStat
+                  value={team.upcomingEvents.length}
+                  label="Evenimente"
+                  hint={team.upcomingEvents[0] ? team.upcomingEvents[0].title : undefined}
+                  dot="var(--c-success)"
                 />
               </View>
-            </GlassCard>
+            </>
+          ) : null}
+        </PageHero>
 
+        {loading ? (
+          <DetailSkeleton />
+        ) : error ? (
+          <ErrorState
+            title="Nu am putut încărca echipa"
+            message={error}
+            actionLabel="Reîncearcă"
+            onAction={() => loadData(true)}
+          />
+        ) : !team ? (
+          <EmptyState icon="groups" title="Echipa nu este disponibilă" message="Întoarce-te la lista echipelor tale." />
+        ) : (
+          <View className="gap-4">
             {/* Segmented control: scrolls horizontally on a 375px viewport
                 rather than wrapping to a second row. */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5">
@@ -322,7 +304,7 @@ export default function PlayerTeamDetailScreen() {
             {tab === 'events' ? (
               <View className="gap-4">
                 <View className="gap-2.5">
-                  <Text className="text-[11px] font-bold uppercase tracking-[0.09em]" style={{ color: 'var(--c-faint)' }}>Urmează</Text>
+                  <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Urmează</Text>
                   {team.upcomingEvents.length === 0 ? (
                     <EmptyState icon="event-busy" compact title="Niciun eveniment programat" message="Antrenamentele și meciurile viitoare apar aici." />
                   ) : (
@@ -331,7 +313,7 @@ export default function PlayerTeamDetailScreen() {
                 </View>
 
                 <View className="gap-2.5">
-                  <Text className="text-[11px] font-bold uppercase tracking-[0.09em]" style={{ color: 'var(--c-faint)' }}>Recente</Text>
+                  <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Recente</Text>
                   {team.recentEvents.length === 0 ? (
                     <EmptyState icon="history" compact title="Niciun eveniment trecut" message="Istoricul echipei apare aici după primele sesiuni." />
                   ) : (
@@ -354,7 +336,7 @@ export default function PlayerTeamDetailScreen() {
                     rate above covers every session ever marked — say so, or a
                     player whose history is longer reads the two as a mismatch. */}
                 <View className="flex-row items-center justify-between gap-3 flex-wrap">
-                  <Text className="text-[11px] font-bold uppercase tracking-[0.09em]" style={{ color: 'var(--c-faint)' }}>Sesiuni recente marcate</Text>
+                  <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Sesiuni recente marcate</Text>
                   <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>
                     {team.attendance.total
                       ? `${team.attendance.present}/${team.attendance.total} sesiuni marcate în total`

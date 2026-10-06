@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import { Clock, MapPin, TrendingUp, Trophy } from 'lucide-react';
+import { Clock, MapPin } from 'lucide-react';
 import { eventsApi, CalendarEvent } from '../../services/eventsApi';
 import { AuthUser, normalizeRole } from '../../utils/authSession';
 import { useSession } from '../../context/AuthContext';
@@ -10,6 +10,7 @@ import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../components/HeaderCo
 import { PlayerEventDetailModal } from '../../components/schedule/player/PlayerEventDetailModal';
 import { Skeleton } from '../../components/ui/Skeleton';
 import PageContainer from '../../components/ui/PageContainer';
+import PageHero, { GlassStat } from '../../components/admin/PageHero';
 import { EmptyState } from '../../components/ui/ScreenState';
 import { findNextUpcomingEvent } from '../../utils/scheduleLanding';
 import { PlayerDayScheduleModal } from '../../components/schedule/player/PlayerDayScheduleModal';
@@ -165,12 +166,12 @@ function UpcomingEventCard({ event, onDetails }: { event: CalendarEvent; onDetai
     <Pressable
       onPress={onDetails}
       accessibilityRole="button"
-      className="bg-[var(--c-surface)] border border-[var(--c-border)] rounded-[20px] px-4 py-4 gap-3 hover:opacity-90"
+      className="bg-[var(--c-surface)] border border-[var(--c-border)] rounded-[14px] px-3.5 py-3 gap-3 ui-lift"
       style={{ borderLeftWidth: 3, borderLeftColor: meta.solid }}
     >
       <View className="flex-row items-center gap-3">
         <View
-          className="w-12 h-12 rounded-[14px] items-center justify-center border"
+          className="w-11 h-11 rounded-[12px] items-center justify-center border"
           style={{ backgroundColor: meta.soft, borderColor: meta.soft }}
         >
           <Text className="text-[9px] font-black uppercase tracking-wider" style={{ color: meta.onSoft }}>
@@ -185,7 +186,7 @@ function UpcomingEventCard({ event, onDetails }: { event: CalendarEvent; onDetai
           <View className="flex-row items-center gap-2">
             <Text
               numberOfLines={1}
-              className="text-[15px] font-black flex-1"
+              className="f-display text-[14.5px] font-extrabold flex-1"
               style={{ color: 'var(--c-ink-strong)' }}
             >
               {event.title}
@@ -214,30 +215,6 @@ function UpcomingEventCard({ event, onDetails }: { event: CalendarEvent; onDetai
         </View>
       </View>
     </Pressable>
-  );
-}
-
-/**
- * Flat stat tile. These were two saturated gradients (indigo + a hardcoded
- * off-brand teal) with 32px white numerals — the loudest thing on a page whose
- * subject is the calendar. Same surface/border/type as every other card now.
- */
-function MiniMetric({ label, value, icon: Icon }: {
-  label: string;
-  value: string;
-  icon: typeof TrendingUp;
-}) {
-  return (
-    <View
-      className="flex-1 rounded-[14px] border p-4 justify-between"
-      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', minHeight: 88, boxShadow: 'var(--e-sm)' } as any}
-    >
-      <View className="flex-row items-center gap-2">
-        <Icon size={14} color="var(--c-faint)" />
-        <Text className="text-[11px] font-bold uppercase tracking-[0.07em]" style={{ color: 'var(--c-faint)' }}>{label}</Text>
-      </View>
-      <Text className="text-[24px] font-bold tracking-tight mt-2" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{value}</Text>
-    </View>
   );
 }
 
@@ -482,6 +459,19 @@ export default function ScheduleScreen() {
       contentContainerClassName="pb-32"
     >
       <PageContainer>
+        {isMobile ? null : (
+          <PageHero
+            eyebrow="Program"
+            title={isCoach ? 'Programul echipelor' : 'Programul meu'}
+            subtitle="Antrenamente, meciuri și cantonamente, într-un singur loc."
+          >
+            <View className="grid grid-cols-3 gap-2.5">
+              <GlassStat value={monthEventCount} label={`Evenimente în ${formatMonthName(viewDate)}`} dot="var(--c-brand-surface)" />
+              <GlassStat value={upcomingEvents.length} label="Evenimente viitoare" dot="var(--c-success)" />
+              <GlassStat value={getNextMatchLabel(nextMatch)} label="Următorul meci" dot="var(--c-purple)" />
+            </View>
+          </PageHero>
+        )}
         <View className="mb-4">
           <PlayerScheduleToolbar
             monthLabel={formatMonthName(viewDate)}
@@ -523,9 +513,9 @@ export default function ScheduleScreen() {
                 <PlayerCalendarGrid days={calendarDays} loading={loading} onSelectDay={handleSelectDay} />
               </View>
 
-              <View className={`${isMobile ? 'w-full' : 'shrink-0'} gap-4`} style={isMobile ? undefined : { width: width >= 1440 ? 380 : 340 }}>
+              <View className={`${isMobile ? 'w-full' : 'shrink-0'} gap-3`} style={isMobile ? undefined : { width: width >= 1440 ? 380 : 340 }}>
                 <View className="flex-row items-center justify-between">
-                  <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Evenimente viitoare</Text>
+                  <Text className="f-display text-[17px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any}>Evenimente viitoare</Text>
                   <Pressable onPress={() => setScheduleView('agenda')}>
                     <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Vezi tot</Text>
                   </Pressable>
@@ -534,7 +524,7 @@ export default function ScheduleScreen() {
                 {loading ? (
                   <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă evenimentele viitoare">
                     {Array.from({ length: 2 }).map((_, index) => (
-                      <Skeleton key={index} className="h-[108px] w-full rounded-[20px]" />
+                      <Skeleton key={index} className="h-[96px] w-full rounded-[14px]" />
                     ))}
                   </View>
                 ) : visibleUpcomingCards.length ? (
@@ -544,11 +534,6 @@ export default function ScheduleScreen() {
                 ) : (
                   <EmptyState icon="event-busy" compact title="Niciun eveniment viitor" message="Evenimentele programate apar aici." />
                 )}
-
-                <View className="flex-row gap-3">
-                  <MiniMetric label="Viitoare" value={String(upcomingEvents.length)} icon={TrendingUp} />
-                  <MiniMetric label="Următorul meci" value={getNextMatchLabel(nextMatch)} icon={Trophy} />
-                </View>
               </View>
             </View>
 
@@ -563,7 +548,7 @@ export default function ScheduleScreen() {
             <View>
               <View className="mb-3 flex-row flex-wrap items-end justify-between gap-3">
                 <View>
-                  <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>
+                  <Text className="f-display text-[17px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any}>
                     Evenimentele lunii
                   </Text>
                   <Text className="mt-0.5 text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>
