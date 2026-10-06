@@ -37,19 +37,19 @@ export function ProfileCard({
       className={`ui-rise rounded-[16px] border ${className ?? ''}`}
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
-      <View className="flex-row items-start gap-3 px-5 pt-5 pb-4 border-b" style={{ borderColor: 'var(--c-border-soft)' } as any}>
-        <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: colors.bg }}>
+      <View className="flex-row items-start gap-3 px-4 pt-4 pb-3.5 border-b" style={{ borderColor: 'var(--c-border-soft)' } as any}>
+        <View className="w-8 h-8 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: colors.bg }}>
           <MaterialIcons name={icon} size={18} color={colors.fg} />
         </View>
         <View className="flex-1 min-w-0">
-          <Text className="text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
+          <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.015em' } as any}>{title}</Text>
           {description ? (
             <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>{description}</Text>
           ) : null}
         </View>
         {trailing ? <View className="shrink-0">{trailing}</View> : null}
       </View>
-      <View className="px-5 py-5">{children}</View>
+      <View className="px-4 py-4">{children}</View>
     </View>
   );
 }

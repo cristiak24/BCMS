@@ -13,6 +13,8 @@ import { useSession } from '../../context/AuthContext';
 import { useTheme, type ThemeMode } from '../../context/ThemeContext';
 import PageContainer from '../ui/PageContainer';
 import PageHeader from '../ui/PageHeader';
+import PageHero, { GlassStat } from '../admin/PageHero';
+import Button from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
 import { ErrorState } from '../ui/ScreenState';
 import { ProfileCard } from './ProfileParts';
@@ -161,6 +163,13 @@ function formatDate(value?: string | null) {
     day: 'numeric',
     year: 'numeric',
   }).format(date);
+}
+
+function formatShortDate(value?: string | null) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('ro-RO', { month: '2-digit', day: '2-digit', year: 'numeric' }).format(date);
 }
 
 function getInitials(profile?: ProfileRecord | null) {
@@ -361,115 +370,53 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
         className="pb-4"
         style={isMobile && showBackButton ? { paddingTop: Math.max(insets.top + 18, 42) } : undefined}
       >
-        {/* The title renders on BOTH routes (/profile and the in-shell
-            /account). Only the back button is route-conditional. Sign-out moved
-            out of the header into its own "Sesiune" card: a filled brand button
-            next to the page title read as the page's primary action. */}
-        <PageHeader
-          title="Profilul meu"
-          subtitle="Datele contului, preferințele și securitatea."
-          actions={showBackButton ? (
-            <Pressable
-              onPress={() => router.back()}
-              className="ui-press h-9 px-3 flex-row items-center gap-1.5 rounded-[10px] border"
-              style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
-              accessibilityRole="button"
-              accessibilityLabel="Înapoi"
-            >
-              <MaterialIcons name="arrow-back" size={16} color="var(--c-ink-soft)" />
-              <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Înapoi</Text>
-            </Pressable>
-          ) : undefined}
-        />
-
-        {/* ── Identity ───────────────────────────────────────────── */}
-        <View
-          className="ui-rise rounded-[18px] border overflow-hidden mb-4"
-          style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
+        {/* Renders on BOTH routes (/profile and the in-shell /account); only
+            the back button is route-conditional. Sign-out lives in its own
+            "Sesiune" card, not next to the title. */}
+        <PageHero
+          eyebrow="Profilul meu"
+          title={profile.fullName || profile.name}
+          subtitle={profile.email}
+          leading={(
+            <ProfileImagePicker
+              avatarUrl={profile.avatarUrl}
+              initials={getInitials(profile)}
+              onUploaded={handleAvatarUploaded}
+              onError={(message) => Alert.alert('Încărcare avatar', message)}
+            />
+          )}
+          actions={showBackButton ? <Button label="Înapoi" icon="arrow-back" onPress={() => router.back()} /> : undefined}
         >
-          <View
-            className="ui-hero-sheen h-[88px] md:h-[104px]"
-            style={{ backgroundColor: 'var(--c-hero-via)', background: 'linear-gradient(120deg, var(--c-hero-from), var(--c-hero-via) 55%, var(--c-hero-to))' } as any}
-          />
-
-          <View className="px-5 md:px-6 pb-5 -mt-12 md:-mt-14">
-            {/* Only the avatar overlaps the cover band; the text starts below it
-                (lg:mt) so dark ink never lands on the indigo gradient. */}
-            <View className="flex-col lg:flex-row lg:items-start gap-4 lg:gap-6">
-              <ProfileImagePicker
-                avatarUrl={profile.avatarUrl}
-                initials={getInitials(profile)}
-                onUploaded={handleAvatarUploaded}
-                onError={(message) => Alert.alert('Încărcare avatar', message)}
-              />
-
-              <View className="flex-1 min-w-0 lg:mt-[64px]">
-                <View className="flex-row items-center gap-2 mb-1.5 flex-wrap">
-                  <View className="flex-row items-center gap-1 px-2.5 py-1 rounded-full" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-                    <MaterialIcons name="badge" size={12} color="var(--c-brand-fg)" />
-                    <Text className="text-[11.5px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{roleLabel}</Text>
-                  </View>
-                  <View className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ backgroundColor: statusMeta.bg }}>
-                    <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusMeta.fg }} />
-                    <Text className="text-[11.5px] font-bold" style={{ color: statusMeta.fg }}>{statusMeta.label}</Text>
-                  </View>
-                </View>
-                <Text
-                  className="text-[24px] md:text-[28px] font-bold leading-tight"
-                  style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.5px' } as any}
-                  numberOfLines={2}
-                >
-                  {profile.fullName || profile.name}
-                </Text>
-                <View className="flex-row flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
-                  {/* break-anywhere: long emails must wrap, not clip. */}
-                  <View className="flex-row items-center gap-1.5 min-w-0 max-w-full">
-                    <MaterialIcons name="mail" size={14} color="var(--c-faint)" />
-                    <Text className="text-[13.5px] font-medium break-anywhere" style={{ color: 'var(--c-muted)' }}>{profile.email}</Text>
-                  </View>
-                  {headerSubtitle ? (
-                    <View className="flex-row items-center gap-1.5 min-w-0">
-                      <MaterialIcons name="groups" size={14} color="var(--c-faint)" />
-                      <Text className="text-[13.5px] font-medium" style={{ color: 'var(--c-muted)' }}>{headerSubtitle}</Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-
-              <View className="grid grid-cols-2 lg:flex lg:flex-row gap-2.5 lg:mt-[68px] shrink-0">
-                <View className="rounded-[12px] border px-3.5 py-2.5" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}>
-                  <Text className="text-[11.5px] font-medium" style={{ color: 'var(--c-faint)' }}>Membru din</Text>
-                  <Text className="font-semibold mt-0.5 text-[13.5px]" style={{ color: 'var(--c-ink)' }}>{formatDate(profile.createdAt)}</Text>
-                </View>
-                <View className="rounded-[12px] border px-3.5 py-2.5" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}>
-                  <Text className="text-[11.5px] font-medium" style={{ color: 'var(--c-faint)' }}>Ultima autentificare</Text>
-                  <Text className="font-semibold mt-0.5 text-[13.5px]" style={{ color: 'var(--c-ink)' }}>{formatDate(profile.lastLoginAt)}</Text>
-                </View>
-              </View>
+          <View className="flex-row flex-wrap items-center gap-2">
+            <View className="flex-row items-center gap-1 px-2.5 py-1 rounded-full" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+              <MaterialIcons name="badge" size={12} color="var(--c-brand-fg)" />
+              <Text className="text-[11.5px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{roleLabel}</Text>
             </View>
-
-            {/* Completion meter — only while something is actually missing. */}
-            {completion.percent < 100 ? (
-              <View
-                className="mt-5 rounded-[12px] border px-4 py-3 flex-col sm:flex-row sm:items-center gap-3"
-                style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}
-              >
-                <View className="flex-1 min-w-0">
-                  <View className="flex-row items-center justify-between gap-3">
-                    <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink)' }}>Profil completat</Text>
-                    <Text className="t-num text-[13px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{completion.percent}%</Text>
-                  </View>
-                  <View className="h-1.5 rounded-full overflow-hidden mt-2" style={{ backgroundColor: 'var(--c-surface-3)' }}>
-                    <View className="ui-bar h-full rounded-full" style={{ width: `${completion.percent}%`, background: 'linear-gradient(90deg, var(--c-hero-to), var(--c-sky))' } as any} />
-                  </View>
-                </View>
-                <Text className="t-meta sm:max-w-[260px]" style={{ color: 'var(--c-muted)' }}>
-                  Mai adaugă: {completion.missing.join(', ')}.
-                </Text>
+            <View className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ backgroundColor: statusMeta.bg }}>
+              <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusMeta.fg }} />
+              <Text className="text-[11.5px] font-bold" style={{ color: statusMeta.fg }}>{statusMeta.label}</Text>
+            </View>
+            {headerSubtitle ? (
+              <View className="flex-row items-center gap-1.5 min-w-0">
+                <MaterialIcons name="groups" size={14} color="var(--c-faint)" />
+                <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-muted)' }}>{headerSubtitle}</Text>
               </View>
             ) : null}
           </View>
-        </View>
+
+          <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
+            <GlassStat dot="var(--c-purple)" value={formatShortDate(profile.createdAt)} label="Membru din" />
+            <GlassStat dot="var(--c-sky)" value={formatShortDate(profile.lastLoginAt)} label="Ultima autentificare" />
+            <View className="col-span-2">
+              <GlassStat
+                dot={completion.percent < 100 ? 'var(--c-warning)' : 'var(--c-success)'}
+                value={`${completion.percent}%`}
+                label={completion.percent < 100 ? `Profil completat · mai adaugă: ${completion.missing.join(', ')}` : 'Profil completat'}
+                bar={completion.percent}
+              />
+            </View>
+          </View>
+        </PageHero>
 
         {error ? (
           <View className="mb-4 rounded-[12px] border px-4 py-3 flex-row items-center gap-3" style={{ backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-border)' } as any}>

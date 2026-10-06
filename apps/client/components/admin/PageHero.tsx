@@ -27,6 +27,7 @@ export default function PageHero({
     title,
     subtitle,
     actions,
+    leading,
     children,
     className,
 }: {
@@ -34,6 +35,7 @@ export default function PageHero({
     title: string;
     subtitle?: string;
     actions?: ReactNode;
+    leading?: ReactNode;
     children?: ReactNode;
     className?: string;
 }) {
@@ -49,13 +51,16 @@ export default function PageHero({
             />
             <CourtLines />
             <View className="relative gap-3.5 p-4 md:p-5">
-                <View className="flex-col md:flex-row md:items-center md:justify-between gap-3">
-                    <View className="min-w-0 flex-1">
-                        <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{eyebrow}</Text>
-                        <Text className="f-display text-[22px] md:text-[26px] font-extrabold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.035em' } as any}>
-                            {title}
-                        </Text>
-                        {subtitle ? <Text className="text-[13px] mt-1" style={{ color: 'var(--c-muted)' }}>{subtitle}</Text> : null}
+                <View className="flex-col md:flex-row md:items-center md:justify-between gap-3.5">
+                    <View className="flex-row items-center gap-3.5 min-w-0 flex-1">
+                        {leading}
+                        <View className="min-w-0 flex-1">
+                            <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{eyebrow}</Text>
+                            <Text className="f-display text-[22px] md:text-[26px] font-extrabold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.035em' } as any}>
+                                {title}
+                            </Text>
+                            {subtitle ? <Text className="text-[13px] mt-1" style={{ color: 'var(--c-muted)' }}>{subtitle}</Text> : null}
+                        </View>
                     </View>
                     {actions ? <View className="flex-row flex-wrap items-center gap-2">{actions}</View> : null}
                 </View>

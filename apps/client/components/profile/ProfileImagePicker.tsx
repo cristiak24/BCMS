@@ -121,24 +121,24 @@ export default function ProfileImagePicker({
       {/* Ring is the card surface colour, not white, so the avatar sits cleanly
           on the cover band in dark mode too. */}
       <View
-        className="w-24 h-24 md:w-28 md:h-28 rounded-full border-4 overflow-hidden items-center justify-center"
+        className="w-[76px] h-[76px] md:w-[88px] md:h-[88px] rounded-full border-[3px] overflow-hidden items-center justify-center"
         style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-surface)', boxShadow: 'var(--e-md)' } as any}
       >
         {avatarUrl ? (
           <Image source={{ uri: avatarUrl }} className="w-full h-full" />
         ) : (
-          <Text className="text-[30px] font-bold" style={{ color: 'var(--c-brand-fg)', letterSpacing: '-0.5px' } as any}>{initials}</Text>
+          <Text className="f-display text-[26px] font-extrabold" style={{ color: 'var(--c-brand-fg)', letterSpacing: '-0.5px' } as any}>{initials}</Text>
         )}
       </View>
 
       <View
-        className="absolute bottom-0.5 right-0.5 w-9 h-9 rounded-full border-[3px] items-center justify-center"
+        className="absolute -bottom-0.5 -right-0.5 w-8 h-8 rounded-full border-[3px] items-center justify-center"
         style={{ backgroundColor: 'var(--c-brand-surface)', borderColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any}
       >
         {uploading ? (
           <ActivityIndicator size="small" color="#FFFFFF" />
         ) : (
-          <MaterialIcons name="photo-camera" size={16} color="var(--c-on-brand)" />
+          <MaterialIcons name="photo-camera" size={14} color="var(--c-on-brand)" />
         )}
       </View>
     </Pressable>
