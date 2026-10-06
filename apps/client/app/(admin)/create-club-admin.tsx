@@ -4,8 +4,8 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
 import GlassCard from '../../components/ui/GlassCard';
 import PageContainer from '../../components/ui/PageContainer';
-import AdminHero from '../../components/admin/AdminHero';
-import AdminActionButton from '../../components/admin/AdminActionButton';
+import PageHero from '../../components/admin/PageHero';
+import Button from '../../components/ui/Button';
 import InviteForm from '../../components/user-access/InviteForm';
 import { getHomeRouteForRole, isSuperadmin } from '../../utils/authSession';
 import { useSession } from '../../context/AuthContext';
@@ -43,16 +43,15 @@ export default function CreateClubAdminScreen() {
         <GlassCard className="items-center px-6 py-10 max-w-xl">
           <MaterialIcons name="lock-outline" size={34} color="var(--c-muted)" />
           <Text className="text-2xl font-black mt-4 text-center" style={{ color: 'var(--c-ink-strong)' }}>
-            Superadmin access required
+            Acces doar pentru superadmin
           </Text>
           <Text className="text-center mt-2" style={{ color: 'var(--c-muted)' }}>
-            This page is restricted to superadmin accounts only.
+            Această pagină este rezervată conturilor de superadmin.
           </Text>
           <View className="mt-6">
-            <AdminActionButton
+            <Button
               label="Înapoi"
               icon="arrow-back"
-              variant="primary"
               onPress={() => router.replace(getHomeRouteForRole(session?.role ?? 'player'))}
             />
           </View>
@@ -64,15 +63,18 @@ export default function CreateClubAdminScreen() {
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
       <PageContainer className="gap-5">
-        <AdminHero
+        <PageHero
+          eyebrow="Superadmin"
           title="Club nou și administrator"
           subtitle="Creează un club și trimite invitația de administrator pe email."
-        >
-          <View className="flex-row flex-wrap gap-2.5">
-            <AdminActionButton label="Reîncarcă" icon="refresh" onPress={reloadSession} />
-            <AdminActionButton label="Deconectare" icon="logout" onPress={signOut} />
-          </View>
-        </AdminHero>
+          className="mb-0"
+          actions={(
+            <>
+              <Button label="Reîncarcă" icon="refresh" size="sm" onPress={reloadSession} />
+              <Button label="Deconectare" icon="logout" size="sm" onPress={signOut} />
+            </>
+          )}
+        />
 
         <View className="w-full max-w-[640px]">
           <InviteForm />
@@ -80,16 +82,16 @@ export default function CreateClubAdminScreen() {
 
         <View className="flex-row flex-wrap gap-4">
           <GlassCard className="p-6 flex-1 min-w-[280px]">
-            <Text className="text-xl font-black" style={{ color: 'var(--c-ink-strong)' }}>Club creation</Text>
+            <Text className="f-display text-[17px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>Crearea clubului</Text>
             <Text className="mt-3 leading-6" style={{ color: 'var(--c-muted)' }}>
-              The backend normalizes the club name, creates the club document if needed, and keeps admin membership in adminIds.
+              Serverul normalizează numele clubului, creează clubul dacă nu există și păstrează administratorii în lista de administratori a clubului.
             </Text>
           </GlassCard>
 
           <GlassCard className="p-6 flex-1 min-w-[280px]">
-            <Text className="text-xl font-black" style={{ color: 'var(--c-ink-strong)' }}>Invite safety</Text>
+            <Text className="f-display text-[17px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>Siguranța invitațiilor</Text>
             <Text className="mt-3 leading-6" style={{ color: 'var(--c-muted)' }}>
-              Invite tokens are hashed before persistence. The client only sees safe invite metadata and never receives the raw token from Firestore.
+              Token-urile de invitație sunt criptate înainte de salvare. Aplicația vede doar metadatele sigure și nu primește niciodată token-ul brut.
             </Text>
           </GlassCard>
         </View>

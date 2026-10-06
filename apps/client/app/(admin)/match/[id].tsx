@@ -4,6 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { basketballApi, GameDetail } from '../../../services/basketballApi';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../../components/HeaderContext';
+import PageHero from '../../../components/admin/PageHero';
 import PageContainer from '../../../components/ui/PageContainer';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import { ErrorState } from '../../../components/ui/ScreenState';
@@ -156,42 +157,44 @@ export default function MatchDetailScreen() {
         <View className="max-w-[920px] w-full self-center">
           {backButton}
 
-          <View className="mb-5">
-            <View
-              className="rounded-[16px] border p-4 md:p-5"
-              style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
-            >
-              <View className="flex-row items-center gap-3">
+          <PageHero
+            eyebrow="Fișă meci · FRB"
+            title={`${detail.homeTeam} vs ${detail.awayTeam}`}
+            subtitle={detail.date ? `${formatDateLabel(detail.date)}${detail.time ? `, ${detail.time}` : ''}` : undefined}
+            className="mb-4"
+          >
+            <View className="glass rounded-[14px] px-4 py-3.5 items-center gap-2.5" style={{ boxShadow: 'var(--e-sm)' } as any}>
+              <View className="flex-row items-center gap-3 w-full">
                 <Text
-                  className="flex-1 text-[16px] md:text-[19px] font-bold text-right leading-tight"
-                  style={{ color: homeWon ? 'var(--c-ink-strong)' : 'var(--c-ink)' }}
+                  className="f-display flex-1 text-[14px] md:text-[17px] font-bold text-right leading-tight"
+                  style={{ color: homeWon ? 'var(--c-ink-strong)' : 'var(--c-muted)' }}
                 >
                   {detail.homeTeam}
                 </Text>
-                <View className="rounded-[12px] px-4 py-2 items-center" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+                <View className="items-center">
                   {isFinished ? (
-                    <Text className="t-num text-[28px] font-bold leading-none" style={{ color: 'var(--c-ink-strong)' }}>
+                    <Text className="f-display t-num text-[30px] font-extrabold leading-none" style={{ color: 'var(--c-ink-strong)' }}>
                       {detail.homeScore}<Text style={{ color: 'var(--c-faint)' }}> : </Text>{detail.awayScore}
                     </Text>
                   ) : (
-                    <Text className="text-[15px] font-bold leading-none" style={{ color: 'var(--c-brand-fg)' }}>vs</Text>
+                    <Text className="f-display text-[16px] font-bold leading-none" style={{ color: 'var(--c-brand-fg)' }}>vs</Text>
                   )}
                   <Text className="text-[10.5px] font-semibold mt-1 uppercase tracking-[0.06em]" style={{ color: 'var(--c-faint)' }}>
                     {isFinished ? 'Final' : 'Programat'}
                   </Text>
                 </View>
                 <Text
-                  className="flex-1 text-[16px] md:text-[19px] font-bold leading-tight"
-                  style={{ color: awayWon ? 'var(--c-ink-strong)' : 'var(--c-ink)' }}
+                  className="f-display flex-1 text-[14px] md:text-[17px] font-bold leading-tight"
+                  style={{ color: awayWon ? 'var(--c-ink-strong)' : 'var(--c-muted)' }}
                 >
                   {detail.awayTeam}
                 </Text>
               </View>
 
               {detail.quarters.length > 0 ? (
-                <View className="flex-row justify-center gap-2 mt-4 flex-wrap">
+                <View className="flex-row justify-center gap-1.5 flex-wrap">
                   {detail.quarters.map((q, i) => (
-                    <View key={i} className="rounded-[10px] px-3 py-1.5 items-center min-w-[56px]" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+                    <View key={i} className="rounded-[10px] px-2.5 py-1 items-center min-w-[52px]" style={{ backgroundColor: 'var(--c-surface-2)' }}>
                       <Text className="text-[10px] font-semibold uppercase tracking-[0.06em]" style={{ color: 'var(--c-faint)' }}>
                         {i < 4 ? `Sf. ${i + 1}` : `Prel. ${i - 3}`}
                       </Text>
@@ -201,7 +204,7 @@ export default function MatchDetailScreen() {
                 </View>
               ) : null}
             </View>
-          </View>
+          </PageHero>
 
           {error ? (
             <View className="mb-4 rounded-[12px] border px-4 py-3 flex-row items-center gap-2.5" style={{ backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-border)' } as any}>

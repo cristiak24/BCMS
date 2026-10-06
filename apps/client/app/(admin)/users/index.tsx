@@ -5,7 +5,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { usersApi, User } from '../../../services/usersApi';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../../components/HeaderContext';
-import AdminHero, { AdminMetricCard } from '../../../components/admin/AdminHero';
+import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import { SkeletonList } from '../../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../../components/dashboard/ScreenStates';
 import PageContainer from '../../../components/ui/PageContainer';
@@ -90,12 +90,14 @@ export default function UserList() {
 
     return (
         <PageContainer className="pb-16">
-            <AdminHero title="Utilizatori" subtitle="Toate conturile, din toate cluburile platformei.">
-                <View className="mt-5 md:mt-0 flex-row flex-wrap gap-3">
-                    <AdminMetricCard label="Utilizatori" value={roleCounts.total} />
-                    <AdminMetricCard label="Administratori" value={roleCounts.admins} />
-                </View>
-            </AdminHero>
+            <PageHero eyebrow="Platformă" title="Utilizatori" subtitle="Toate conturile, din toate cluburile platformei.">
+                {!loading && !error ? (
+                    <View className="grid grid-cols-2 gap-2 max-w-[440px] ui-stagger">
+                        <GlassStat value={roleCounts.total} label="Utilizatori" dot="var(--c-brand-fg)" />
+                        <GlassStat value={roleCounts.admins} label="Administratori" dot="var(--c-purple)" />
+                    </View>
+                ) : null}
+            </PageHero>
 
             {loading ? (
                 <SkeletonList count={5} />
@@ -110,18 +112,18 @@ export default function UserList() {
                         return (
                             <Link key={item.id} href={`/admin/users/${item.id}`} asChild>
                                 <Pressable
-                                    className="flex-row items-center gap-3.5 rounded-[16px] border p-3.5 md:p-4 transition-colors"
+                                    className="ui-lift flex-row items-center gap-3.5 rounded-[14px] border p-3 md:p-3.5"
                                     style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
                                 >
                                     <View
-                                        className="w-11 h-11 rounded-[13px] items-center justify-center flex-none"
+                                        className="w-10 h-10 rounded-[12px] items-center justify-center flex-none"
                                         style={{ backgroundColor: rv.tint }}
                                     >
-                                        <Text className="text-[14px] font-black" style={{ color: rv.fg }}>{initialsOf(item.name)}</Text>
+                                        <Text className="f-display text-[13px] font-extrabold" style={{ color: rv.fg }}>{initialsOf(item.name)}</Text>
                                     </View>
                                     <View className="flex-1 min-w-0">
                                         <Text
-                                            className={isMobile ? 'text-[14px] font-bold' : 'text-[14.5px] font-bold'}
+                                            className={`f-display ${isMobile ? 'text-[14px]' : 'text-[14.5px]'} font-bold`}
                                             style={{ color: 'var(--c-ink-strong)' }}
                                             numberOfLines={1}
                                         >
