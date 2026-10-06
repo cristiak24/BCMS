@@ -5,6 +5,8 @@ import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { eventsApi, CalendarEvent } from '../../../services/eventsApi';
 import { teamsApi, Team, Player } from '../../../services/teamsApi';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../../components/HeaderContext';
+import PageHero, { GlassStat } from '../../../components/admin/PageHero';
+import Button from '../../../components/ui/Button';
 import PageContainer from '../../../components/ui/PageContainer';
 import FilterChips from '../../../components/ui/FilterChips';
 import ProgressRing from '../../../components/ui/ProgressRing';
@@ -308,10 +310,41 @@ export default function AttendanceScreen() {
     <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
       <ScrollView className="flex-1" contentContainerClassName="pb-32" showsVerticalScrollIndicator={false}>
         <PageContainer>
-          {/* Event header — the event is the content here, so it stays on phones too. */}
-          <View className="mb-5 gap-3">
+          <View className="mb-3 self-start">{backButton}</View>
+
+          <PageHero
+            eyebrow="Notare prezență"
+            title={event.title}
+            subtitle={roster.length > 0 ? `${marked} din ${counts.all} marcați${counts.unmarked ? ` · ${counts.unmarked} încă nemarcați` : ' · toți jucătorii sunt marcați'}` : undefined}
+            leading={roster.length > 0 ? (
+              <ProgressRing
+                value={markedPercent}
+                size={56}
+                stroke={6}
+                color={markedPercent === 100 ? 'var(--c-success)' : 'var(--c-brand-fg)'}
+                label={`${marked} din ${counts.all} marcați`}
+              >
+                {markedPercent === 100 ? (
+                  <MaterialIcons name="check" size={20} color="var(--c-success-fg)" />
+                ) : (
+                  <Text className="f-display t-num text-[13px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>{markedPercent}%</Text>
+                )}
+              </ProgressRing>
+            ) : (
+              <View className="w-12 h-12 rounded-[14px] items-center justify-center shrink-0" style={{ backgroundColor: meta.bg }}>
+                <MaterialIcons name={meta.icon} size={22} color={meta.fg} />
+              </View>
+            )}
+            actions={counts.unmarked > 0 ? (
+              <Button
+                icon="done-all"
+                label={`Restul prezenți (${counts.unmarked})`}
+                onPress={() => setBulkConfirmOpen(true)}
+              />
+            ) : undefined}
+            className="mb-4"
+          >
             <View className="flex-row flex-wrap items-center gap-2">
-              {backButton}
               <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: meta.bg }}>
                 <MaterialIcons name={meta.icon} size={13} color={meta.fg} />
                 <Text className="text-[12px] font-bold" style={{ color: meta.fg }}>{meta.label}</Text>
@@ -322,93 +355,21 @@ export default function AttendanceScreen() {
                   <Text className="text-[12px] font-bold" style={{ color: 'var(--c-success-fg)' }}>Notat</Text>
                 </View>
               ) : null}
-            </View>
-
-            <View>
-              <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Notare prezență</Text>
-              <Text
-                className="text-[22px] md:text-[28px] font-bold leading-tight mt-1"
-                style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.5px' } as any}
-              >
-                {event.title}
-              </Text>
-              <View className="flex-row flex-wrap items-center gap-x-4 gap-y-1.5 mt-2">
-                {facts.map((fact) => (
-                  <View key={fact.icon} className="flex-row items-center gap-1.5 min-w-0">
-                    <MaterialIcons name={fact.icon} size={15} color="var(--c-faint)" />
-                    <Text className="text-[13px] font-medium" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{fact.label}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          </View>
-
-          {/* Summary strip — one row on desktop so the roster below gets the
-              full page width (the note field is what needs it). Nothing to
-              summarise or filter on an empty roster, so both are skipped. */}
-          {roster.length > 0 ? (
-            <View
-              className="rounded-[16px] border p-4 md:p-5 mb-4 flex-col lg:flex-row lg:items-center gap-4 lg:gap-6"
-              style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
-            >
-              <View className="flex-row items-center gap-4 lg:shrink-0 lg:min-w-[260px]">
-                <ProgressRing
-                  value={markedPercent}
-                  size={64}
-                  stroke={7}
-                  color={markedPercent === 100 ? 'var(--c-success)' : 'var(--c-brand-fg)'}
-                  label={`${marked} din ${counts.all} marcați`}
-                >
-                  {markedPercent === 100 ? (
-                    <MaterialIcons name="check" size={22} color="var(--c-success-fg)" />
-                  ) : (
-                    <Text className="t-num text-[14px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{markedPercent}%</Text>
-                  )}
-                </ProgressRing>
-                <View className="flex-1 min-w-0">
-                  <Text className="t-num text-[22px] font-bold leading-none" style={{ color: 'var(--c-ink-strong)' }}>
-                    {marked}<Text className="text-[15px]" style={{ color: 'var(--c-faint)' }}> / {counts.all} marcați</Text>
-                  </Text>
-                  <Text className="text-[13px] font-medium mt-1" style={{ color: 'var(--c-muted)' }}>
-                    {counts.unmarked ? `${counts.unmarked} încă nemarcați` : 'Toți jucătorii sunt marcați'}
-                  </Text>
+              {facts.map((fact) => (
+                <View key={fact.icon} className="flex-row items-center gap-1.5 min-w-0 ml-1">
+                  <MaterialIcons name={fact.icon} size={14} color="var(--c-faint)" />
+                  <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{fact.label}</Text>
                 </View>
-              </View>
-
-              <View className="grid grid-cols-3 gap-2 lg:flex-1 lg:max-w-[520px]">
-                {STATUS_OPTIONS.map((option) => (
-                  <View
-                    key={option.status}
-                    className="rounded-[12px] px-3 py-2.5 min-w-0 flex-col xl:flex-row xl:items-center xl:gap-2.5"
-                    style={{ backgroundColor: option.bg }}
-                  >
-                    <View className="hidden xl:flex">
-                      <MaterialIcons name={option.icon} size={18} color={option.fg} />
-                    </View>
-                    <Text className="t-num text-[20px] font-bold leading-none" style={{ color: option.fg }}>{counts[option.status]}</Text>
-                    <Text className="text-[12px] font-semibold mt-1 xl:mt-0" style={{ color: option.fg }} numberOfLines={1}>
-                      {option.status === 'present' ? 'Prezenți' : option.status === 'absent' ? 'Absenți' : 'Motivați'}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-
-              {counts.unmarked > 0 ? (
-                <Pressable
-                  onPress={() => setBulkConfirmOpen(true)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Marchează restul prezenți (${counts.unmarked})`}
-                  className="ui-press h-11 rounded-[12px] px-4 flex-row items-center justify-center gap-2 border lg:ml-auto lg:shrink-0"
-                  style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
-                >
-                  <MaterialIcons name="done-all" size={17} color="var(--c-success-fg)" />
-                  <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>
-                    Restul prezenți ({counts.unmarked})
-                  </Text>
-                </Pressable>
-              ) : null}
+              ))}
             </View>
-          ) : null}
+            {roster.length > 0 ? (
+              <View className="grid grid-cols-3 gap-2 max-w-[520px] ui-stagger">
+                <GlassStat value={counts.present} label="Prezenți" dot="var(--c-success)" />
+                <GlassStat value={counts.absent} label="Absenți" dot="var(--c-danger)" />
+                <GlassStat value={counts.medical} label="Motivați" dot="var(--c-warning)" />
+              </View>
+            ) : null}
+          </PageHero>
 
           {/* Roster */}
           <View className="gap-3">
