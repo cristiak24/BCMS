@@ -1,4 +1,4 @@
-import { and, count, desc, eq, like, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, like, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db';
 import { auditLogs, users } from '../db/schema';
 
@@ -47,6 +47,9 @@ export type AuditLogQuery = {
   /** Action prefix, e.g. "finance." or "club_admin.". */
   category?: string | null;
   actorUserId?: number | null;
+  /** One entity's history, e.g. { entityType: 'player', entityId: '42' }. */
+  entityType?: string | null;
+  entityId?: string | null;
 };
 
 const MAX_PAGE_SIZE = 100;
@@ -59,6 +62,8 @@ export async function listAuditLogs(query: AuditLogQuery) {
   if (query.clubId != null) conditions.push(eq(auditLogs.clubId, query.clubId));
   if (query.category && /^[a-z_.]{1,40}$/.test(query.category)) conditions.push(like(auditLogs.action, `${query.category}%`));
   if (query.actorUserId != null) conditions.push(eq(auditLogs.actorUserId, query.actorUserId));
+  if (query.entityType) conditions.push(eq(auditLogs.entityType, query.entityType));
+  if (query.entityId) conditions.push(eq(auditLogs.entityId, query.entityId));
   const where = conditions.length ? and(...conditions) : undefined;
 
   const [rows, [{ total }]] = await Promise.all([
@@ -98,4 +103,45 @@ export async function listAuditLogs(query: AuditLogQuery) {
       return { ...row, metadata };
     }),
   };
+}
+
+/**
+ * A player's history: changes to the roster record itself plus the payments
+ * the club recorded for them (stored against the payment, with the player in
+ * the metadata).
+ */
+export async function listPlayerHistory(clubId: number | null, playerId: number, limit = 50) {
+  const forPlayer = or(
+    and(eq(auditLogs.entityType, 'player'), eq(auditLogs.entityId, String(playerId))),
+    and(eq(auditLogs.entityType, 'player_payment'), sql`${auditLogs.metadata}::jsonb ->> 'playerId' = ${String(playerId)}`),
+  ) as SQL;
+  const conditions: SQL[] = [forPlayer];
+  if (clubId != null) conditions.push(eq(auditLogs.clubId, clubId));
+  const rows = await db
+    .select({
+      id: auditLogs.id,
+      action: auditLogs.action,
+      entityType: auditLogs.entityType,
+      entityId: auditLogs.entityId,
+      actorUserId: auditLogs.actorUserId,
+      actorRole: auditLogs.actorRole,
+      actorName: users.name,
+      clubId: auditLogs.clubId,
+      metadata: auditLogs.metadata,
+      createdAt: auditLogs.createdAt,
+    })
+    .from(auditLogs)
+    .leftJoin(users, eq(users.id, auditLogs.actorUserId))
+    .where(and(...conditions))
+    .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
+    .limit(Math.min(100, Math.max(1, limit)));
+  return rows.map((row) => {
+    let metadata: unknown = null;
+    try {
+      metadata = row.metadata ? JSON.parse(row.metadata) : null;
+    } catch {
+      metadata = row.metadata;
+    }
+    return { ...row, metadata };
+  });
 }

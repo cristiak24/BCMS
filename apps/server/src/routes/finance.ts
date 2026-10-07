@@ -1684,7 +1684,6 @@ router.post('/player/setup-session', async (req, res) => {
 
 router.post('/player/confirm-checkout-session', async (req, res) => {
     try {
-        const currentPlayer = await getCurrentPlayer(req);
         const { sessionId } = req.body as { sessionId?: string };
         if (!sessionId) {
             res.status(400).json({ error: 'sessionId is required.' });
@@ -1693,10 +1692,18 @@ router.post('/player/confirm-checkout-session', async (req, res) => {
 
         const stripe = getStripe();
         const session = await stripe.checkout.sessions.retrieve(sessionId);
-        const sessionPlayerId = Number(session.metadata?.playerId);
-        if (sessionPlayerId !== currentPlayer.data.id) {
-            res.status(403).json({ error: 'This payment session does not belong to the signed-in player.' });
-            return;
+        // The account that opened the checkout may confirm it. Matching only
+        // the currently selected child made a parent who switched children
+        // during checkout get a 403 for a payment that had gone through.
+        const callerId = Number((req as AuthenticatedRequest).user?.id);
+        const payerId = Number(session.metadata?.payerUserId);
+        const openedByCaller = Number.isInteger(callerId) && callerId > 0 && payerId === callerId;
+        if (!openedByCaller) {
+            const currentPlayer = await getCurrentPlayer(req);
+            if (Number(session.metadata?.playerId) !== currentPlayer.data.id) {
+                res.status(403).json({ error: 'Această plată nu aparține contului tău.' });
+                return;
+            }
         }
 
         const fulfillment = await fulfillPaidCheckoutSession(sessionId);

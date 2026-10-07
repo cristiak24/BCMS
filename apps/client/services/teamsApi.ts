@@ -264,6 +264,12 @@ export const teamsApi = {
         return data;
     },
 
+    /** Staff only: changes to this player's record and payments recorded for them. */
+    async getPlayerHistory(id: number): Promise<{ logs: import('./clubAdminApi').AuditLogEntry[] }> {
+        const { data } = await apiClient.get<{ logs: import('./clubAdminApi').AuditLogEntry[] }>(`/players/${id}/history`);
+        return data;
+    },
+
     /** Own player record (medical/compliance status, own team) — player/parent sessions only. */
     async getMyPlayerRecord(): Promise<Player | null> {
         try {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { and, eq, inArray, ne, or } from 'drizzle-orm';
 import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
+import { writeAuditLog } from '../services/auditService';
 import { db } from '../db';
 import { playerGuardians, players, playersToTeams, teams, users } from '../db/schema';
 import { resolveRequestClubId } from '../lib/tenantScope';
@@ -170,8 +171,26 @@ router.put(
                 return;
             }
 
+            const [before] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
             await db.update(players).set(parsed.value).where(eq(players.id, playerId));
             res.json({ id: playerId, ...parsed.value });
+
+            // Which fields changed — not the numbers themselves (personal data).
+            const changed = Object.keys(parsed.value).filter((key) => (
+                String((before as Record<string, unknown> | undefined)?.[key] ?? '') !== String((parsed.value as Record<string, unknown>)[key] ?? '')
+            ));
+            if (changed.length) {
+                await writeAuditLog({
+                    action: 'player.contacts_updated',
+                    entityType: 'player',
+                    entityId: playerId,
+                    actorUserId: req.user?.id ?? null,
+                    actorUid: req.firebaseUser?.uid ?? null,
+                    actorRole: req.user?.role ?? null,
+                    clubId,
+                    metadata: { fields: changed },
+                });
+            }
         } catch (error) {
             console.error('[contacts:update] error:', error);
             res.status(500).json({ error: 'Nu am putut salva contactele.' });

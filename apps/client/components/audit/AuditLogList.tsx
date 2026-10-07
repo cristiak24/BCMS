@@ -46,7 +46,11 @@ const ACTION_LABELS: Record<string, string> = {
     'manage_access.invite_link_generated': 'Link de invitație generat',
     'manage_access.request_approved': 'Cerere de acces aprobată',
     'manage_access.request_denied': 'Cerere de acces respinsă',
-    'player.email_changed': 'Email jucător schimbat',
+    'player.email_changed': 'Email schimbat',
+    'player.updated': 'Fișă modificată',
+    'player.removed_from_roster': 'Scos din lot',
+    'player.added_to_team': 'Adăugat în echipă',
+    'player.contacts_updated': 'Telefoane modificate',
     'team.join_code_rotate': 'Cod de echipă regenerat',
     'user.deactivated': 'Cont dezactivat',
     'user.registration_completed': 'Înregistrare finalizată',
@@ -61,7 +65,17 @@ const ROLE_LABELS: Record<string, string> = {
 const FIELD_LABELS: Record<string, string> = {
     monthlyPlayerFee: 'cotizație', trainingLevy: 'contribuție antrenament', facilityFee: 'taxă bază', paymentDueDay: 'zi limită',
     autoAdjust: 'ajustare automată', billingStartMonth: 'restanțe din luna',
+    firstName: 'prenume', lastName: 'nume', name: 'nume complet', status: 'status', number: 'număr',
+    birthYear: 'an naștere', medicalCheckExpiry: 'viză medicală', avatarUrl: 'poză',
+    phone: 'telefon', guardianName: 'părinte 1', guardianPhone: 'telefon părinte 1', guardian2Name: 'părinte 2', guardian2Phone: 'telefon părinte 2',
 };
+
+function shortValue(value: unknown) {
+    if (value == null || value === '') return '—';
+    const text = String(value);
+    // ISO dates (medical visa) read better as a day.
+    return /^\d{4}-\d{2}-\d{2}T/.test(text) ? text.slice(0, 10) : text.length > 40 ? `${text.slice(0, 40)}…` : text;
+}
 const METHOD_LABELS: Record<string, string> = { cash: 'numerar', transfer: 'transfer bancar', card: 'card', other: 'altă metodă' };
 const STATUS_LABELS: Record<string, string> = { pending: 'în așteptare', processed: 'aprobat', rejected: 'respins' };
 const ENTITY_LABELS: Record<string, string> = {
@@ -90,10 +104,12 @@ function detailOf(entry: AuditLogEntry) {
     if (meta.reason) parts.push(`motiv: ${meta.reason}`);
     if (meta.changes && typeof meta.changes === 'object') {
         for (const [field, change] of Object.entries(meta.changes as Record<string, { before: unknown; after: unknown }>)) {
-            parts.push(`${FIELD_LABELS[field] ?? field}: ${change?.before ?? '—'} → ${change?.after ?? '—'}`);
+            parts.push(`${FIELD_LABELS[field] ?? field}: ${shortValue(change?.before)} → ${shortValue(change?.after)}`);
         }
     }
     if (meta.before !== undefined || meta.after !== undefined) parts.push(`${meta.before ?? '—'} → ${meta.after ?? '—'}`);
+    if (Array.isArray(meta.fields)) parts.push((meta.fields as string[]).map((field) => FIELD_LABELS[field] ?? field).join(', '));
+    if (meta.teamName) parts.push(String(meta.teamName));
     return parts.join(' · ');
 }
 
@@ -147,28 +163,7 @@ export default function AuditLogList({ load }: { load: (filters: AuditLogFilters
                     <Text className="text-[13px]" style={{ color: 'var(--c-muted)' }}>Nicio acțiune înregistrată pentru acest filtru.</Text>
                 </View>
             ) : (
-                <View className="rounded-[12px] border overflow-hidden" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}>
-                    {data.logs.map((entry, index) => {
-                        const detail = detailOf(entry);
-                        return (
-                            <View key={entry.id} className={`px-3.5 py-2.5 ${index ? 'border-t' : ''}`} style={{ borderColor: 'var(--c-border)' } as any}>
-                                <View className="flex-row items-start justify-between gap-3">
-                                    <Text className="text-[13.5px] font-semibold flex-1 min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
-                                        {ACTION_LABELS[entry.action] ?? entry.action}
-                                    </Text>
-                                    <Text className="text-[11.5px] shrink-0" style={{ color: 'var(--c-faint)' }}>{formatWhen(entry.createdAt)}</Text>
-                                </View>
-                                <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
-                                    {[
-                                        entry.actorName ? `${entry.actorName}${entry.actorRole ? ` (${ROLE_LABELS[entry.actorRole] ?? entry.actorRole})` : ''}` : 'Sistem / cont șters',
-                                        entry.entityId ? `${ENTITY_LABELS[entry.entityType] ?? entry.entityType} #${entry.entityId}` : ENTITY_LABELS[entry.entityType] ?? entry.entityType,
-                                        detail || null,
-                                    ].filter(Boolean).join(' · ')}
-                                </Text>
-                            </View>
-                        );
-                    })}
-                </View>
+                <AuditEntries logs={data.logs} />
             )}
 
             {data && pages > 1 ? (
@@ -178,6 +173,34 @@ export default function AuditLogList({ load }: { load: (filters: AuditLogFilters
                     <Button size="sm" label="Înainte" icon="chevron-right" disabled={page >= pages || loading} onPress={() => setPage((p) => p + 1)} />
                 </View>
             ) : null}
+        </View>
+    );
+}
+
+/** The entries themselves — also used for a single player's history. */
+export function AuditEntries({ logs }: { logs: AuditLogEntry[] }) {
+    return (
+        <View className="rounded-[12px] border overflow-hidden" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}>
+            {logs.map((entry, index) => {
+                const detail = detailOf(entry);
+                return (
+                    <View key={entry.id} className={`px-3.5 py-2.5 ${index ? 'border-t' : ''}`} style={{ borderColor: 'var(--c-border)' } as any}>
+                        <View className="flex-row items-start justify-between gap-3">
+                            <Text className="text-[13.5px] font-semibold flex-1 min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+                                {ACTION_LABELS[entry.action] ?? entry.action}
+                            </Text>
+                            <Text className="text-[11.5px] shrink-0" style={{ color: 'var(--c-faint)' }}>{formatWhen(entry.createdAt)}</Text>
+                        </View>
+                        <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
+                            {[
+                                entry.actorName ? `${entry.actorName}${entry.actorRole ? ` (${ROLE_LABELS[entry.actorRole] ?? entry.actorRole})` : ''}` : 'Sistem / cont șters',
+                                entry.entityId ? `${ENTITY_LABELS[entry.entityType] ?? entry.entityType} #${entry.entityId}` : ENTITY_LABELS[entry.entityType] ?? entry.entityType,
+                                detail || null,
+                            ].filter(Boolean).join(' · ')}
+                        </Text>
+                    </View>
+                );
+            })}
         </View>
     );
 }

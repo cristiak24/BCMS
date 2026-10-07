@@ -12,6 +12,8 @@ import { Skeleton } from '../../../components/ui/Skeleton';
 import { ErrorState } from '../../../components/ui/ScreenState';
 import { ToastHost, useToasts } from '../../../components/ui/Toast';
 import GuardiansPanel from '../../../components/family/GuardiansPanel';
+import { AuditEntries } from '../../../components/audit/AuditLogList';
+import type { AuditLogEntry } from '../../../services/clubAdminApi';
 import { MEDICAL_META, formatDate, medicalStatus } from '../../../components/myclub/teamDisplay';
 
 /**
@@ -64,6 +66,8 @@ export default function PlayerProfile() {
     setMedicalExpiry(data.medicalCheckExpiry ? new Date(data.medicalCheckExpiry).toISOString().slice(0, 10) : '');
   };
 
+  const [history, setHistory] = useState<AuditLogEntry[] | null>(null);
+
   const fetchPlayer = useCallback(async () => {
     if (!id) return;
     try {
@@ -74,6 +78,10 @@ export default function PlayerProfile() {
     } catch {
       setLoadError('Nu am putut încărca jucătorul.');
     }
+    // History is secondary: an older server (404) or an error just hides it.
+    teamsApi.getPlayerHistory(parseInt(id as string, 10))
+      .then((result) => setHistory(result.logs))
+      .catch(() => setHistory([]));
   }, [id]);
 
   useEffect(() => {
@@ -316,6 +324,16 @@ export default function PlayerProfile() {
                       </View>
                     ))}
                   </View>
+                )}
+              </Card>
+
+              <Card title="Istoric modificări" icon="history">
+                {history == null ? (
+                  <Skeleton className="h-[60px] w-full rounded-[12px]" />
+                ) : history.length === 0 ? (
+                  <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Nicio modificare înregistrată încă.</Text>
+                ) : (
+                  <AuditEntries logs={history.slice(0, 20)} />
                 )}
               </Card>
             </View>

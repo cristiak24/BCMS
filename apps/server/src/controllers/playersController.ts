@@ -10,7 +10,7 @@ import { isFailedStatus, isOutstandingStatus, isPaidStatus } from '../lib/paymen
 import { teamsManagedByCoach } from '../lib/coachScope';
 import { attendanceSummary, isAttendedStatus, isCountedStatus } from '../lib/attendanceRate';
 import { clubBalances, playerFees } from '../services/clubFinance';
-import { writeAuditLog } from '../services/auditService';
+import { listPlayerHistory, writeAuditLog } from '../services/auditService';
 import { sendPaymentReminders as sendReminderNotifications } from '../lib/notifications';
 
 const DEFAULT_PAYMENT_CURRENCY = (process.env.STRIPE_CURRENCY || 'ron').trim().toLowerCase();
@@ -105,6 +105,22 @@ async function coachMayUseTeam(req: AuthenticatedRequest, teamId: number) {
 }
 
 const COACH_SCOPE_ERROR = 'Poți modifica doar jucătorii echipelor pe care le antrenezi.';
+
+/** One entry in the player's history (Jurnal + the player page). */
+function auditPlayer(req: AuthenticatedRequest, action: string, playerId: number, metadata: Record<string, unknown>) {
+    return writeAuditLog({
+        action,
+        entityType: 'player',
+        entityId: playerId,
+        actorUserId: req.user?.id ?? null,
+        actorUid: req.firebaseUser?.uid ?? null,
+        actorRole: req.user?.role ?? null,
+        clubId: getRequestClubId(req),
+        metadata,
+    });
+}
+
+const HISTORY_FIELDS = ['firstName', 'lastName', 'name', 'status', 'number', 'birthYear', 'medicalCheckExpiry', 'avatarUrl'] as const;
 
 async function getPlayerClubIdByEmail(email?: string | null) {
     if (!email) return null;
@@ -634,6 +650,7 @@ export const playersController = {
 
             await db.delete(playersToTeams).where(eq(playersToTeams.playerId, id));
             await db.update(players).set({ teamId: null, status: 'inactive' }).where(eq(players.id, id));
+            await auditPlayer(req, 'player.removed_from_roster', id, {});
 
             res.json({ success: true });
         } catch (error) {
@@ -682,6 +699,10 @@ export const playersController = {
             const membership = existing[0] ?? (await db.insert(playersToTeams).values({ playerId, teamId }).returning())[0];
 
             await db.update(players).set({ teamId, status: 'active' }).where(eq(players.id, playerId));
+            if (!existing[0]) {
+                const [team] = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, teamId)).limit(1);
+                await auditPlayer(req, 'player.added_to_team', playerId, { teamId, teamName: team?.name ?? null });
+            }
 
             res.json(membership);
         } catch (error) {
@@ -733,6 +754,17 @@ export const playersController = {
             }
 
             const [updated] = await db.update(players).set(update.data).where(eq(players.id, playerId)).returning();
+            const before = pRows[0] as Record<string, unknown>;
+            const changes: Record<string, { before: unknown; after: unknown }> = {};
+            for (const field of HISTORY_FIELDS) {
+                if (!(field in update.data)) continue;
+                const previous = before[field] ?? null;
+                const next = (updated as Record<string, unknown>)[field] ?? null;
+                if (String(previous ?? '') !== String(next ?? '')) changes[field] = { before: previous, after: next };
+            }
+            if (Object.keys(changes).length) {
+                await auditPlayer(req, 'player.updated', playerId, { changes });
+            }
             if (nextEmail !== previousEmail) {
                 await writeAuditLog({
                     action: 'player.email_changed',
@@ -778,6 +810,24 @@ export const playersController = {
             res.json(await buildFullPlayerPayload(req, player));
         } catch (error) {
             console.error('Get player by id error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    /** Staff only: what changed on this player's record, newest first. */
+    async getPlayerHistory(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (isPlayerFacingRole(req)) return res.status(403).json({ error: 'Forbidden' });
+            const playerId = parseInt(req.params.id as string, 10);
+            if (Number.isNaN(playerId)) return res.status(400).json({ error: 'Invalid id' });
+            const [player] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
+            if (!player) return res.status(404).json({ error: 'Player not found' });
+            if (!isSuperadmin(req) && !await isPlayerAllowedForRequest(req, player)) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            res.json({ logs: await listPlayerHistory(isSuperadmin(req) ? null : getRequestClubId(req), playerId) });
+        } catch (error) {
+            console.error('Get player history error:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     },

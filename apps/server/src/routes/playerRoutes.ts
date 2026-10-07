@@ -16,6 +16,7 @@ router.get('/me/attendance', playersController.getMyAttendance);
 router.get('/me/teams/:teamId', playersController.getMyTeamDetail);
 router.get('/me/teams', playersController.getMyTeams);
 router.get('/me', playersController.getMe);
+router.get('/:id/history', playersController.getPlayerHistory);
 router.get('/:id', playersController.getPlayerById);
 router.post('/add-to-team', playersController.addPlayerToTeam);
 router.put('/:id', playersController.updatePlayer);
