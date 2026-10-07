@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from '@/src/web/reactNative';
+import { View, Text, TouchableOpacity, Pressable, ScrollView, StyleSheet, Alert } from '@/src/web/reactNative';
 import { useRouter } from '@/src/web/expoRouter';
-import { CreditCard, Download, Plus, UserPlus } from 'lucide-react';
+import { CreditCard, Download, Plus } from 'lucide-react';
 import { teamsApi, Player, RosterSummary, Team } from '../../services/teamsApi';
 import { useResponsive } from '../../hooks/useResponsive';
 import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../components/HeaderContext';
 import { dash } from '../../components/dashboard/dashboardTheme';
 import { EmptyState, ErrorState, SkeletonBlock } from '../../components/dashboard/ScreenStates';
 import PageHero, { GlassStat } from '../../components/admin/PageHero';
+import Button from '../../components/ui/Button';
 import PlayerRow from '../../components/roster/PlayerRow';
 import RosterPlayerCard from '../../components/roster/RosterPlayerCard';
 import RosterFilters from '../../components/roster/RosterFilters';
@@ -427,36 +428,47 @@ export default function RosterScreen() {
     selectedPayment !== 'all';
 
   // Header/mobile FAB wiring — put the currently-inert HeaderContext slots to real use.
+  // "Adaugă jucător" itself lives in PageHero's actions (desktop) and this FAB
+  // (mobile), fixed to the viewport above the bottom nav — same geometry as the
+  // Program screen's "+ Eveniment" FAB, so both add actions match.
   useEffect(() => {
     if (isMobile) {
       setHeaderActions(null);
       setMobileFab(
-        <TouchableOpacity
+        <Pressable
           onPress={() => setShowAddModal(true)}
-          style={styles.mobileFab}
+          accessibilityRole="button"
+          accessibilityLabel="Adaugă jucător"
+          className="ui-press"
+          style={{
+            position: 'fixed',
+            right: 16,
+            bottom: 'calc(88px + env(safe-area-inset-bottom, 0px))',
+            height: 48,
+            paddingLeft: 16,
+            paddingRight: 18,
+            borderRadius: 999,
+            backgroundColor: 'var(--c-brand-surface)',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            boxShadow: '0 10px 24px -8px rgba(49, 46, 129, 0.7), 0 2px 6px rgba(0, 0, 0, 0.25)',
+            zIndex: 30,
+          } as any}
         >
-          <UserPlus color="var(--c-surface)" size={22} />
-        </TouchableOpacity>
+          <Plus color="#FFFFFF" size={18} strokeWidth={2.6} />
+          <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' } as any}>Jucător</Text>
+        </Pressable>
       );
       return;
     }
 
     setMobileFab(null);
     setHeaderActions(
-      <View className="flex-row items-center gap-3">
-        <View className="rounded-full px-3 py-2" style={{ backgroundColor: dash.lineSoft }}>
-          <Text className="text-[11px] font-black" style={{ color: dash.inkSoft }}>
-            {filteredPlayers.length} vizibili
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => setShowAddModal(true)}
-          className="dash-btn-hover h-11 flex-row items-center rounded-2xl px-4"
-          style={{ backgroundColor: dash.accentBlue }}
-        >
-          <Plus color="var(--c-surface)" size={16} />
-          <Text className="ml-2 text-[13px] font-black text-white">Adaugă jucător</Text>
-        </TouchableOpacity>
+      <View className="rounded-full px-3 py-2" style={{ backgroundColor: dash.lineSoft }}>
+        <Text className="text-[11px] font-black" style={{ color: dash.inkSoft }}>
+          {filteredPlayers.length} vizibili
+        </Text>
       </View>
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -496,19 +508,24 @@ export default function RosterScreen() {
         eyebrow="Lot"
         title="Lotul de jucători"
         subtitle="Prezență, echipe și plăți, într-o singură vedere."
-        actions={pendingPayments > 0 ? (
-          <TouchableOpacity
-            onPress={handleSendReminders}
-            disabled={sendingReminders}
-            className="flex-row items-center gap-2 h-10 px-3.5 rounded-[10px]"
-            style={{ backgroundColor: sendingReminders ? dash.surfaceSubtle : 'var(--c-brand-surface)', boxShadow: sendingReminders ? undefined : 'var(--e-brand)' } as any}
-          >
-            <CreditCard size={15} color={sendingReminders ? dash.faint : 'var(--c-on-brand)'} />
-            <Text className="text-[12px] font-semibold" style={{ color: sendingReminders ? dash.faint : 'var(--c-on-brand)' }}>
-              {sendingReminders ? 'Se trimite...' : `Trimite mementouri (${pendingPayments})`}
-            </Text>
-          </TouchableOpacity>
-        ) : undefined}
+        actions={
+          <View className="flex-row items-center gap-2">
+            {pendingPayments > 0 ? (
+              <TouchableOpacity
+                onPress={handleSendReminders}
+                disabled={sendingReminders}
+                className="flex-row items-center gap-2 h-10 px-3.5 rounded-[10px]"
+                style={{ backgroundColor: sendingReminders ? dash.surfaceSubtle : 'var(--c-brand-surface)', boxShadow: sendingReminders ? undefined : 'var(--e-brand)' } as any}
+              >
+                <CreditCard size={15} color={sendingReminders ? dash.faint : 'var(--c-on-brand)'} />
+                <Text className="text-[12px] font-semibold" style={{ color: sendingReminders ? dash.faint : 'var(--c-on-brand)' }}>
+                  {sendingReminders ? 'Se trimite...' : `Trimite mementouri (${pendingPayments})`}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            <Button icon="add" label="Adaugă jucător" variant="primary" onPress={() => setShowAddModal(true)} />
+          </View>
+        }
       >
         <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
           <GlassStat dot="var(--c-brand-fg)" value={`${attendanceValue.toFixed(1)}%`} label="Prezență generală" />
@@ -737,21 +754,4 @@ const styles = StyleSheet.create({
     marginBottom: -1,
   },
   rowSpacer: {},
-  mobileFab: {
-    position: 'absolute',
-    bottom: 96,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: dash.accentBlue,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: dash.accentBlue,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 10,
-    zIndex: 30,
-  },
 });
