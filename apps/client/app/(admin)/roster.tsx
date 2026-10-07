@@ -193,9 +193,13 @@ export default function RosterScreen() {
     try {
       setSendingReminders(true);
       const result = await teamsApi.sendPaymentReminders();
+      const owing = result.players ?? result.recipients.length;
+      const skipped = result.skipped ?? 0;
       Alert.alert(
-        'Mementouri procesate',
-        `${result.sent} ${result.sent === 1 ? 'memento a fost marcat' : 'mementouri au fost marcate'} pentru plățile restante.`
+        owing ? 'Mementouri trimise' : 'Nicio plată de amintit',
+        owing
+          ? `${result.sent} ${result.sent === 1 ? 'notificare trimisă' : 'notificări trimise'} pentru ${owing} ${owing === 1 ? 'jucător care are' : 'jucători care au'} de plată (jucătorilor și părinților lor).${skipped ? ` ${skipped} ${skipped === 1 ? 'cont a primit' : 'conturi au primit'} deja un memento în ultimele 7 zile.` : ''}`
+          : 'Toți jucătorii sunt la zi cu plățile.'
       );
       await fetchRosterData();
     } catch (reminderError: any) {
@@ -391,9 +395,18 @@ export default function RosterScreen() {
           onPress: async () => {
             setBulkBusy(true);
             try {
-              await Promise.allSettled(Array.from(selectedIds).map((id) => teamsApi.removePlayerFromRoster(id)));
+              const results = await Promise.allSettled(Array.from(selectedIds).map((id) => teamsApi.removePlayerFromRoster(id)));
+              const failed = results.filter((result) => result.status === 'rejected').length;
               clearSelection();
               await fetchRosterData();
+              if (failed) {
+                const done = results.length - failed;
+                const reason = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')?.reason;
+                Alert.alert(
+                  'Eliminare parțială',
+                  `${done} din ${results.length} sportivi au fost eliminați. ${failed} nu au putut fi eliminați${reason instanceof Error && reason.message ? `: ${reason.message}` : '.'}`,
+                );
+              }
             } finally {
               setBulkBusy(false);
             }

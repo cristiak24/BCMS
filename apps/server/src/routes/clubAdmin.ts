@@ -4,18 +4,20 @@ import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import { accessRequests, attendance, auditLogs, clubDocuments, clubInviteCodes, clubs, events, inviteLinks, invites, notifications, playerPayments, players, playersToTeams, teams, users } from '../db/schema';
 import { db } from '../db';
 import { createSuperAdminInvitation, isVisiblePendingInvite, resendClubInvitation, syncInvitationStatuses } from '../services/invitationsService';
-import { writeAuditLog } from '../services/auditService';
+import { listAuditLogs, writeAuditLog } from '../services/auditService';
 import { rateLimit } from '../middleware/rateLimit';
 import { getOrCompute, invalidate } from '../lib/microCache';
 import { deleteClerkUser } from '../lib/clerkAuth';
+import { publicUser } from '../lib/publicUser';
 
 const router = Router();
 
 type ClubAdminInviteRole = 'coach' | 'player';
 // Roles an admin may assign to an existing member from this screen. `parent` is
 // assignable (a member can be reclassified) even though invitations stay limited
-// to coach/player.
-type ClubAdminAssignableRole = 'coach' | 'player' | 'parent';
+// to coach/player. `accountant` too: it was the only way for a club to get its
+// accountant, and only a superadmin could do it.
+type ClubAdminAssignableRole = 'coach' | 'player' | 'parent' | 'accountant';
 // Roles that must never be demoted / deactivated from the club-admin screen —
 // this is what protects the club from an admin locking themselves (or the last
 // admin) out.
@@ -48,7 +50,7 @@ function normalizeClubAdminInviteRole(value: unknown): ClubAdminInviteRole | nul
 }
 
 function normalizeClubAdminAssignableRole(value: unknown): ClubAdminAssignableRole | null {
-    return value === 'coach' || value === 'player' || value === 'parent' ? value : null;
+    return value === 'coach' || value === 'player' || value === 'parent' || value === 'accountant' ? value : null;
 }
 
 function ensureClubAdmin(req: AuthenticatedRequest, res: Response) {
@@ -66,6 +68,28 @@ function ensureClubAdmin(req: AuthenticatedRequest, res: Response) {
 }
 
 router.use(authenticate);
+
+// The club's audit trail (who changed roles, fees, documents, payments…).
+// Club admins only; filters: ?category=finance. & ?actorUserId= & ?page=.
+router.get('/audit-logs', async (req: AuthenticatedRequest, res) => {
+    const actor = ensureClubAdmin(req, res);
+    if (!actor) {
+        return;
+    }
+    try {
+        const actorUserId = Number(req.query.actorUserId);
+        res.json(await listAuditLogs({
+            clubId: actor.clubId!,
+            page: Number(req.query.page) || 1,
+            pageSize: Number(req.query.pageSize) || 50,
+            category: typeof req.query.category === 'string' ? req.query.category : null,
+            actorUserId: Number.isInteger(actorUserId) && actorUserId > 0 ? actorUserId : null,
+        }));
+    } catch (error) {
+        console.error('Club admin audit logs error:', error);
+        res.status(500).json({ error: 'Nu am putut încărca jurnalul.' });
+    }
+});
 
 router.get('/accounts', async (req: AuthenticatedRequest, res) => {
     const actor = ensureClubAdmin(req, res);
@@ -200,7 +224,7 @@ router.patch('/accounts/:id', rateLimit({ bucket: 'club-admin:mutate', limit: 30
     }
 
     if (!nextRole) {
-        return res.status(400).json({ error: 'Only coach, player, and parent roles can be assigned from club admin.' });
+        return res.status(400).json({ error: 'Din acest ecran se pot atribui doar rolurile antrenor, jucător, părinte și contabil.' });
     }
 
     // Self-guard: an admin changing their own role could drop their admin rights
@@ -246,7 +270,7 @@ router.patch('/accounts/:id', rateLimit({ bucket: 'club-admin:mutate', limit: 30
         });
 
         invalidate(accountsCacheKey(actor.clubId!));
-        res.json({ success: true, user: updated[0] });
+        res.json({ success: true, user: publicUser(updated[0]) });
     } catch (error) {
         console.error('Club admin update user error:', error);
         res.status(500).json({ error: 'Could not update user role.' });
@@ -344,7 +368,7 @@ router.post('/accounts/:id/deactivate', rateLimit({ bucket: 'club-admin:mutate',
         });
 
         invalidate(accountsCacheKey(actor.clubId!));
-        res.json({ success: true, user: updated[0] });
+        res.json({ success: true, user: publicUser(updated[0]) });
     } catch (error) {
         console.error('Club admin deactivate account error:', error);
         res.status(500).json({ error: 'Could not update this account.' });
@@ -438,7 +462,7 @@ router.post('/accounts/:id/reactivate', rateLimit({ bucket: 'club-admin:mutate',
         });
 
         invalidate(accountsCacheKey(actor.clubId!));
-        res.json({ success: true, user: updated[0] });
+        res.json({ success: true, user: publicUser(updated[0]) });
     } catch (error) {
         console.error('Club admin reactivate account error:', error);
         res.status(500).json({ error: 'Could not reactivate this account.' });
@@ -517,13 +541,34 @@ router.delete('/accounts/:id', rateLimit({ bucket: 'club-admin:mutate', limit: 3
             .filter((player) => [...(teamIdsByPlayer.get(player.id) ?? [])].every((teamId) => teamClub.get(teamId) === actor.clubId))
             .map((player) => player.id);
 
+        // Payments and attendance are the club's books, not the account's: a
+        // roster record that has any is kept (inactive, unlinked from the
+        // deleted sign-in) so past totals and reports don't change. Only
+        // records with no history at all are removed.
+        const [paidRows, attendedRows] = playerIdsToDelete.length > 0
+            ? await Promise.all([
+                db.select({ playerId: playerPayments.playerId }).from(playerPayments).where(inArray(playerPayments.playerId, playerIdsToDelete)),
+                db.select({ playerId: attendance.playerId }).from(attendance).where(inArray(attendance.playerId, playerIdsToDelete)),
+            ])
+            : [[], []];
+        const withHistory = new Set([...paidRows, ...attendedRows].map((row) => row.playerId));
+        const playerIdsToArchive = playerIdsToDelete.filter((playerId) => withHistory.has(playerId));
+        const playerIdsToRemove = playerIdsToDelete.filter((playerId) => !withHistory.has(playerId));
+
         await db.transaction(async (tx) => {
+            if (playerIdsToArchive.length > 0) {
+                // Email is how an account finds its roster record; clearing it
+                // stops a future sign-up with the same address inheriting it.
+                await tx.update(players)
+                    .set({ status: 'inactive', email: null })
+                    .where(inArray(players.id, playerIdsToArchive));
+            }
             if (playerIdsToDelete.length > 0) {
-                await tx.delete(attendance).where(inArray(attendance.playerId, playerIdsToDelete));
-                await tx.delete(playerPayments).where(inArray(playerPayments.playerId, playerIdsToDelete));
-                await tx.delete(playersToTeams).where(inArray(playersToTeams.playerId, playerIdsToDelete));
                 await tx.delete(notifications).where(inArray(notifications.playerId, playerIdsToDelete));
-                await tx.delete(players).where(inArray(players.id, playerIdsToDelete));
+            }
+            if (playerIdsToRemove.length > 0) {
+                await tx.delete(playersToTeams).where(inArray(playersToTeams.playerId, playerIdsToRemove));
+                await tx.delete(players).where(inArray(players.id, playerIdsToRemove));
             }
             await tx.update(teams).set({ coachId: null }).where(eq(teams.coachId, id));
             await tx.update(events).set({ coachId: null }).where(eq(events.coachId, id));
@@ -559,11 +604,11 @@ router.delete('/accounts/:id', rateLimit({ bucket: 'club-admin:mutate', limit: 3
             actorUid: req.firebaseUser?.uid ?? null,
             actorRole: req.user?.role ?? null,
             clubId: actor.clubId,
-            metadata: { email: targetUser.email, name: targetUser.name, role: targetUser.role, deletedPlayerIds: playerIdsToDelete },
+            metadata: { email: targetUser.email, name: targetUser.name, role: targetUser.role, deletedPlayerIds: playerIdsToRemove, archivedPlayerIds: playerIdsToArchive },
         });
 
         invalidate(accountsCacheKey(actor.clubId!));
-        res.json({ success: true, deletedPlayers: playerIdsToDelete.length });
+        res.json({ success: true, deletedPlayers: playerIdsToRemove.length, archivedPlayers: playerIdsToArchive.length });
     } catch (error) {
         console.error('Club admin delete account error:', error);
         res.status(500).json({ error: 'Could not delete this account.' });

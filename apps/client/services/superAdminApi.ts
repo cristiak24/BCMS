@@ -1,3 +1,4 @@
+import { auditQuery, type AuditLogFilters, type AuditLogPage } from './clubAdminApi';
 import { apiFetch } from './apiClient';
 
 export type SuperAdminDashboardResponse = {
@@ -170,8 +171,8 @@ export const superAdminApi = {
     });
   },
 
-  listAuditLogs() {
-    return apiFetch<{ success: boolean; logs: Array<Record<string, unknown>> }>('/super-admin/audit-logs');
+  listAuditLogs(filters: AuditLogFilters = {}) {
+    return apiFetch<AuditLogPage & { success: boolean }>(`/super-admin/audit-logs${auditQuery(filters)}`);
   },
 
   listRoles() {

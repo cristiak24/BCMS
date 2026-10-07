@@ -32,6 +32,20 @@ const ACCOUNTANT_MOBILE_NAV_ITEMS = [
     { href: '/admin/contacts' as const, label: 'Agendă', icon: 'contacts' as const, match: 'contacts' },
 ];
 
+// Staff (scorekeepers, team managers) can read the schedule, keep live stats
+// and open staff documents; every other admin screen answered them with 403s.
+const STAFF_MENU_ITEMS: typeof ADMIN_MENU_ITEMS = [
+    { label: 'Program', icon: 'calendar-today', href: '/admin/schedule' },
+    { label: 'Documente', icon: 'folder', href: '/admin/documents' },
+    { label: 'Agendă', icon: 'contacts', href: '/admin/contacts' },
+];
+
+const STAFF_MOBILE_NAV_ITEMS = [
+    { href: '/admin/schedule' as const, label: 'Program', icon: 'calendar-today' as const, match: 'schedule' },
+    { href: '/admin/documents' as const, label: 'Documente', icon: 'folder' as const, match: 'documents' },
+    { href: '/admin/contacts' as const, label: 'Agendă', icon: 'contacts' as const, match: 'contacts' },
+];
+
 /**
  * Titles for admin screens that intentionally have no sidebar entry (detail
  * pages and sub-flows reached from another screen).
@@ -94,9 +108,11 @@ function AdminLayoutContent() {
     const { isMobile } = useResponsive();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-    const isAccountant = normalizeRole(session?.role) === 'accountant';
-    const menuItems = isAccountant ? ACCOUNTANT_MENU_ITEMS : ADMIN_MENU_ITEMS;
-    const mobileNavItems = isAccountant ? ACCOUNTANT_MOBILE_NAV_ITEMS : MOBILE_NAV_ITEMS;
+    const role = normalizeRole(session?.role);
+    const isAccountant = role === 'accountant';
+    const isStaff = role === 'staff';
+    const menuItems = isAccountant ? ACCOUNTANT_MENU_ITEMS : isStaff ? STAFF_MENU_ITEMS : ADMIN_MENU_ITEMS;
+    const mobileNavItems = isAccountant ? ACCOUNTANT_MOBILE_NAV_ITEMS : isStaff ? STAFF_MOBILE_NAV_ITEMS : MOBILE_NAV_ITEMS;
 
     const activeAdminItem = getActiveAdminItem(pathname, menuItems);
     const availableMenuItems = useMemo(

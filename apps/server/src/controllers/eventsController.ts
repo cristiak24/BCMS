@@ -1,14 +1,15 @@
 import { Request, Response } from 'express';
 import { toDate, toIso } from '../lib/dateUtils';
 import { db } from '../db';
-import { attendance, events, players, playersToTeams, teams, users } from '../db/schema';
+import { attendance, events, notifications, players, playersToTeams, teams, users } from '../db/schema';
 import { and, eq, gte, inArray, isNull, lte, or } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { buildEventQueryPlan, type EventQueryParams } from '../lib/eventQuery';
-import { createFeedbackNotification } from '../lib/notifications';
+import { createFeedbackNotification, notifyEventChange } from '../lib/notifications';
 import { parseAttendancePayload, parseEventInput } from '../lib/eventValidation';
 import { fetchFrbMatches, frbDateToUtc, type ParsedMatch } from '../lib/frbMatches';
 import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
+import { coachManagesEvent, coachManagesTeam } from '../lib/coachScope';
 
 
 /** FRB sync: only fixtures from this far back are inserted as new events. */
@@ -131,7 +132,12 @@ async function ensureEventReadAccess(req: AuthenticatedRequest, event: { teamId:
     return null;
 }
 
-async function ensureTeamAccess(req: AuthenticatedRequest, teamId: number) {
+/**
+ * Write access to a team's events. A coach is limited to the teams they manage
+ * (lib/coachScope.ts) — or to one event they are assigned to, when
+ * `eventCoachId` is passed for an existing event.
+ */
+async function ensureTeamAccess(req: AuthenticatedRequest, teamId: number, eventCoachId?: number | null) {
     const rows = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
     const team = rows[0];
     if (!team) {
@@ -156,7 +162,26 @@ async function ensureTeamAccess(req: AuthenticatedRequest, teamId: number) {
         return { status: 403 as const, error: 'You do not have permission to modify events for this team.' };
     }
 
+    if (role === 'coach') {
+        const allowed = eventCoachId === undefined
+            ? coachManagesTeam(team.coachId, req.user?.id)
+            : coachManagesEvent(team.coachId, eventCoachId, req.user?.id);
+        if (!allowed) {
+            return { status: 403 as const, error: 'Poți modifica doar echipele pe care le antrenezi.' };
+        }
+    }
+
     return { status: 200 as const, team };
+}
+
+/**
+ * Event fees are charged to families through Stripe, so setting or changing
+ * one is a club decision (admin), not something a coach does with the schedule.
+ */
+function feeChangeDenied(req: AuthenticatedRequest, nextAmount: number | null | undefined, currentAmount: number | null) {
+    if (req.user?.role !== 'coach' || nextAmount === undefined) return false;
+    // No fee and a zero fee are the same thing; re-sending the current fee is fine.
+    return (nextAmount ?? 0) !== (currentAmount ?? 0);
 }
 
 function isPlayerFacingRole(req: AuthenticatedRequest) {
@@ -281,12 +306,12 @@ export const eventsController = {
                 // `event.teamId !== Number(teamId)` did.
                 conditions.push(inArray(events.teamId, plan.teamIds));
             } else if (plan.clubTeamIds) {
-                // The tenancy restriction, by contrast, always let `team_id IS NULL`
-                // events through — the old check was `event.teamId != null && ...`.
-                // A bare inArray here would silently drop every club-less event.
-                conditions.push(plan.clubTeamIds.length
-                    ? or(isNull(events.teamId), inArray(events.teamId, plan.clubTeamIds))
-                    : isNull(events.teamId));
+                // Only the club's own teams. A club-less event (team_id NULL) has
+                // no club to belong to; letting it through showed one club's
+                // team-less events to every club on the platform. Those stay
+                // superadmin-only, like the single-event read.
+                if (!plan.clubTeamIds.length) return res.json([]);
+                conditions.push(inArray(events.teamId, plan.clubTeamIds));
             }
 
             // `and()` of zero conditions is undefined, which Drizzle treats as "no
@@ -338,6 +363,10 @@ export const eventsController = {
                 return res.status(access.status).json({ error: access.error });
             }
 
+            if (feeChangeDenied(req, input.amount, null)) {
+                return res.status(403).json({ error: 'Doar administratorul clubului poate stabili o taxă pentru eveniment.' });
+            }
+
             const coachError = await validateCoachForClub(input.coachId, access.team.clubId ?? null);
             if (coachError) {
                 return res.status(400).json({ error: coachError });
@@ -379,7 +408,7 @@ export const eventsController = {
 
             let clubId: number | null = null;
             if (existingEvent.teamId != null) {
-                const access = await ensureTeamAccess(req, existingEvent.teamId);
+                const access = await ensureTeamAccess(req, existingEvent.teamId, existingEvent.coachId ?? null);
                 if (access.status !== 200) {
                     return res.status(access.status).json({ error: access.error });
                 }
@@ -398,6 +427,10 @@ export const eventsController = {
                 return res.status(400).json({ error: parsed.error });
             }
             const updates = parsed.data;
+
+            if (feeChangeDenied(req, updates.amount, existingEvent.amount ?? null)) {
+                return res.status(403).json({ error: 'Doar administratorul clubului poate modifica taxa evenimentului.' });
+            }
 
             // Moving an event to another team needs access to the DESTINATION
             // too — checking only the current team let a coach re-home an event
@@ -425,6 +458,23 @@ export const eventsController = {
 
             const [updated] = await db.update(events).set(updates).where(eq(events.id, eventId)).returning();
             res.json(await enrichEvent(updated as EventDoc));
+
+            // Families hear about a cancelled or moved session (best effort —
+            // the change is already saved).
+            const wasCancelled = String(existingEvent.status ?? '').toLowerCase() === 'cancelled';
+            const nowCancelled = String(updated.status ?? '').toLowerCase() === 'cancelled';
+            const moved = String(updated.startTime) !== String(existingEvent.startTime)
+                || (updated.location ?? null) !== (existingEvent.location ?? null);
+            if ((nowCancelled && !wasCancelled) || (!nowCancelled && moved)) {
+                notifyEventChange({
+                    kind: nowCancelled ? 'cancelled' : 'rescheduled',
+                    teamId: updated.teamId ?? null,
+                    eventId: updated.id,
+                    title: updated.title,
+                    startTime: String(updated.startTime),
+                    location: updated.location,
+                }).catch((error) => console.error('Event change notification error:', error));
+            }
         } catch (error) {
             console.error('Update event error:', error);
             res.status(500).json({ error: 'Internal server error' });
@@ -444,7 +494,7 @@ export const eventsController = {
             }
 
             if (existingEvent.teamId != null) {
-                const access = await ensureTeamAccess(req, existingEvent.teamId);
+                const access = await ensureTeamAccess(req, existingEvent.teamId, existingEvent.coachId ?? null);
                 if (access.status !== 200) {
                     return res.status(access.status).json({ error: access.error });
                 }
@@ -458,9 +508,22 @@ export const eventsController = {
             // an event with its attendance sheet already gone.
             await db.transaction(async (tx) => {
                 await tx.delete(attendance).where(eq(attendance.eventId, eventId));
+                // Feedback notifications point at the event (FK, no cascade): keep
+                // them, unlinked — they used to make deleting such an event fail.
+                await tx.update(notifications).set({ eventId: null }).where(eq(notifications.eventId, eventId));
                 await tx.delete(events).where(eq(events.id, eventId));
             });
             res.json({ success: true });
+
+            if (String(existingEvent.status ?? '').toLowerCase() !== 'cancelled') {
+                notifyEventChange({
+                    kind: 'cancelled',
+                    teamId: existingEvent.teamId ?? null,
+                    eventId: null,
+                    title: existingEvent.title,
+                    startTime: String(existingEvent.startTime),
+                }).catch((error) => console.error('Event delete notification error:', error));
+            }
         } catch (error) {
             console.error('Delete event error:', error);
             res.status(500).json({ error: 'Internal server error' });
@@ -629,7 +692,7 @@ export const eventsController = {
                 return res.status(400).json({ error: 'This event is not linked to a team.' });
             }
 
-            const access = await ensureTeamAccess(req, event.teamId);
+            const access = await ensureTeamAccess(req, event.teamId, event.coachId ?? null);
             if (access.status !== 200) {
                 return res.status(access.status).json({ error: access.error });
             }
@@ -649,7 +712,10 @@ export const eventsController = {
             const existingRows = await db.select().from(attendance)
                 .where(and(eq(attendance.eventId, eventId), inArray(attendance.playerId, playerIds)));
             const existingByPlayer = new Map(existingRows.map((row) => [row.playerId, row]));
-            const now = new Date().toISOString();
+            // A row is dated by the session it records, not by when it was
+            // marked: correcting last month's sheet today used to move it into
+            // this month's attendance stats.
+            const sessionDate = toIso(event.startTime) ?? new Date().toISOString();
 
             await db.transaction(async (tx) => {
                 for (const item of items) {
@@ -660,7 +726,7 @@ export const eventsController = {
                     const noteUpdate = item.note !== undefined ? { note: item.note } : {};
                     if (existing) {
                         await tx.update(attendance)
-                            .set({ status: item.status, date: now, ...noteUpdate })
+                            .set({ status: item.status, date: sessionDate, ...noteUpdate })
                             .where(eq(attendance.id, existing.id));
                     } else {
                         await tx.insert(attendance).values({
@@ -668,7 +734,7 @@ export const eventsController = {
                             eventId,
                             teamId: event.teamId as number,
                             status: item.status,
-                            date: now,
+                            date: sessionDate,
                             note: item.note ?? null,
                         });
                     }

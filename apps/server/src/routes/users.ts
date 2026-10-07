@@ -3,6 +3,7 @@ import { db } from '../db';
 import { users } from '../db/schema';
 import { eq, asc, and } from 'drizzle-orm';
 import { authenticate, requireRoles, type AuthenticatedRequest } from '../middleware/auth';
+import { writeAuditLog } from '../services/auditService';
 
 const router = Router();
 
@@ -206,6 +207,24 @@ router.patch('/:id', requireRoles(['admin']), async (req: AuthenticatedRequest, 
 
         const updatedRows = await db.update(users).set(nextUser).where(eq(users.id, user.id)).returning();
         const updatedUser = updatedRows[0];
+
+        // Same trail as the club-admin screen: a role change through this
+        // endpoint used to leave no record of who granted what.
+        await writeAuditLog({
+            action: typeof role === 'string' && role !== user.role ? 'user.role_updated' : 'user.updated',
+            entityType: 'user',
+            entityId: user.id,
+            actorUserId: req.user?.id ?? null,
+            actorUid: req.firebaseUser?.uid ?? null,
+            actorRole: req.user?.role ?? null,
+            clubId: user.clubId ?? null,
+            metadata: {
+                ...(typeof role === 'string' ? { previousRole: user.role, nextRole: role } : {}),
+                ...(trimmedName !== undefined ? { previousName: user.name, nextName: trimmedName } : {}),
+            },
+            ipAddress: req.ip ?? null,
+            userAgent: req.get('user-agent') ?? null,
+        }).catch((error) => console.error('[users] audit log failed:', error));
 
         res.json({
             id: updatedUser.id,

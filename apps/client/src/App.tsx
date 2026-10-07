@@ -126,6 +126,8 @@ const AdminPlayerDetails = lazyRoute(loadAdminPlayerDetails);
 const loadAdminUsers = () => import('../app/(admin)/users');
 const AdminUsers = lazyRoute(loadAdminUsers);
 const loadAdminUserDetails = () => import('../app/(admin)/users/[id]');
+const loadAdminAuditLog = () => import('../app/(admin)/audit-log');
+const AdminAuditLog = lazyRoute(loadAdminAuditLog);
 const AdminUserDetails = lazyRoute(loadAdminUserDetails);
 
 const loadSuperAdminLayout = () => import('../app/super-admin/_layout');
@@ -208,6 +210,7 @@ const ROUTE_CHUNKS: Array<[string, Loader[]]> = [
   ['/admin/player/:id', [loadAdminLayout, loadAdminPlayerDetails]],
   ['/admin/users', [loadAdminLayout, loadAdminUsers]],
   ['/admin/users/:id', [loadAdminLayout, loadAdminUserDetails]],
+  ['/admin/audit-log', [loadAdminLayout, loadAdminAuditLog]],
   ['/super-admin', [loadSuperAdminLayout, loadSuperAdminIndex]],
   ['/super-admin/dashboard', [loadSuperAdminLayout, loadSuperAdminDashboard]],
   ['/super-admin/clubs', [loadSuperAdminLayout, loadSuperAdminClubs]],
@@ -252,6 +255,8 @@ function RoutePrefetcher() {
       prefetchRoutes([loadPlayerLayout, loadPlayerHome, loadPlayerSchedule, loadPlayerAttendance, loadPlayerPayments, loadPlayerTeam, loadPlayerAccount]);
     } else if (role === 'superadmin') {
       prefetchRoutes([loadSuperAdminLayout, loadSuperAdminDashboard, loadSuperAdminClubs, loadSuperAdminUsers, loadAdminLayout, loadAdminDashboard]);
+    } else if (role === 'staff') {
+      prefetchRoutes([loadAdminLayout, loadAdminSchedule, loadAdminDocuments, loadAdminContacts, loadProfile]);
     } else if (role === 'accountant') {
       prefetchRoutes([loadAdminLayout, loadAdminFinance, loadAdminDocuments, loadAdminContacts, loadProfile]);
     } else {
@@ -341,6 +346,7 @@ export default function App() {
                   <Route path="player/:id" element={<AdminPlayerDetails />} />
                   <Route path="users" element={<AdminUsers />} />
                   <Route path="users/:id" element={<AdminUserDetails />} />
+                  <Route path="audit-log" element={<AdminAuditLog />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
 

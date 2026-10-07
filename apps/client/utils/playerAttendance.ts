@@ -18,14 +18,17 @@ function normalizeName(value?: string | null) {
   return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+// Same definition as the server (lib/attendanceRate.ts) and the admin
+// schedule: rate = attended ÷ (attended + absent). Late counts as attended;
+// medical/excused absences are left out of the rate.
 export function isPresentAttendanceStatus(status?: string | null) {
-  const normalized = String(status ?? '').toLowerCase();
-  return normalized === 'present' || normalized === 'prezent';
+  const normalized = String(status ?? '').trim().toLowerCase();
+  return normalized === 'present' || normalized === 'prezent' || normalized === 'late';
 }
 
 export function isCountedAttendanceStatus(status?: string | null) {
-  const normalized = String(status ?? '').toLowerCase();
-  return ['present', 'prezent', 'absent', 'medical', 'excused'].includes(normalized);
+  const normalized = String(status ?? '').trim().toLowerCase();
+  return isPresentAttendanceStatus(normalized) || normalized === 'absent';
 }
 
 export function findCurrentPlayerAttendance(rows: EventAttendance[], user: AuthUser | null) {

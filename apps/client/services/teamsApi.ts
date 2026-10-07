@@ -59,7 +59,8 @@ export interface Coach {
     name: string;
 }
 
-export type PlayerPaymentState = 'paid' | 'due' | 'none';
+/** due = overdue (Restanță), pending = owed but not late yet. */
+export type PlayerPaymentState = 'paid' | 'due' | 'pending' | 'none';
 
 export interface TeamPlayerStat {
     playerId: number;
@@ -186,13 +187,17 @@ export interface RosterSummary {
 }
 
 export interface PaymentReminderResponse {
+    /** In-app notifications created (players and their parents). */
     sent: number;
+    /** Players who owe money. */
+    players?: number;
+    /** Accounts skipped because they got a reminder in the last 7 days. */
+    skipped?: number;
     recipients: {
         id: number;
-        firstName: string;
-        lastName: string;
-        email: string | null;
-        paymentStatus: string;
+        name: string;
+        outstanding: number;
+        overdue: number;
     }[];
     sentAt: string;
     provider: string;

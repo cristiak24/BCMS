@@ -131,7 +131,18 @@ export const playerPayments = pgTable("player_payments", {
 	// payments the club recorded by hand. No FK: a deleted account must not
 	// block or erase the payment history.
 	paidByUserId: integer("paid_by_user_id"),
+	// The Stripe Checkout session that produced this row. Unique, so the
+	// webhook and the browser's confirm call (or a retried webhook) can never
+	// record the same payment twice.
+	stripeSessionId: varchar("stripe_session_id", { length: 255 }),
+	// Fees this row settled, comma-separated ("monthly:2026-10,event:42") —
+	// see lib/paymentLedger.ts. Null on rows written before the column existed.
+	feeIds: text("fee_ids"),
+	// How a payment the club recorded by hand was made (cash, transfer, …).
+	method: varchar({ length: 20 }),
+	description: text(),
 }, (table) => [
+	unique("player_payments_stripe_session_id_unique").on(table.stripeSessionId),
 	foreignKey({
 			columns: [table.playerId],
 			foreignColumns: [players.id],
@@ -164,7 +175,15 @@ export const financialSettings = pgTable("financial_settings", {
 	autoAdjust: integer("auto_adjust").default(1).notNull(),
 	paymentDueDay: integer("payment_due_day").default(25).notNull(),
 	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
-});
+	// The club these fees belong to. Rows used to be found by `id = club id`,
+	// which nothing enforced (services/clubFinance.ts reads by this column now).
+	clubId: integer("club_id"),
+	// First month ('YYYY-MM') whose fees the app tracks as owed — see
+	// lib/feeSchedule.ts. Null: only the current month is billed.
+	billingStartMonth: varchar("billing_start_month", { length: 7 }),
+}, (table) => [
+	unique("financial_settings_club_id_unique").on(table.clubId),
+]);
 
 export const events = pgTable("events", {
 	id: serial().primaryKey().notNull(),

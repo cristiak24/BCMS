@@ -4,6 +4,8 @@ import { db } from '../db';
 import { attendance, clubs, events, l12Documents, playerPayments, players, playersToTeams, teams, users, l12Lineups } from '../db/schema';
 import { requireRoles, authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import { foldName, generateTeamCode } from '../lib/familyJoin';
+import { clubBalances } from '../services/clubFinance';
+import { attendanceSummary, isAttendedStatus, isCountedStatus } from '../lib/attendanceRate';
 
 const router = Router();
 
@@ -17,15 +19,7 @@ const requireTeamManager = requireRoles(['admin', 'manager']);
 const TEAM_GENDERS = ['M', 'F'] as const;
 const TEAM_LEVELS = ['national', 'municipal', 'initiere'] as const;
 
-function isAttendancePresent(status?: string | null) {
-    const normalized = (status || '').trim().toLowerCase();
-    return normalized === 'present' || normalized === 'late' || normalized === 'medical' || normalized === 'excused';
-}
 
-function isPaidStatus(status?: string | null) {
-    const normalized = (status || '').trim().toLowerCase();
-    return normalized === 'paid' || normalized === 'processed' || normalized === 'succeeded' || normalized === 'success';
-}
 
 // The invite code lets families sign up to the team (approval follows), so
 // only staff get it — players and parents could otherwise pass it around.
@@ -39,6 +33,14 @@ function mapTeam(team: typeof teams.$inferSelect, req?: AuthenticatedRequest) {
         createdAt: team.createdAt ?? new Date().toISOString(),
         updatedAt: team.updatedAt ?? team.createdAt ?? new Date().toISOString(),
     };
+}
+
+// Per-player data on a whole squad (emails, medical visas, attendance and
+// arrears) is for club staff. Players and parents see their own record and a
+// teammate list without personal fields through /api/players/me/teams.
+function isPlayerFacing(req: AuthenticatedRequest) {
+    const role = String(req.user?.role ?? '');
+    return role === 'player' || role === 'parent';
 }
 
 function getRequestClubId(req: AuthenticatedRequest) {
@@ -311,7 +313,7 @@ router.post('/', requireTeamManager, async (req: AuthenticatedRequest, res) => {
 
         let coachName: string | null = null;
         if (normalizedCoachId != null) {
-            const coachRows = await db.select({ id: users.id, name: users.name }).from(users).where(and(eq(users.id, normalizedCoachId), eq(users.role, 'coach'))).limit(1);
+            const coachRows = await db.select({ id: users.id, name: users.name }).from(users).where(and(eq(users.id, normalizedCoachId), eq(users.role, 'coach'), eq(users.clubId, clubId))).limit(1);
             if (!coachRows[0]) {
                 res.status(400).json({ error: 'Selected coach was not found.' });
                 return;
@@ -381,6 +383,11 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
 
 router.get('/:id/stats', async (req: AuthenticatedRequest, res) => {
     try {
+        if (isPlayerFacing(req)) {
+            res.status(403).json({ error: 'Doar staff-ul clubului vede datele întregii echipe.' });
+            return;
+        }
+
         const id = parseRouteId(req.params.id);
         if (Number.isNaN(id)) {
             res.status(400).json({ error: 'Invalid ID' });
@@ -396,40 +403,36 @@ router.get('/:id/stats', async (req: AuthenticatedRequest, res) => {
         const teamPlayers = await getTeamPlayersById(id);
         const playerIds = teamPlayers.map((p) => p.id);
 
-        const [attendanceRows, paymentRows] = await Promise.all([
+        // What each player owes: the club's shared fee calculation, so this
+        // matches Finanțe and the player's own Plăți page.
+        const [attendanceRows, balances] = await Promise.all([
             db.select().from(attendance).where(eq(attendance.teamId, id)),
-            playerIds.length
-                ? db.select().from(playerPayments).where(inArray(playerPayments.playerId, playerIds))
-                : Promise.resolve([] as (typeof playerPayments.$inferSelect)[]),
+            playerIds.length && access.team.clubId != null
+                ? clubBalances(access.team.clubId, { teamId: id })
+                : Promise.resolve([]),
         ]);
+        const balanceByPlayer = new Map(balances.map((balance) => [balance.playerId, balance]));
 
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-        const rateOf = (rows: { status: string | null }[]) =>
-            rows.length === 0 ? null : Math.round((rows.filter((r) => isAttendancePresent(r.status)).length / rows.length) * 1000) / 10;
+        const rateOf = (rows: { status: string | null }[]) => attendanceSummary(rows).rate;
 
         const monthRows = attendanceRows.filter((r) => r.date && new Date(r.date) >= monthStart);
         const prevMonthRows = attendanceRows.filter((r) => r.date && new Date(r.date) >= prevMonthStart && new Date(r.date) < monthStart);
 
         const attByPlayer = new Map<number, { present: number; total: number; monthPresent: number; monthTotal: number }>();
         for (const row of attendanceRows) {
+            if (!isCountedStatus(row.status)) continue;
             const bucket = attByPlayer.get(row.playerId) ?? { present: 0, total: 0, monthPresent: 0, monthTotal: 0 };
             bucket.total += 1;
-            if (isAttendancePresent(row.status)) bucket.present += 1;
+            if (isAttendedStatus(row.status)) bucket.present += 1;
             if (row.date && new Date(row.date) >= monthStart) {
                 bucket.monthTotal += 1;
-                if (isAttendancePresent(row.status)) bucket.monthPresent += 1;
+                if (isAttendedStatus(row.status)) bucket.monthPresent += 1;
             }
             attByPlayer.set(row.playerId, bucket);
-        }
-
-        const paymentsByPlayer = new Map<number, typeof paymentRows>();
-        for (const row of paymentRows) {
-            const list = paymentsByPlayer.get(row.playerId) ?? [];
-            list.push(row);
-            paymentsByPlayer.set(row.playerId, list);
         }
 
         let playersWithArrears = 0;
@@ -440,12 +443,10 @@ router.get('/:id/stats', async (req: AuthenticatedRequest, res) => {
             const attendanceRate = att && att.total > 0 ? Math.round((att.present / att.total) * 100) : null;
             const monthlyRate = att && att.monthTotal > 0 ? Math.round((att.monthPresent / att.monthTotal) * 100) : null;
 
-            const payments = paymentsByPlayer.get(player.id) ?? [];
-            const unpaid = payments.filter((row) => !isPaidStatus(row.status));
-            const outstandingAmount = unpaid.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
-            const latest = [...payments].sort((a, b) =>
-                new Date(b.date ?? b.createdAt ?? 0).getTime() - new Date(a.date ?? a.createdAt ?? 0).getTime())[0];
-            const paymentStatus = latest ? (isPaidStatus(latest.status) ? 'paid' : 'due') : 'none';
+            const balance = balanceByPlayer.get(player.id);
+            const outstandingAmount = balance?.outstanding ?? 0;
+            // due = overdue (Restanță), pending = owed but not late yet.
+            const paymentStatus = !balance ? 'none' : balance.state === 'overdue' ? 'due' : balance.state === 'due' ? 'pending' : 'paid';
             if (outstandingAmount > 0) {
                 playersWithArrears += 1;
                 totalOutstanding += outstandingAmount;
@@ -487,6 +488,17 @@ router.delete('/:id', requireTeamManager, async (req: AuthenticatedRequest, res)
         const access = await ensureTeamAccess(req, id);
         if (access.status !== 200) {
             res.status(access.status).json({ error: access.error });
+            return;
+        }
+
+        // A team with a history (sessions, attendance, match sheets) is
+        // deactivated, not deleted: deleting cascaded through every event,
+        // attendance sheet, L12 and live stat of the squad. Only an empty team
+        // — typically one created by mistake — can be removed.
+        const [eventRow] = await db.select({ id: events.id }).from(events).where(eq(events.teamId, id)).limit(1);
+        const [attendanceRow] = eventRow ? [eventRow] : await db.select({ id: attendance.id }).from(attendance).where(eq(attendance.teamId, id)).limit(1);
+        if (eventRow || attendanceRow) {
+            res.status(409).json({ error: 'Echipa are program și prezențe înregistrate, deci nu poate fi ștearsă. Dezactiveaz-o: istoricul rămâne, iar echipa dispare din listele active.' });
             return;
         }
 
@@ -571,7 +583,12 @@ router.patch('/:id', requireTeamManager, async (req: AuthenticatedRequest, res) 
         if ('coachId' in body) {
             const nextCoachId = body.coachId == null || body.coachId === '' ? null : Number(body.coachId);
             if (nextCoachId != null) {
-                const coachRows = await db.select({ id: users.id }).from(users).where(and(eq(users.id, nextCoachId), eq(users.role, 'coach'))).limit(1);
+                // The coach must be one of this club's coaches.
+                const coachRows = await db.select({ id: users.id }).from(users).where(and(
+                    eq(users.id, nextCoachId),
+                    eq(users.role, 'coach'),
+                    ...(access.team.clubId != null ? [eq(users.clubId, access.team.clubId)] : []),
+                )).limit(1);
                 if (!coachRows[0]) {
                     res.status(400).json({ error: 'Selected coach was not found.' });
                     return;
@@ -604,6 +621,11 @@ router.patch('/:id', requireTeamManager, async (req: AuthenticatedRequest, res) 
 
 router.get('/:id/players', async (req: AuthenticatedRequest, res) => {
     try {
+        if (isPlayerFacing(req)) {
+            res.status(403).json({ error: 'Doar staff-ul clubului vede datele întregii echipe.' });
+            return;
+        }
+
         const id = parseRouteId(req.params.id);
         if (Number.isNaN(id)) {
             res.status(400).json({ error: 'Invalid ID' });

@@ -410,7 +410,7 @@ export default function MyClubAdmin() {
             <ConfirmDialog
                 visible={teamToDelete !== null}
                 title="Ștergi echipa?"
-                message={teamToDelete ? `„${teamToDelete.name}” va fi ștearsă. Vei avea câteva secunde să anulezi.` : undefined}
+                message={teamToDelete ? `„${teamToDelete.name}” va fi ștearsă. Se pot șterge doar echipele fără program sau prezențe; o echipă cu istoric se dezactivează. Vei avea câteva secunde să anulezi.` : undefined}
                 confirmLabel="Șterge"
                 cancelLabel="Renunță"
                 destructive

@@ -19,6 +19,8 @@ export type FinancialSettings = {
     facilityFee: number;
     autoAdjust: number; // 1 or 0
     paymentDueDay: number; // day of month (1..31) the monthly fee is due
+    /** 'YYYY-MM': first month whose unpaid fees count as arrears. Null: current month only. */
+    billingStartMonth?: string | null;
     updatedAt: string;
 };
 
@@ -28,7 +30,8 @@ export type PlayerPaymentFee = {
     description: string;
     amount: number;
     currency: string;
-    status: 'pending' | 'failed' | 'upcoming';
+    /** overdue = past its due date (restanță); upcoming = this month's fee. */
+    status: 'overdue' | 'pending' | 'upcoming' | 'failed';
     dueDate: string | null;
     icon: 'training' | 'trophy' | 'receipt';
     paymentId?: number | string | null;
@@ -104,6 +107,31 @@ export type AdminRecentPayment = {
     receiptUrl: string | null;
 };
 
+export type BalanceFee = PlayerPaymentFee & { kind: 'monthly' | 'levy' | 'facility' | 'event' | 'request' };
+
+export type PlayerBalance = {
+    playerId: number;
+    playerName: string;
+    teamName: string | null;
+    status: string;
+    outstanding: number;
+    overdue: number;
+    overdueCount: number;
+    oldestOverdue: string | null;
+    state: 'overdue' | 'due' | 'paid';
+    fees: BalanceFee[];
+};
+
+export type FinanceSummary = {
+    currency: string;
+    month: string;
+    collected: number;
+    outstanding: number;
+    overdue: number;
+    playersOverdue: number;
+    playersOwing: number;
+};
+
 export const financeApi = {
     async getDocuments(): Promise<FinancialDocument[]> {
         return apiFetch<FinancialDocument[]>('/finance/documents');
@@ -130,11 +158,12 @@ export const financeApi = {
         });
     },
 
-    async updateDocumentStatus(id: number, status: 'pending' | 'processed' | 'rejected'): Promise<FinancialDocument> {
+    /** Rejecting or reopening needs a reason; approving one's own upload is refused when someone else can review. */
+    async updateDocumentStatus(id: number, status: 'pending' | 'processed' | 'rejected', reason?: string): Promise<FinancialDocument> {
         return apiFetch<FinancialDocument>(`/finance/documents/${id}/status`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status }),
+            body: JSON.stringify({ status, reason }),
         });
     },
 
@@ -159,7 +188,23 @@ export const financeApi = {
         return apiFetch<AdminRecentPayment[]>(`/finance/admin/recent-payments?limit=${limit}${teamQuery}`);
     },
 
-    async createManualPayment(payload: { playerId: number; amount: number; description?: string; method?: string; date?: string }): Promise<{ success: boolean }> {
+    /** What every player owes (same calculation as the player's Plăți page). */
+    async getBalances(teamId?: number | null): Promise<{ currency: string; players: PlayerBalance[] }> {
+        const query = teamId != null ? `?teamId=${teamId}` : '';
+        return apiFetch<{ currency: string; players: PlayerBalance[] }>(`/finance/admin/balances${query}`);
+    },
+
+    /** Every payment of the club in a date range (YYYY-MM-DD), for the CSV export. */
+    async getPaymentsExport(from: string, to: string): Promise<{ currency: string; payments: import('../components/finance/financeCsv').ExportedPayment[] }> {
+        return apiFetch(`/finance/admin/payments-export?from=${from}&to=${to}`);
+    },
+
+    /** Collected in a month (default: this one) and what is owed today. */
+    async getSummary(month?: string): Promise<FinanceSummary> {
+        return apiFetch<FinanceSummary>(`/finance/admin/summary${month ? `?month=${month}` : ''}`);
+    },
+
+    async createManualPayment(payload: { playerId: number; amount: number; description?: string; method?: string; date?: string; feeIds?: string[] }): Promise<{ success: boolean }> {
         return apiFetch<{ success: boolean }>('/finance/admin/manual-payment', {
             method: 'POST',
             body: JSON.stringify({ method: 'cash', ...payload }),

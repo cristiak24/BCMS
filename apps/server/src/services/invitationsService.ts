@@ -7,12 +7,14 @@ import { writeAuditLog } from './auditService';
 import type { AuthenticatedRequest } from '../middleware/auth';
 import { loadServerEnv } from '../lib/loadEnv';
 import { resolvePublicAppUrl } from '../lib/publicUrl';
+import { inviteTtlMinutes } from '../lib/inviteTtl';
+import { publicUser } from '../lib/publicUser';
 
 loadServerEnv();
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim() || '';
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || 'BCMS <no-reply@bcms.ro>';
-const INVITE_TTL_MINUTES = Number(process.env.INVITE_EXPIRATION_MINUTES ?? 10) || 10;
+const INVITE_TTL_MINUTES = inviteTtlMinutes(process.env);
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 export type SuperAdminInviteInput = {
@@ -127,38 +129,63 @@ async function findClubById(clubId: number) {
 // The admin-entered `fullName` on an invite is an internal label, not the
 // member's name (they enter their real first/last name when registering), so it
 // is deliberately kept out of the email.
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'administrator',
+  coach: 'antrenor',
+  staff: 'staff',
+  player: 'jucător',
+  parent: 'părinte',
+  accountant: 'contabil',
+};
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] as string));
+}
+
+function validityLabel(minutes: number) {
+  const days = Math.round(minutes / (24 * 60));
+  if (days >= 1 && minutes % (24 * 60) === 0) return days === 1 ? '24 de ore' : `${days} zile`;
+  const hours = Math.round(minutes / 60);
+  return hours === 1 ? 'o oră' : `${hours} ore`;
+}
+
 async function sendInviteEmail(params: { to: string; clubName: string; role: string; url: string; expiresAt: Date }) {
   if (!resend) {
     throw new Error('RESEND_API_KEY is missing.');
   }
 
-  const expiresLabel = params.expiresAt.toLocaleString('en-US', {
-    dateStyle: 'medium',
+  const expiresLabel = params.expiresAt.toLocaleString('ro-RO', {
+    dateStyle: 'long',
     timeStyle: 'short',
+    timeZone: 'Europe/Bucharest',
   });
+  const club = escapeHtml(params.clubName);
+  const role = escapeHtml(ROLE_LABELS[params.role] ?? params.role);
+  const url = escapeHtml(params.url);
+  const validity = validityLabel(INVITE_TTL_MINUTES);
 
   await resend.emails.send({
     from: RESEND_FROM_EMAIL,
     to: params.to,
-    subject: `Invitation to join ${params.clubName}`,
+    subject: `Invitație în ${params.clubName}`,
     html: `
       <div style="margin:0;padding:0;background:#f3f4f6;font-family:Inter,Arial,sans-serif">
         <div style="max-width:640px;margin:0 auto;padding:32px 18px">
           <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:32px;box-shadow:0 24px 70px rgba(17,24,39,.06)">
-            <div style="display:inline-block;padding:8px 12px;border-radius:999px;background:#eef2ff;color:#4f46e5;font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase">BCMS invitation</div>
-            <h1 style="margin:20px 0 12px;font-size:30px;line-height:1.1;color:#111827">Finish your registration</h1>
-            <p style="font-size:16px;line-height:1.7;color:#334155;margin:0 0 10px">You were invited to join <strong>${params.clubName}</strong> as <strong>${params.role}</strong>.</p>
-            <p style="font-size:14px;line-height:1.7;color:#64748b;margin:0 0 10px">This invitation expires in 10 minutes and can be used only once.</p>
-            <p style="font-size:13px;line-height:1.7;color:#64748b;margin:0 0 22px">Expires at ${expiresLabel}.</p>
+            <div style="display:inline-block;padding:8px 12px;border-radius:999px;background:#eef2ff;color:#4f46e5;font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase">Invitație BCMS</div>
+            <h1 style="margin:20px 0 12px;font-size:30px;line-height:1.1;color:#111827">Finalizează înregistrarea</h1>
+            <p style="font-size:16px;line-height:1.7;color:#334155;margin:0 0 10px">Ai fost invitat(ă) în <strong>${club}</strong> cu rolul de <strong>${role}</strong>.</p>
+            <p style="font-size:14px;line-height:1.7;color:#64748b;margin:0 0 10px">Invitația este valabilă ${validity} și poate fi folosită o singură dată.</p>
+            <p style="font-size:13px;line-height:1.7;color:#64748b;margin:0 0 22px">Expiră pe ${escapeHtml(expiresLabel)}.</p>
             <p style="margin:0 0 18px">
-              <a href="${params.url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 24px;border-radius:10px;font-weight:700">Complete registration</a>
+              <a href="${url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 24px;border-radius:10px;font-weight:700">Finalizează înregistrarea</a>
             </p>
-            <p style="font-size:13px;color:#64748b;word-break:break-all;line-height:1.5;margin:0">${params.url}</p>
+            <p style="font-size:13px;color:#64748b;word-break:break-all;line-height:1.5;margin:0">${url}</p>
           </div>
         </div>
       </div>
     `,
-    text: `You were invited to ${params.clubName} as ${params.role}. This invitation expires in 10 minutes. Complete registration: ${params.url}`,
+    text: `Ai fost invitat(ă) în ${params.clubName} cu rolul de ${ROLE_LABELS[params.role] ?? params.role}. Invitația este valabilă ${validity} (până pe ${expiresLabel}). Finalizează înregistrarea: ${params.url}`,
   });
 }
 
@@ -495,7 +522,9 @@ export async function completeUserRegistration(params: {
     lastName: params.lastName.trim(),
     phone: params.phone ?? user.phone ?? null,
     avatarUrl: params.avatarUrl ?? user.avatarUrl ?? null,
-    status: 'active' as any,
+    // Profile details only. This used to set status 'active' for any caller,
+    // so an account still waiting for the club's approval could approve
+    // itself. Activation happens where the club approves (or the invite flow).
     updatedAt: new Date().toISOString(),
   }).where(eq(users.id, user.id)).returning();
 
@@ -515,7 +544,7 @@ export async function completeUserRegistration(params: {
     },
   });
 
-  return updated[0];
+  return publicUser(updated[0]);
 }
 
 export async function listInvitations() {

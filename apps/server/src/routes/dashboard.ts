@@ -4,7 +4,6 @@ import { db } from '../db';
 import {
     attendance as pgAttendance,
     financialDocuments as pgFinancialDocuments,
-    financialSettings as pgFinancialSettings,
     playerPayments as pgPlayerPayments,
     players as pgPlayers,
     playersToTeams as pgPlayersToTeams,
@@ -13,29 +12,34 @@ import {
 } from '../db/schema';
 import { and, eq, gte, inArray } from 'drizzle-orm';
 import { getRequestUser } from '../lib/requestContext';
-import { dashboardSettingsRowId, resolveDashboardClubScope, type DashboardClubScope } from '../lib/dashboardScope';
+import { resolveDashboardClubScope, type DashboardClubScope } from '../lib/dashboardScope';
+import { clubBalances } from '../services/clubFinance';
 import { authenticate, requireRoles } from '../middleware/auth';
+import { isPaidStatus } from '../lib/paymentLedger';
+import { isAttendedStatus, isCountedStatus } from '../lib/attendanceRate';
 
 const router = Router();
 
-router.use(authenticate, requireRoles(['admin', 'coach', 'accountant']));
+// Club income, expenses and profit: admins and the accountant only. Coaches
+// used to be let in too, and nothing on their screens reads this summary.
+router.use(authenticate, requireRoles(['admin', 'accountant']));
 
 function normalizeStatus(status?: string | null) {
     return String(status ?? '').trim().toLowerCase();
 }
 
-function isPaidStatus(status?: string | null) {
-    const normalized = normalizeStatus(status);
-    return normalized === 'paid' || normalized === 'processed' || normalized === 'succeeded' || normalized === 'success';
-}
 
-function isPresentStatus(status?: string | null) {
-    const normalized = normalizeStatus(status);
-    return normalized === 'present' || normalized === 'late' || normalized === 'medical' || normalized === 'excused';
-}
+// Shared definition (lib/attendanceRate.ts): late = attended; medical and
+// excused are left out of the rate.
+const isPresentStatus = isAttendedStatus;
+
+// Finanțe uploads both kinds from its "Cheltuieli și facturi" card: a supplier
+// invoice is money going out, like an expense. Counting it as income (anything
+// not literally "expense" used to be) inflated profit by the invoice amount.
+const EXPENSE_TYPES = new Set(['expense', 'invoice', 'cheltuiala', 'cheltuială', 'factura', 'factură']);
 
 function isExpenseType(type?: string | null) {
-    return normalizeStatus(type) === 'expense';
+    return EXPENSE_TYPES.has(normalizeStatus(type));
 }
 
 function amountOf(value: unknown) {
@@ -50,15 +54,6 @@ function amountOf(value: unknown) {
 // stub instead of unwinding every arithmetic expression below it.
 async function getFirestoreDocs(_collectionName: string) {
     return [] as Array<{ data: () => Record<string, unknown> }>;
-}
-
-async function getDashboardFinancialSettings(clubScope: DashboardClubScope) {
-    const rowId = dashboardSettingsRowId(clubScope);
-    if (rowId == null) {
-        return null;
-    }
-    const rows = await db.select().from(pgFinancialSettings).where(eq(pgFinancialSettings.id, rowId)).limit(1);
-    return rows[0] ?? null;
 }
 
 async function resolveDashboardScope(req: Request) {
@@ -262,8 +257,11 @@ router.get('/summary', async (req, res) => {
             ? Math.round(((monthlyProfit - previousMonthProfit) / Math.abs(previousMonthProfit)) * 100)
             : null;
 
-        const pendingPaymentsCount = paymentDocs.filter((docSnap) => normalizeStatus((docSnap.data() as { status?: string }).status ?? 'pending') === 'pending').length
-            + pgPaymentRows.filter((row) => normalizeStatus(row.status ?? 'pending') === 'pending').length;
+        // Players who owe money, from the shared fee calculation (the same as
+        // Finanțe → Restanțe). It used to count "pending" payment rows, which
+        // the app no longer writes, so it sat at 0 while families owed money.
+        const balances = scope.clubId != null ? await clubBalances(scope.clubId, { now }) : [];
+        const pendingPaymentsCount = balances.filter((balance) => balance.outstanding > 0).length;
 
         const attendanceRows = attendanceDocs.map((docSnap) => docSnap.data() as {
             status: string;
@@ -279,7 +277,8 @@ router.get('/summary', async (req, res) => {
             const date = toDate(row.date);
             return date ? date >= startOfMonth && date <= endOfMonth : false;
         });
-        const postgresMonthlyAttendanceRows = pgAttendanceRows.filter((row) => {
+        const countedPgAttendanceRows = pgAttendanceRows.filter((row) => isCountedStatus(row.status));
+        const postgresMonthlyAttendanceRows = countedPgAttendanceRows.filter((row) => {
             const date = toDate(row.date);
             return date ? date >= startOfMonth && date <= endOfMonth : false;
         });
@@ -292,7 +291,7 @@ router.get('/summary', async (req, res) => {
             : null;
 
         const prevMonthFirestoreAttendanceRows = attendanceRows.filter((row) => inRange(toDate(row.date), startOfPrevMonth, endOfPrevMonth));
-        const prevMonthPgAttendanceRows = pgAttendanceRows.filter((row) => inRange(toDate(row.date), startOfPrevMonth, endOfPrevMonth));
+        const prevMonthPgAttendanceRows = countedPgAttendanceRows.filter((row) => inRange(toDate(row.date), startOfPrevMonth, endOfPrevMonth));
         const previousPresentCount = prevMonthFirestoreAttendanceRows.filter((row) => isPresentStatus(row.status)).length
             + prevMonthPgAttendanceRows.filter((row) => isPresentStatus(row.status)).length;
         const previousTotalAttendanceRecords = prevMonthFirestoreAttendanceRows.length + prevMonthPgAttendanceRows.length;
@@ -381,22 +380,40 @@ router.get('/summary', async (req, res) => {
                 };
             });
 
-        const financialSettings = await getDashboardFinancialSettings(scope.clubScope);
-        const hasRecurringFees = financialSettings != null && (
-            Number(financialSettings.monthlyPlayerFee ?? 0) > 0 ||
-            Number(financialSettings.trainingLevy ?? 0) > 0 ||
-            Number(financialSettings.facilityFee ?? 0) > 0
-        );
+        const overdueBalances = balances.filter((balance) => balance.state === 'overdue');
+        if (overdueBalances.length) {
+            const oldest = overdueBalances
+                .map((balance) => balance.oldestOverdue)
+                .filter((date): date is string => Boolean(date))
+                .sort()[0];
+            const oldestDate = oldest ? new Date(oldest) : null;
+            const overdueTotal = overdueBalances.reduce((sum, balance) => sum + balance.overdue, 0);
+            expiredRiskItems.push({
+                type: 'PLĂȚI RESTANTE',
+                name: `${overdueBalances.length} ${overdueBalances.length === 1 ? 'jucător' : 'jucători'} · ${Math.round(overdueTotal).toLocaleString('ro-RO')} RON`,
+                daysLeft: null,
+                expiryDate: oldestDate ? oldestDate.toLocaleDateString('ro-RO') : '',
+                urgent: true,
+                expired: true,
+                daysOverdue: oldestDate ? Math.max(0, Math.floor((todayTs.getTime() - oldestDate.getTime()) / 86400000)) : 0,
+            });
+        }
 
-        if (hasRecurringFees && pendingPaymentsCount > 0) {
-            const feeDueDate = new Date(now.getFullYear(), now.getMonth(), 28);
-            const daysLeft = Math.ceil((feeDueDate.getTime() - todayTs.getTime()) / 86400000);
+        // Fees falling due in the next two weeks (not yet late).
+        const nextDue = balances
+            .flatMap((balance) => balance.fees.filter((fee) => fee.status !== 'overdue' && fee.dueDate))
+            .map((fee) => new Date(fee.dueDate as string))
+            .filter((date) => date.getTime() >= todayTs.getTime())
+            .sort((a, b) => a.getTime() - b.getTime())[0];
+        const owingNotLate = balances.filter((balance) => balance.state === 'due').length;
+        if (nextDue && owingNotLate > 0) {
+            const daysLeft = Math.ceil((nextDue.getTime() - todayTs.getTime()) / 86400000);
             if (daysLeft <= 14) {
                 expiringItems.push({
                     type: 'COTIZAȚIE LUNARĂ',
-                    name: `${pendingPaymentsCount} ${pendingPaymentsCount === 1 ? 'plată restantă' : 'plăți restante'}`,
-                    daysLeft: daysLeft >= 0 ? daysLeft : null,
-                    expiryDate: feeDueDate.toLocaleDateString('ro-RO'),
+                    name: `${owingNotLate} ${owingNotLate === 1 ? 'plată de încasat' : 'plăți de încasat'}`,
+                    daysLeft,
+                    expiryDate: nextDue.toLocaleDateString('ro-RO'),
                     urgent: daysLeft <= 7,
                 });
             }

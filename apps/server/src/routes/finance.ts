@@ -6,23 +6,36 @@ import { toDate, toIso } from '../lib/dateUtils';
 import { verifyBearerToken } from '../lib/clerkAuth';
 import { requireRequestUser } from '../lib/requestContext';
 import { normalizeRole } from '../lib/requestAuth';
-import { buildDefaultSettings, DEFAULT_PAYMENT_DUE_DAY, DEFAULT_SETTINGS_ROW_ID } from '../lib/financeDefaults';
+import { DEFAULT_PAYMENT_DUE_DAY, DEFAULT_SETTINGS_ROW_ID } from '../lib/financeDefaults';
 import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import { writeAuditLog, type AuditLogInput } from '../services/auditService';
 import { requestedChildId, resolveSelfPlayer } from '../lib/selfPlayer';
 import { saveStoredFile, sniffMime } from '../lib/storedFiles';
 import { db } from '../db';
 import {
-    events as pgEvents,
     financialDocuments as pgFinancialDocuments,
     financialSettings as pgFinancialSettings,
     playerPayments as pgPlayerPayments,
     players as pgPlayers,
     playersToTeams as pgPlayersToTeams,
+    storedFiles as pgStoredFiles,
     teams as pgTeams,
     users as pgUsers,
 } from '../db/schema';
-import { desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import {
+    isFailedStatus,
+    isOutstandingStatus,
+    isPaidStatus,
+    monthKey,
+    parseFeeIds,
+    safeReturnUrl,
+    serializeFeeIds,
+} from '../lib/paymentLedger';
+import { createAllowedOrigins, isOriginAllowed } from '../lib/corsOrigins';
+import { isValidBillingMonth, type ComputedFee } from '../lib/feeSchedule';
+import { clubBalances, clubPlayers, collectedInRange, getClubFeeSettings, playerFees } from '../services/clubFinance';
+import { notifyPaymentRecorded } from '../lib/notifications';
 
 const router = Router();
 
@@ -60,6 +73,7 @@ const AUDITED_SETTINGS_FIELDS = [
     'facilityFee',
     'paymentDueDay',
     'autoAdjust',
+    'billingStartMonth',
 ] as const;
 
 function settingsAuditChanges(before: FinancialSettingsDoc | null | undefined, updates: Record<string, unknown>) {
@@ -112,6 +126,8 @@ type PlayerDoc = {
     email?: string | null;
     teamId?: number | null;
     clubId?: number | null;
+    status?: string | null;
+    createdAt?: string | null;
 };
 
 type FinancialSettingsDoc = {
@@ -122,6 +138,7 @@ type FinancialSettingsDoc = {
     facilityFee?: number;
     autoAdjust?: number;
     paymentDueDay?: number;
+    billingStartMonth?: string | null;
     updatedAt?: Date | string | null;
 };
 
@@ -146,24 +163,13 @@ type PlayerPaymentDoc = {
     paidByUserId?: number | null;
 };
 
-type EventFeeDoc = {
-    id: number;
-    title: string;
-    description?: string | null;
-    teamId?: number | null;
-    amount?: number | string | null;
-    status?: string | null;
-    type?: string | null;
-    startTime?: Date | string | null;
-};
-
 type PlayerPaymentFee = {
     id: string;
     label: string;
     description: string;
     amount: number;
     currency: string;
-    status: 'pending' | 'failed' | 'upcoming';
+    status: ComputedFee['status'];
     dueDate: string | null;
     icon: 'training' | 'trophy' | 'receipt';
     paymentId?: number | string | null;
@@ -219,16 +225,6 @@ function normalizeStatus(status?: string | null) {
     return String(status ?? '').trim().toLowerCase();
 }
 
-function isPaidStatus(status?: string | null) {
-    const normalized = normalizeStatus(status);
-    return normalized === 'paid' || normalized === 'processed' || normalized === 'succeeded' || normalized === 'success';
-}
-
-function isFailedStatus(status?: string | null) {
-    const normalized = normalizeStatus(status);
-    return normalized === 'failed' || normalized === 'error' || normalized === 'rejected';
-}
-
 function asPositiveAmount(value: unknown) {
     const amount = Number(value ?? 0);
     return Number.isFinite(amount) && amount > 0 ? amount : 0;
@@ -251,15 +247,15 @@ function getPlayerName(player: PlayerDoc) {
 }
 
 function formatBillingCycle(date = new Date()) {
-    return new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(date);
+    return new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric' }).format(date);
 }
 
 function monthName(month?: number | null, year?: number | null) {
     if (!month || !year) {
-        return 'Training Fee';
+        return 'Cotizație';
     }
 
-    return `${new Intl.DateTimeFormat('en', { month: 'long' }).format(new Date(year, month - 1, 1))} Training Fee`;
+    return `Cotizație ${new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1))}`;
 }
 
 function getAppBaseUrl(req: Request) {
@@ -275,13 +271,15 @@ function appendQuery(url: string, query: string) {
     return `${url}${url.includes('?') ? '&' : '?'}${query}`;
 }
 
+const RETURN_URL_ORIGINS = createAllowedOrigins(process.env);
+
 function getPaymentsReturnUrl(req: Request) {
     const requested = (req.body as { returnUrl?: unknown } | undefined)?.returnUrl;
-    if (typeof requested === 'string' && requested.trim()) {
-        return requested.trim();
-    }
-
-    return `${getAppBaseUrl(req)}/payments`;
+    return safeReturnUrl(
+        requested,
+        `${getAppBaseUrl(req)}/payments`,
+        (origin) => isOriginAllowed(origin, RETURN_URL_ORIGINS, process.env),
+    );
 }
 
 async function getRequesterEmail(req: Request) {
@@ -298,7 +296,7 @@ async function getRequesterEmail(req: Request) {
 async function getCurrentPlayer(req: Request): Promise<CurrentPlayer> {
     const email = await getRequesterEmail(req);
     if (!email) {
-        throw Object.assign(new Error('You must be signed in to load player payments.'), { statusCode: 401 });
+        throw Object.assign(new Error('Trebuie să fii autentificat ca să vezi plățile.'), { statusCode: 401 });
     }
 
     const userRows = await db
@@ -313,7 +311,8 @@ async function getCurrentPlayer(req: Request): Promise<CurrentPlayer> {
         : (await db
             .select()
             .from(pgPlayers)
-            .where(sql`lower(${pgPlayers.email}) = ${email.trim().toLowerCase()}`)
+            .where(sql`lower(trim(${pgPlayers.email})) = ${email.trim().toLowerCase()}`)
+            .orderBy(pgPlayers.id)
             .limit(1))[0];
 
     if (!player && user?.role === 'player') {
@@ -339,6 +338,8 @@ async function getCurrentPlayer(req: Request): Promise<CurrentPlayer> {
                 email: createdPlayer.email,
                 teamId: createdPlayer.teamId,
                 clubId: user.clubId,
+                status: createdPlayer.status,
+                createdAt: createdPlayer.createdAt,
             },
         };
     }
@@ -346,7 +347,7 @@ async function getCurrentPlayer(req: Request): Promise<CurrentPlayer> {
     if (!player) {
         throw Object.assign(new Error(user?.role === 'parent'
             ? 'Contul tău nu este încă legat de niciun copil.'
-            : 'No player profile was found for this account.'), { statusCode: 404 });
+            : 'Nu am găsit profilul de jucător al acestui cont.'), { statusCode: 404 });
     }
 
     return {
@@ -358,12 +359,10 @@ async function getCurrentPlayer(req: Request): Promise<CurrentPlayer> {
             email: player.email,
             teamId: player.teamId,
             clubId: user?.clubId,
+            status: player.status,
+            createdAt: player.createdAt,
         },
     };
-}
-
-function getSettingsDocId(clubId?: number | null) {
-    return clubId != null && Number.isFinite(clubId) ? `club:${clubId}` : '1';
 }
 
 function normalizeMoneyValue(value: unknown) {
@@ -405,25 +404,7 @@ async function getPlayerClubId(player: PlayerDoc) {
     return null;
 }
 
-function seedSettingsData(clubId?: number | null): FinancialSettingsDoc {
-    // Seeded from neutral defaults only. This used to read club 1's live settings and
-    // hand them to whichever club was being onboarded, which meant a new tenant began
-    // charging another club's fees — and these numbers feed real Stripe amounts, so
-    // the blast radius was money taken from real parents, not a cosmetic default.
-    return buildDefaultSettings(clubId);
-}
-
 async function getSettingsData(clubId?: number | null) {
-    // TODO(schema): `financial_settings` has no `club_id` column, so both this read
-    // and the PATCH /settings write overload the primary key as the tenant key. That
-    // only holds while club ids and the settings id sequence cannot collide, which
-    // nothing enforces. The table needs a real `club_id` column plus a backfill
-    // migration; until then, read and write MUST keep using the same key or every
-    // club silently reads another club's fees.
-    // Both settings inserts pin `id` explicitly, so financial_settings_id_seq never
-    // advances and any future insert that omits the id will collide with an existing
-    // club's row — the migration adding `club_id` must also setval the sequence past
-    // the highest id in use.
     if (clubId == null) {
         // Never fall back to row 1 for a caller we could not scope. These values drive
         // Stripe charges, so handing back some other club's real fees is strictly worse
@@ -437,58 +418,25 @@ async function getSettingsData(clubId?: number | null) {
             facilityFee: 0,
             autoAdjust: 1,
             paymentDueDay: DEFAULT_PAYMENT_DUE_DAY,
+            billingStartMonth: null as string | null,
             updatedAt: new Date(),
         };
     }
 
-    const rows = await db
-        .select()
-        .from(pgFinancialSettings)
-        .where(eq(pgFinancialSettings.id, clubId))
-        .limit(1);
-    const existing = rows[0];
-    if (existing) {
-        return {
-            id: existing.id,
-            clubId: clubId ?? null,
-            monthlyPlayerFee: existing.monthlyPlayerFee,
-            trainingLevy: existing.trainingLevy,
-            facilityFee: existing.facilityFee,
-            autoAdjust: existing.autoAdjust,
-            paymentDueDay: resolveDueDay(existing.paymentDueDay),
-            updatedAt: existing.updatedAt,
-        };
-    }
-
-    // The id has to be pinned to the club, not left to the serial default: the read
-    // above looks the row up by club id, so an auto-assigned id would never be found
-    // again and every request would insert another orphan row.
-    const inserted = await db
-        .insert(pgFinancialSettings)
-        .values({
-            id: clubId,
-            monthlyPlayerFee: 0,
-            trainingLevy: 0,
-            facilityFee: 0,
-            autoAdjust: 1,
-            updatedAt: new Date().toISOString(),
-        })
-        .returning();
-
+    // Found by the row's own club_id (services/clubFinance.ts). Rows used to be
+    // looked up by `id = club id`, which nothing enforced.
+    const row = await getClubFeeSettings(clubId);
     return {
-        id: inserted[0].id,
-        clubId: clubId ?? null,
-        monthlyPlayerFee: inserted[0].monthlyPlayerFee,
-        trainingLevy: inserted[0].trainingLevy,
-        facilityFee: inserted[0].facilityFee,
-        autoAdjust: inserted[0].autoAdjust,
-        paymentDueDay: resolveDueDay(inserted[0].paymentDueDay),
-        updatedAt: inserted[0].updatedAt,
+        id: row.id,
+        clubId,
+        monthlyPlayerFee: row.monthlyPlayerFee,
+        trainingLevy: row.trainingLevy,
+        facilityFee: row.facilityFee,
+        autoAdjust: row.autoAdjust,
+        paymentDueDay: resolveDueDay(row.paymentDueDay),
+        billingStartMonth: row.billingStartMonth ?? null,
+        updatedAt: row.updatedAt,
     };
-}
-
-async function getPlayerSettingsData(player: PlayerDoc) {
-    return getSettingsData(await getPlayerClubId(player));
 }
 
 async function resolveAdminFinanceClubId(req: Request, res: Response) {
@@ -556,6 +504,9 @@ async function getPlayerPaymentRows(playerId: number) {
             date: row.date,
             createdAt: row.createdAt,
             paidByUserId: row.paidByUserId ?? null,
+            stripeCheckoutSessionId: row.stripeSessionId ?? null,
+            feeIds: row.feeIds ?? null,
+            description: row.description ?? null,
         } satisfies PlayerPaymentDoc,
     }));
 }
@@ -571,150 +522,35 @@ async function getPlayerByNumericId(playerId: number) {
             lastName: player.lastName,
             email: player.email,
             teamId: player.teamId,
+            status: player.status,
+            createdAt: player.createdAt,
         } satisfies PlayerDoc
         : null;
 }
 
-function getPaidFeeIds(paymentRows: Array<{ data: PlayerPaymentDoc }>) {
-    const paidFeeIds = new Set<string>();
-
-    paymentRows
-        .filter(({ data }) => isPaidStatus(data.status))
-        .forEach(({ data }) => {
-            const rawFeeIds = Array.isArray(data.feeIds)
-                ? data.feeIds
-                : String(data.feeIds ?? '').split(',');
-
-            rawFeeIds
-                .map((feeId) => String(feeId).trim())
-                .filter(Boolean)
-                .forEach((feeId) => paidFeeIds.add(feeId));
-        });
-
-    return paidFeeIds;
-}
-
-async function buildEventFees(player: PlayerDoc, currency: string, paidFeeIds: Set<string>): Promise<PlayerPaymentFee[]> {
-    const teamIds = await getPlayerTeamIds(player);
-    if (!teamIds.size) {
-        return [];
-    }
-
-    const now = new Date();
-    const eventRows = await db
-        .select()
-        .from(pgEvents)
-        .where(inArray(pgEvents.teamId, Array.from(teamIds))) as EventFeeDoc[];
-
-    return eventRows
-        .filter((event) => {
-            const amount = asPositiveAmount(event.amount);
-            const startsAt = toDate(event.startTime);
-            const teamId = Number(event.teamId);
-            const feeId = `event:${event.id}`;
-            return amount > 0
-                && !paidFeeIds.has(feeId)
-                && Number.isFinite(teamId)
-                && teamIds.has(teamId)
-                && startsAt
-                && startsAt >= now
-                && normalizeStatus(event.status) !== 'cancelled';
-        })
-        .sort((a, b) => (toDate(a.startTime)?.getTime() ?? 0) - (toDate(b.startTime)?.getTime() ?? 0))
-        .slice(0, 6)
-        .map((event) => ({
-            id: `event:${event.id}`,
-            label: event.title || 'Team Event Fee',
-            description: event.description || 'Team event registration fee',
-            amount: asPositiveAmount(event.amount),
-            currency,
-            status: 'upcoming' as const,
-            dueDate: toIso(event.startTime) ?? null,
-            icon: event.type === 'match' ? 'trophy' : 'receipt',
-        }));
-}
-
-async function buildPlayerFees(player: PlayerDoc, paymentRows: Array<{ data: PlayerPaymentDoc }>, currency: string): Promise<PlayerPaymentFee[]> {
-    const settings = await getPlayerSettingsData(player);
-    const currentDate = new Date();
-    const currentMonth = currentDate.getMonth() + 1;
-    const currentYear = currentDate.getFullYear();
-    const paidFeeIds = getPaidFeeIds(paymentRows);
-
-    const fees: PlayerPaymentFee[] = paymentRows
-        .filter(({ data }) => !isPaidStatus(data.status))
-        .map(({ data }) => {
-            const amount = asPositiveAmount(data.amount);
-            const status: PlayerPaymentFee['status'] = isFailedStatus(data.status) ? 'failed' : 'pending';
-            return {
-                id: `payment:${data.id ?? `${data.month ?? currentMonth}-${data.year ?? currentYear}`}`,
-                label: data.description || monthName(data.month, data.year),
-                description: data.description ? 'Club payment request' : 'Recurring monthly coaching fee',
-                amount,
-                currency: data.currency || currency,
-                status,
-                dueDate: toIso(data.date ?? data.createdAt) ?? null,
-                icon: 'training' as const,
-                paymentId: data.id ?? null,
-            };
-        })
-        .filter((fee) => fee.amount > 0);
-
-    const hasCurrentMonthlyFee = paymentRows.some(({ data }) => (
-        Number(data.month) === currentMonth &&
-        Number(data.year) === currentYear
-    ));
-
-    if (!hasCurrentMonthlyFee) {
-        const monthlyFeeId = `monthly:${currentYear}-${String(currentMonth).padStart(2, '0')}`;
-        const monthlyPlayerFee = asPositiveAmount(settings.monthlyPlayerFee);
-        if (monthlyPlayerFee > 0 && !paidFeeIds.has(monthlyFeeId)) {
-            fees.push({
-                id: monthlyFeeId,
-                label: monthName(currentMonth, currentYear),
-                description: 'Recurring monthly coaching fee',
-                amount: monthlyPlayerFee,
-                currency,
-                status: 'upcoming',
-                // The monthly fee can be paid until the configured due day of the
-                // following month (e.g. due day 25 → July's fee is due Aug 25).
-                dueDate: new Date(currentYear, currentMonth, resolveDueDay(settings.paymentDueDay)).toISOString(),
-                icon: 'training',
-            });
-        }
-    }
-
-    const trainingLevy = asPositiveAmount(settings.trainingLevy);
-    const trainingLevyId = `levy:${currentYear}-${String(currentMonth).padStart(2, '0')}`;
-    if (trainingLevy > 0 && !paidFeeIds.has(trainingLevyId)) {
-        fees.push({
-            id: trainingLevyId,
-            label: 'Training Levy',
-            description: 'Club training and development levy',
-            amount: trainingLevy,
-            currency,
-            status: 'upcoming',
-            dueDate: new Date(currentYear, currentMonth - 1, 28).toISOString(),
-            icon: 'receipt',
-        });
-    }
-
-    const facilityFee = asPositiveAmount(settings.facilityFee);
-    const facilityFeeId = `facility:${currentYear}-${String(currentMonth).padStart(2, '0')}`;
-    if (facilityFee > 0 && !paidFeeIds.has(facilityFeeId)) {
-        fees.push({
-            id: facilityFeeId,
-            label: 'Facility Fee',
-            description: 'Court and facility contribution',
-            amount: facilityFee,
-            currency,
-            status: 'upcoming',
-            dueDate: new Date(currentYear, currentMonth - 1, 28).toISOString(),
-            icon: 'receipt',
-        });
-    }
-
-    return [...fees, ...(await buildEventFees(player, currency, paidFeeIds))];
+/**
+ * What the player owes — the shared calculation in lib/feeSchedule.ts (via
+ * services/clubFinance.ts), so this page and the club's balances agree.
+ */
+async function buildPlayerFees(player: PlayerDoc, currency: string): Promise<PlayerPaymentFee[]> {
+    const clubId = await getPlayerClubId(player);
+    const { fees } = await playerFees({
+        id: player.id,
+        teamId: player.teamId ?? null,
+        createdAt: player.createdAt ?? null,
+        status: player.status ?? null,
+    }, clubId);
+    return fees.map((fee) => ({
+        id: fee.id,
+        label: fee.label,
+        description: fee.description,
+        amount: fee.amount,
+        currency,
+        status: fee.status,
+        dueDate: fee.dueDate,
+        icon: fee.icon,
+        paymentId: fee.paymentId ?? null,
+    }));
 }
 
 function buildTransactions(paymentRows: Array<{ data: PlayerPaymentDoc }>, currency: string, payerNames = new Map<number, string>()) {
@@ -727,7 +563,7 @@ function buildTransactions(paymentRows: Array<{ data: PlayerPaymentDoc }>, curre
             label: data.description || monthName(data.month, data.year),
             description: data.paidByUserId != null && payerNames.has(data.paidByUserId)
                 ? `Plătit de ${payerNames.get(data.paidByUserId)}`
-                : data.stripeCheckoutSessionId ? 'Stripe Checkout payment' : 'Club payment record',
+                : data.stripeCheckoutSessionId ? 'Plată online' : 'Înregistrată de club',
             paidByName: data.paidByUserId != null ? payerNames.get(data.paidByUserId) ?? null : null,
             amount: asPositiveAmount(data.amount),
             currency: data.currency || currency,
@@ -816,6 +652,8 @@ async function buildAdminRecentPayments(clubId: number | null, limit = 12, teamI
         .where(inArray(pgPlayerPayments.playerId, playerIds));
 
     const payments: AdminRecentPayment[] = postgresPaymentRows
+        // A voided request was settled by a later payment, which is listed itself.
+        .filter((payment) => normalizeStatus(payment.status) !== 'void')
         .map((payment) => {
             const player = playersById.get(payment.playerId);
             const paymentDate = toIso(payment.date) ?? toIso(payment.createdAt) ?? new Date().toISOString();
@@ -829,8 +667,8 @@ async function buildAdminRecentPayments(clubId: number | null, limit = 12, teamI
                 currency: DEFAULT_PAYMENT_CURRENCY,
                 status: payment.status,
                 date: paymentDate,
-                description: monthName(payment.month, payment.year),
-                provider: null,
+                description: payment.description || monthName(payment.month, payment.year),
+                provider: payment.stripeSessionId ? 'stripe' : payment.method ?? null,
                 receiptUrl: null,
             } satisfies AdminRecentPayment;
         });
@@ -857,7 +695,11 @@ async function buildAdminRecentPayments(clubId: number | null, limit = 12, teamI
 
 function buildDueLabel(fees: PlayerPaymentFee[]) {
     if (!fees.length) {
-        return 'Settled';
+        return 'Achitat';
+    }
+
+    if (fees.some((fee) => fee.status === 'overdue')) {
+        return 'Restanță';
     }
 
     const dueTimes = fees
@@ -866,15 +708,15 @@ function buildDueLabel(fees: PlayerPaymentFee[]) {
         .sort((a, b) => a - b);
 
     if (!dueTimes.length) {
-        return 'Due this cycle';
+        return 'Scadent luna aceasta';
     }
 
     const diffDays = Math.ceil((dueTimes[0] - Date.now()) / 86400000);
     if (diffDays <= 0) {
-        return 'Due now';
+        return 'Scadent acum';
     }
 
-    return diffDays === 1 ? 'Due in 1 day' : `Due in ${diffDays} days`;
+    return diffDays === 1 ? 'Scadent mâine' : `Scadent în ${diffDays} zile`;
 }
 
 type Payer = { id: number; email: string; name: string; stripeCustomerId: string | null };
@@ -883,7 +725,7 @@ type Payer = { id: number; email: string; name: string; stripeCustomerId: string
 async function getPayer(req: Request): Promise<Payer> {
     const user = (req as AuthenticatedRequest).user;
     if (!user?.id) {
-        throw Object.assign(new Error('You must be signed in to pay.'), { statusCode: 401 });
+        throw Object.assign(new Error('Trebuie să fii autentificat ca să plătești.'), { statusCode: 401 });
     }
     return { id: Number(user.id), email: user.email, name: user.name, stripeCustomerId: user.stripeCustomerId ?? null };
 }
@@ -957,17 +799,25 @@ function selectedFeesFromBody(allFees: PlayerPaymentFee[], feeIds: unknown) {
     return allFees.filter((fee) => requested.has(fee.id));
 }
 
-async function markPaymentRowsPaid(params: {
+type CheckoutPaymentRecord = {
     playerId: number;
-    fees: PlayerPaymentFee[];
+    sessionId: string;
+    status: 'paid' | 'failed';
     amount: number;
-    currency: string;
+    feeIds: string[];
     label: string;
-    checkoutSessionId: string;
-    paymentIntentId: string | null;
-    receiptUrl: string | null;
     paidByUserId: number | null;
-}) {
+};
+
+/**
+ * Record a Checkout session's outcome exactly once.
+ *
+ * The webhook and the browser's confirm call both land here, Stripe retries
+ * webhooks, and a payer can reload the success page — each of those used to
+ * insert another "paid" row. The session id is unique on the table, so every
+ * repeat finds the first row instead of writing a new one.
+ */
+async function recordCheckoutPayment(params: CheckoutPaymentRecord) {
     const now = new Date();
     const inserted = await db
         .insert(pgPlayerPayments)
@@ -977,15 +827,95 @@ async function markPaymentRowsPaid(params: {
             amount: Math.round(params.amount),
             month: now.getMonth() + 1,
             year: now.getFullYear(),
-            status: 'paid',
+            status: params.status,
             date: now.toISOString(),
             createdAt: now.toISOString(),
+            stripeSessionId: params.sessionId,
+            feeIds: serializeFeeIds(params.feeIds),
+            method: 'card',
+            description: params.label,
         })
+        .onConflictDoNothing({ target: pgPlayerPayments.stripeSessionId })
         .returning();
-    return inserted[0];
+
+    if (inserted[0]) {
+        if (params.status === 'paid') {
+            await voidSettledRequests(params.playerId, params.feeIds);
+            notifyPaymentRecorded(params.playerId, params.amount, params.label).catch((error) => console.error('[finance] payment notification failed:', error));
+        }
+        return { payment: inserted[0], duplicate: false };
+    }
+
+    const [existing] = await db
+        .select()
+        .from(pgPlayerPayments)
+        .where(eq(pgPlayerPayments.stripeSessionId, params.sessionId))
+        .limit(1);
+    return { payment: existing ?? null, duplicate: true };
+}
+
+/**
+ * Request rows ("payment:17") a payment just settled. Their amount is part of
+ * the new paid row, so they turn void — neither still owed nor counted as
+ * money received a second time.
+ */
+async function voidSettledRequests(playerId: number, feeIds: string[]) {
+    const requestIds = feeIds
+        .filter((id) => id.startsWith('payment:'))
+        .map((id) => Number(id.slice('payment:'.length)))
+        .filter((id) => Number.isInteger(id) && id > 0);
+    if (!requestIds.length) return;
+
+    const rows = await db
+        .select({ id: pgPlayerPayments.id, status: pgPlayerPayments.status })
+        .from(pgPlayerPayments)
+        .where(inArray(pgPlayerPayments.id, requestIds));
+    const toVoid = rows.filter((row) => isOutstandingStatus(row.status)).map((row) => row.id);
+    if (!toVoid.length) return;
+
+    await db
+        .update(pgPlayerPayments)
+        .set({ status: 'void' })
+        .where(and(inArray(pgPlayerPayments.id, toVoid), eq(pgPlayerPayments.playerId, playerId)));
+}
+
+// Stripe caps a metadata value at 500 characters; a basket with months of
+// arrears is longer, so the list is split over feeIds, feeIds_1, feeIds_2, …
+const FEE_ID_CHUNK = 480;
+
+function feeIdMetadata(feeIds: string[]) {
+    const chunks: string[] = [];
+    let current = '';
+    for (const id of feeIds) {
+        const next = current ? `${current},${id}` : id;
+        if (next.length > FEE_ID_CHUNK && current) {
+            chunks.push(current);
+            current = id;
+        } else {
+            current = next;
+        }
+    }
+    if (current) chunks.push(current);
+    const metadata: Record<string, string> = {};
+    chunks.forEach((chunk, index) => { metadata[index === 0 ? 'feeIds' : `feeIds_${index}`] = chunk; });
+    return metadata;
+}
+
+function sessionFeeIds(session: { metadata?: Record<string, string> | null }) {
+    const metadata = session.metadata ?? {};
+    const parts = [metadata.feeIds];
+    for (let index = 1; metadata[`feeIds_${index}`]; index += 1) parts.push(metadata[`feeIds_${index}`]);
+    return parseFeeIds(parts.filter(Boolean).join(','));
 }
 
 async function markCheckoutSessionFailed(sessionId: string, reason: 'failed' | 'expired') {
+    // An expired session is a checkout the payer abandoned. It moved no money
+    // and changes nothing they owe; recording it as a failed payment used to
+    // show up as a brand-new debt for the whole basket.
+    if (reason === 'expired') {
+        return { recorded: false, reason: 'checkout_session_expired' };
+    }
+
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 
@@ -1002,32 +932,22 @@ async function markCheckoutSessionFailed(sessionId: string, reason: 'failed' | '
     }
 
     const currency = (session.currency || DEFAULT_PAYMENT_CURRENCY).toLowerCase();
-    const amount = fromMinorUnits(session.amount_total, currency);
-    const now = new Date();
-    const inserted = await db
-        .insert(pgPlayerPayments)
-        .values({
-            playerId,
-            amount: Math.round(amount),
-            month: now.getMonth() + 1,
-            year: now.getFullYear(),
-            status: 'failed',
-            date: now.toISOString(),
-            createdAt: now.toISOString(),
-        })
-        .returning();
+    const result = await recordCheckoutPayment({
+        playerId,
+        sessionId: session.id,
+        status: 'failed',
+        amount: fromMinorUnits(session.amount_total, currency),
+        feeIds: sessionFeeIds(session),
+        label: session.metadata?.label || 'Plată online',
+        paidByUserId: Number(session.metadata?.payerUserId) || null,
+    });
 
-    return {
-        recorded: true,
-        payment: inserted[0],
-    };
+    return { recorded: !result.duplicate, payment: result.payment };
 }
 
 async function fulfillPaidCheckoutSession(sessionId: string) {
     const stripe = getStripe();
-    const session = await stripe.checkout.sessions.retrieve(sessionId, {
-        expand: ['payment_intent.latest_charge'],
-    });
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
 
     if (session.mode !== 'payment' || session.payment_status !== 'paid') {
         return {
@@ -1047,34 +967,27 @@ async function fulfillPaidCheckoutSession(sessionId: string) {
     }
 
     const currency = (session.currency || DEFAULT_PAYMENT_CURRENCY).toLowerCase();
-    const paymentIntent = session.payment_intent as any;
-    const latestCharge = paymentIntent && typeof paymentIntent.latest_charge !== 'string'
-        ? paymentIntent.latest_charge as any
-        : null;
-    const amount = fromMinorUnits(session.amount_total, currency);
-    const feeIds = String(session.metadata?.feeIds ?? '')
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean);
+    // The fees the payer chose are in the session's metadata (set when it was
+    // created). Sessions made before that have none: fall back to what was due.
+    let feeIds = sessionFeeIds(session);
+    if (!feeIds.length) {
+        feeIds = (await buildPlayerFees(player, currency)).map((fee) => fee.id);
+    }
 
-    const paymentRows = await getPlayerPaymentRows(player.id);
-    const allFees = await buildPlayerFees(player, paymentRows, currency);
-    const paidFees = selectedFeesFromBody(allFees, feeIds);
-    const record = await markPaymentRowsPaid({
+    const result = await recordCheckoutPayment({
         playerId: player.id,
-        fees: paidFees.length ? paidFees : allFees,
-        amount,
-        currency,
-        label: session.metadata?.label || 'Stripe payment',
-        checkoutSessionId: session.id,
-        paymentIntentId: paymentIntent?.id ?? null,
-        receiptUrl: latestCharge?.receipt_url ?? null,
+        sessionId: session.id,
+        status: 'paid',
+        amount: fromMinorUnits(session.amount_total, currency),
+        feeIds,
+        label: session.metadata?.label || 'Plată online',
         paidByUserId: Number(session.metadata?.payerUserId) || null,
     });
 
     return {
         fulfilled: true,
-        payment: record,
+        duplicate: result.duplicate,
+        payment: result.payment,
     };
 }
 
@@ -1190,12 +1103,13 @@ router.patch('/documents/:id/status', async (req, res) => {
     }
 
     const id = Number(req.params.id);
-    const { status } = req.body as { status?: string };
+    const { status, reason } = req.body as { status?: string; reason?: unknown };
 
     if (!status || !['pending', 'processed', 'rejected'].includes(status)) {
         res.status(400).json({ error: 'Invalid status' });
         return;
     }
+    const reasonText = typeof reason === 'string' ? reason.trim().slice(0, 500) : '';
 
     try {
         const existingRows = await db.select().from(pgFinancialDocuments).where(eq(pgFinancialDocuments.id, id)).limit(1);
@@ -1204,9 +1118,27 @@ router.patch('/documents/:id/status', async (req, res) => {
             res.status(404).json({ error: 'Document not found' });
             return;
         }
-        if (clubId !== null && existing.clubId != null && Number(existing.clubId) !== clubId) {
+        // Documents with no club (pre-tenancy rows) are superadmin-only.
+        if (clubId !== null && Number(existing.clubId) !== clubId) {
             res.status(403).json({ error: 'This document belongs to a different club.' });
             return;
+        }
+
+        const transition = documentTransitionError(existing.status, status, reasonText);
+        if (transition) {
+            res.status(400).json({ error: transition });
+            return;
+        }
+
+        // Four eyes: whoever uploaded a document does not approve it — unless
+        // nobody else in the club could (a one-person finance team).
+        if (status === 'processed') {
+            const actorId = Number((req as AuthenticatedRequest).user?.id);
+            const uploaderId = await documentUploaderId(existing.documentUrl);
+            if (uploaderId != null && uploaderId === actorId && clubId !== null && await hasOtherFinanceReviewer(clubId, actorId)) {
+                res.status(403).json({ error: 'Un document trebuie aprobat de altă persoană decât cea care l-a încărcat.' });
+                return;
+            }
         }
 
         const updatedRows = await db
@@ -1230,7 +1162,7 @@ router.patch('/documents/:id/status', async (req, res) => {
             entityType: 'financial_document',
             entityId: id,
             clubId,
-            metadata: { previousStatus: existing.status ?? null, nextStatus: status },
+            metadata: { previousStatus: existing.status ?? null, nextStatus: status, reason: reasonText || null },
             ...financeAuditActor(req),
         });
     } catch (error) {
@@ -1238,6 +1170,45 @@ router.patch('/documents/:id/status', async (req, res) => {
         res.status(500).json({ error: 'Failed to update document status' });
     }
 });
+
+/**
+ * Allowed moves: pending → processed/rejected (rejecting needs a reason), and
+ * back to pending to reopen a decided document (also with a reason). A decided
+ * document no longer jumps straight to the opposite decision.
+ */
+function documentTransitionError(current: string | null, next: string, reason: string) {
+    const from = normalizeStatus(current) || 'pending';
+    if (from === next) return 'Documentul are deja acest status.';
+    if (from === 'pending') {
+        return next === 'rejected' && !reason ? 'Scrie motivul respingerii.' : null;
+    }
+    if (next === 'pending') {
+        return reason ? null : 'Scrie motivul redeschiderii documentului.';
+    }
+    return 'Redeschide documentul înainte de a schimba decizia.';
+}
+
+/** Who uploaded the file behind a finance document (/api/files/<key>). */
+async function documentUploaderId(documentUrl: string | null) {
+    const key = documentUrl?.match(/^\/api\/files\/([a-f0-9]{32})$/)?.[1];
+    if (!key) return null;
+    const [file] = await db.select({ uploadedBy: pgStoredFiles.uploadedBy }).from(pgStoredFiles).where(eq(pgStoredFiles.key, key)).limit(1);
+    return file?.uploadedBy ?? null;
+}
+
+async function hasOtherFinanceReviewer(clubId: number, actorId: number) {
+    const rows = await db
+        .select({ id: pgUsers.id })
+        .from(pgUsers)
+        .where(and(
+            eq(pgUsers.clubId, clubId),
+            inArray(pgUsers.role, ['admin', 'accountant']),
+            eq(pgUsers.status, 'active'),
+            sql`${pgUsers.id} <> ${actorId}`,
+        ))
+        .limit(1);
+    return rows.length > 0;
+}
 
 router.post('/upload', (req, res, next) => {
     upload.single('file')(req, res, (error) => {
@@ -1311,16 +1282,18 @@ router.get('/player/summary', async (req, res) => {
     try {
         const currentPlayer = await getCurrentPlayer(req);
         const currency = DEFAULT_PAYMENT_CURRENCY;
-        const paymentRows = await getPlayerPaymentRows(currentPlayer.data.id);
-        const fees = await buildPlayerFees(currentPlayer.data, paymentRows, currency);
+        const [paymentRows, fees] = await Promise.all([
+            getPlayerPaymentRows(currentPlayer.data.id),
+            buildPlayerFees(currentPlayer.data, currency),
+        ]);
         const outstandingAmount = fees.reduce((sum, fee) => sum + fee.amount, 0);
 
         res.json({
             playerName: getPlayerName(currentPlayer.data),
             playerEmail: currentPlayer.data.email ?? null,
-            billingCycle: `${formatBillingCycle()} Cycle`,
+            billingCycle: `Ciclul ${formatBillingCycle()}`,
             dueLabel: buildDueLabel(fees),
-            autoPayNote: 'Stripe Checkout is used for secure payments and saved cards.',
+            autoPayNote: 'Plățile și cardurile salvate sunt procesate securizat prin Stripe.',
             outstandingAmount,
             currency,
             provider: 'stripe',
@@ -1387,6 +1360,125 @@ router.get('/admin/recent-payments', async (req, res) => {
     }
 });
 
+/**
+ * What every player owes — the same calculation as the player's own Plăți
+ * page. Optional ?teamId= narrows it to one squad.
+ */
+router.get('/admin/balances', async (req, res) => {
+    try {
+        const clubId = await resolveAdminFinanceClubId(req, res);
+        if (clubId === null) {
+            if (!res.headersSent) res.json({ currency: DEFAULT_PAYMENT_CURRENCY, players: [] });
+            return;
+        }
+        const parsedTeamId = Number(req.query?.teamId);
+        const teamId = Number.isFinite(parsedTeamId) && parsedTeamId > 0 ? parsedTeamId : null;
+        const balances = await clubBalances(clubId, { teamId });
+        res.json({
+            currency: DEFAULT_PAYMENT_CURRENCY,
+            players: balances
+                .sort((a, b) => b.overdue - a.overdue || b.outstanding - a.outstanding || a.playerName.localeCompare(b.playerName))
+                .map(({ fees, ...rest }) => ({ ...rest, fees: fees.map((fee) => ({ ...fee, currency: DEFAULT_PAYMENT_CURRENCY })) })),
+        });
+    } catch (error) {
+        handleRouteError(res, error, '[GET /api/finance/admin/balances]');
+    }
+});
+
+/**
+ * Every payment of the club in a date range (?from=YYYY-MM-DD&to=YYYY-MM-DD,
+ * default: this month) for the accountant's CSV export — paid, failed and
+ * voided rows alike, with method, note and the fees each one settled.
+ */
+router.get('/admin/payments-export', async (req, res) => {
+    try {
+        const clubId = await resolveAdminFinanceClubId(req, res);
+        if (clubId === null) {
+            if (!res.headersSent) res.status(400).json({ error: 'Alege un club.' });
+            return;
+        }
+        const parseDay = (value: unknown) => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : null);
+        const now = new Date();
+        const from = parseDay(req.query.from) ?? new Date(now.getFullYear(), now.getMonth(), 1);
+        const toDay = parseDay(req.query.to) ?? new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const to = new Date(toDay.getFullYear(), toDay.getMonth(), toDay.getDate(), 23, 59, 59, 999);
+        if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+            res.status(400).json({ error: 'Perioada este invalidă.' });
+            return;
+        }
+
+        const roster = await clubPlayers(clubId);
+        const byId = new Map(roster.map((entry) => [entry.player.id, entry]));
+        const ids = roster.map((entry) => entry.player.id);
+        const rows = ids.length
+            ? await db.select().from(pgPlayerPayments).where(and(
+                inArray(pgPlayerPayments.playerId, ids),
+                sql`${pgPlayerPayments.date} >= ${from.toISOString()}`,
+                sql`${pgPlayerPayments.date} <= ${to.toISOString()}`,
+            )).orderBy(desc(pgPlayerPayments.date)).limit(5000)
+            : [];
+        res.json({
+            currency: DEFAULT_PAYMENT_CURRENCY,
+            from: from.toISOString(),
+            to: to.toISOString(),
+            payments: rows.map((row) => {
+                const entry = byId.get(row.playerId);
+                return {
+                    id: row.id,
+                    date: toIso(row.date) ?? toIso(row.createdAt),
+                    playerId: row.playerId,
+                    playerName: entry ? getPlayerName(entry.player) : `Jucător #${row.playerId}`,
+                    teamName: entry?.teamName ?? null,
+                    amount: Number(row.amount) || 0,
+                    status: row.status,
+                    method: row.stripeSessionId ? 'card online' : row.method ?? null,
+                    description: row.description ?? monthName(row.month, row.year),
+                    feeIds: parseFeeIds(row.feeIds),
+                };
+            }),
+        });
+    } catch (error) {
+        handleRouteError(res, error, '[GET /api/finance/admin/payments-export]');
+    }
+});
+
+/**
+ * The club's money for one month (?month=YYYY-MM, default: this month):
+ * collected = paid rows dated in that month; owed = today's balances.
+ * The Finanțe header and the dashboard both read these definitions.
+ */
+router.get('/admin/summary', async (req, res) => {
+    try {
+        const clubId = await resolveAdminFinanceClubId(req, res);
+        if (clubId === null) {
+            if (!res.headersSent) res.status(400).json({ error: 'Alege un club.' });
+            return;
+        }
+        const now = new Date();
+        const requested = typeof req.query?.month === 'string' && isValidBillingMonth(req.query.month) ? req.query.month : null;
+        const [year, month] = requested ? requested.split('-').map(Number) : [now.getFullYear(), now.getMonth() + 1];
+        const start = new Date(year, month - 1, 1);
+        const end = new Date(year, month, 0, 23, 59, 59, 999);
+
+        const [roster, balances] = await Promise.all([clubPlayers(clubId), clubBalances(clubId, { now })]);
+        const collected = await collectedInRange(roster.map((entry) => entry.player.id), start, end);
+        res.json({
+            currency: DEFAULT_PAYMENT_CURRENCY,
+            month: monthKey(year, month),
+            collected,
+            outstanding: balances.reduce((sum, row) => sum + row.outstanding, 0),
+            overdue: balances.reduce((sum, row) => sum + row.overdue, 0),
+            playersOverdue: balances.filter((row) => row.state === 'overdue').length,
+            playersOwing: balances.filter((row) => row.outstanding > 0).length,
+        });
+    } catch (error) {
+        handleRouteError(res, error, '[GET /api/finance/admin/summary]');
+    }
+});
+
+const MANUAL_PAYMENT_METHODS = new Set(['cash', 'transfer', 'card', 'other']);
+const FEE_ID_PATTERN = /^(?:(?:monthly|levy|facility):\d{4}-\d{2}|(?:event|payment):\d+)$/;
+
 // Record a payment made outside Stripe (e.g. a player paying cash) so it shows
 // up in the team payment report alongside online payments.
 router.post('/admin/manual-payment', async (req, res) => {
@@ -1396,7 +1488,7 @@ router.post('/admin/manual-payment', async (req, res) => {
             return;
         }
 
-        const body = req.body as { playerId?: unknown; amount?: unknown; description?: unknown; method?: unknown; date?: unknown };
+        const body = req.body as { playerId?: unknown; amount?: unknown; description?: unknown; method?: unknown; date?: unknown; feeIds?: unknown };
         const playerId = Number(body.playerId);
         const amount = Number(body.amount);
 
@@ -1415,12 +1507,38 @@ router.post('/admin/manual-payment', async (req, res) => {
             return;
         }
 
-        const method = (String(body.method ?? 'cash').trim().toLowerCase()) || 'cash';
+        // The id came from the client: the player must belong to the caller's
+        // club, or an admin could write payments onto another club's books.
+        if (clubId !== null && await getPlayerClubId(player) !== clubId) {
+            res.status(404).json({ error: 'Jucătorul nu a fost găsit.' });
+            return;
+        }
+
+        const method = MANUAL_PAYMENT_METHODS.has(String(body.method ?? '').trim().toLowerCase())
+            ? String(body.method).trim().toLowerCase()
+            : 'cash';
         const description = typeof body.description === 'string' && body.description.trim()
-            ? body.description.trim()
+            ? body.description.trim().slice(0, 500)
             : 'Plată numerar';
-        const when = body.date ? (toDate(body.date) ?? new Date()) : new Date();
+        const when = body.date ? toDate(body.date) : new Date();
+        if (!when) {
+            res.status(400).json({ error: 'Data plății este invalidă.' });
+            return;
+        }
+        // Money cannot arrive in the future; a typo in the year would otherwise
+        // book the payment into a month nobody is looking at.
+        if (when.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
+            res.status(400).json({ error: 'Data plății nu poate fi în viitor.' });
+            return;
+        }
         const currency = DEFAULT_PAYMENT_CURRENCY;
+        // The fees this payment settles, picked in Finanțe → Restanțe. Without a
+        // list (older clients, the team report) a desk payment is the monthly fee
+        // of the month it is dated in — what the app assumed before fee ids.
+        const requestedFeeIds = parseFeeIds(body.feeIds).filter((id) => FEE_ID_PATTERN.test(id));
+        const feeIds = requestedFeeIds.length
+            ? requestedFeeIds
+            : [`monthly:${monthKey(when.getFullYear(), when.getMonth() + 1)}`];
 
         const inserted = await db
             .insert(pgPlayerPayments)
@@ -1431,10 +1549,16 @@ router.post('/admin/manual-payment', async (req, res) => {
                 year: when.getFullYear(),
                 status: 'paid',
                 date: when.toISOString(),
-                createdAt: when.toISOString(),
+                createdAt: new Date().toISOString(),
+                paidByUserId: null,
+                feeIds: serializeFeeIds(feeIds),
+                method,
+                description,
             })
             .returning();
+        await voidSettledRequests(playerId, feeIds);
         res.json({ success: true, payment: inserted[0] });
+        notifyPaymentRecorded(playerId, amount, description).catch((error) => console.error('[finance] payment notification failed:', error));
         await recordFinanceAudit({
             action: 'finance.payment.manual',
             entityType: 'player_payment',
@@ -1445,6 +1569,8 @@ router.post('/admin/manual-payment', async (req, res) => {
                 amount: Math.round(amount),
                 currency,
                 method,
+                description,
+                feeIds,
                 month: when.getMonth() + 1,
                 year: when.getFullYear(),
             },
@@ -1460,22 +1586,21 @@ router.post('/player/checkout-session', async (req, res) => {
         const currentPlayer = await getCurrentPlayer(req);
         const customerId = await ensureStripeCustomer(await getPayer(req));
         const currency = DEFAULT_PAYMENT_CURRENCY;
-        const paymentRows = await getPlayerPaymentRows(currentPlayer.data.id);
         const fees = selectedFeesFromBody(
-            await buildPlayerFees(currentPlayer.data, paymentRows, currency),
+            await buildPlayerFees(currentPlayer.data, currency),
             (req.body as { feeIds?: unknown })?.feeIds
         );
         const payableFees = fees.filter((fee) => fee.amount > 0);
         const totalAmount = payableFees.reduce((sum, fee) => sum + fee.amount, 0);
 
         if (!payableFees.length || totalAmount <= 0) {
-            res.status(400).json({ error: 'There is no payable balance for this player.' });
+            res.status(400).json({ error: 'Nu există nicio sumă de plată pentru acest jucător.' });
             return;
         }
 
         const stripe = getStripe();
         const returnUrl = getPaymentsReturnUrl(req);
-        const label = payableFees.length === 1 ? payableFees[0].label : 'Player balance payment';
+        const label = payableFees.length === 1 ? payableFees[0].label : 'Plată sold';
         const feeIds = payableFees.map((fee) => fee.id);
         const payerUserId = String((req as AuthenticatedRequest).user?.id ?? '');
         const session = await stripe.checkout.sessions.create({
@@ -1499,7 +1624,7 @@ router.post('/player/checkout-session', async (req, res) => {
                 metadata: {
                     source: 'player_payments',
                     playerId: String(currentPlayer.data.id),
-                    feeIds: feeIds.join(','),
+                    ...feeIdMetadata(feeIds),
                     label,
                     payerUserId: payerUserId,
                 },
@@ -1507,7 +1632,7 @@ router.post('/player/checkout-session', async (req, res) => {
             metadata: {
                 source: 'player_payments',
                 playerId: String(currentPlayer.data.id),
-                feeIds: feeIds.join(','),
+                ...feeIdMetadata(feeIds),
                 label,
                 // The player or a linked parent — shown as "Plătit de …".
                 payerUserId: payerUserId,
@@ -1635,6 +1760,7 @@ router.get('/settings', async (req, res) => {
             facilityFee: normalizeMoneyValue(data.facilityFee) ?? 0,
             autoAdjust: Number(data.autoAdjust ?? 1) ? 1 : 0,
             paymentDueDay: resolveDueDay(data.paymentDueDay),
+            billingStartMonth: data.billingStartMonth ?? null,
             updatedAt: toIso(data.updatedAt) ?? new Date().toISOString(),
         });
     } catch (error) {
@@ -1651,11 +1777,7 @@ router.patch('/settings', async (req, res) => {
         }
 
         const { monthlyPlayerFee, trainingLevy, facilityFee, autoAdjust, paymentDueDay } = req.body;
-        const updates: Record<string, unknown> = {
-            id: clubId ?? 1,
-            clubId: clubId ?? null,
-            updatedAt: new Date(),
-        };
+        const updates: Record<string, unknown> = {};
 
         if (paymentDueDay !== undefined) {
             const day = normalizeDueDay(paymentDueDay);
@@ -1697,30 +1819,41 @@ router.patch('/settings', async (req, res) => {
             updates.autoAdjust = Number(autoAdjust) ? 1 : 0;
         }
 
+        const { billingStartMonth } = req.body as { billingStartMonth?: unknown };
+        if (billingStartMonth !== undefined) {
+            if (billingStartMonth === null || billingStartMonth === '') {
+                updates.billingStartMonth = null;
+            } else if (!isValidBillingMonth(billingStartMonth)) {
+                res.status(400).json({ error: 'Luna de început trebuie să fie de forma AAAA-LL.' });
+                return;
+            } else {
+                const now = new Date();
+                if (String(billingStartMonth) > monthKey(now.getFullYear(), now.getMonth() + 1)) {
+                    res.status(400).json({ error: 'Luna de început nu poate fi în viitor.' });
+                    return;
+                }
+                updates.billingStartMonth = String(billingStartMonth);
+            }
+        }
+
+        if (clubId === null) {
+            // A superadmin without a club: there is no club whose fees to change.
+            res.status(400).json({ error: 'Alege clubul ale cărui taxe le modifici.' });
+            return;
+        }
+
         const pgUpdates: Partial<typeof pgFinancialSettings.$inferInsert> = {
             ...(updates.monthlyPlayerFee !== undefined ? { monthlyPlayerFee: Number(updates.monthlyPlayerFee) } : {}),
             ...(updates.trainingLevy !== undefined ? { trainingLevy: Number(updates.trainingLevy) } : {}),
             ...(updates.facilityFee !== undefined ? { facilityFee: Number(updates.facilityFee) } : {}),
             ...(updates.autoAdjust !== undefined ? { autoAdjust: Number(updates.autoAdjust) } : {}),
             ...(updates.paymentDueDay !== undefined ? { paymentDueDay: Number(updates.paymentDueDay) } : {}),
+            ...(updates.billingStartMonth !== undefined ? { billingStartMonth: updates.billingStartMonth as string | null } : {}),
             updatedAt: new Date().toISOString(),
         };
-        // Must use the same key as getSettingsData, which now reads by club id. Left
-        // hardcoded to 1, a club would write its fees into the legacy row and then read
-        // back its own (empty) row — silently losing every settings change.
-        const settingsRowId = clubId ?? DEFAULT_SETTINGS_ROW_ID;
-        const existingRows = await db.select().from(pgFinancialSettings).where(eq(pgFinancialSettings.id, settingsRowId)).limit(1);
-        const data = existingRows[0]
-            ? (await db.update(pgFinancialSettings).set(pgUpdates).where(eq(pgFinancialSettings.id, settingsRowId)).returning())[0]
-            : (await db.insert(pgFinancialSettings).values({
-                id: settingsRowId,
-                monthlyPlayerFee: Number(updates.monthlyPlayerFee ?? 0),
-                trainingLevy: Number(updates.trainingLevy ?? 0),
-                facilityFee: Number(updates.facilityFee ?? 0),
-                autoAdjust: Number(updates.autoAdjust ?? 1),
-                paymentDueDay: Number(updates.paymentDueDay ?? DEFAULT_PAYMENT_DUE_DAY),
-                updatedAt: new Date().toISOString(),
-            }).returning())[0];
+        // The club's row, found by its club_id (and created on first use).
+        const existing = await getClubFeeSettings(clubId);
+        const [data] = await db.update(pgFinancialSettings).set(pgUpdates).where(eq(pgFinancialSettings.id, existing.id)).returning();
         res.json({
             ...data,
             monthlyPlayerFee: normalizeMoneyValue(data.monthlyPlayerFee) ?? 0,
@@ -1728,14 +1861,15 @@ router.patch('/settings', async (req, res) => {
             facilityFee: normalizeMoneyValue(data.facilityFee) ?? 0,
             autoAdjust: Number(data.autoAdjust ?? 1) ? 1 : 0,
             paymentDueDay: resolveDueDay(data.paymentDueDay),
+            billingStartMonth: data.billingStartMonth ?? null,
             updatedAt: toIso(data.updatedAt as any) ?? new Date().toISOString(),
         });
         await recordFinanceAudit({
             action: 'finance.settings.update',
             entityType: 'financial_settings',
-            entityId: settingsRowId,
+            entityId: existing.id,
             clubId,
-            metadata: { store: 'postgres', changes: settingsAuditChanges(existingRows[0], updates) },
+            metadata: { store: 'postgres', changes: settingsAuditChanges(existing, updates) },
             ...financeAuditActor(req),
         });
     } catch (error) {

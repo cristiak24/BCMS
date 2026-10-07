@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { and, desc, eq } from 'drizzle-orm';
 import { authenticate, requireSuperadmin, type AuthenticatedRequest } from '../middleware/auth';
+import { inviteTtlMinutes } from '../lib/inviteTtl';
+import { listAuditLogs } from '../services/auditService';
+import { publicUser } from '../lib/publicUser';
 import { auditLogs, clubs, invites, role, users } from '../db/schema';
 import { db } from '../db';
 import { writeAuditLog } from '../services/auditService';
@@ -170,7 +173,8 @@ router.get('/users', async (_req, res) => {
         source: 'invite',
       }));
 
-    const activeUsers = userRows.map((user) => ({
+    // Never ship credentials or external ids to the browser.
+    const activeUsers = userRows.map((row) => publicUser(row)).map((user) => ({
       ...user,
       status: user.status === 'pending' ? 'pending_registration' : user.status === 'disabled' ? 'inactive' : 'active',
       clubName: user.clubId == null ? null : clubMap.get(user.clubId) ?? null,
@@ -220,7 +224,7 @@ router.patch('/users/:id', async (req: AuthenticatedRequest, res) => {
       metadata: payload,
     });
 
-    res.json({ success: true, user: updated[0] });
+    res.json({ success: true, user: publicUser(updated[0]) });
   } catch (error) {
     console.error('Update user error:', error);
     res.status(500).json({ error: 'Could not update user.' });
@@ -283,17 +287,25 @@ router.post('/users/:id/deactivate', async (req: AuthenticatedRequest, res) => {
       clubId: updated[0].clubId ?? null,
     });
 
-    res.json({ success: true, user: updated[0] });
+    res.json({ success: true, user: publicUser(updated[0]) });
   } catch (error) {
     console.error('Deactivate user error:', error);
     res.status(500).json({ error: 'Could not deactivate user.' });
   }
 });
 
-router.get('/audit-logs', async (_req, res) => {
+router.get('/audit-logs', async (req, res) => {
   try {
-    const rows = await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(100);
-    res.json({ success: true, logs: rows });
+    const clubId = Number(req.query.clubId);
+    const actorUserId = Number(req.query.actorUserId);
+    const result = await listAuditLogs({
+      clubId: Number.isInteger(clubId) && clubId > 0 ? clubId : null,
+      page: Number(req.query.page) || 1,
+      pageSize: Number(req.query.pageSize) || 50,
+      category: typeof req.query.category === 'string' ? req.query.category : null,
+      actorUserId: Number.isInteger(actorUserId) && actorUserId > 0 ? actorUserId : null,
+    });
+    res.json({ success: true, ...result });
   } catch (error) {
     console.error('Audit logs error:', error);
     res.status(500).json({ error: 'Could not load audit logs.' });
@@ -342,7 +354,7 @@ router.get('/settings', (_req, res) => {
   res.json({
     success: true,
     settings: {
-      inviteTtlHours: process.env.INVITE_TTL_HOURS ?? '168',
+      inviteTtlHours: String(Math.round(inviteTtlMinutes(process.env) / 60)),
       resendFromEmail: process.env.RESEND_FROM_EMAIL ?? 'BCMS <no-reply@bcms.ro>',
       appBaseUrl: process.env.APP_BASE_URL ?? process.env.FRONTEND_URL ?? 'https://bcms.ro',
     },

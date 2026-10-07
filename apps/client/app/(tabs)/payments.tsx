@@ -106,7 +106,9 @@ function FeeCard({
   disabled?: boolean;
 }) {
   const due = formatDueDate(fee.dueDate);
-  const failed = fee.status === 'failed';
+  const overdue = fee.status === 'overdue';
+  // An older server sends 'failed' for a row whose Stripe attempt failed.
+  const failed = fee.status === 'failed' || overdue;
   const upcoming = fee.status === 'upcoming';
 
   return (
@@ -128,9 +130,11 @@ function FeeCard({
       <View className="flex-1 min-w-0">
         <Text className="text-[14.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{fee.label}</Text>
         <Text className="t-meta mt-0.5" style={{ color: failed ? 'var(--c-danger-fg)' : 'var(--c-muted)' }} numberOfLines={1}>
-          {failed
-            ? 'Plata a eșuat — încearcă din nou'
-            : [due ? `${upcoming ? 'Scadent' : 'Scadență'} ${due}` : null, fee.description].filter(Boolean).join(' · ')}
+          {overdue
+            ? `Restanță${due ? ` din ${due}` : ''}`
+            : failed
+              ? 'Plata a eșuat — încearcă din nou'
+              : [due ? `${upcoming ? 'Scadent' : 'Scadență'} ${due}` : null, fee.description].filter(Boolean).join(' · ')}
         </Text>
       </View>
 
@@ -602,8 +606,8 @@ function PlayerPaymentsScreen() {
 
         <View className="mb-6">
           <SectionHeader
-            title="Taxe viitoare"
-            subtitle="Taxele pe care le ai de achitat."
+            title="De plată"
+            subtitle="Restanțele, apoi taxele care urmează."
             isMobile={isMobile}
           />
           {payableFees.length ? (

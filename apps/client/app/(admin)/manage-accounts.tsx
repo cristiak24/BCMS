@@ -101,6 +101,7 @@ const ROLE_ACTIONS = [
     { role: 'coach', icon: 'sports', label: 'Schimbă în antrenor' },
     { role: 'player', icon: 'sports-basketball', label: 'Schimbă în jucător' },
     { role: 'parent', icon: 'family-restroom', label: 'Schimbă în părinte' },
+    { role: 'accountant', icon: 'account-balance', label: 'Schimbă în contabil' },
 ] as const;
 
 export default function ManageAccountsScreen() {
@@ -452,7 +453,7 @@ export default function ManageAccountsScreen() {
         if (pending.kind === 'delete') {
             return {
                 title: `Ștergi definitiv contul lui ${pending.account.name}?`,
-                message: `Se șterg contul ${pending.account.email}, accesul și fișa din lot — inclusiv prezențe, plăți și echipe. Nu se poate anula; ar avea nevoie de o invitație nouă. Ca doar să oprești accesul, folosește Dezactivează.`,
+                message: `Se șterg contul ${pending.account.email} și accesul. Plățile și prezențele rămân în evidența clubului, pe fișa din lot (marcată inactivă). Nu se poate anula; ar avea nevoie de o invitație nouă. Ca doar să oprești accesul, folosește Dezactivează.`,
                 confirmLabel: 'Șterge definitiv',
                 destructive: true,
                 icon: 'delete-forever',

@@ -526,9 +526,10 @@ type RowProps = {
     onRemove: () => void;
 };
 
-function PaymentPill({ status }: { status: 'paid' | 'due' | 'none' }) {
+function PaymentPill({ status }: { status: 'paid' | 'due' | 'pending' | 'none' }) {
     const map = {
         due: { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', label: 'Restanță' },
+        pending: { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', label: 'De plată' },
         paid: { bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', label: 'Achitat' },
         none: { bg: 'var(--c-surface-3)', fg: 'var(--c-faint)', label: 'Fără plăți' },
     }[status];

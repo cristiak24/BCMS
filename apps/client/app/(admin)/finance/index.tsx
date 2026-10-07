@@ -2,7 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, Modal, Platform } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import * as DocumentPicker from '@/src/web/documentPicker';
-import { financeApi, FinancialSettings, FinancialDocument, StripeAdminConfig, AdminRecentPayment } from '../../../services/financeApi';
+import { financeApi, FinancialSettings, FinancialDocument, StripeAdminConfig, AdminRecentPayment, type FinanceSummary } from '../../../services/financeApi';
+import BalancesCard from '../../../components/finance/BalancesCard';
+import FeeExtrasCard from '../../../components/finance/FeeExtrasCard';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { buildServerUrl, resolveDocumentUrl } from '../../../config/serverUrl';
 import { apiFetch } from '../../../services/apiClient';
@@ -179,6 +182,20 @@ export default function FinancialSettingsPage() {
     const [documentFilter, setDocumentFilter] = useState<'all' | AccountingStatus>('all');
     const [documentSearch, setDocumentSearch] = useState('');
     const [updatingDocId, setUpdatingDocId] = useState<number | null>(null);
+    const [summary, setSummary] = useState<FinanceSummary | null>(null);
+    const [loadingSummary, setLoadingSummary] = useState(true);
+
+    // Collected this month + what is owed today: the same definitions as the
+    // dashboard, from the server — no longer the sum of the last 12 payments.
+    const loadSummary = useCallback(() => {
+        setLoadingSummary(true);
+        return financeApi.getSummary()
+            .then(setSummary)
+            .catch((error) => console.error('Failed to load finance summary:', error))
+            .finally(() => setLoadingSummary(false));
+    }, []);
+
+    useEffect(() => { void loadSummary(); }, [loadSummary]);
 
     /* ─── Load data ────────────────────────────────────────────── */
     const loadDocuments = useCallback(() => {
@@ -370,22 +387,39 @@ export default function FinancialSettingsPage() {
         }
     };
 
-    const handleUpdateDocumentStatus = async (id: number, status: 'processed' | 'rejected') => {
+    const handleUpdateDocumentStatus = async (id: number, status: 'processed' | 'rejected' | 'pending', reason?: string) => {
         setUpdatingDocId(id);
         try {
-            await financeApi.updateDocumentStatus(id, status);
+            await financeApi.updateDocumentStatus(id, status, reason);
             setUploads((prev) => prev.map((entry) => entry.id === id
                 ? {
                     ...entry,
-                    accountingStatus: status === 'processed' ? 'approved' : 'rejected',
-                    accountingNote: status === 'processed' ? 'Aprobat de contabilitate' : 'Respins - vă rugăm reîncărcați',
+                    accountingStatus: status === 'processed' ? 'approved' : status === 'rejected' ? 'rejected' : 'pending',
+                    accountingNote: status === 'processed'
+                        ? 'Aprobat de contabilitate'
+                        : status === 'rejected' ? `Respins: ${reason ?? ''}`.trim() : 'Redeschis pentru verificare',
                 }
                 : entry));
+            void loadSummary();
+            return true;
         } catch (error) {
             console.error('Failed to update document status:', error);
-            Alert.alert('Eroare', 'Nu am putut actualiza statusul documentului.');
+            Alert.alert('Eroare', error instanceof Error ? error.message : 'Nu am putut actualiza statusul documentului.');
+            return false;
         } finally {
             setUpdatingDocId(null);
+        }
+    };
+
+    // Rejecting or reopening a document asks for a reason (kept in the audit log).
+    const [reviewDialog, setReviewDialog] = useState<{ id: number; mode: 'reject' | 'reopen' } | null>(null);
+    const [reviewReason, setReviewReason] = useState('');
+    const submitReview = async () => {
+        if (!reviewDialog || !reviewReason.trim()) return;
+        const ok = await handleUpdateDocumentStatus(reviewDialog.id, reviewDialog.mode === 'reject' ? 'rejected' : 'pending', reviewReason.trim());
+        if (ok) {
+            setReviewDialog(null);
+            setReviewReason('');
         }
     };
 
@@ -466,22 +500,23 @@ export default function FinancialSettingsPage() {
                         />
                         <GlassStat
                             dot="var(--c-success)"
-                            label="Încasări"
-                            hint={`${recentPayments.length} plăți recente`}
-                            value={loadingRecentPayments ? '—' : Math.round(financeStats.collectedAmount).toLocaleString('ro-RO')}
-                            suffix={loadingRecentPayments ? undefined : 'RON'}
+                            label="Încasat luna aceasta"
+                            hint={summary ? new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric' }).format(new Date(`${summary.month}-01T12:00:00`)) : undefined}
+                            value={loadingSummary || !summary ? '—' : Math.round(summary.collected).toLocaleString('ro-RO')}
+                            suffix={loadingSummary || !summary ? undefined : 'RON'}
+                        />
+                        <GlassStat
+                            dot="var(--c-danger)"
+                            label="Restanțe"
+                            hint={summary ? `${summary.playersOverdue} ${summary.playersOverdue === 1 ? 'jucător' : 'jucători'}` : undefined}
+                            value={loadingSummary || !summary ? '—' : Math.round(summary.overdue).toLocaleString('ro-RO')}
+                            suffix={loadingSummary || !summary ? undefined : 'RON'}
                         />
                         <GlassStat
                             dot="var(--c-warning)"
                             label="De verificat"
                             hint={loadingDocuments ? undefined : formatCurrency(financeStats.pendingAmount)}
                             value={loadingDocuments ? '—' : financeStats.pendingCount}
-                        />
-                        <GlassStat
-                            dot="var(--c-sky)"
-                            label="Documente"
-                            hint={loadingDocuments ? undefined : `${formatCurrency(financeStats.approvedAmount)} aprobat`}
-                            value={loadingDocuments ? '—' : uploads.length}
                         />
                     </View>
                 ) : null}
@@ -492,6 +527,8 @@ export default function FinancialSettingsPage() {
                ═══════════════════════════════════════════════════════ */}
             {activeTab === 'Finances' && (
                 <View className="mb-20">
+
+                    <BalancesCard onPaymentRecorded={() => void loadSummary()} />
 
                     {/* ── Row: Monthly Fee + Upload ─────────────────── */}
                     <View className={`gap-4 mb-5 ${isMobile ? '' : 'flex-row'}`}>
@@ -695,6 +732,11 @@ export default function FinancialSettingsPage() {
                         </View>
                     </View>
 
+                    <FeeExtrasCard
+                        settings={settings}
+                        onSaved={(next) => { setSettings(next); void loadSummary(); }}
+                    />
+
                     {/* ── Row: Documents Ledger + Recent Payments ──── */}
                     <View className={`gap-6 items-start ${isMobile ? '' : 'flex-row'}`}>
 
@@ -819,7 +861,7 @@ export default function FinancialSettingsPage() {
                                                                             <Text className="text-[11px] font-bold" style={{ color: dash.successDeep }}>Aprobă</Text>
                                                                         </Pressable>
                                                                         <Pressable
-                                                                            onPress={() => handleUpdateDocumentStatus(entry.id, 'rejected')}
+                                                                            onPress={() => { setReviewReason(''); setReviewDialog({ id: entry.id, mode: 'reject' }); }}
                                                                             className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-[10px]"
                                                                             style={{ backgroundColor: 'rgba(239,68,68,0.08)' }}
                                                                         >
@@ -829,6 +871,17 @@ export default function FinancialSettingsPage() {
                                                                     </>
                                                                 )
                                                             )}
+                                                            {entry.accountingStatus !== 'pending' && !isUpdating ? (
+                                                                <Pressable
+                                                                    onPress={() => { setReviewReason(''); setReviewDialog({ id: entry.id, mode: 'reopen' }); }}
+                                                                    className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-[10px]"
+                                                                    style={{ backgroundColor: dash.lineSoft }}
+                                                                    accessibilityLabel="Redeschide documentul"
+                                                                >
+                                                                    <MaterialIcons name="undo" size={13} color={dash.muted} />
+                                                                    <Text className="text-[11px] font-bold" style={{ color: dash.muted }}>Redeschide</Text>
+                                                                </Pressable>
+                                                            ) : null}
                                                         </View>
                                                     </View>
 
@@ -996,6 +1049,32 @@ export default function FinancialSettingsPage() {
                     </Pressable>
                 </View>
             </ModalShell>
+
+            <ConfirmDialog
+                visible={reviewDialog != null}
+                title={reviewDialog?.mode === 'reject' ? 'Respinge documentul' : 'Redeschide documentul'}
+                message={reviewDialog?.mode === 'reject'
+                    ? 'Motivul ajunge în jurnalul de audit și în nota documentului.'
+                    : 'Documentul revine la „În așteptare” și poate fi decis din nou. Motivul ajunge în jurnalul de audit.'}
+                confirmLabel={reviewDialog?.mode === 'reject' ? 'Respinge' : 'Redeschide'}
+                destructive={reviewDialog?.mode === 'reject'}
+                loading={reviewDialog != null && updatingDocId === reviewDialog.id}
+                confirmDisabled={!reviewReason.trim()}
+                onConfirm={() => void submitReview()}
+                onCancel={() => setReviewDialog(null)}
+            >
+                <TextInput
+                    value={reviewReason}
+                    onChangeText={setReviewReason}
+                    placeholder="Motiv"
+                    placeholderTextColor={dash.faint}
+                    accessibilityLabel="Motiv"
+                    maxLength={500}
+                    autoFocus
+                    className="h-10 rounded-[10px] px-3 border text-[13px]"
+                    style={{ borderColor: 'var(--c-border-strong, var(--c-border))', color: 'var(--c-ink)', backgroundColor: 'var(--c-surface-2, var(--c-surface))' } as any}
+                />
+            </ConfirmDialog>
 
         </ScrollView>
     );

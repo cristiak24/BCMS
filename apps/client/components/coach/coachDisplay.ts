@@ -52,6 +52,9 @@ export function attendanceStatusTone(status?: string | null) {
   if (normalized === 'present' || normalized === 'prezent') {
     return { label: 'Prezent', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', icon: 'check-circle' as const };
   }
+  if (normalized === 'late') {
+    return { label: 'Întârziat', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', icon: 'check-circle' as const };
+  }
   if (normalized === 'absent') {
     return { label: 'Absent', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', icon: 'cancel' as const };
   }
@@ -63,7 +66,7 @@ export function attendanceStatusTone(status?: string | null) {
 
 export function isPresentStatus(status?: string | null) {
   const normalized = String(status ?? '').trim().toLowerCase();
-  return normalized === 'present' || normalized === 'prezent';
+  return normalized === 'present' || normalized === 'prezent' || normalized === 'late';
 }
 
 /**

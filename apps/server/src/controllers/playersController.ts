@@ -6,6 +6,12 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { buildPlayerUpdate } from '../lib/playerUpdate';
 import { toIso } from '../lib/dateUtils';
 import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
+import { isFailedStatus, isOutstandingStatus, isPaidStatus } from '../lib/paymentLedger';
+import { teamsManagedByCoach } from '../lib/coachScope';
+import { attendanceSummary, isAttendedStatus, isCountedStatus } from '../lib/attendanceRate';
+import { clubBalances, playerFees } from '../services/clubFinance';
+import { writeAuditLog } from '../services/auditService';
+import { sendPaymentReminders as sendReminderNotifications } from '../lib/notifications';
 
 const DEFAULT_PAYMENT_CURRENCY = (process.env.STRIPE_CURRENCY || 'ron').trim().toLowerCase();
 
@@ -65,19 +71,9 @@ function getRequestClubId(req: AuthenticatedRequest) {
     return req.user?.clubId == null ? null : Number(req.user.clubId);
 }
 
-function normalizePaymentStatus(status?: string | null) {
-    return (status || '').trim().toLowerCase();
-}
 
-function isPaidStatus(status?: string | null) {
-    const normalized = normalizePaymentStatus(status);
-    return normalized === 'paid' || normalized === 'processed' || normalized === 'succeeded' || normalized === 'success';
-}
-
-function isAttendancePresent(status?: string | null) {
-    const normalized = (status || '').trim().toLowerCase();
-    return normalized === 'present' || normalized === 'late' || normalized === 'medical' || normalized === 'excused';
-}
+// One definition for every screen (lib/attendanceRate.ts).
+const isAttendancePresent = isAttendedStatus;
 
 async function getAllowedTeamIds(req: AuthenticatedRequest) {
     if (isSuperadmin(req)) return null; 
@@ -86,6 +82,29 @@ async function getAllowedTeamIds(req: AuthenticatedRequest) {
     const clubTeams = await db.select({ id: teams.id }).from(teams).where(eq(teams.clubId, clubId));
     return clubTeams.map(t => t.id);
 }
+
+/**
+ * For a coach: may they change this player? Only when the player is on a team
+ * they manage (lib/coachScope.ts) — or on no team at all yet. Other roles: true.
+ */
+async function coachMayEditPlayer(req: AuthenticatedRequest, playerId: number, directTeamId: number | null) {
+    if (req.user?.role !== 'coach') return true;
+    const clubId = getRequestClubId(req);
+    if (clubId == null) return false;
+    const playerTeamIds = await getTeamIdsForPlayer(playerId, directTeamId);
+    if (!playerTeamIds.length) return true;
+    const clubTeams = await db.select({ id: teams.id, coachId: teams.coachId }).from(teams).where(eq(teams.clubId, clubId));
+    const managed = new Set(teamsManagedByCoach(clubTeams, req.user?.id));
+    return playerTeamIds.some((teamId) => managed.has(teamId));
+}
+
+async function coachMayUseTeam(req: AuthenticatedRequest, teamId: number) {
+    if (req.user?.role !== 'coach') return true;
+    const rows = await db.select({ id: teams.id, coachId: teams.coachId }).from(teams).where(eq(teams.id, teamId)).limit(1);
+    return teamsManagedByCoach(rows, req.user?.id).includes(teamId);
+}
+
+const COACH_SCOPE_ERROR = 'Poți modifica doar jucătorii echipelor pe care le antrenezi.';
 
 async function getPlayerClubIdByEmail(email?: string | null) {
     if (!email) return null;
@@ -112,34 +131,40 @@ async function isPlayerAllowedForRequest(req: AuthenticatedRequest, player: type
 }
 
 function monthName(month?: number | null, year?: number | null) {
-    if (!month || !year) return 'Season Fee';
-    return `${new Intl.DateTimeFormat('en', { month: 'long' }).format(new Date(year, month - 1, 1))} ${year} Fee`;
+    if (!month || !year) return 'Cotizație';
+    return `Cotizație ${new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1))}`;
 }
 
 function getPaymentDate(value?: string | null) {
     return value ? new Date(value).toISOString() : new Date().toISOString();
 }
 
-async function buildPlayerPaymentSummary(playerId: number) {
-    const paymentRows = await db.select().from(playerPayments).where(eq(playerPayments.playerId, playerId));
+/** Roster/payment-pill wording for a balance state (see services/clubFinance.ts). */
+function paymentStatusFromState(state: 'overdue' | 'due' | 'paid') {
+    return state === 'paid' ? 'paid' : state === 'overdue' ? 'overdue' : 'pending';
+}
+
+async function buildPlayerPaymentSummary(player: typeof players.$inferSelect, clubId: number | null) {
+    // What is owed comes from the same fee calculation as the player's Plăți
+    // page and the club's balances, not from summing "unpaid" rows.
+    const { totals, rows: paymentRows } = await playerFees(player, clubId);
     const paidRows = paymentRows.filter(row => isPaidStatus(row.status));
-    const unpaidRows = paymentRows.filter(row => !isPaidStatus(row.status));
     const paidAmount = paidRows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
-    const outstandingAmount = unpaidRows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
-    const latestPayment = [...paymentRows].sort((a, b) => new Date(b.date ?? b.createdAt ?? 0).getTime() - new Date(a.date ?? a.createdAt ?? 0).getTime())[0];
+    const outstandingAmount = totals.outstanding;
 
     return {
-        paymentStatus: latestPayment?.status ?? 'pending',
+        paymentStatus: paymentStatusFromState(totals.state),
+        overdueAmount: totals.overdue,
         paidAmount,
         outstandingAmount,
         amountDue: outstandingAmount,
         paymentCurrency: DEFAULT_PAYMENT_CURRENCY,
         paymentTransactions: paymentRows
-            .filter(row => isPaidStatus(row.status) || normalizePaymentStatus(row.status) === 'failed' || normalizePaymentStatus(row.status) === 'error')
+            .filter(row => isPaidStatus(row.status) || isFailedStatus(row.status))
             .sort((a, b) => new Date(b.date ?? b.createdAt ?? 0).getTime() - new Date(a.date ?? a.createdAt ?? 0).getTime())
             .map(row => ({
                 id: String(row.id),
-                label: monthName(row.month, row.year),
+                label: row.description || monthName(row.month, row.year),
                 amount: Number(row.amount ?? 0),
                 currency: DEFAULT_PAYMENT_CURRENCY,
                 status: isPaidStatus(row.status) ? 'success' : 'error',
@@ -148,8 +173,8 @@ async function buildPlayerPaymentSummary(playerId: number) {
     };
 }
 
-async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPlayerFacing?: boolean } = {}) {
-    const { stripForPlayerFacing = true } = options;
+async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPlayerFacing?: boolean; withBalances?: boolean } = {}) {
+    const { stripForPlayerFacing = true, withBalances = true } = options;
     const isPlayerFacing = isPlayerFacingRole(req);
     let allowedTeamIds = await getAllowedTeamIds(req);
 
@@ -255,6 +280,7 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
 
     const attendanceByPlayer = new Map<number, { present: number; total: number }>();
     for (const row of attendanceRows) {
+        if (!isCountedStatus(row.status)) continue;
         const curr = attendanceByPlayer.get(row.playerId) || { present: 0, total: 0 };
         curr.total += 1;
         if (isAttendancePresent(row.status)) {
@@ -275,6 +301,17 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
         }
     }
 
+    // Staff rosters show what each player owes from the shared fee calculation.
+    // The latest payment row's status (the old signal) only stays as a fallback
+    // for a platform-wide superadmin view, which has no single club to bill.
+    const balanceStatus = new Map<number, string>();
+    const requesterClubId = getRequestClubId(req);
+    if (withBalances && !isPlayerFacing && requesterClubId != null) {
+        for (const balance of await clubBalances(requesterClubId)) {
+            balanceStatus.set(balance.playerId, paymentStatusFromState(balance.state));
+        }
+    }
+
     const rows = allPlayers.map(player => {
         const firstName = player.firstName || player.name?.split(' ')[0] || 'Unknown';
         const lastName = player.lastName || player.name?.split(' ').slice(1).join(' ') || 'Player';
@@ -290,7 +327,7 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
             : 0;
 
         const latestPayment = latestPaymentByPlayer.get(player.id);
-        const paymentStatus = latestPayment?.status || 'pending';
+        const paymentStatus = balanceStatus.get(player.id) ?? latestPayment?.status ?? 'pending';
 
         return {
             ...player,
@@ -310,15 +347,18 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
     // position, team) — never another player's payment/medical/attendance/
     // contact data. Their own data is still reachable through the dedicated
     // "me" endpoints, not this shared roster.
-    return isPlayerFacing && stripForPlayerFacing ? rows.map(toSafeRosterRow) : rows;
+    if (isPlayerFacing && stripForPlayerFacing) return rows.map(toSafeRosterRow);
+    // The accountant works with payments, not medical visas.
+    if (req.user?.role === 'accountant') return rows.map((row) => ({ ...row, medicalCheckExpiry: null }));
+    return rows;
 }
 
 // Shared by getPlayerById and getMe — callers must already have verified the
 // requester is allowed to see this exact player's full (unstripped) record.
 async function buildFullPlayerPayload(req: AuthenticatedRequest, player: typeof players.$inferSelect) {
-    const rosterRows = await buildRosterRows(req, { stripForPlayerFacing: false });
+    const rosterRows = await buildRosterRows(req, { stripForPlayerFacing: false, withBalances: false });
     const rosterPlayer = rosterRows.find(row => row.id === player.id);
-    const paymentSummary = await buildPlayerPaymentSummary(player.id);
+    const paymentSummary = await buildPlayerPaymentSummary(player, getRequestClubId(req) ?? rosterPlayer?.clubId ?? null);
 
     return {
         ...player,
@@ -333,26 +373,17 @@ async function buildFullPlayerPayload(req: AuthenticatedRequest, player: typeof 
 }
 
 function computeAttendanceRateFromRecords(records: (typeof attendance.$inferSelect)[]) {
-    if (records.length === 0) return null;
-    const present = records.filter(record => isAttendancePresent(record.status)).length;
-    return Math.round((present / records.length) * 1000) / 10;
+    return attendanceSummary(records).rate;
 }
 
-// "Echipa mea" counts a session the same way the player's own Prezență screen
-// does — medical/excused are counted as sessions but not as attended — so the
-// two screens can never disagree about the same player's rate. (The club-side
-// `isAttendancePresent` above is deliberately more generous; that number is a
-// staffing metric, not the player's own record.)
-const COUNTED_ATTENDANCE_STATUSES = ['present', 'prezent', 'absent', 'medical', 'excused'];
-const ATTENDED_STATUSES = ['present', 'prezent'];
-
+// "Echipa mea" and the club screens now share one definition
+// (lib/attendanceRate.ts), so they can no longer disagree about a player.
 function summarizeOwnAttendance(rows: { status: string | null }[]) {
-    const counted = rows.filter(row => COUNTED_ATTENDANCE_STATUSES.includes(String(row.status ?? '').trim().toLowerCase()));
-    const present = counted.filter(row => ATTENDED_STATUSES.includes(String(row.status ?? '').trim().toLowerCase())).length;
+    const summary = attendanceSummary(rows);
     return {
-        rate: counted.length ? Math.round((present / counted.length) * 100) : null,
-        present,
-        total: counted.length,
+        rate: summary.rate == null ? null : Math.round(summary.rate),
+        present: summary.attended,
+        total: summary.counted,
     };
 }
 
@@ -436,34 +467,31 @@ export const playersController = {
             const allowedTeamIds = await getAllowedTeamIds(req);
             if (allowedTeamIds !== null && allowedTeamIds.length === 0) return res.json([]);
 
-            const q = query.toLowerCase();
-            let allPlayers = await db.select().from(players);
-            const userRows = await db.select({
-                email: users.email,
-                clubId: users.clubId,
-            }).from(users);
-            const clubIdByUserEmail = new Map(
-                userRows
-                    .filter(user => user.clubId != null)
-                    .map(user => [user.email.trim().toLowerCase(), Number(user.clubId)] as const)
-            );
-            
-            if (allowedTeamIds !== null) {
-                const membershipRows = await db.select().from(playersToTeams).where(inArray(playersToTeams.teamId, allowedTeamIds));
-                const allowedPlayerIds = new Set(membershipRows.map(m => m.playerId));
-                const allowedTeamsSet = new Set(allowedTeamIds);
-                const clubId = getRequestClubId(req);
+            const q = query.trim().toLowerCase().slice(0, 80);
+            if (!q) return res.json([]);
+            // Filtered in SQL and scoped to the caller's club. This used to load
+            // every player and every user of the platform on each keystroke.
+            const pattern = `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+            const nameMatch = sql`lower(concat_ws(' ', ${players.firstName}, ${players.lastName}, ${players.name})) like ${pattern}`;
 
-                allPlayers = allPlayers.filter(p => {
-                    const playerClubId = p.email ? clubIdByUserEmail.get(p.email.trim().toLowerCase()) : null;
-                    return (p.teamId != null && allowedTeamsSet.has(p.teamId)) || allowedPlayerIds.has(p.id) || (clubId != null && playerClubId === clubId);
-                });
+            let scope;
+            if (allowedTeamIds !== null) {
+                const clubId = getRequestClubId(req);
+                const memberIds = (await db.select({ playerId: playersToTeams.playerId }).from(playersToTeams).where(inArray(playersToTeams.teamId, allowedTeamIds)))
+                    .map((row) => row.playerId);
+                const clubEmails = clubId != null
+                    ? (await db.select({ email: users.email }).from(users).where(eq(users.clubId, clubId))).map((row) => row.email.trim().toLowerCase())
+                    : [];
+                const inClub = [inArray(players.teamId, allowedTeamIds)];
+                if (memberIds.length) inClub.push(inArray(players.id, memberIds));
+                if (clubEmails.length) inClub.push(inArray(sql<string>`lower(trim(${players.email}))`, clubEmails));
+                scope = or(...inClub);
             }
 
-            const results = allPlayers.filter(player => {
-                const haystack = `${player.firstName ?? ''} ${player.lastName ?? ''} ${player.name ?? ''}`.toLowerCase();
-                return haystack.includes(q);
-            });
+            const results = await db.select().from(players)
+                .where(scope ? and(nameMatch, scope) : nameMatch)
+                .orderBy(players.lastName, players.firstName)
+                .limit(50);
 
             res.json(results);
         } catch (error) {
@@ -510,7 +538,6 @@ export const playersController = {
             }
 
             const attendanceRows = await db.select().from(attendance).where(inArray(attendance.playerId, rosterPlayerIds));
-            const paymentRows = await db.select().from(playerPayments).where(inArray(playerPayments.playerId, rosterPlayerIds));
 
             const now = new Date();
             const currentStart = new Date(now);
@@ -535,22 +562,8 @@ export const playersController = {
                 ? Math.round((currentPeriodAttendance - previousPeriodAttendance) * 10) / 10
                 : null;
 
-            const latestPaymentByPlayer = new Map<number, typeof paymentRows[0]>();
-            for (const row of paymentRows) {
-                const current = latestPaymentByPlayer.get(row.playerId);
-                if (!current) {
-                    latestPaymentByPlayer.set(row.playerId, row);
-                } else {
-                    if (row.year > current.year || (row.year === current.year && row.month > current.month) || (row.year === current.year && row.month === current.month && new Date(row.createdAt ?? 0).getTime() > new Date(current.createdAt ?? 0).getTime())) {
-                        latestPaymentByPlayer.set(row.playerId, row);
-                    }
-                }
-            }
-
-            const pendingPlayerIds = rosterPlayerIds.filter(playerId => {
-                const latest = latestPaymentByPlayer.get(playerId);
-                return !isPaidStatus(latest?.status);
-            });
+            // Same answer as the roster's payment column (shared balances).
+            const pendingPlayerIds = rosterRows.filter(row => !isPaidStatus(row.paymentStatus)).map(row => row.id);
 
             res.json({
                 athleteCount: rosterRows.length,
@@ -573,22 +586,22 @@ export const playersController = {
             if (role !== 'admin' && role !== 'superadmin' && role !== 'accountant' && role !== 'manager') {
                 return res.status(403).json({ error: 'Forbidden' });
             }
-            const rosterRows = await buildRosterRows(req);
-            const pendingPlayers = rosterRows.filter(player => !isPaidStatus(player.paymentStatus));
-
-            const reminderRecipients = pendingPlayers.map(player => ({
-                id: player.id,
-                firstName: player.firstName,
-                lastName: player.lastName,
-                email: player.email,
-                paymentStatus: player.paymentStatus,
-            }));
-
+            const clubId = getRequestClubId(req);
+            if (clubId == null) {
+                return res.status(400).json({ error: 'Alege un club.' });
+            }
+            // Who owes money, from the shared fee calculation — then an in-app
+            // notification to the player and their parents (this used to report
+            // reminders as "sent" without sending anything).
+            const owing = (await clubBalances(clubId)).filter((balance) => balance.outstanding > 0);
+            const { notified, skipped } = await sendReminderNotifications(owing);
             res.json({
-                sent: reminderRecipients.length,
-                recipients: reminderRecipients,
+                sent: notified,
+                players: owing.length,
+                skipped,
+                recipients: owing.map((balance) => ({ id: balance.playerId, name: balance.playerName, outstanding: balance.outstanding, overdue: balance.overdue })),
                 sentAt: new Date().toISOString(),
-                provider: 'not-configured',
+                provider: 'in-app',
             });
         } catch (error) {
             console.error('Send payment reminders error:', error);
@@ -616,6 +629,7 @@ export const playersController = {
                 const allowedSet = new Set(allowedTeamIds);
                 const isAllowed = (p.teamId && allowedSet.has(p.teamId)) || mRows.some(m => allowedSet.has(m.teamId));
                 if (!isAllowed) return res.status(403).json({ error: 'Access denied' });
+                if (!await coachMayEditPlayer(req, p.id, p.teamId ?? null)) return res.status(403).json({ error: COACH_SCOPE_ERROR });
             }
 
             await db.delete(playersToTeams).where(eq(playersToTeams.playerId, id));
@@ -644,6 +658,9 @@ export const playersController = {
             const allowedTeamIds = await getAllowedTeamIds(req);
             if (allowedTeamIds !== null && !allowedTeamIds.includes(teamId)) {
                 return res.status(403).json({ error: 'Cannot add to a team outside your club' });
+            }
+            if (!await coachMayUseTeam(req, teamId)) {
+                return res.status(403).json({ error: 'Poți adăuga jucători doar în echipele pe care le antrenezi.' });
             }
 
             const pRows = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
@@ -690,6 +707,7 @@ export const playersController = {
             if (allowedTeamIds !== null) {
                 const p = pRows[0];
                 if (!await isPlayerAllowedForRequest(req, p)) return res.status(403).json({ error: 'Access denied' });
+                if (!await coachMayEditPlayer(req, p.id, p.teamId ?? null)) return res.status(403).json({ error: COACH_SCOPE_ERROR });
             }
 
             const update = buildPlayerUpdate(req.body);
@@ -697,7 +715,36 @@ export const playersController = {
                 return res.status(400).json({ error: update.error });
             }
 
+            // The email is what links a sign-in to this roster record
+            // (lib/selfPlayer.ts). Two records with one address made the link
+            // ambiguous, and a typo could hand a family someone else's child.
+            const previousEmail = pRows[0].email?.trim().toLowerCase() || null;
+            const nextEmail = update.data.email !== undefined ? (update.data.email.trim().toLowerCase() || null) : previousEmail;
+            if (update.data.email !== undefined) {
+                update.data.email = nextEmail ?? '';
+                if (nextEmail && nextEmail !== previousEmail) {
+                    const [taken] = await db.select({ id: players.id }).from(players)
+                        .where(and(sql`lower(trim(${players.email})) = ${nextEmail}`, sql`${players.id} <> ${playerId}`))
+                        .limit(1);
+                    if (taken) {
+                        return res.status(409).json({ error: 'Acest email este deja folosit de alt jucător din lot.' });
+                    }
+                }
+            }
+
             const [updated] = await db.update(players).set(update.data).where(eq(players.id, playerId)).returning();
+            if (nextEmail !== previousEmail) {
+                await writeAuditLog({
+                    action: 'player.email_changed',
+                    entityType: 'player',
+                    entityId: playerId,
+                    actorUserId: req.user?.id ?? null,
+                    actorUid: req.firebaseUser?.uid ?? null,
+                    actorRole: req.user?.role ?? null,
+                    clubId: getRequestClubId(req),
+                    metadata: { before: previousEmail, after: nextEmail },
+                }).catch((error) => console.error('[players] audit log failed:', error));
+            }
             res.json(updated);
         } catch (error) {
             console.error('Update player error:', error);

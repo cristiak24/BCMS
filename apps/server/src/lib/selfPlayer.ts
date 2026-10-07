@@ -43,7 +43,8 @@ export async function resolveSelfPlayer(user: Caller, childId: number | null = n
     }
     const email = String(user.email ?? '').trim().toLowerCase();
     if (!email) return null;
-    const rows = await db.select().from(players).where(sql`lower(trim(${players.email})) = ${email}`).limit(1);
+    // Oldest record first: deterministic if two rows ever share an address.
+    const rows = await db.select().from(players).where(sql`lower(trim(${players.email})) = ${email}`).orderBy(asc(players.id)).limit(1);
     return rows[0] ?? null;
 }
 

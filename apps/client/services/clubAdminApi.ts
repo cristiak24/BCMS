@@ -1,6 +1,6 @@
 import { apiFetch } from './apiClient';
 
-export type ClubAdminAccountRole = 'coach' | 'player' | 'parent';
+export type ClubAdminAccountRole = 'coach' | 'player' | 'parent' | 'accountant';
 
 export type ClubAdminAccount = {
     id: number | string;
@@ -15,7 +15,36 @@ export type ClubAdminAccount = {
     source?: 'user' | 'invite';
 };
 
+export type AuditLogEntry = {
+    id: number;
+    action: string;
+    entityType: string;
+    entityId: string | null;
+    actorUserId: number | null;
+    actorRole: string | null;
+    actorName: string | null;
+    clubId: number | null;
+    metadata: unknown;
+    createdAt: string;
+};
+
+export type AuditLogPage = { page: number; pageSize: number; total: number; logs: AuditLogEntry[] };
+
+export type AuditLogFilters = { page?: number; category?: string | null };
+
+export function auditQuery(filters: AuditLogFilters) {
+    const params = new URLSearchParams();
+    if (filters.page && filters.page > 1) params.set('page', String(filters.page));
+    if (filters.category) params.set('category', filters.category);
+    const text = params.toString();
+    return text ? `?${text}` : '';
+}
+
 export const clubAdminApi = {
+    listAuditLogs(filters: AuditLogFilters = {}) {
+        return apiFetch<AuditLogPage>(`/club-admin/audit-logs${auditQuery(filters)}`);
+    },
+
     listAccounts() {
         return apiFetch<{ success: boolean; users: ClubAdminAccount[] }>('/club-admin/accounts');
     },

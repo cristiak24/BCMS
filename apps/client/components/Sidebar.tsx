@@ -23,6 +23,7 @@ export const ADMIN_MENU_ITEMS: { label: string; icon: AdminMenuIconName; href: s
     // Compliance and Users were reachable only by typing the URL: with no menu
     // entry the header title also fell back to the first item ("Dashboard").
     { label: 'Conformitate', icon: 'verified-user', href: '/admin/compliance' },
+    { label: 'Jurnal', icon: 'history', href: '/admin/audit-log' },
     { label: 'Utilizatori', icon: 'people', href: '/admin/users', superadminOnly: true },
 ];
 

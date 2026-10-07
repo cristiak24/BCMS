@@ -81,7 +81,9 @@ export default function AppHeader({
     // There is no deep-linkable per-event route on the player side (schedule
     // detail opens as an in-page modal, not a URL) — send them to the tab
     // that lists the event instead.
-    if (notification.eventId != null) {
+    if (notification.type === 'payment_reminder' || notification.type === 'payment_recorded') {
+      router.push('/payments');
+    } else if (notification.eventId != null) {
       router.push('/schedule');
     }
   };
