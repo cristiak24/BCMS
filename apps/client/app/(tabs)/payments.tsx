@@ -14,6 +14,7 @@ import SectionHeader from '../../components/ui/SectionHeader';
 import Pagination, { usePagination } from '../../components/ui/Pagination';
 import { useResponsive } from '../../hooks/useResponsive';
 import { useSession } from '../../context/AuthContext';
+import { openPaymentProof } from '../../utils/paymentProof';
 import { normalizeRole } from '../../utils/authSession';
 import {
   financeApi,
@@ -262,7 +263,7 @@ function TransactionRow({
         <Pressable
           onPress={onOpenReceipt}
           accessibilityRole="button"
-          accessibilityLabel="Deschide chitanța"
+          accessibilityLabel="Dovada de plată"
           className="ui-press h-9 w-9 rounded-[10px] items-center justify-center shrink-0"
           style={{ backgroundColor: 'var(--c-surface-tint)' } as any}
         >
@@ -422,6 +423,8 @@ function PlayerPaymentsScreen() {
   // Opens a single receipt from a direct click, one URL per call — browsers
   // block window.open() calls made in a forEach loop after the first popup,
   // so receipts are opened one at a time from their own row instead of in bulk.
+  const { session } = useSession();
+
   const openReceipt = (url: string) => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.open(url, '_blank');
@@ -658,7 +661,11 @@ function PlayerPaymentsScreen() {
                 <TransactionRow
                   key={transaction.id}
                   transaction={transaction}
-                  onOpenReceipt={transaction.receiptUrl ? () => openReceipt(transaction.receiptUrl as string) : undefined}
+                  onOpenReceipt={transaction.receiptUrl
+                    ? () => openReceipt(transaction.receiptUrl as string)
+                    : transaction.status === 'success' && Platform.OS === 'web'
+                      ? () => openPaymentProof({ clubName: session?.clubName ?? null, playerName: summary?.playerName ?? '', transaction })
+                      : undefined}
                 />
               ))
             ) : (
