@@ -953,8 +953,8 @@ function PlayerHomeScreen() {
 
       const [allEvents, savedTeams, roster, myRecord] = await Promise.all([
         eventsApi.getEvents({ start: historyStart.toISOString() }),
-        teamsApi.getTeams().catch(() => [] as Team[]),
-        teamsApi.getRoster().catch(() => [] as Player[]),
+        teamsApi.getTeams(),
+        teamsApi.getRoster(),
         teamsApi.getMyPlayerRecord().catch(() => null),
       ]);
 

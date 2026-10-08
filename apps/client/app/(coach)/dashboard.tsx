@@ -309,7 +309,7 @@ export default function CoachDashboardScreen() {
       const [eventRows, teamRows, rosterRows] = await Promise.all([
         eventsApi.getEvents({ start: since.toISOString() }),
         teamsApi.getTeams(),
-        teamsApi.getRoster().catch(() => []),
+        teamsApi.getRoster(),
       ]);
       setEvents(eventRows);
       setTeams(teamRows);

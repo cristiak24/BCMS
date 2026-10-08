@@ -215,22 +215,36 @@ function AuthBridge({ children }: PropsWithChildren) {
       }
 
       try {
-        let nextSession: AuthUser;
-        try {
-          nextSession = await fetchMeFromBackend(currentUser);
-        } catch (error) {
-          if (!(error instanceof ApiError && error.status === 401)) throw error;
-          // Clerk still lists a session but the backend rejects its token (it
-          // was revoked/expired server-side, or the user was deleted). Retry
-          // once with a freshly minted token; if that also fails the session
-          // is dead, so drop it and go to /login instead of spinning forever.
-          const freshToken = await getToken({ skipCache: true }).catch(() => null);
-          if (!freshToken) throw new DeadSessionError();
+        let nextSession!: AuthUser;
+        // A plain network error/timeout (the 15s abort in apiClient) just means
+        // the backend was briefly slow or unreachable, not that the session is
+        // bad — retry a couple of times with backoff before giving up and
+        // falling back to the cached session below, instead of permanently
+        // settling for stale data after a single slow request.
+        const maxTransientRetries = 2;
+        for (let transientAttempt = 0; ; transientAttempt++) {
           try {
             nextSession = await fetchMeFromBackend(currentUser);
-          } catch (retryError) {
-            if (retryError instanceof ApiError && retryError.status === 401) throw new DeadSessionError();
-            throw retryError;
+            break;
+          } catch (error) {
+            if (error instanceof ApiError && error.status === 401) {
+              // Clerk still lists a session but the backend rejects its token (it
+              // was revoked/expired server-side, or the user was deleted). Retry
+              // once with a freshly minted token; if that also fails the session
+              // is dead, so drop it and go to /login instead of spinning forever.
+              const freshToken = await getToken({ skipCache: true }).catch(() => null);
+              if (!freshToken) throw new DeadSessionError();
+              try {
+                nextSession = await fetchMeFromBackend(currentUser);
+                break;
+              } catch (retryError) {
+                if (retryError instanceof ApiError && retryError.status === 401) throw new DeadSessionError();
+                throw retryError;
+              }
+            }
+
+            if (transientAttempt >= maxTransientRetries) throw error;
+            await new Promise((r) => setTimeout(r, (transientAttempt + 1) * 1000));
           }
         }
         setCachedAuthSession(nextSession);
