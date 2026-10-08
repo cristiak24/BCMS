@@ -538,6 +538,11 @@ export const clubs = pgTable("clubs", {
 	createdBy: varchar("created_by", { length: 255 }),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+	// The club's own Stripe account (Connect, Express). When set and able to
+	// take charges, families' online payments go to the club instead of the
+	// platform account (routes/finance.ts). Null: the platform account, as before.
+	stripeAccountId: varchar("stripe_account_id", { length: 64 }),
+	stripeChargesEnabled: boolean("stripe_charges_enabled").default(false).notNull(),
 }, (table) => [
 	unique("clubs_normalized_name_unique").on(table.normalizedName),
 ]);

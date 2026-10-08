@@ -37,6 +37,7 @@ const ACTION_LABELS: Record<string, string> = {
     'finance.document.status': 'Status document financiar',
     'finance.payment.manual': 'Plată înregistrată manual',
     'finance.settings.update': 'Taxe modificate',
+    'finance.stripe.account_created': 'Cont Stripe al clubului creat',
     'invitation.accepted': 'Invitație acceptată',
     'invitation.created': 'Invitație trimisă',
     'invitation.resent': 'Invitație retrimisă',

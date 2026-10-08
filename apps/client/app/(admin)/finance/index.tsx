@@ -6,6 +6,8 @@ import { financeApi, FinancialSettings, FinancialDocument, StripeAdminConfig, Ad
 import BalancesCard from '../../../components/finance/BalancesCard';
 import FeeExtrasCard from '../../../components/finance/FeeExtrasCard';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
+import StripeConnectCard from '../../../components/finance/StripeConnectCard';
+import { useLocalSearchParams } from '@/src/web/expoRouter';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { buildServerUrl, resolveDocumentUrl } from '../../../config/serverUrl';
 import { apiFetch } from '../../../services/apiClient';
@@ -158,7 +160,9 @@ function ModalShell({ visible, onClose, children, maxWidth = 420 }: {
 
 export default function FinancialSettingsPage() {
     const { isMobile } = useResponsive();
-    const [activeTab, setActiveTab] = useState('Finances');
+    // Back from Stripe's onboarding (?tab=online&connect=return) → the online tab.
+    const params = useLocalSearchParams<{ tab?: string; connect?: string }>();
+    const [activeTab, setActiveTab] = useState(params.tab === 'online' ? 'Payment Gateways' : 'Finances');
 
     /* ─── Settings state ───────────────────────────────────────── */
     const [settings, setSettings] = useState<FinancialSettings | null>(null);
@@ -948,6 +952,7 @@ export default function FinancialSettingsPage() {
 
             {activeTab === 'Payment Gateways' && (
                 <View className="mb-20">
+                    <StripeConnectCard returned={params.connect === 'return'} />
                     <View className={`rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in`} style={cardStyle}>
                         <View className={`gap-6 ${isMobile ? '' : 'flex-row items-start justify-between'}`}>
                             <View className="flex-1">

@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
 import { loadServerEnv } from '../lib/loadEnv';
+import { checkDatabaseTarget } from '../lib/dbEnvironment';
 
 loadServerEnv();
 
@@ -9,6 +10,14 @@ const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
   console.warn('⚠️  DATABASE_URL environment variable is missing.');
+}
+
+const target = checkDatabaseTarget(process.env);
+if (target.level === 'block') {
+  throw new Error(target.message);
+}
+if (target.level === 'warn') {
+  console.warn(`\n⚠️  ${target.message}\n`);
 }
 
 export const pool = new Pool({

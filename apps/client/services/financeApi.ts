@@ -132,7 +132,26 @@ export type FinanceSummary = {
     playersOwing: number;
 };
 
+export type StripeConnectStatus = {
+    available: boolean;
+    connected: boolean;
+    accountId?: string | null;
+    chargesEnabled?: boolean;
+    payoutsEnabled?: boolean;
+    detailsSubmitted?: boolean;
+    canManage?: boolean;
+};
+
 export const financeApi = {
+    /** The club's own Stripe account (Connect). */
+    async getConnectStatus(): Promise<StripeConnectStatus> {
+        return apiFetch<StripeConnectStatus>('/finance/stripe/connect');
+    },
+
+    async startConnectOnboarding(): Promise<{ url: string }> {
+        return apiFetch<{ url: string }>('/finance/stripe/connect/onboard', { method: 'POST' });
+    },
+
     async getDocuments(): Promise<FinancialDocument[]> {
         return apiFetch<FinancialDocument[]>('/finance/documents');
     },

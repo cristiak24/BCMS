@@ -218,7 +218,9 @@ export async function createSuperAdminInvitation(
   const expiresAt = new Date(now.getTime() + INVITE_TTL_MINUTES * 60 * 1000);
 
   const inserted = await db.insert(invites).values({
-    token,
+    // Only the hash is kept (also in the legacy `token` column, which is NOT
+    // NULL): the raw token lives in the emailed link and in this response.
+    token: tokenHash,
     email,
     role,
     clubId: club.id,
@@ -298,7 +300,7 @@ export async function resendClubInvitation(
   const expiresAt = new Date(Date.now() + INVITE_TTL_MINUTES * 60 * 1000);
 
   await db.update(invites).set({
-    token,
+    token: tokenHash,
     tokenHash,
     status: 'pending',
     expiresAt: expiresAt.toISOString(),
@@ -350,7 +352,6 @@ export async function validateInvitationToken(token: string) {
   const tokenHash = hashInviteToken(token);
   const rows = await db.select({
     id: invites.id,
-    token: invites.token,
     email: invites.email,
     role: invites.role,
     clubId: invites.clubId,
@@ -382,7 +383,6 @@ export async function validateInvitationToken(token: string) {
 
   return {
     id: invite.id,
-    token: invite.token,
     email: invite.email,
     role: invite.role,
     clubId: invite.clubId,
@@ -552,7 +552,6 @@ export async function listInvitations() {
 
   const rows = await db.select({
     id: invites.id,
-    token: invites.token,
     email: invites.email,
     role: invites.role,
     clubId: invites.clubId,

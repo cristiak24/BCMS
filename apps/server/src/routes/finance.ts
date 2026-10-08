@@ -19,6 +19,7 @@ import {
     players as pgPlayers,
     playersToTeams as pgPlayersToTeams,
     storedFiles as pgStoredFiles,
+    clubs as pgClubs,
     teams as pgTeams,
     users as pgUsers,
 } from '../db/schema';
@@ -220,6 +221,30 @@ function getStripeIfConfigured() {
     } catch {
         return null;
     }
+}
+
+/**
+ * Stripe Connect (audit BUG-014). A club that connected its own Stripe account
+ * receives its families' payments directly (destination charge, the club as
+ * merchant of record). Clubs that didn't keep using the platform account.
+ */
+async function clubPayoutAccount(clubId: number | null) {
+    if (clubId == null) return null;
+    const [club] = await db.select({ accountId: pgClubs.stripeAccountId, chargesEnabled: pgClubs.stripeChargesEnabled })
+        .from(pgClubs).where(eq(pgClubs.id, clubId)).limit(1);
+    return club?.accountId && club.chargesEnabled ? club.accountId : null;
+}
+
+/** Re-read a connected account from Stripe and cache whether it can take charges. */
+async function refreshClubAccount(clubId: number) {
+    const [club] = await db.select().from(pgClubs).where(eq(pgClubs.id, clubId)).limit(1);
+    if (!club?.stripeAccountId) return { club: club ?? null, account: null };
+    const account = await getStripe().accounts.retrieve(club.stripeAccountId);
+    const chargesEnabled = Boolean(account.charges_enabled);
+    if (chargesEnabled !== club.stripeChargesEnabled) {
+        await db.update(pgClubs).set({ stripeChargesEnabled: chargesEnabled, updatedAt: new Date().toISOString() }).where(eq(pgClubs.id, clubId));
+    }
+    return { club: { ...club, stripeChargesEnabled: chargesEnabled }, account };
 }
 
 function normalizeStatus(status?: string | null) {
@@ -1307,6 +1332,95 @@ router.get('/player/summary', async (req, res) => {
     }
 });
 
+/** Admin only: connecting a bank account is the club's legal decision. */
+async function requireClubAdminForConnect(req: Request, res: Response) {
+    const user = await requireRequestUser(req, res);
+    if (!user) return null;
+    if (normalizeRole(user.role) !== 'admin' || user.clubId == null) {
+        res.status(403).json({ error: 'Doar administratorul clubului poate conecta contul Stripe al clubului.' });
+        return null;
+    }
+    return { user, clubId: Number(user.clubId) };
+}
+
+router.get('/stripe/connect', async (req, res) => {
+    try {
+        const user = await requireRequestUser(req, res);
+        if (!user) return;
+        const role = normalizeRole(user.role);
+        if (!['admin', 'accountant'].includes(role) || user.clubId == null) {
+            res.status(403).json({ error: 'Admin finance access is required.' });
+            return;
+        }
+        if (!getStripeIfConfigured()) {
+            res.json({ available: false, connected: false });
+            return;
+        }
+        const { club, account } = await refreshClubAccount(Number(user.clubId));
+        res.json({
+            available: true,
+            connected: Boolean(club?.stripeAccountId),
+            accountId: club?.stripeAccountId ? `…${club.stripeAccountId.slice(-6)}` : null,
+            chargesEnabled: Boolean(account?.charges_enabled),
+            payoutsEnabled: Boolean(account?.payouts_enabled),
+            detailsSubmitted: Boolean(account?.details_submitted),
+            canManage: role === 'admin',
+        });
+    } catch (error) {
+        handleRouteError(res, error, '[GET /api/finance/stripe/connect]');
+    }
+});
+
+/**
+ * Start (or continue) Stripe's onboarding for the club's own account and
+ * return the hosted onboarding link. The account is created once per club.
+ */
+router.post('/stripe/connect/onboard', async (req, res) => {
+    try {
+        const actor = await requireClubAdminForConnect(req, res);
+        if (!actor) return;
+        const stripe = getStripe();
+        const [club] = await db.select().from(pgClubs).where(eq(pgClubs.id, actor.clubId)).limit(1);
+        if (!club) {
+            res.status(404).json({ error: 'Clubul nu a fost găsit.' });
+            return;
+        }
+
+        let accountId = club.stripeAccountId;
+        if (!accountId) {
+            const account = await stripe.accounts.create({
+                type: 'express',
+                country: 'RO',
+                email: actor.user.email || undefined,
+                business_profile: { name: club.name },
+                capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+                metadata: { clubId: String(club.id) },
+            });
+            accountId = account.id;
+            await db.update(pgClubs).set({ stripeAccountId: accountId, stripeChargesEnabled: false, updatedAt: new Date().toISOString() }).where(eq(pgClubs.id, club.id));
+            await recordFinanceAudit({
+                action: 'finance.stripe.account_created',
+                entityType: 'club',
+                entityId: club.id,
+                clubId: club.id,
+                metadata: { accountId },
+                ...financeAuditActor(req),
+            });
+        }
+
+        const back = `${getAppBaseUrl(req)}/admin/finance?tab=online`;
+        const link = await stripe.accountLinks.create({
+            account: accountId,
+            type: 'account_onboarding',
+            refresh_url: `${back}&connect=refresh`,
+            return_url: `${back}&connect=return`,
+        });
+        res.json({ url: link.url });
+    } catch (error) {
+        handleRouteError(res, error, '[POST /api/finance/stripe/connect/onboard]');
+    }
+});
+
 router.get('/stripe/config', async (req, res) => {
     const user = await requireRequestUser(req, res);
     if (!user) {
@@ -1598,6 +1712,8 @@ router.post('/player/checkout-session', async (req, res) => {
         const stripe = getStripe();
         const returnUrl = getPaymentsReturnUrl(req);
         const label = payableFees.length === 1 ? payableFees[0].label : 'Plată sold';
+        // The club's own Stripe account, when it connected one (else: platform).
+        const destination = await clubPayoutAccount(await getPlayerClubId(currentPlayer.data));
         const feeIds = payableFees.map((fee) => fee.id);
         const payerUserId = String((req as AuthenticatedRequest).user?.id ?? '');
         const session = await stripe.checkout.sessions.create({
@@ -1618,6 +1734,7 @@ router.post('/player/checkout-session', async (req, res) => {
             cancel_url: appendQuery(returnUrl, 'payment_status=cancelled'),
             payment_intent_data: {
                 setup_future_usage: 'off_session',
+                ...(destination ? { on_behalf_of: destination, transfer_data: { destination } } : {}),
                 metadata: {
                     source: 'player_payments',
                     playerId: String(currentPlayer.data.id),
