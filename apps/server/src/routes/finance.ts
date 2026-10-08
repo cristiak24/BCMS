@@ -307,14 +307,9 @@ async function getCurrentPlayer(req: Request): Promise<CurrentPlayer> {
         .limit(1);
     const user = userRows[0];
     // A parent pays for their selected child; a player for themselves (lib/selfPlayer.ts).
-    const player = user?.role === 'parent'
-        ? await resolveSelfPlayer(user, requestedChildId(req))
-        : (await db
-            .select()
-            .from(pgPlayers)
-            .where(sql`lower(trim(${pgPlayers.email})) = ${email.trim().toLowerCase()}`)
-            .orderBy(pgPlayers.id)
-            .limit(1))[0];
+    // A parent pays for their selected child; a player for their own record —
+    // both resolved the one way every player screen does (lib/selfPlayer.ts).
+    const player = user ? await resolveSelfPlayer(user, requestedChildId(req)) : null;
 
     if (!player && user?.role === 'player') {
         const inserted = await db
@@ -326,6 +321,7 @@ async function getCurrentPlayer(req: Request): Promise<CurrentPlayer> {
                 email: user.email,
                 status: 'active',
                 teamId: null,
+                userId: user.id,
             })
             .returning();
         const createdPlayer = inserted[0];

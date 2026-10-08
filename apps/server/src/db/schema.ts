@@ -86,12 +86,22 @@ export const players = pgTable("players", {
 	guardianPhone: varchar("guardian_phone", { length: 32 }),
 	guardian2Name: varchar("guardian2_name", { length: 120 }),
 	guardian2Phone: varchar("guardian2_phone", { length: 32 }),
+	// The player's own sign-in, once it has claimed this record (lib/selfPlayer.ts).
+	// The link used to be the email alone, which anyone editing the record could
+	// point at another account. Cleared when the record's email changes.
+	userId: integer("user_id"),
 }, (table) => [
+	unique("players_user_id_unique").on(table.userId),
 	foreignKey({
 			columns: [table.teamId],
 			foreignColumns: [teams.id],
 			name: "players_team_id_teams_id_fk"
 		}),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "players_user_id_users_id_fk"
+		}).onDelete('set null'),
 ]);
 
 export const teams = pgTable("teams", {

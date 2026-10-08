@@ -1,5 +1,5 @@
 import { Response, Router } from 'express';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import { accessRequests, attendance, auditLogs, clubDocuments, clubInviteCodes, clubs, events, inviteLinks, invites, notifications, playerPayments, players, playersToTeams, teams, users } from '../db/schema';
 import { db } from '../db';
@@ -515,7 +515,7 @@ router.delete('/accounts/:id', rateLimit({ bucket: 'club-admin:mutate', limit: 3
         const linkedPlayers = await db
             .select({ id: players.id, teamId: players.teamId })
             .from(players)
-            .where(sql`lower(${players.email}) = ${targetUser.email.trim().toLowerCase()}`);
+            .where(or(eq(players.userId, id), sql`lower(${players.email}) = ${targetUser.email.trim().toLowerCase()}`));
         const linkedPlayerIds = linkedPlayers.map((player) => player.id);
         const membershipRows = linkedPlayerIds.length > 0
             ? await db

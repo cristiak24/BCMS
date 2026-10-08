@@ -1,4 +1,4 @@
-import { asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Request } from 'express';
 import { db } from '../db';
 import { playerGuardians, players, playersToTeams } from '../db/schema';
@@ -41,11 +41,31 @@ export async function resolveSelfPlayer(user: Caller, childId: number | null = n
         const children = await guardianChildren(Number(user.id));
         return children.find((child) => child.id === childId) ?? children[0] ?? null;
     }
+    // 1. The record this account has already claimed.
+    const userId = Number(user.id);
+    const hasUserId = Number.isInteger(userId) && userId > 0;
+    if (hasUserId) {
+        const [linked] = await db.select().from(players).where(eq(players.userId, userId)).limit(1);
+        if (linked) return linked;
+    }
+
+    // 2. First sign-in: the unclaimed record with the account's email. A record
+    // claimed by another account is never handed out, whatever its email says.
     const email = String(user.email ?? '').trim().toLowerCase();
     if (!email) return null;
-    // Oldest record first: deterministic if two rows ever share an address.
-    const rows = await db.select().from(players).where(sql`lower(trim(${players.email})) = ${email}`).orderBy(asc(players.id)).limit(1);
-    return rows[0] ?? null;
+    const rows = await db.select().from(players)
+        .where(and(sql`lower(trim(${players.email})) = ${email}`, isNull(players.userId)))
+        .orderBy(asc(players.id))
+        .limit(1);
+    const found = rows[0] ?? null;
+    if (found && hasUserId && user.role === 'player') {
+        const [claimed] = await db.update(players)
+            .set({ userId })
+            .where(and(eq(players.id, found.id), isNull(players.userId)))
+            .returning();
+        return claimed ?? found;
+    }
+    return found;
 }
 
 export async function resolveSelfPlayerForRequest(req: Pick<Request, 'header'> & { user?: Caller }) {

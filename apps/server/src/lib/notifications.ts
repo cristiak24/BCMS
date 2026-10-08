@@ -23,7 +23,7 @@ export async function recipientsForPlayers(playerIds: number[]) {
     playerIds.forEach((id) => byPlayer.set(id, new Set()));
 
     const [playerRows, guardianRows] = await Promise.all([
-        db.select({ id: players.id, email: players.email }).from(players).where(inArray(players.id, playerIds)),
+        db.select({ id: players.id, email: players.email, userId: players.userId }).from(players).where(inArray(players.id, playerIds)),
         db.select({ playerId: playerGuardians.playerId, userId: playerGuardians.userId }).from(playerGuardians).where(inArray(playerGuardians.playerId, playerIds)),
     ]);
     const emails = playerRows.map((row) => row.email?.trim().toLowerCase()).filter((email): email is string => Boolean(email));
@@ -34,7 +34,8 @@ export async function recipientsForPlayers(playerIds: number[]) {
     const accountByEmail = new Map(accounts.map((account) => [account.email.trim().toLowerCase(), account.id]));
 
     playerRows.forEach((row) => {
-        const accountId = row.email ? accountByEmail.get(row.email.trim().toLowerCase()) : undefined;
+        // The claimed account first; the email match covers records not yet claimed.
+        const accountId = row.userId ?? (row.email ? accountByEmail.get(row.email.trim().toLowerCase()) : undefined);
         if (accountId != null) byPlayer.get(row.id)?.add(accountId);
     });
     guardianRows.forEach((row) => byPlayer.get(row.playerId)?.add(row.userId));

@@ -753,7 +753,10 @@ export const playersController = {
                 }
             }
 
-            const [updated] = await db.update(players).set(update.data).where(eq(players.id, playerId)).returning();
+            // A new email means the record belongs to whichever account signs in
+            // with it next; the previous account's claim is released.
+            const unlink = nextEmail !== previousEmail ? { userId: null } : {};
+            const [updated] = await db.update(players).set({ ...update.data, ...unlink }).where(eq(players.id, playerId)).returning();
             const before = pRows[0] as Record<string, unknown>;
             const changes: Record<string, { before: unknown; after: unknown }> = {};
             for (const field of HISTORY_FIELDS) {
