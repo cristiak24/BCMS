@@ -22,10 +22,10 @@ const LANGUAGE_OPTIONS = [
   { value: 'en', label: 'English' },
 ];
 
+// Only what the server actually sends. Push and SMS toggles used to be shown
+// here although nothing stored or sent them.
 const NOTIFICATION_OPTIONS = [
-  { key: 'email', icon: 'mail', label: 'Email', description: 'Program, schimbări de ultim moment și plăți.' },
-  { key: 'push', icon: 'notifications-active', label: 'Notificări push', description: 'Alerte instant pe acest dispozitiv.' },
-  { key: 'sms', icon: 'sms', label: 'SMS', description: 'Doar pentru anunțuri urgente ale clubului.' },
+  { key: 'email', icon: 'mail', label: 'Email', description: 'Mementouri de plată și antrenamente sau meciuri anulate ori mutate. Notificările din aplicație rămân oricum.' },
 ] as const;
 
 function normalizeLanguage(value?: string | null) {

@@ -105,7 +105,8 @@ async function resolveProfileRecord(userId: number, childId: number | null = nul
         avatarUrl: user.avatarUrl ?? null,
         phone: user.phone ?? null,
         preferredLanguage: user.preferredLanguage ?? null,
-        notificationPreferences: null as NotificationPreferences | null,
+        // Only email exists today (lib/mailer.ts); push/SMS are not built.
+        notificationPreferences: { email: user.emailNotifications !== false, push: false, sms: false } as NotificationPreferences,
         createdAt: toIso(user.createdAt) ?? null,
         lastLoginAt: toIso(user.lastLoginAt) ?? null,
     };
@@ -140,12 +141,15 @@ router.patch('/me', async (req, res) => {
             return;
         }
 
-        const { firstName, lastName, phone, preferredLanguage } = req.body as {
+        const { firstName, lastName, phone, preferredLanguage, notificationPreferences } = req.body as {
             firstName?: string;
             lastName?: string;
             phone?: string | null;
             preferredLanguage?: string | null;
+            notificationPreferences?: { email?: unknown } | null;
         };
+        // The profile's email toggle used to be ignored here (never stored).
+        const emailNotifications = typeof notificationPreferences?.email === 'boolean' ? notificationPreferences.email : undefined;
 
         const trimmedFirstName = typeof firstName === 'string' ? firstName.trim() : undefined;
         const trimmedLastName = typeof lastName === 'string' ? lastName.trim() : undefined;
@@ -184,6 +188,7 @@ router.patch('/me', async (req, res) => {
             ...(trimmedLastName !== undefined ? { lastName: trimmedLastName } : {}),
             ...(trimmedPhone !== undefined ? { phone: trimmedPhone } : {}),
             ...(trimmedLanguage !== undefined ? { preferredLanguage: trimmedLanguage } : {}),
+            ...(emailNotifications !== undefined ? { emailNotifications } : {}),
             ...(nextName ? { name: nextName } : {}),
             updatedAt: new Date().toISOString(),
         }).where(eq(users.id, requestUser.id));

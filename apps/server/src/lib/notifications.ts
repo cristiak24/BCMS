@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { notifications, playerGuardians, players, playersToTeams, users } from '../db/schema';
 import { and, eq, gte, inArray, ne, sql } from 'drizzle-orm';
+import { sendNotificationEmails } from './mailer';
 
 const NOTE_PREVIEW_MAX_LENGTH = 300;
 
@@ -48,7 +49,18 @@ type NewNotification = {
     playerId?: number | null;
 };
 
-async function notifyPlayers(playerIds: number[], build: (playerId: number) => NewNotification) {
+/** The same message by email (respecting each account's email opt-out). */
+function emailRows(rows: Array<typeof notifications.$inferInsert>, path: string) {
+    return sendNotificationEmails(rows.map((row) => ({
+        userId: row.userId,
+        subject: row.title,
+        title: row.title,
+        body: row.message,
+        path,
+    })));
+}
+
+async function notifyPlayers(playerIds: number[], build: (playerId: number) => NewNotification, emailPath?: string) {
     const recipients = await recipientsForPlayers(playerIds);
     const rows: Array<typeof notifications.$inferInsert> = [];
     const seen = new Set<string>();
@@ -62,7 +74,10 @@ async function notifyPlayers(playerIds: number[], build: (playerId: number) => N
             rows.push({ userId, ...content });
         }
     }
-    if (rows.length) await db.insert(notifications).values(rows);
+    if (rows.length) {
+        await db.insert(notifications).values(rows);
+        if (emailPath) await emailRows(rows, emailPath);
+    }
     return rows.length;
 }
 
@@ -124,7 +139,7 @@ export async function notifyEventChange(params: {
             title: 'Program modificat',
             message: `„${params.title}” are loc acum ${when}${params.location ? `, la ${params.location}` : ''}.`,
             eventId: params.eventId,
-        });
+        }, '/schedule');
 }
 
 /** A payment the club recorded (desk or online) — a receipt in the app. */
@@ -173,6 +188,9 @@ export async function sendPaymentReminders(owing: Array<{ playerId: number; play
             });
         }
     }
-    if (rows.length) await db.insert(notifications).values(rows);
+    if (rows.length) {
+        await db.insert(notifications).values(rows);
+        await emailRows(rows, '/payments');
+    }
     return { notified: rows.length, skipped };
 }

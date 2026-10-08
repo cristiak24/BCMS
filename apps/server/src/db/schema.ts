@@ -58,6 +58,9 @@ export const users = pgTable("users", {
 	// Stripe customer of the person who pays (the player or a parent), so saved
 	// cards belong to whoever saved them — never shared between family accounts.
 	stripeCustomerId: varchar("stripe_customer_id", { length: 64 }),
+	// Profil → Notificări → Email: payment reminders and cancelled/moved
+	// sessions by email as well as in the app (lib/mailer.ts).
+	emailNotifications: boolean("email_notifications").default(true).notNull(),
 }, (table) => [
 	unique("users_email_unique").on(table.email),
 	unique("users_firebase_uid_unique").on(table.firebaseUid),
