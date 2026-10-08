@@ -14,7 +14,14 @@ export type DatabaseTargetCheck =
 
 export function checkDatabaseTarget(env: Env): DatabaseTargetCheck {
     if (env.NODE_ENV === 'production') return { level: 'ok' };
+    // Tests only ever run on the embedded database: a test must never reach
+    // a real one, whatever .env.local says.
+    if (env.NODE_ENV === 'test' && !(env.DATABASE_URL ?? '').startsWith('pglite:')) {
+        return { level: 'block', message: 'Testele rulează doar pe PGlite (DATABASE_URL=pglite:memory).' };
+    }
     if ((env.DB_ENVIRONMENT ?? '').trim().toLowerCase() === 'development') return { level: 'ok' };
+    // PGlite is local by construction (db/index.ts).
+    if ((env.DATABASE_URL ?? '').startsWith('pglite:')) return { level: 'ok' };
     let host = 'baza configurată';
     try {
         host = env.DATABASE_URL ? new URL(env.DATABASE_URL).hostname : host;

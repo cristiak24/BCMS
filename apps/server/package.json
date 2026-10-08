@@ -7,7 +7,9 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "tsx --test \"src/**/*.test.ts\""
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "db:local": "tsx src/scripts/localDb.ts",
+    "dev:local": "DATABASE_URL=pglite:./.pglite DB_ENVIRONMENT=development tsx watch src/index.ts"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +29,7 @@
     "stripe": "^22.1.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.16",
     "@types/axios": "^0.9.36",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

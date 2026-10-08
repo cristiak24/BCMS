@@ -38,6 +38,7 @@ import { roundMoney } from '../lib/money';
 import { isValidBillingMonth, type ComputedFee } from '../lib/feeSchedule';
 import { clubBalances, clubPlayers, collectedInRange, getClubFeeSettings, playerFees } from '../services/clubFinance';
 import { notifyPaymentRecorded } from '../lib/notifications';
+import { applyCheckoutSession, feeIdMetadata, recordManualPayment } from '../services/payments';
 
 const router = Router();
 
@@ -821,196 +822,28 @@ function selectedFeesFromBody(allFees: PlayerPaymentFee[], feeIds: unknown) {
     return allFees.filter((fee) => requested.has(fee.id));
 }
 
-type CheckoutPaymentRecord = {
-    playerId: number;
-    sessionId: string;
-    status: 'paid' | 'failed';
-    amount: number;
-    feeIds: string[];
-    label: string;
-    paidByUserId: number | null;
-};
-
-/**
- * Record a Checkout session's outcome exactly once.
- *
- * The webhook and the browser's confirm call both land here, Stripe retries
- * webhooks, and a payer can reload the success page — each of those used to
- * insert another "paid" row. The session id is unique on the table, so every
- * repeat finds the first row instead of writing a new one.
- */
-async function recordCheckoutPayment(params: CheckoutPaymentRecord) {
-    const now = new Date();
-    const inserted = await db
-        .insert(pgPlayerPayments)
-        .values({
-            playerId: params.playerId,
-            paidByUserId: params.paidByUserId,
-            amount: roundMoney(params.amount),
-            month: now.getMonth() + 1,
-            year: now.getFullYear(),
-            status: params.status,
-            date: now.toISOString(),
-            createdAt: now.toISOString(),
-            stripeSessionId: params.sessionId,
-            feeIds: serializeFeeIds(params.feeIds),
-            method: 'card',
-            description: params.label,
-        })
-        .onConflictDoNothing({ target: pgPlayerPayments.stripeSessionId })
-        .returning();
-
-    if (inserted[0]) {
-        if (params.status === 'paid') {
-            await voidSettledRequests(params.playerId, params.feeIds);
-            notifyPaymentRecorded(params.playerId, params.amount, params.label).catch((error) => console.error('[finance] payment notification failed:', error));
-        }
-        return { payment: inserted[0], duplicate: false };
-    }
-
-    const [existing] = await db
-        .select()
-        .from(pgPlayerPayments)
-        .where(eq(pgPlayerPayments.stripeSessionId, params.sessionId))
-        .limit(1);
-    return { payment: existing ?? null, duplicate: true };
-}
-
-/**
- * Request rows ("payment:17") a payment just settled. Their amount is part of
- * the new paid row, so they turn void — neither still owed nor counted as
- * money received a second time.
- */
-async function voidSettledRequests(playerId: number, feeIds: string[]) {
-    const requestIds = feeIds
-        .filter((id) => id.startsWith('payment:'))
-        .map((id) => Number(id.slice('payment:'.length)))
-        .filter((id) => Number.isInteger(id) && id > 0);
-    if (!requestIds.length) return;
-
-    const rows = await db
-        .select({ id: pgPlayerPayments.id, status: pgPlayerPayments.status })
-        .from(pgPlayerPayments)
-        .where(inArray(pgPlayerPayments.id, requestIds));
-    const toVoid = rows.filter((row) => isOutstandingStatus(row.status)).map((row) => row.id);
-    if (!toVoid.length) return;
-
-    await db
-        .update(pgPlayerPayments)
-        .set({ status: 'void' })
-        .where(and(inArray(pgPlayerPayments.id, toVoid), eq(pgPlayerPayments.playerId, playerId)));
-}
-
-// Stripe caps a metadata value at 500 characters; a basket with months of
-// arrears is longer, so the list is split over feeIds, feeIds_1, feeIds_2, …
-const FEE_ID_CHUNK = 480;
-
-function feeIdMetadata(feeIds: string[]) {
-    const chunks: string[] = [];
-    let current = '';
-    for (const id of feeIds) {
-        const next = current ? `${current},${id}` : id;
-        if (next.length > FEE_ID_CHUNK && current) {
-            chunks.push(current);
-            current = id;
-        } else {
-            current = next;
-        }
-    }
-    if (current) chunks.push(current);
-    const metadata: Record<string, string> = {};
-    chunks.forEach((chunk, index) => { metadata[index === 0 ? 'feeIds' : `feeIds_${index}`] = chunk; });
-    return metadata;
-}
-
-function sessionFeeIds(session: { metadata?: Record<string, string> | null }) {
-    const metadata = session.metadata ?? {};
-    const parts = [metadata.feeIds];
-    for (let index = 1; metadata[`feeIds_${index}`]; index += 1) parts.push(metadata[`feeIds_${index}`]);
-    return parseFeeIds(parts.filter(Boolean).join(','));
-}
-
 async function markCheckoutSessionFailed(sessionId: string, reason: 'failed' | 'expired') {
-    // An expired session is a checkout the payer abandoned. It moved no money
-    // and changes nothing they owe; recording it as a failed payment used to
-    // show up as a brand-new debt for the whole basket.
+    // An expired session is a checkout the payer abandoned: nothing to record
+    // (lib payments: applyCheckoutSession), so Stripe needn't even be asked.
     if (reason === 'expired') {
         return { recorded: false, reason: 'checkout_session_expired' };
     }
-
-    const stripe = getStripe();
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-    if (session.mode !== 'payment') {
-        return {
-            recorded: false,
-            reason: 'checkout_session_not_payment_mode',
-        };
-    }
-
-    const playerId = Number(session.metadata?.playerId);
-    if (!Number.isFinite(playerId)) {
-        throw new Error(`Stripe session ${session.id} is missing playerId metadata.`);
-    }
-
-    const currency = (session.currency || DEFAULT_PAYMENT_CURRENCY).toLowerCase();
-    const result = await recordCheckoutPayment({
-        playerId,
-        sessionId: session.id,
-        status: 'failed',
-        amount: fromMinorUnits(session.amount_total, currency),
-        feeIds: sessionFeeIds(session),
-        label: session.metadata?.label || 'Plată online',
-        paidByUserId: Number(session.metadata?.payerUserId) || null,
-    });
-
-    return { recorded: !result.duplicate, payment: result.payment };
+    const session = await getStripe().checkout.sessions.retrieve(sessionId);
+    const result = await applyCheckoutSession(session, 'failed');
+    return { recorded: result.recorded, payment: result.payment, reason: result.reason };
 }
 
 async function fulfillPaidCheckoutSession(sessionId: string) {
-    const stripe = getStripe();
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-    if (session.mode !== 'payment' || session.payment_status !== 'paid') {
-        return {
-            fulfilled: false,
-            reason: 'checkout_session_not_paid',
-        };
-    }
-
-    const playerId = Number(session.metadata?.playerId);
-    if (!Number.isFinite(playerId)) {
-        throw new Error(`Stripe session ${session.id} is missing playerId metadata.`);
-    }
-
-    const player = await getPlayerByNumericId(playerId);
-    if (!player) {
-        throw new Error(`Player ${playerId} from Stripe session ${session.id} was not found.`);
-    }
-
-    const currency = (session.currency || DEFAULT_PAYMENT_CURRENCY).toLowerCase();
-    // The fees the payer chose are in the session's metadata (set when it was
-    // created). Sessions made before that have none: fall back to what was due.
-    let feeIds = sessionFeeIds(session);
-    if (!feeIds.length) {
-        feeIds = (await buildPlayerFees(player, currency)).map((fee) => fee.id);
-    }
-
-    const result = await recordCheckoutPayment({
-        playerId: player.id,
-        sessionId: session.id,
-        status: 'paid',
-        amount: fromMinorUnits(session.amount_total, currency),
-        feeIds,
-        label: session.metadata?.label || 'Plată online',
-        paidByUserId: Number(session.metadata?.payerUserId) || null,
+    const session = await getStripe().checkout.sessions.retrieve(sessionId);
+    const result = await applyCheckoutSession(session, 'paid', async (playerId) => {
+        // Sessions made before fee ids were stored: settle what was due.
+        const player = await getPlayerByNumericId(playerId);
+        return player ? (await buildPlayerFees(player, DEFAULT_PAYMENT_CURRENCY)).map((fee) => fee.id) : [];
     });
-
-    return {
-        fulfilled: true,
-        duplicate: result.duplicate,
-        payment: result.payment,
-    };
+    if (result.recorded && result.payment) {
+        notifyPaymentRecorded(result.payment.playerId, Number(result.payment.amount), result.payment.description ?? '').catch((error) => console.error('[finance] payment notification failed:', error));
+    }
+    return { fulfilled: result.reason !== 'checkout_session_not_paid', duplicate: !result.recorded && result.payment != null, payment: result.payment, reason: result.reason };
 }
 
 function handleRouteError(res: Response, error: unknown, fallback: string) {
@@ -1588,7 +1421,6 @@ router.get('/admin/summary', async (req, res) => {
 });
 
 const MANUAL_PAYMENT_METHODS = new Set(['cash', 'transfer', 'card', 'other']);
-const FEE_ID_PATTERN = /^(?:(?:monthly|levy|facility):\d{4}-\d{2}|(?:event|payment):\d+)$/;
 
 // Record a payment made outside Stripe (e.g. a player paying cash) so it shows
 // up in the team payment report alongside online payments.
@@ -1643,37 +1475,13 @@ router.post('/admin/manual-payment', async (req, res) => {
             return;
         }
         const currency = DEFAULT_PAYMENT_CURRENCY;
-        // The fees this payment settles, picked in Finanțe → Restanțe. Without a
-        // list (older clients, the team report) a desk payment is the monthly fee
-        // of the month it is dated in — what the app assumed before fee ids.
-        const requestedFeeIds = parseFeeIds(body.feeIds).filter((id) => FEE_ID_PATTERN.test(id));
-        const feeIds = requestedFeeIds.length
-            ? requestedFeeIds
-            : [`monthly:${monthKey(when.getFullYear(), when.getMonth() + 1)}`];
-
-        const inserted = await db
-            .insert(pgPlayerPayments)
-            .values({
-                playerId,
-                amount: roundMoney(amount),
-                month: when.getMonth() + 1,
-                year: when.getFullYear(),
-                status: 'paid',
-                date: when.toISOString(),
-                createdAt: new Date().toISOString(),
-                paidByUserId: null,
-                feeIds: serializeFeeIds(feeIds),
-                method,
-                description,
-            })
-            .returning();
-        await voidSettledRequests(playerId, feeIds);
-        res.json({ success: true, payment: inserted[0] });
+        const { payment: inserted, feeIds } = await recordManualPayment({ playerId, amount, when, method, description, feeIds: body.feeIds });
+        res.json({ success: true, payment: inserted });
         notifyPaymentRecorded(playerId, amount, description).catch((error) => console.error('[finance] payment notification failed:', error));
         await recordFinanceAudit({
             action: 'finance.payment.manual',
             entityType: 'player_payment',
-            entityId: inserted[0]?.id ?? null,
+            entityId: inserted?.id ?? null,
             clubId,
             metadata: {
                 playerId,

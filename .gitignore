@@ -8,3 +8,6 @@ scripts/bcms-61b00-firebase-adminsdk-fbsvc-98ff59a97d.json
 **/dist
 **/*.log
 .firebase
+
+# Local development database (npm run db:local)
+**/.pglite

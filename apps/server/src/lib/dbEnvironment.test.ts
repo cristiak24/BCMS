@@ -13,3 +13,8 @@ test('an unmarked local database warns, or blocks when required', () => {
     assert.ok('message' in warn && warn.message.includes('ep-x.neon.tech'));
     assert.equal(checkDatabaseTarget({ REQUIRE_DEV_DATABASE: '1' }).level, 'block');
 });
+
+test('tests can never reach a real database', () => {
+    assert.equal(checkDatabaseTarget({ NODE_ENV: 'test', DATABASE_URL: 'postgres://u:p@ep-x.neon.tech/db' }).level, 'block');
+    assert.equal(checkDatabaseTarget({ NODE_ENV: 'test', DATABASE_URL: 'pglite:memory' }).level, 'ok');
+});
