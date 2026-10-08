@@ -317,7 +317,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
           endTime: `${newEventType !== 'training' ? toLocalDateStr(newEndDate) : localBaseDateStr}T${effectiveEndTime}:00`,
           location: newLocation.trim(),
           teamId: newTeamId,
-          amount: newAmount ? parseInt(newAmount, 10) : null,
+          amount: newAmount ? Number(newAmount.replace(',', '.')) || null : null,
         });
       }
 

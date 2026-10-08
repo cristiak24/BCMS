@@ -33,6 +33,7 @@ import {
     serializeFeeIds,
 } from '../lib/paymentLedger';
 import { createAllowedOrigins, isOriginAllowed } from '../lib/corsOrigins';
+import { roundMoney } from '../lib/money';
 import { isValidBillingMonth, type ComputedFee } from '../lib/feeSchedule';
 import { clubBalances, clubPlayers, collectedInRange, getClubFeeSettings, playerFees } from '../services/clubFinance';
 import { notifyPaymentRecorded } from '../lib/notifications';
@@ -824,7 +825,7 @@ async function recordCheckoutPayment(params: CheckoutPaymentRecord) {
         .values({
             playerId: params.playerId,
             paidByUserId: params.paidByUserId,
-            amount: Math.round(params.amount),
+            amount: roundMoney(params.amount),
             month: now.getMonth() + 1,
             year: now.getFullYear(),
             status: params.status,
@@ -1251,7 +1252,7 @@ router.post('/upload', (req, res, next) => {
         const documentUrl = `/api/files/${key}`;
         const record = {
             type: type || 'expense',
-            amount: parsedAmount != null ? Math.round(parsedAmount) : 0,
+            amount: parsedAmount != null ? roundMoney(parsedAmount) : 0,
             description: description || 'New Document',
             documentUrl,
             status: 'pending',
@@ -1544,7 +1545,7 @@ router.post('/admin/manual-payment', async (req, res) => {
             .insert(pgPlayerPayments)
             .values({
                 playerId,
-                amount: Math.round(amount),
+                amount: roundMoney(amount),
                 month: when.getMonth() + 1,
                 year: when.getFullYear(),
                 status: 'paid',
@@ -1566,7 +1567,7 @@ router.post('/admin/manual-payment', async (req, res) => {
             clubId,
             metadata: {
                 playerId,
-                amount: Math.round(amount),
+                amount: roundMoney(amount),
                 currency,
                 method,
                 description,

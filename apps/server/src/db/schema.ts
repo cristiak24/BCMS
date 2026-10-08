@@ -1,5 +1,8 @@
-import { pgTable, serial, varchar, integer, text, timestamp, unique, foreignKey, pgEnum, boolean, jsonb, customType, index } from "drizzle-orm/pg-core"
+import { pgTable, serial, varchar, integer, text, timestamp, unique, foreignKey, pgEnum, boolean, jsonb, customType, index, numeric } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
+
+// Lei with bani (lib/money.ts). Read back as a JS number.
+const money = (name: string) => numeric(name, { precision: 12, scale: 2, mode: 'number' });
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 	dataType() {
@@ -20,7 +23,7 @@ export const teamLevel = pgEnum("team_level", ['national', 'municipal', 'initier
 export const financialDocuments = pgTable("financial_documents", {
 	id: serial().primaryKey().notNull(),
 	type: varchar({ length: 50 }).notNull(),
-	amount: integer().notNull(),
+	amount: money("amount").notNull(),
 	description: text(),
 	date: timestamp({ mode: 'string' }).defaultNow().notNull(),
 	documentUrl: text("document_url"),
@@ -121,7 +124,7 @@ export const teams = pgTable("teams", {
 export const playerPayments = pgTable("player_payments", {
 	id: serial().primaryKey().notNull(),
 	playerId: integer("player_id").notNull(),
-	amount: integer().notNull(),
+	amount: money("amount").notNull(),
 	month: integer().notNull(),
 	year: integer().notNull(),
 	status: varchar({ length: 50 }).notNull(),
@@ -169,9 +172,9 @@ export const playersToTeams = pgTable("players_to_teams", {
 
 export const financialSettings = pgTable("financial_settings", {
 	id: serial().primaryKey().notNull(),
-	monthlyPlayerFee: integer("monthly_player_fee").default(0).notNull(),
-	trainingLevy: integer("training_levy").default(0).notNull(),
-	facilityFee: integer("facility_fee").default(0).notNull(),
+	monthlyPlayerFee: money("monthly_player_fee").default(0).notNull(),
+	trainingLevy: money("training_levy").default(0).notNull(),
+	facilityFee: money("facility_fee").default(0).notNull(),
 	autoAdjust: integer("auto_adjust").default(1).notNull(),
 	paymentDueDay: integer("payment_due_day").default(25).notNull(),
 	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
@@ -195,7 +198,7 @@ export const events = pgTable("events", {
 	endTime: timestamp("end_time", { mode: 'string' }).notNull(),
 	teamId: integer("team_id"),
 	coachId: integer("coach_id"),
-	amount: integer(),
+	amount: money("amount"),
 	status: varchar({ length: 50 }).default('scheduled'),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	// Shared note from the coach on this event, visible to every player on it

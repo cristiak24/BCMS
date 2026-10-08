@@ -192,7 +192,7 @@ export function parseEventInput(
         } else {
             const amount = Number(input.amount);
             if (!Number.isFinite(amount) || amount < 0) return { ok: false, error: 'amount must be a positive number.' };
-            out.amount = Math.round(amount);
+            out.amount = Math.round(amount * 100) / 100;
         }
     }
 
