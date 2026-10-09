@@ -221,6 +221,12 @@ export default function Login() {
         forgotPassword,
         submitPasswordReset,
         cancelPasswordReset,
+        secondFactor,
+        secondFactorCode,
+        setSecondFactorCode,
+        verifySecondFactor,
+        resendSecondFactor,
+        cancelSecondFactor,
     } = useLogin();
     const { session, initializing } = useSession();
     const [showPassword, setShowPassword] = useState(false);
@@ -247,6 +253,66 @@ export default function Login() {
                         <AuthCard>
                             <AuthHeading title="Intră în cont" subtitle="Conectare securizată pentru contul tău BCMS." />
 
+                            {secondFactor ? (
+                                <form
+                                    className="flex w-full flex-col gap-3.5"
+                                    onSubmit={(event) => {
+                                        event.preventDefault();
+                                        void verifySecondFactor();
+                                    }}
+                                >
+                                    <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold leading-5 text-blue-900">
+                                        {secondFactor.strategy === 'totp'
+                                            ? 'Introdu codul din aplicația de autentificare.'
+                                            : secondFactor.strategy === 'backup_code'
+                                                ? 'Introdu unul dintre codurile de rezervă.'
+                                                : `${secondFactor.newDevice ? 'Te conectezi de pe un dispozitiv nou. ' : ''}Ți-am trimis un cod${secondFactor.sentTo ? ` la ${secondFactor.sentTo}` : ''}. Introdu-l mai jos.`}
+                                    </div>
+                                    <label className="block">
+                                        <span className={authLabelClass}>Cod de verificare</span>
+                                        <span className={`${authFieldClass} ${errorMsg ? 'border-red-300' : 'border-slate-200'}`}>
+                                            <input
+                                                className={`${authInputClass} tracking-[0.3em]`}
+                                                placeholder="123456"
+                                                inputMode={secondFactor.strategy === 'backup_code' ? 'text' : 'numeric'}
+                                                autoComplete="one-time-code"
+                                                value={secondFactorCode}
+                                                onChange={(e) => setSecondFactorCode(e.target.value)}
+                                                disabled={loading}
+                                                autoFocus
+                                            />
+                                        </span>
+                                    </label>
+
+                                    {errorMsg ? (
+                                        <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+                                            <AlertCircle className="mt-0.5 shrink-0" size={18} />
+                                            <p className="m-0 text-sm font-bold leading-5">{errorMsg}</p>
+                                        </div>
+                                    ) : null}
+                                    {forgotPasswordMsg ? (
+                                        <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
+                                            <CheckCircle2 className="mt-0.5 shrink-0" size={18} />
+                                            <p className="m-0 text-sm font-bold leading-5">{forgotPasswordMsg}</p>
+                                        </div>
+                                    ) : null}
+
+                                    <button type="submit" disabled={loading} className={`mt-1 ${authPrimaryButtonClass}`}>
+                                        {loading ? <Loader2 className="animate-spin" size={20} /> : <LoginGlyph size={19} />}
+                                        <span>{loading ? 'Se verifică...' : 'Verifică și intră'}</span>
+                                    </button>
+                                    <div className="flex items-center justify-between gap-3">
+                                        {secondFactor.strategy === 'email_code' || secondFactor.strategy === 'phone_code' ? (
+                                            <button type="button" onClick={() => void resendSecondFactor()} disabled={loading} className="min-h-[36px] border-0 bg-transparent px-0 text-sm font-black text-blue-700 hover:text-blue-900 disabled:opacity-60">
+                                                Trimite din nou
+                                            </button>
+                                        ) : <span />}
+                                        <button type="button" onClick={cancelSecondFactor} disabled={loading} className="min-h-[36px] border-0 bg-transparent px-0 text-sm font-black text-slate-500 hover:text-slate-700 disabled:opacity-60">
+                                            Renunță
+                                        </button>
+                                    </div>
+                                </form>
+                            ) : (
                             <form
                                 className="flex w-full flex-col gap-3.5"
                                 onSubmit={(event) => {
@@ -386,6 +452,7 @@ export default function Login() {
                                     {!loading ? <ArrowGlyph size={18} /> : null}
                                 </button>
                             </form>
+                            )}
 
                             <p className="m-0 mt-5 text-center text-sm font-semibold text-slate-500">
                                 Ai primit o invitație? <Link to="/signup" className="font-black text-blue-700 no-underline hover:underline">Creează cont</Link>

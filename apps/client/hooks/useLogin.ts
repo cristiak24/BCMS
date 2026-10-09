@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { authApi } from '../services/authApi';
+import { authApi, type SecondFactorChallenge } from '../services/authApi';
 import { useSession } from '../context/AuthContext';
 
 /**
@@ -19,6 +19,9 @@ export function useLogin() {
     const [resetStage, setResetStage] = useState<'idle' | 'code-sent'>('idle');
     const [resetCode, setResetCode] = useState('');
     const [newPassword, setNewPassword] = useState('');
+    // Clerk asked for a code (new device or 2FA) after the password step.
+    const [secondFactor, setSecondFactor] = useState<SecondFactorChallenge | null>(null);
+    const [secondFactorCode, setSecondFactorCode] = useState('');
     // Enter + click, or a double tap, fired two sign-ins before `loading`
     // re-rendered; the second failed with "already signed in".
     const inFlight = useRef(false);
@@ -39,6 +42,12 @@ export function useLogin() {
         try {
             const result = await authApi.login(email.trim().toLowerCase(), password);
 
+            if (result.secondFactor) {
+                setSecondFactor(result.secondFactor);
+                setSecondFactorCode('');
+                return;
+            }
+
             if (!result.success) {
                 setErrorMsg(result.error ?? 'Email sau parola incorecte.');
                 return;
@@ -56,6 +65,47 @@ export function useLogin() {
             inFlight.current = false;
             setLoading(false);
         }
+    };
+
+    const verifySecondFactor = async () => {
+        if (inFlight.current) return;
+        setErrorMsg(null);
+        if (!secondFactorCode.trim()) {
+            setErrorMsg('Introdu codul primit.');
+            return;
+        }
+        inFlight.current = true;
+        setLoading(true);
+        try {
+            const result = await authApi.verifySecondFactor(secondFactorCode);
+            if (!result.success) {
+                setErrorMsg(result.error ?? 'Codul nu a fost acceptat.');
+                return;
+            }
+            setSecondFactor(null);
+            setSecondFactorCode('');
+            await reloadSession();
+        } catch (error) {
+            setErrorMsg(error instanceof Error ? error.message : 'Nu am putut verifica codul.');
+        } finally {
+            inFlight.current = false;
+            setLoading(false);
+        }
+    };
+
+    const resendSecondFactor = async () => {
+        setErrorMsg(null);
+        const result = await authApi.resendSecondFactor();
+        if (result.error) setErrorMsg(result.error);
+        else setForgotPasswordMsg('Am trimis un cod nou.');
+    };
+
+    const cancelSecondFactor = () => {
+        authApi.cancelSecondFactor();
+        setSecondFactor(null);
+        setSecondFactorCode('');
+        setErrorMsg(null);
+        setForgotPasswordMsg(null);
     };
 
     const forgotPassword = async () => {
@@ -138,5 +188,11 @@ export function useLogin() {
         forgotPassword,
         submitPasswordReset,
         cancelPasswordReset,
+        secondFactor,
+        secondFactorCode,
+        setSecondFactorCode,
+        verifySecondFactor,
+        resendSecondFactor,
+        cancelSecondFactor,
     };
 }

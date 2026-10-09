@@ -6,11 +6,55 @@ import type { AuthUser } from '../utils/authSession';
 // Response shapes
 // ────────────────────────────────────────────────────────────────────────────────
 
+export type SecondFactorChallenge = {
+  strategy: 'email_code' | 'phone_code' | 'totp' | 'backup_code';
+  /** Where the code went ("m***@gmail.com"), for code strategies. */
+  sentTo: string | null;
+  /** True when Clerk wants it because this is a new device (Device Trust). */
+  newDevice: boolean;
+};
+
 export type LoginResponse = {
   success: boolean;
   user?: AuthUser;
   error?: string;
+  /** Clerk wants a code before the session starts (new device or 2FA). */
+  secondFactor?: SecondFactorChallenge;
 };
+
+// The sign-in waiting for its second factor (one at a time, per tab).
+let pendingSecondFactor: SecondFactorChallenge | null = null;
+
+type ClerkSignIn = {
+  status: string | null;
+  createdSessionId: string | null;
+  supportedSecondFactors?: Array<{ strategy: string; emailAddressId?: string; phoneNumberId?: string; safeIdentifier?: string }> | null;
+  prepareSecondFactor: (params: any) => Promise<ClerkSignIn>;
+  attemptSecondFactor: (params: any) => Promise<ClerkSignIn>;
+};
+
+/**
+ * Ask Clerk to send the code (email first, then SMS; an authenticator app or
+ * backup code needs nothing sent). Covers both "needs_second_factor" (2FA)
+ * and "needs_client_trust" (a sign-in from a new device), which the login
+ * screen used to report as a dead-end error.
+ */
+async function startSecondFactor(signIn: ClerkSignIn): Promise<SecondFactorChallenge | null> {
+  const factors = signIn.supportedSecondFactors ?? [];
+  const pick = (strategy: string) => factors.find((factor) => factor.strategy === strategy);
+  const factor = pick('email_code') ?? pick('phone_code') ?? pick('totp') ?? pick('backup_code');
+  if (!factor) return null;
+  if (factor.strategy === 'email_code') {
+    await signIn.prepareSecondFactor({ strategy: 'email_code', emailAddressId: factor.emailAddressId });
+  } else if (factor.strategy === 'phone_code') {
+    await signIn.prepareSecondFactor({ strategy: 'phone_code', phoneNumberId: factor.phoneNumberId });
+  }
+  return {
+    strategy: factor.strategy as SecondFactorChallenge['strategy'],
+    sentTo: factor.safeIdentifier ?? null,
+    newDevice: signIn.status === 'needs_client_trust',
+  };
+}
 
 export type SignupPayload = {
   email: string;
@@ -116,6 +160,14 @@ export const authApi = {
         return (await pendingTaskResult()) ?? ({ success: true } as LoginResponse);
       }
 
+      if (result.status === 'needs_second_factor' || result.status === 'needs_client_trust') {
+        const challenge = await startSecondFactor(result as unknown as ClerkSignIn);
+        if (challenge) {
+          pendingSecondFactor = challenge;
+          return { success: false, secondFactor: challenge } as LoginResponse;
+        }
+      }
+
       return {
         success: false,
         error: `Contul necesită un pas suplimentar de verificare. Verifică emailul sau contactează administratorul clubului. (cod: ${result.status})`,
@@ -139,6 +191,45 @@ export const authApi = {
       }
       return { success: false, error: describeLoginError(error) };
     }
+  },
+
+  /** Finish a sign-in that stopped at the second factor (see login()). */
+  async verifySecondFactor(code: string): Promise<LoginResponse> {
+    const clerk = await getClerk().catch(() => null);
+    if (!clerk || !pendingSecondFactor) {
+      return { success: false, error: 'Sesiunea de conectare a expirat. Introdu din nou emailul și parola.' };
+    }
+    try {
+      const signIn = clerk.client.signIn as unknown as ClerkSignIn;
+      const result = await signIn.attemptSecondFactor({ strategy: pendingSecondFactor.strategy, code: code.trim() });
+      if (result.status === 'complete' && result.createdSessionId) {
+        pendingSecondFactor = null;
+        await clerk.setActive({ session: result.createdSessionId });
+        return { success: true };
+      }
+      return { success: false, error: `Codul nu a fost acceptat. (cod: ${result.status})` };
+    } catch (error) {
+      return { success: false, error: describeSecondFactorError(error) };
+    }
+  },
+
+  /** Send the second-factor code again (email/SMS strategies). */
+  async resendSecondFactor(): Promise<LoginResponse> {
+    const clerk = await getClerk().catch(() => null);
+    if (!clerk || !pendingSecondFactor) {
+      return { success: false, error: 'Sesiunea de conectare a expirat. Introdu din nou emailul și parola.' };
+    }
+    try {
+      const challenge = await startSecondFactor(clerk.client.signIn as unknown as ClerkSignIn);
+      if (challenge) pendingSecondFactor = challenge;
+      return { success: false, secondFactor: pendingSecondFactor ?? undefined };
+    } catch (error) {
+      return { success: false, error: describeSecondFactorError(error) };
+    }
+  },
+
+  cancelSecondFactor() {
+    pendingSecondFactor = null;
   },
 
   /**
@@ -315,4 +406,12 @@ function mapClerkError(error: unknown): string | null {
     default:
       return null;
   }
+}
+
+function describeSecondFactorError(error: any) {
+  const code = error?.errors?.[0]?.code as string | undefined;
+  if (code === 'form_code_incorrect') return 'Codul este greșit. Verifică ultimul email/SMS primit.';
+  if (code === 'verification_expired') return 'Codul a expirat. Apasă „Trimite din nou”.';
+  if (code === 'too_many_requests') return 'Prea multe încercări. Așteaptă un minut și încearcă din nou.';
+  return error?.errors?.[0]?.longMessage ?? error?.message ?? 'Nu am putut verifica codul.';
 }
