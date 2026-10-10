@@ -1,9 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     AlertCircle,
+    ArrowRight,
+    Check,
     CheckCircle2,
+    Eye,
+    EyeOff,
     Loader2,
+    Lock,
+    Mail,
+    MapPin,
+    Receipt,
 } from 'lucide-react';
 import { getHomeRouteForRole } from '../utils/authSession';
 import { useLogin } from '../hooks/useLogin';
@@ -20,147 +28,81 @@ import {
     authPrimaryButtonClass,
 } from '../components/auth/AuthChrome';
 
-type GlyphProps = {
-    className?: string;
-    size?: number;
-};
+const AVATARS = ['AM', 'DP', 'IS', 'MC', 'RT'];
 
-function MailGlyph({ className, size = 22 }: GlyphProps) {
+/** Static product preview built from the real tokens; purely decorative. */
+function ProductPreview() {
+    const card = 'rounded-[var(--r-lg)] border border-[var(--c-border)] bg-[var(--c-surface)] shadow-[var(--e-lg)]';
+    const eyebrow = 'text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--c-muted)]';
     return (
-        <svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 28 28" fill="none">
-            <path d="M4.6 8.4h18.8v13H4.6v-13Z" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
-            <path d="M5.4 9.2 14 15.3l8.6-6.1" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M8.5 5.6h11" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" opacity="0.45" />
-        </svg>
-    );
-}
-
-function LockGlyph({ className, size = 22 }: GlyphProps) {
-    return (
-        <svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 28 28" fill="none">
-            <path d="M6.4 12.1h17.2v12H6.4v-12Z" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
-            <path d="M10 12.1V9.3c0-3 2-5.1 5-5.1s5 2.1 5 5.1v2.8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-            <path d="M15 16.1v4.1M11.1 18.1h7.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" opacity="0.62" />
-        </svg>
-    );
-}
-
-function EyeGlyph({ className, hidden = false, size = 18 }: GlyphProps & { hidden?: boolean }) {
-    return (
-        <svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 28 28" fill="none">
-            <path d="M3.8 14s3.7-6 10.2-6 10.2 6 10.2 6-3.7 6-10.2 6-10.2-6-10.2-6Z" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
-            <circle cx="14" cy="14" r="3.2" stroke="currentColor" strokeWidth="2" />
-            {hidden ? <path d="M5.8 23.2 22.2 6.8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /> : null}
-        </svg>
-    );
-}
-
-function RoleGlyph({ className, size = 16 }: GlyphProps) {
-    return (
-        <svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 24 24" fill="none">
-            <circle cx="7.2" cy="8.2" r="2.6" stroke="currentColor" strokeWidth="2" />
-            <path d="M3.5 18.5c.7-2.9 2.3-4.4 4.7-4.4 1.7 0 3 .8 3.9 2.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            <path d="M14.2 8.4h6.3M14.2 13h6.3M14.2 17.6h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-    );
-}
-
-function LoginGlyph({ className, size = 20 }: GlyphProps) {
-    return (
-        <svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 28 28" fill="none">
-            <path d="M4.5 14h13" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-            <path d="m13.5 9 5 5-5 5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M18.5 5.8h4.2v16.4h-4.2" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.72" />
-        </svg>
-    );
-}
-
-function ArrowGlyph({ className, size = 18 }: GlyphProps) {
-    return (
-        <svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 24 24" fill="none">
-            <path d="M4 12h15M14 6l6 6-6 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-    );
-}
-
-function TacticNodeGlyph({ className, size = 23, variant = 'target' }: GlyphProps & { variant?: 'target' | 'route' | 'seal' }) {
-    if (variant === 'route') {
-        return (
-            <svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 28 28" fill="none">
-                <circle cx="7" cy="8" r="2.6" stroke="currentColor" strokeWidth="2.1" />
-                <circle cx="21" cy="14" r="2.6" stroke="currentColor" strokeWidth="2.1" />
-                <circle cx="9" cy="21" r="2.6" stroke="currentColor" strokeWidth="2.1" />
-                <path d="M9.4 9.2 18.6 13M18.7 15.7 11.4 19.5" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
-            </svg>
-        );
-    }
-
-    if (variant === 'seal') {
-        return (
-            <svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 28 28" fill="none">
-                <path d="M14 3.9 17 6l3.6-.2 1.1 3.4 2.7 2.4-1.3 3.4.5 3.6-3.3 1.5-2 3-3.6-.8-3.6.8-2-3-3.3-1.5.5-3.6-1.3-3.4 2.7-2.4L7.4 5.8 11 6l3-2.1Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-                <path d="m10.2 14.1 2.4 2.4 5.3-5.6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-        );
-    }
-
-    return (
-        <svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 28 28" fill="none">
-            <circle cx="14" cy="14" r="8.5" stroke="currentColor" strokeWidth="2.1" />
-            <circle cx="14" cy="14" r="2.7" stroke="currentColor" strokeWidth="2.1" />
-            <path d="M14 5.5v17M5.5 14h17" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" opacity="0.58" />
-        </svg>
-    );
-}
-
-function TacticsCanvas() {
-    return (
-        <div className="relative min-h-[420px] overflow-hidden">
-            <svg aria-hidden="true" className="absolute inset-x-0 top-0 h-[420px] w-full" viewBox="0 0 720 420" fill="none">
-                <defs>
-                    <linearGradient id="courtWash" x1="70" x2="690" y1="30" y2="370" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="var(--c-tint-fg)" />
-                        <stop offset="0.48" stopColor="var(--c-surface-2)" />
-                        <stop offset="1" stopColor="var(--c-warning-bg)" />
-                    </linearGradient>
-                    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-                        <feDropShadow dx="0" dy="18" stdDeviation="22" floodColor="var(--c-brand-fg)" floodOpacity="0.16" />
-                    </filter>
-                </defs>
-                <rect x="22" y="24" width="676" height="366" rx="8" fill="url(#courtWash)" filter="url(#softShadow)" />
-                <rect x="46" y="48" width="628" height="318" rx="8" stroke="var(--c-brand-fg)" strokeOpacity="0.16" strokeWidth="2" />
-                <path d="M360 48V366" stroke="var(--c-brand-fg)" strokeOpacity="0.12" strokeWidth="2" />
-                <circle cx="360" cy="207" r="54" stroke="var(--c-brand-fg)" strokeOpacity="0.14" strokeWidth="2" />
-                <path d="M46 126H158V288H46" stroke="var(--c-brand-fg)" strokeOpacity="0.14" strokeWidth="2" />
-                <path d="M674 126H562V288H674" stroke="var(--c-brand-fg)" strokeOpacity="0.14" strokeWidth="2" />
-                <path d="M158 158C218 177 218 237 158 256" stroke="var(--c-brand-fg)" strokeOpacity="0.14" strokeWidth="2" />
-                <path d="M562 158C502 177 502 237 562 256" stroke="var(--c-brand-fg)" strokeOpacity="0.14" strokeWidth="2" />
-
-                <path d="M126 276C206 190 278 244 350 168C411 103 487 113 568 74" stroke="var(--c-blue)" strokeWidth="5" strokeLinecap="round" strokeDasharray="2 14" />
-                <path d="M152 116C226 156 284 147 339 214C389 275 466 288 591 244" stroke="var(--c-success-fg)" strokeWidth="4" strokeLinecap="round" />
-                <path d="M248 318C310 282 344 300 407 253C453 219 511 205 610 212" stroke="var(--c-warning)" strokeWidth="4" strokeLinecap="round" />
-            </svg>
-
-            <div className="absolute left-[14%] top-[64%] flex h-12 w-12 items-center justify-center rounded-lg bg-[#2563EB] text-white shadow-lg shadow-blue-500/25">
-                <TacticNodeGlyph variant="target" size={23} />
-            </div>
-            <div className="absolute left-[46%] top-[36%] flex h-12 w-12 items-center justify-center rounded-lg bg-[#059669] text-white shadow-lg shadow-emerald-500/20">
-                <TacticNodeGlyph variant="route" size={23} />
-            </div>
-            <div className="absolute right-[12%] top-[14%] flex h-12 w-12 items-center justify-center rounded-lg bg-[#D97706] text-white shadow-lg shadow-amber-500/20">
-                <TacticNodeGlyph variant="seal" size={23} />
+        <div aria-hidden="true" className="relative mt-10 h-[300px] w-[540px] max-w-full select-none">
+            <div className="ui-rise absolute left-0 top-0 w-[390px]" style={{ animationDelay: '0.1s' }}>
+                <div className={`auth-float ${card} p-4`}>
+                    <div className="flex items-center justify-between">
+                        <span className={`${eyebrow} flex items-center gap-2`}>
+                            <span className="ui-ping h-2 w-2 rounded-full bg-[var(--c-success)]" />
+                            Următorul meci
+                        </span>
+                        <span className="rounded-full bg-[var(--c-surface-tint)] px-2.5 py-0.5 text-[11px] font-bold text-[var(--c-brand-fg)]">Acasă</span>
+                    </div>
+                    <div className="mt-3.5 flex items-center gap-3.5">
+                        <div className="flex h-[52px] w-[52px] shrink-0 flex-col items-center justify-center rounded-xl bg-[var(--c-surface-tint)]">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--c-brand-fg)]">Sâm</span>
+                            <span className="text-[22px] font-extrabold leading-none tracking-tight text-[var(--c-ink-strong)]">14</span>
+                        </div>
+                        <div className="min-w-0">
+                            <p className="m-0 text-[15px] font-extrabold tracking-tight text-[var(--c-ink-strong)]">U16 Masculin <span className="font-semibold text-[var(--c-muted)]">vs</span> CSM Rivals</p>
+                            <p className="m-0 mt-1 flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--c-muted)]">
+                                <MapPin size={13} /> Sala Polivalentă · 18:30
+                            </p>
+                        </div>
+                    </div>
+                    <div className="mt-4">
+                        <div className="mb-1.5 flex items-center justify-between text-[12px] font-semibold text-[var(--c-muted)]">
+                            <span>Confirmări</span>
+                            <span className="text-[var(--c-ink-strong)]">11 / 14</span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-[var(--c-surface-3)]">
+                            <div className="ui-bar h-full w-[78%] rounded-full bg-[var(--c-brand-surface)]" />
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div className="absolute left-8 top-8 max-w-[220px]">
-                <p className="m-0 text-xs font-black uppercase tracking-[0.18em] text-[#123B95]">Court logic</p>
-                <p className="m-0 mt-2 text-2xl font-black leading-tight text-[#0D1F3A]">
-                    Tot clubul, asezat ca o schema de joc.
-                </p>
+            <div className="ui-rise absolute right-0 top-[156px] w-[236px]" style={{ animationDelay: '0.25s' }}>
+                <div className={`auth-float ${card} p-4`} style={{ animationDelay: '-2.5s' }}>
+                    <div className="flex items-center justify-between">
+                        <span className={eyebrow}>Prezență</span>
+                        <span className="rounded-full bg-[var(--c-success-bg)] px-2 py-0.5 text-[11px] font-bold text-[var(--c-success-fg)]">+2</span>
+                    </div>
+                    <p className="m-0 mt-2 text-[30px] font-extrabold leading-none tracking-tight text-[var(--c-ink-strong)] [font-variant-numeric:tabular-nums]">
+                        12<span className="text-[18px] font-bold text-[var(--c-muted)]"> / 14</span>
+                    </p>
+                    <div className="mt-3.5 flex items-center">
+                        {AVATARS.map((initials, index) => (
+                            <span
+                                key={initials}
+                                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-[var(--c-surface)] bg-[var(--c-surface-3)] text-[10px] font-bold text-[var(--c-ink-soft)] ${index ? '-ml-2' : ''}`}
+                            >
+                                {initials}
+                            </span>
+                        ))}
+                        <span className="ml-2 text-[12px] font-semibold text-[var(--c-muted)]">+7</span>
+                    </div>
+                </div>
             </div>
 
-            <div className="absolute bottom-3 right-8 max-w-[250px] border-l-2 border-[#D97706] bg-white/55 py-2 pl-4 pr-1 backdrop-blur-sm">
-                <p className="m-0 text-sm font-black text-slate-950">Program, prezenta, plati, documente.</p>
-                <p className="m-0 mt-1 text-xs font-bold leading-5 text-slate-500">Fiecare rol intra direct in contextul potrivit.</p>
+            <div className="ui-rise absolute bottom-0 left-6 w-[270px]" style={{ animationDelay: '0.4s' }}>
+                <div className={`auth-float ${card} flex items-center gap-3 p-3.5`} style={{ animationDelay: '-4.5s' }}>
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--c-success-bg)] text-[var(--c-success-fg)]">
+                        <Check size={20} strokeWidth={2.5} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                        <p className="m-0 text-[14px] font-extrabold tracking-tight text-[var(--c-ink-strong)]">Cotizație achitată</p>
+                        <p className="m-0 mt-0.5 text-[12px] font-medium text-[var(--c-muted)]">Martie · 150 RON</p>
+                    </div>
+                    <Receipt size={18} className="shrink-0 text-[var(--c-muted)]" />
+                </div>
             </div>
         </div>
     );
@@ -168,34 +110,29 @@ function TacticsCanvas() {
 
 function BrandSide() {
     return (
-        <section className="relative hidden min-h-[680px] flex-col justify-center overflow-hidden md:flex">
-            <div className="absolute inset-0 opacity-75 [background-image:linear-gradient(rgba(18,59,149,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(18,59,149,0.055)_1px,transparent_1px)] [background-size:34px_34px]" />
-
-            <div className="relative z-10 flex min-h-[680px] flex-col justify-between p-7">
-                <div className="flex items-center justify-between gap-5">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#123B95] text-white shadow-lg shadow-blue-600/20">
-                            <BrandGlyph size={30} />
-                        </div>
-                        <div>
-                            <p className="m-0 text-xl font-black text-slate-950">BCMS</p>
-                            <p className="m-0 text-sm font-bold text-slate-500">Basketball Club Management</p>
-                        </div>
-                    </div>
-                    <div className="h-px min-w-20 flex-1 bg-slate-200" />
-                    <p className="m-0 text-xs font-black uppercase tracking-[0.18em] text-slate-400">Access</p>
+        <section className="relative hidden min-h-[640px] flex-col justify-between py-10 pr-6 lg:flex">
+            <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--c-brand-surface)] text-white shadow-[var(--e-sm)]">
+                    <BrandGlyph size={26} />
                 </div>
-
                 <div>
-                    <h1 className="m-0 max-w-[660px] text-5xl font-black leading-tight text-[#0D1F3A]">
-                        Mai putin admin. Mai mult joc.
-                    </h1>
-                    <p className="m-0 mt-5 max-w-xl text-lg font-semibold leading-8 text-slate-600">
-                        Login-ul deschide un spatiu construit pentru ritmul real al unui club de baschet: oameni, program, responsabilitati si decizii rapide.
-                    </p>
+                    <p className="m-0 text-lg font-extrabold leading-tight tracking-tight text-[var(--c-ink-strong)]">BCMS</p>
+                    <p className="m-0 text-[13px] font-medium text-[var(--c-muted)]">Basketball Club Management</p>
                 </div>
+            </div>
 
-                <TacticsCanvas />
+            <div className="relative z-10 my-10">
+                <h1 className="m-0 max-w-[520px] text-[46px] font-extrabold leading-[1.06] tracking-tight text-[var(--c-ink-strong)]">
+                    Mai puțin admin.
+                    <br />
+                    <span className="text-[var(--c-brand-fg)]">Mai mult joc.</span>
+                </h1>
+                <p className="m-0 mt-4 max-w-[460px] text-[16.5px] font-medium leading-7 text-[var(--c-muted)]">
+                    Program, prezență și plăți pentru tot clubul — într-un singur loc, pe înțelesul fiecărui rol.
+                </p>
+                <div className="hidden [@media(min-height:760px)]:block">
+                    <ProductPreview />
+                </div>
             </div>
         </section>
     );
@@ -231,23 +168,23 @@ export default function Login() {
     const { session, initializing } = useSession();
     const [showPassword, setShowPassword] = useState(false);
 
-    const emailIsFilled = useMemo(() => email.trim().length > 0, [email]);
-    const passwordIsFilled = password.length > 0;
-
     useEffect(() => {
         if (!initializing && session) {
             navigate(getHomeRouteForRole(session.role), { replace: true });
         }
     }, [initializing, navigate, session]);
 
+    const fieldBorder = errorMsg ? 'border-red-300' : 'border-[var(--c-border)]';
+    const plainInput = 'min-h-[46px] min-w-0 flex-1 rounded-[var(--r-md)] border border-[var(--c-border)] bg-[var(--c-surface)] px-3.5 text-base font-medium text-[var(--c-ink-strong)] outline-none placeholder:text-[var(--c-muted)]/70 focus:border-[var(--c-brand-border)] focus:ring-[3px] focus:ring-[var(--c-brand-border)]/20';
+
     return (
-        <main className="relative isolate min-h-screen overflow-hidden text-slate-950">
+        <main className="relative isolate min-h-screen overflow-hidden text-[var(--c-ink)]">
             <PageBackdrop />
-            <div className="relative z-10 mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 items-center gap-6 px-4 py-4 md:grid-cols-[minmax(0,1fr)_minmax(390px,460px)] md:px-8 lg:gap-12">
+            <div className="relative z-10 mx-auto grid min-h-screen w-full max-w-[1200px] grid-cols-1 items-center gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_minmax(400px,448px)] lg:gap-16 lg:px-10">
                 <BrandSide />
 
                 <section className="w-full">
-                    <div className="mx-auto w-full max-w-[460px]">
+                    <div className="mx-auto w-full max-w-[448px]">
                         <MobileBrand />
 
                         <AuthCard>
@@ -255,13 +192,13 @@ export default function Login() {
 
                             {secondFactor ? (
                                 <form
-                                    className="flex w-full flex-col gap-3.5"
+                                    className="flex w-full flex-col gap-4"
                                     onSubmit={(event) => {
                                         event.preventDefault();
                                         void verifySecondFactor();
                                     }}
                                 >
-                                    <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold leading-5 text-blue-900">
+                                    <div className="rounded-[var(--r-md)] border border-[var(--c-border)] bg-[var(--c-surface-tint)] px-4 py-3 text-sm font-semibold leading-5 text-[var(--c-ink-soft)]">
                                         {secondFactor.strategy === 'totp'
                                             ? 'Introdu codul din aplicația de autentificare.'
                                             : secondFactor.strategy === 'backup_code'
@@ -270,7 +207,7 @@ export default function Login() {
                                     </div>
                                     <label className="block">
                                         <span className={authLabelClass}>Cod de verificare</span>
-                                        <span className={`${authFieldClass} ${errorMsg ? 'border-red-300' : 'border-slate-200'}`}>
+                                        <span className={`${authFieldClass} ${fieldBorder}`}>
                                             <input
                                                 className={`${authInputClass} tracking-[0.3em]`}
                                                 placeholder="123456"
@@ -285,177 +222,161 @@ export default function Login() {
                                     </label>
 
                                     {errorMsg ? (
-                                        <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+                                        <div role="alert" className="flex items-start gap-3 rounded-[var(--r-md)] border border-red-200 bg-red-50 px-4 py-3 text-red-700">
                                             <AlertCircle className="mt-0.5 shrink-0" size={18} />
-                                            <p className="m-0 text-sm font-bold leading-5">{errorMsg}</p>
+                                            <p className="m-0 text-sm font-semibold leading-5">{errorMsg}</p>
                                         </div>
                                     ) : null}
                                     {forgotPasswordMsg ? (
-                                        <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
+                                        <div className="flex items-start gap-3 rounded-[var(--r-md)] border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
                                             <CheckCircle2 className="mt-0.5 shrink-0" size={18} />
-                                            <p className="m-0 text-sm font-bold leading-5">{forgotPasswordMsg}</p>
+                                            <p className="m-0 text-sm font-semibold leading-5">{forgotPasswordMsg}</p>
                                         </div>
                                     ) : null}
 
-                                    <button type="submit" disabled={loading} className={`mt-1 ${authPrimaryButtonClass}`}>
-                                        {loading ? <Loader2 className="animate-spin" size={20} /> : <LoginGlyph size={19} />}
+                                    <button type="submit" disabled={loading} className={authPrimaryButtonClass}>
+                                        {loading ? <Loader2 className="animate-spin" size={18} /> : null}
                                         <span>{loading ? 'Se verifică...' : 'Verifică și intră'}</span>
                                     </button>
                                     <div className="flex items-center justify-between gap-3">
                                         {secondFactor.strategy === 'email_code' || secondFactor.strategy === 'phone_code' ? (
-                                            <button type="button" onClick={() => void resendSecondFactor()} disabled={loading} className="min-h-[36px] border-0 bg-transparent px-0 text-sm font-black text-blue-700 hover:text-blue-900 disabled:opacity-60">
+                                            <button type="button" onClick={() => void resendSecondFactor()} disabled={loading} className="min-h-[36px] border-0 bg-transparent px-0 text-sm font-bold text-[var(--c-brand-fg)] hover:underline disabled:opacity-60">
                                                 Trimite din nou
                                             </button>
                                         ) : <span />}
-                                        <button type="button" onClick={cancelSecondFactor} disabled={loading} className="min-h-[36px] border-0 bg-transparent px-0 text-sm font-black text-slate-500 hover:text-slate-700 disabled:opacity-60">
+                                        <button type="button" onClick={cancelSecondFactor} disabled={loading} className="min-h-[36px] border-0 bg-transparent px-0 text-sm font-bold text-[var(--c-muted)] hover:text-[var(--c-ink)] disabled:opacity-60">
                                             Renunță
                                         </button>
                                     </div>
                                 </form>
                             ) : (
-                            <form
-                                className="flex w-full flex-col gap-3.5"
-                                onSubmit={(event) => {
-                                    event.preventDefault();
-                                    void login();
-                                }}
-                            >
-                                <label className="block">
-                                    <span className={authLabelClass}>
-                                        Email
-                                        {emailIsFilled ? <CheckCircle2 size={16} className="text-emerald-600" /> : null}
-                                    </span>
-                                    <span className={`${authFieldClass} ${errorMsg ? 'border-red-300' : 'border-slate-200'}`}>
-                                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
-                                            <MailGlyph size={20} />
+                                <form
+                                    className="flex w-full flex-col gap-4"
+                                    onSubmit={(event) => {
+                                        event.preventDefault();
+                                        void login();
+                                    }}
+                                >
+                                    <div>
+                                        <label htmlFor="login-email" className={authLabelClass}>Email</label>
+                                        <span className={`${authFieldClass} ${fieldBorder}`}>
+                                            <Mail size={18} className="shrink-0 text-[var(--c-muted)]" />
+                                            <input
+                                                id="login-email"
+                                                className={`ml-3 ${authInputClass}`}
+                                                placeholder="nume@club.ro"
+                                                type="email"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                autoCapitalize="none"
+                                                autoComplete="email"
+                                                disabled={loading}
+                                            />
                                         </span>
-                                        <input
-                                            className={`ml-3 ${authInputClass}`}
-                                            placeholder="nume@club.ro"
-                                            type="email"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            autoCapitalize="none"
-                                            autoComplete="email"
-                                            disabled={loading}
-                                        />
-                                    </span>
-                                </label>
-
-                                <label className="block">
-                                    <span className={authLabelClass}>
-                                        Parola
-                                        {passwordIsFilled ? <CheckCircle2 size={16} className="text-emerald-600" /> : null}
-                                    </span>
-                                    <span className={`${authFieldClass} ${errorMsg ? 'border-red-300' : 'border-slate-200'}`}>
-                                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
-                                            <LockGlyph size={20} />
-                                        </span>
-                                        <input
-                                            className={`ml-3 ${authInputClass}`}
-                                            placeholder="Parola"
-                                            type={showPassword ? 'text' : 'password'}
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            autoComplete="current-password"
-                                            disabled={loading}
-                                        />
-                                        <button
-                                            type="button"
-                                            aria-label={showPassword ? 'Ascunde parola' : 'Arata parola'}
-                                            onClick={() => setShowPassword((value) => !value)}
-                                            className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:bg-slate-100"
-                                        >
-                                            <EyeGlyph hidden={showPassword} size={18} />
-                                        </button>
-                                    </span>
-                                </label>
-
-                                <div className="flex items-center justify-between gap-4">
-                                    <div className="hidden items-center gap-2 text-xs font-bold text-slate-500 sm:flex">
-                                        <RoleGlyph size={16} className="text-emerald-600" />
-                                        Acces pe rol
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={forgotPassword}
-                                        disabled={forgotPasswordLoading || loading}
-                                        className="ml-auto min-h-[36px] border-0 bg-transparent px-0 text-sm font-black text-blue-700 transition-colors hover:text-blue-900 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        {forgotPasswordLoading ? 'Trimit resetarea...' : 'Ai uitat parola?'}
-                                    </button>
-                                </div>
 
-                                {errorMsg ? (
-                                    <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700">
-                                        <AlertCircle className="mt-0.5 shrink-0" size={18} />
-                                        <p className="m-0 text-sm font-bold leading-5">{errorMsg}</p>
-                                    </div>
-                                ) : null}
-
-                                {forgotPasswordMsg ? (
-                                    <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
-                                        <CheckCircle2 className="mt-0.5 shrink-0" size={18} />
-                                        <p className="m-0 text-sm font-bold leading-5">{forgotPasswordMsg}</p>
-                                    </div>
-                                ) : null}
-
-                                {resetStage === 'code-sent' ? (
-                                    <div className="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
-                                        <p className="m-0 text-sm font-bold text-blue-900">
-                                            Introdu codul primit pe email si o parola noua.
-                                        </p>
-                                        <input
-                                            className="min-h-[48px] rounded-lg border border-slate-200 bg-white px-3 text-base font-bold text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-600"
-                                            placeholder="Cod de resetare"
-                                            value={resetCode}
-                                            onChange={(e) => setResetCode(e.target.value)}
-                                            disabled={forgotPasswordLoading}
-                                        />
-                                        <input
-                                            className="min-h-[48px] rounded-lg border border-slate-200 bg-white px-3 text-base font-bold text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-600"
-                                            placeholder="Parola noua"
-                                            type="password"
-                                            value={newPassword}
-                                            onChange={(e) => setNewPassword(e.target.value)}
-                                            autoComplete="new-password"
-                                            disabled={forgotPasswordLoading}
-                                        />
-                                        <div className="flex items-center gap-3">
+                                    <div>
+                                        <div className="mb-1.5 flex items-center justify-between">
+                                            <label htmlFor="login-password" className="text-[13px] font-bold text-[var(--c-ink-soft)]">Parolă</label>
                                             <button
                                                 type="button"
-                                                onClick={submitPasswordReset}
-                                                disabled={forgotPasswordLoading}
-                                                className="min-h-[44px] flex-1 rounded-lg border-0 bg-[#2563EB] px-4 text-sm font-black text-white transition-colors hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-70"
+                                                onClick={forgotPassword}
+                                                disabled={forgotPasswordLoading || loading}
+                                                className="border-0 bg-transparent p-0 text-[13px] font-bold text-[var(--c-brand-fg)] hover:underline disabled:cursor-not-allowed disabled:opacity-60"
                                             >
-                                                {forgotPasswordLoading ? 'Se salveaza...' : 'Salveaza parola noua'}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={cancelPasswordReset}
-                                                disabled={forgotPasswordLoading}
-                                                className="min-h-[44px] rounded-lg border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 hover:bg-slate-50"
-                                            >
-                                                Renunta
+                                                {forgotPasswordLoading ? 'Trimit resetarea...' : 'Ai uitat parola?'}
                                             </button>
                                         </div>
+                                        <span className={`${authFieldClass} ${fieldBorder}`}>
+                                            <Lock size={18} className="shrink-0 text-[var(--c-muted)]" />
+                                            <input
+                                                id="login-password"
+                                                className={`ml-3 ${authInputClass}`}
+                                                placeholder="Parola ta"
+                                                type={showPassword ? 'text' : 'password'}
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                autoComplete="current-password"
+                                                disabled={loading}
+                                            />
+                                            <button
+                                                type="button"
+                                                aria-label={showPassword ? 'Ascunde parola' : 'Arată parola'}
+                                                onClick={() => setShowPassword((value) => !value)}
+                                                className="-mr-1.5 ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-0 bg-transparent text-[var(--c-muted)] transition-colors hover:bg-[var(--c-surface-3)] hover:text-[var(--c-ink)]"
+                                            >
+                                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                            </button>
+                                        </span>
                                     </div>
-                                ) : null}
 
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className={`mt-1 ${authPrimaryButtonClass}`}
-                                >
-                                    {loading ? <Loader2 className="animate-spin" size={20} /> : <LoginGlyph size={19} />}
-                                    <span>{loading ? 'Se conecteaza...' : 'Autentificare'}</span>
-                                    {!loading ? <ArrowGlyph size={18} /> : null}
-                                </button>
-                            </form>
+                                    {errorMsg ? (
+                                        <div role="alert" className="flex items-start gap-3 rounded-[var(--r-md)] border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+                                            <AlertCircle className="mt-0.5 shrink-0" size={18} />
+                                            <p className="m-0 text-sm font-semibold leading-5">{errorMsg}</p>
+                                        </div>
+                                    ) : null}
+
+                                    {forgotPasswordMsg ? (
+                                        <div className="flex items-start gap-3 rounded-[var(--r-md)] border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
+                                            <CheckCircle2 className="mt-0.5 shrink-0" size={18} />
+                                            <p className="m-0 text-sm font-semibold leading-5">{forgotPasswordMsg}</p>
+                                        </div>
+                                    ) : null}
+
+                                    {resetStage === 'code-sent' ? (
+                                        <div className="flex flex-col gap-3 rounded-[var(--r-md)] border border-[var(--c-border)] bg-[var(--c-surface-2)] p-4">
+                                            <p className="m-0 text-sm font-semibold text-[var(--c-ink-soft)]">
+                                                Introdu codul primit pe email și o parolă nouă.
+                                            </p>
+                                            <input
+                                                className={plainInput}
+                                                placeholder="Cod de resetare"
+                                                value={resetCode}
+                                                onChange={(e) => setResetCode(e.target.value)}
+                                                disabled={forgotPasswordLoading}
+                                            />
+                                            <input
+                                                className={plainInput}
+                                                placeholder="Parolă nouă"
+                                                type="password"
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                autoComplete="new-password"
+                                                disabled={forgotPasswordLoading}
+                                            />
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={submitPasswordReset}
+                                                    disabled={forgotPasswordLoading}
+                                                    className="min-h-[44px] flex-1 rounded-[var(--r-md)] border-0 bg-[var(--c-brand-surface)] px-4 text-sm font-bold text-white transition-colors hover:bg-[var(--c-brand-strong)] disabled:cursor-not-allowed disabled:opacity-70"
+                                                >
+                                                    {forgotPasswordLoading ? 'Se salvează...' : 'Salvează parola nouă'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={cancelPasswordReset}
+                                                    disabled={forgotPasswordLoading}
+                                                    className="min-h-[44px] rounded-[var(--r-md)] border border-[var(--c-border)] bg-[var(--c-surface)] px-4 text-sm font-bold text-[var(--c-muted)] hover:bg-[var(--c-surface-3)]"
+                                                >
+                                                    Renunță
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : null}
+
+                                    <button type="submit" disabled={loading} className={`group mt-1 ${authPrimaryButtonClass}`}>
+                                        {loading ? <Loader2 className="animate-spin" size={18} /> : null}
+                                        <span>{loading ? 'Se conectează...' : 'Autentificare'}</span>
+                                        {!loading ? <ArrowRight size={17} className="transition-transform group-hover:translate-x-0.5" /> : null}
+                                    </button>
+                                </form>
                             )}
 
-                            <p className="m-0 mt-5 text-center text-sm font-semibold text-slate-500">
-                                Ai primit o invitație? <Link to="/signup" className="font-black text-blue-700 no-underline hover:underline">Creează cont</Link>
+                            <p className="m-0 mt-6 border-t border-[var(--c-border-soft)] pt-5 text-center text-sm font-medium text-[var(--c-muted)]">
+                                Ai primit o invitație?{' '}
+                                <Link to="/signup" className="font-bold text-[var(--c-brand-fg)] no-underline hover:underline">Creează cont</Link>
                             </p>
                         </AuthCard>
                     </div>

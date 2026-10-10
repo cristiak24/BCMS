@@ -32,7 +32,7 @@ export function useLogin() {
         setForgotPasswordMsg(null);
 
         if (!email.trim() || !password) {
-            setErrorMsg('Introdu emailul si parola.');
+            setErrorMsg('Introdu emailul și parola.');
             return;
         }
 
@@ -49,7 +49,7 @@ export function useLogin() {
             }
 
             if (!result.success) {
-                setErrorMsg(result.error ?? 'Email sau parola incorecte.');
+                setErrorMsg(result.error ?? 'Email sau parolă incorecte.');
                 return;
             }
 
@@ -115,7 +115,7 @@ export function useLogin() {
         const normalizedEmail = email.trim().toLowerCase();
 
         if (!normalizedEmail) {
-            setErrorMsg('Introdu emailul inainte de resetarea parolei.');
+            setErrorMsg('Introdu emailul înainte de resetarea parolei.');
             return;
         }
 
@@ -136,7 +136,7 @@ export function useLogin() {
         setErrorMsg(null);
 
         if (!resetCode.trim() || !newPassword) {
-            setErrorMsg('Introdu codul primit pe email si o parola noua.');
+            setErrorMsg('Introdu codul primit pe email și o parolă nouă.');
             return;
         }
 
@@ -150,7 +150,7 @@ export function useLogin() {
                 return;
             }
 
-            setForgotPasswordMsg('Parola a fost schimbata. Te conectam...');
+            setForgotPasswordMsg('Parola a fost schimbată. Te conectăm...');
             setResetStage('idle');
             setResetCode('');
             setNewPassword('');

@@ -22,44 +22,25 @@ export function BrandGlyph({ className, size = 28 }: GlyphProps) {
 
 export function PageBackdrop() {
     return (
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-            <div className="absolute inset-0 bg-[#EDF4FA]" />
-            <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(18,59,149,0.08)_0%,rgba(18,59,149,0.025)_31%,rgba(255,255,255,0)_58%),linear-gradient(245deg,rgba(217,119,6,0.12)_0%,rgba(217,119,6,0.035)_28%,rgba(255,255,255,0)_56%)]" />
-            <div className="absolute inset-0 opacity-55 [background-image:linear-gradient(rgba(18,59,149,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(18,59,149,0.045)_1px,transparent_1px)] [background-size:34px_34px]" />
-            {/* The skewed light panels read as a hard diagonal split on a narrow,
-                tall screen, so they only appear from tablet width up. */}
-            <div className="absolute -left-24 top-0 hidden h-full w-[58%] skew-x-[-10deg] bg-white/34 md:block" />
-            <div className="absolute bottom-0 right-0 hidden h-[48%] w-[62%] skew-x-[-14deg] bg-[#FFF7E8]/52 md:block" />
-
-            {/* "slice" keeps circles round and boxes square on a portrait phone
-                (the old "none" stretched them into tall ellipses); it just crops
-                the sides of the drawing instead. */}
-            <svg className="absolute inset-0 h-full w-full opacity-80" viewBox="0 0 1440 900" fill="none" preserveAspectRatio="xMidYMid slice">
-                <path d="M-80 713C154 585 302 635 472 517C638 402 795 317 1057 374C1222 410 1340 351 1510 268" stroke="var(--c-brand-fg)" strokeOpacity="0.10" strokeWidth="3" />
-                <path d="M-92 252C145 334 279 279 463 355C643 429 688 552 905 555C1100 558 1217 482 1510 533" stroke="var(--c-success-fg)" strokeOpacity="0.13" strokeWidth="3" />
-                <path d="M83 108H587V365H83V108Z" stroke="var(--c-brand-fg)" strokeOpacity="0.08" strokeWidth="2" />
-                <path d="M942 570H1390V874H942V570Z" stroke="var(--c-warning)" strokeOpacity="0.10" strokeWidth="2" />
-                <circle cx="336" cy="236" r="72" stroke="var(--c-brand-fg)" strokeOpacity="0.08" strokeWidth="2" />
-                <circle cx="1167" cy="722" r="96" stroke="var(--c-warning)" strokeOpacity="0.10" strokeWidth="2" />
-                <path d="M336 108V365M83 236H587M1167 570V874M942 722H1390" stroke="var(--c-brand-fg)" strokeOpacity="0.055" strokeWidth="2" />
-            </svg>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[var(--c-bg)]">
+            <div className="absolute inset-0 opacity-70 [background-image:radial-gradient(var(--c-border-strong)_1px,transparent_1.2px)] [background-size:22px_22px] [mask-image:radial-gradient(ellipse_70%_60%_at_35%_45%,#000,transparent)]" />
         </div>
     );
 }
 
 /**
- * Small brand row above the card. Login shows it on phones only (desktop has
- * the brand panel); signup has no panel, so it shows it everywhere.
+ * Brand lockup. On the login page it only shows below the desktop split (the
+ * brand column carries it there); signup has no column, so it shows always.
  */
 export function MobileBrand({ showOnDesktop = false }: { showOnDesktop?: boolean }) {
     return (
-        <div className={`mb-3 flex items-center gap-2.5 ${showOnDesktop ? '' : 'md:hidden'}`}>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#123B95] text-white">
+        <div className={`mb-5 flex items-center gap-2.5 ${showOnDesktop ? '' : 'lg:hidden'}`}>
+            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[var(--c-brand-surface)] text-white">
                 <BrandGlyph size={22} />
             </div>
             <div>
-                <p className="m-0 text-base font-black leading-tight text-slate-950">BCMS</p>
-                <p className="m-0 text-[11px] font-bold text-slate-500">Club workspace</p>
+                <p className="m-0 text-base font-extrabold leading-tight tracking-tight text-[var(--c-ink-strong)]">BCMS</p>
+                <p className="m-0 text-[11px] font-semibold text-[var(--c-muted)]">Club workspace</p>
             </div>
         </div>
     );
@@ -67,7 +48,7 @@ export function MobileBrand({ showOnDesktop = false }: { showOnDesktop?: boolean
 
 export function AuthCard({ children }: { children: ReactNode }) {
     return (
-        <div className="rounded-lg border border-white/80 bg-white/82 p-4 shadow-xl shadow-slate-400/30 backdrop-blur-xl sm:p-6 md:p-7">
+        <div className="ui-rise rounded-[var(--r-xl)] border border-[var(--c-border)] bg-[var(--c-surface)] p-5 shadow-[var(--e-md)] sm:p-7">
             {children}
         </div>
     );
@@ -75,19 +56,20 @@ export function AuthCard({ children }: { children: ReactNode }) {
 
 export function AuthHeading({ title, subtitle }: { title: string; subtitle?: string }) {
     return (
-        <div className="mb-5">
-            <h1 className="m-0 text-2xl font-black leading-tight text-slate-950 md:text-3xl">{title}</h1>
+        <div className="mb-6">
+            <span className="mb-3 block h-[3px] w-7 rounded-full bg-[var(--c-brand-surface)]" />
+            <h1 className="m-0 text-2xl font-extrabold leading-tight tracking-tight text-[var(--c-ink-strong)] md:text-[28px]">{title}</h1>
             {subtitle ? (
-                <p className="m-0 mt-1.5 text-sm font-semibold leading-6 text-slate-500">{subtitle}</p>
+                <p className="m-0 mt-1.5 text-sm font-medium leading-6 text-[var(--c-muted)]">{subtitle}</p>
             ) : null}
         </div>
     );
 }
 
-export const authLabelClass = 'mb-1.5 flex items-center justify-between text-[13px] font-black text-slate-700';
+export const authLabelClass = 'mb-1.5 flex items-center justify-between text-[13px] font-bold text-[var(--c-ink-soft)]';
 export const authFieldClass =
-    'flex min-h-[48px] items-center rounded-lg border bg-white px-3 transition-colors focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100';
+    'flex min-h-[48px] items-center rounded-[var(--r-md)] border bg-[var(--c-surface)] px-3.5 transition-colors focus-within:border-[var(--c-brand-border)] focus-within:ring-[3px] focus-within:ring-[var(--c-brand-border)]/20';
 export const authInputClass =
-    'min-h-[46px] min-w-0 flex-1 bg-transparent text-[15px] font-bold text-slate-950 outline-none placeholder:text-slate-400';
+    'min-h-[46px] min-w-0 flex-1 bg-transparent text-[15px] font-medium text-[var(--c-ink-strong)] outline-none placeholder:text-[var(--c-muted)]/70';
 export const authPrimaryButtonClass =
-    'flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg border-0 bg-[#2563EB] px-4 text-[15px] font-black text-white shadow-lg shadow-blue-600/20 transition-colors hover:bg-[#1D4ED8] active:bg-[#1E3A8A] disabled:cursor-not-allowed disabled:opacity-70';
+    'flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[var(--r-md)] border-0 bg-[var(--c-brand-surface)] px-4 text-[15px] font-bold text-white shadow-[var(--e-sm)] transition-colors hover:bg-[var(--c-brand-strong)] disabled:cursor-not-allowed disabled:opacity-70';

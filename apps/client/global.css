@@ -544,3 +544,15 @@
   }
   .m-scroller > * { flex: none; }
 }
+
+/* Login: product preview cards drift very slightly, out of phase. */
+@keyframes authFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+.auth-float {
+  animation: authFloat 7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-float { animation: none !important; }
+}
