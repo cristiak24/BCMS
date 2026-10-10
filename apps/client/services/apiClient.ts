@@ -1,4 +1,4 @@
-import { buildApiUrl } from '../config/serverUrl';
+import { buildApiUrl, buildServerUrl } from '../config/serverUrl';
 
 type ApiResponseType = 'json' | 'text' | 'blob' | 'void';
 type QueryParamValue = string | number | boolean | null | undefined;
@@ -182,6 +182,29 @@ async function fetchWithTimeout(url: string, init?: RequestInit) {
   }
 }
 
+// The API runs on Render's free plan, which sleeps after ~15 min idle and
+// needs up to a minute to boot. Every request used to hit the 15s timeout
+// during that boot, so a login after a quiet spell sat on the loading screen
+// and then rendered a dashboard with no data. A ping to the server root
+// (no auth, no CORS preflight) wakes it; requests wait for that instead.
+const WAKE_TIMEOUT_MS = 75000;
+let wakePromise: Promise<void> | null = null;
+
+/** Wake the API server; resolves once it answers (or gives up), never rejects. */
+export function wakeServer(): Promise<void> {
+  if (!wakePromise) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), WAKE_TIMEOUT_MS);
+    wakePromise = fetch(buildServerUrl('/'), { mode: 'no-cors', cache: 'no-store', signal: controller.signal })
+      .then(() => undefined, () => undefined)
+      .finally(() => {
+        clearTimeout(timeout);
+        wakePromise = null;
+      });
+  }
+  return wakePromise;
+}
+
 const ACTIVE_CHILD_KEY = 'bcms.child-id';
 
 /** The child a parent account is looking at, if they picked one. */
@@ -208,29 +231,52 @@ export async function apiFetch<T>(
   init?: RequestInit,
   responseType: ApiResponseType = 'json'
 ): Promise<T> {
-  const headers = new Headers(init?.headers);
-
-  // Always try to attach the current session token
-  const token = await getSessionToken();
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
+  // The server is still booting from the app-start ping: wait for it rather
+  // than burn the request timeout on a sleeping server.
+  if (wakePromise) {
+    await wakePromise;
   }
 
-  if (!headers.has('Content-Type') && !isFormDataBody(init?.body)) {
-    headers.set('Content-Type', 'application/json');
-  }
+  const send = async () => {
+    const headers = new Headers(init?.headers);
 
-  // A parent's selected child. Only a selection — the server checks it
-  // against the parent's own links (apps/server/src/lib/selfPlayer.ts).
-  const childId = getActiveChildId();
-  if (childId != null && !headers.has('X-BCMS-Child')) {
-    headers.set('X-BCMS-Child', String(childId));
-  }
+    // Always try to attach the current session token
+    const token = await getSessionToken();
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
 
-  const response = await fetchWithTimeout(buildApiUrl(path), {
-    ...init,
-    headers,
-  });
+    if (!headers.has('Content-Type') && !isFormDataBody(init?.body)) {
+      headers.set('Content-Type', 'application/json');
+    }
+
+    // A parent's selected child. Only a selection — the server checks it
+    // against the parent's own links (apps/server/src/lib/selfPlayer.ts).
+    const childId = getActiveChildId();
+    if (childId != null && !headers.has('X-BCMS-Child')) {
+      headers.set('X-BCMS-Child', String(childId));
+    }
+
+    return fetchWithTimeout(buildApiUrl(path), {
+      ...init,
+      headers,
+    });
+  };
+
+  let response: Response;
+  try {
+    response = await send();
+  } catch (error) {
+    // Timeout or network failure, most likely the server fell asleep (e.g. a
+    // tab resumed after a while). Reads are safe to repeat: wake it and try
+    // once more. send() mints a fresh token — Clerk's expire after 60s.
+    const method = (init?.method ?? 'GET').toUpperCase();
+    if (method !== 'GET' || init?.signal) {
+      throw error;
+    }
+    await wakeServer();
+    response = await send();
+  }
 
   if (!response.ok) {
     const error = await buildError(response);

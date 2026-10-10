@@ -19,9 +19,14 @@ import './theme/dark.css';
 import './theme/dark-extras.css';
 import App from './App';
 import { captureInstallPrompt } from './pwa/installApp';
+import { wakeServer } from '../services/apiClient';
 
 // Before render: Chrome can fire beforeinstallprompt as soon as the page loads.
 captureInstallPrompt();
+
+// Start waking the API (Render free plan sleeps when idle) while Clerk loads
+// and the user types their password.
+void wakeServer();
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
