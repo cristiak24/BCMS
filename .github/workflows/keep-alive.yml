@@ -1,0 +1,13 @@
+name: Keep Render server warm
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping bcms-server
+        run: curl -fsS --max-time 30 https://bcms-qflv.onrender.com/
