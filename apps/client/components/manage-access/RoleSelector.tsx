@@ -148,3 +148,30 @@ export function AccessButton({
         </Pressable>
     );
 }
+
+export type TeamOption = { id: number; name: string };
+
+/**
+ * Optional team for a parent invite: the children who register with it are
+ * placed in that team directly. Hidden for other roles and for clubs with no
+ * teams.
+ */
+export function TeamPicker({ teams, selectedTeamId, onSelect }: { teams: TeamOption[]; selectedTeamId: number | null; onSelect: (teamId: number | null) => void }) {
+    if (teams.length === 0) return null;
+    return (
+        <View>
+            <FieldLabel hint="opțional">Echipă</FieldLabel>
+            <View className="flex-row flex-wrap gap-1.5">
+                <OptionChip label="Fără echipă" active={selectedTeamId == null} onPress={() => onSelect(null)} />
+                {teams.map((team) => (
+                    <OptionChip key={team.id} label={team.name} active={selectedTeamId === team.id} onPress={() => onSelect(team.id)} />
+                ))}
+            </View>
+            <Text className="text-[11.5px] mt-1.5 leading-4" style={{ color: 'var(--c-faint)' }}>
+                {selectedTeamId != null
+                    ? 'Copiii se înscriu direct în această echipă, fără alt pas de alegere.'
+                    : 'Fără echipă, copiii rămân neîncadrați până îi adaugi tu într-o echipă.'}
+            </Text>
+        </View>
+    );
+}

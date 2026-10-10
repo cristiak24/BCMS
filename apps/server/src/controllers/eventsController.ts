@@ -129,6 +129,15 @@ async function ensureEventReadAccess(req: AuthenticatedRequest, event: { teamId:
         return { status: 403 as const, error: 'Access denied' };
     }
 
+    // A player/parent not (yet) linked to a team must not reach another
+    // team's event directly by id either.
+    if (isPlayerFacingRole(req)) {
+        const selfTeamIds = await getSelfTeamIds(req);
+        if (!selfTeamIds.includes(event.teamId)) {
+            return { status: 403 as const, error: 'Access denied' };
+        }
+    }
+
     return null;
 }
 
@@ -253,19 +262,19 @@ export const eventsController = {
                 }
             }
 
-            // Players/parents: only their own team(s). The endpoint used to
-            // return every event the club had ever recorded to any member —
-            // unbounded, and every other squad's schedule on the wire — and
-            // the player screens filtered it down in the browser. A member not
-            // yet linked to a team keeps the club-wide view (no blank page).
+            // Players/parents: only their own team(s). A member of a club with
+            // several teams who isn't linked to one yet must not see any other
+            // team's trainings/matches/results, so they get an empty list
+            // rather than the club-wide view.
             let playerScoped = false;
             if (isPlayerFacingRole(req) && allowedTeamIds) {
                 const selfTeamIds = await getSelfTeamIds(req);
-                if (selfTeamIds.length) {
-                    const clubSet = new Set(allowedTeamIds);
-                    allowedTeamIds = selfTeamIds.filter((id) => clubSet.has(id));
-                    playerScoped = true;
+                if (!selfTeamIds.length) {
+                    return res.json([]);
                 }
+                const clubSet = new Set(allowedTeamIds);
+                allowedTeamIds = selfTeamIds.filter((id) => clubSet.has(id));
+                playerScoped = true;
             }
 
             const plan = buildEventQueryPlan(req.query as EventQueryParams, {

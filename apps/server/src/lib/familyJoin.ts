@@ -101,6 +101,34 @@ export function parseTeamSignup(body: unknown): Result<TeamSignupInput> {
     return { ok: true, value: { kind: 'parent', phone: phone.value, children } };
 }
 
+/**
+ * Children typed on the signup form of a parent code/link: name and birth
+ * YEAR only. null = the client sent no children (older build) — the account
+ * is still created, just without a child. The year is stored as 1 January.
+ */
+export function parseParentChildren(body: unknown, now = new Date()): Result<ChildInput[] | null> {
+    const raw = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+    if (raw.children == null) return { ok: true, value: null };
+
+    const list = Array.isArray(raw.children) ? raw.children : [];
+    if (list.length === 0) return { ok: false, error: 'Adaugă cel puțin un copil.' };
+    if (list.length > MAX_CHILDREN_PER_SIGNUP) return { ok: false, error: `Poți adăuga cel mult ${MAX_CHILDREN_PER_SIGNUP} copii.` };
+
+    const children: ChildInput[] = [];
+    for (const entry of list) {
+        const child = (entry ?? {}) as Record<string, unknown>;
+        const firstName = cleanName(child.firstName);
+        const lastName = cleanName(child.lastName);
+        if (!firstName || !lastName) return { ok: false, error: 'Completează numele și prenumele fiecărui copil.' };
+        const text = String(child.birthYear ?? '').trim();
+        const year = /^\d{4}$/.test(text) ? Number(text) : NaN;
+        const age = now.getUTCFullYear() - year;
+        if (!Number.isInteger(year) || age < 3 || age > 30) return { ok: false, error: `${firstName}: anul nașterii nu pare corect.` };
+        children.push({ firstName, lastName, birthDate: `${year}-01-01` });
+    }
+    return { ok: true, value: children };
+}
+
 /** "Ștefan  POPESCU" → "stefan popescu" — diacritics (ș/ş, ț/ţ, ă, â, î) folded. */
 export function foldName(value: string | null | undefined) {
     return String(value ?? '')

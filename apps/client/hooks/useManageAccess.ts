@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isClubAdmin } from '../utils/authSession';
 import { useSession } from '../context/AuthContext';
 import { manageAccessApi } from '../services/manageAccessApi';
+import { familyRequestsApi } from '../services/familyRequestsApi';
+import type { TeamOption } from '../components/manage-access/RoleSelector';
 import type { AccessRequestItem, InviteLinkItem, InviteRole } from '../types/manageAccess';
 import { DEFAULT_REFRESH_INTERVAL_MINUTES, isInviteExpired } from '../utils/manageAccess';
 
@@ -19,7 +21,9 @@ export function useManageAccess() {
     const [requestsError, setRequestsError] = useState<string | null>(null);
     const [requestAction, setRequestAction] = useState<{ id: number; type: RequestAction } | null>(null);
 
-    const [selectedRole, setSelectedRole] = useState<InviteRole>('player');
+    const [selectedRole, setSelectedRoleState] = useState<InviteRole>('player');
+    const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+    const [teams, setTeams] = useState<TeamOption[]>([]);
     const [refreshIntervalMinutes, setRefreshIntervalMinutes] = useState(DEFAULT_REFRESH_INTERVAL_MINUTES);
     const [inviteLink, setInviteLink] = useState<InviteLinkItem | null>(null);
     const [inviteLoading, setInviteLoading] = useState(true);
@@ -83,12 +87,18 @@ export function useManageAccess() {
         }
     }, []);
 
-    const loadInviteLink = useCallback(async (role: InviteRole) => {
+    // Teams only matter for parent links, so another role always means no team.
+    const setSelectedRole = useCallback((role: InviteRole) => {
+        setSelectedRoleState(role);
+        if (role !== 'parent') setSelectedTeamId(null);
+    }, []);
+
+    const loadInviteLink = useCallback(async (role: InviteRole, teamId: number | null) => {
         setInviteLoading(true);
         setInviteError(null);
 
         try {
-            const activeLink = await manageAccessApi.getActiveInviteLink(role);
+            const activeLink = await manageAccessApi.getActiveInviteLink(role, teamId);
             setInviteLink(activeLink);
             if (activeLink) {
                 setRefreshIntervalMinutes(activeLink.refreshIntervalMinutes);
@@ -121,8 +131,15 @@ export function useManageAccess() {
             return;
         }
 
-        void loadInviteLink(selectedRole);
-    }, [hasResolvedSession, isAdmin, loadInviteLink, selectedRole]);
+        void loadInviteLink(selectedRole, selectedTeamId);
+    }, [hasResolvedSession, isAdmin, loadInviteLink, selectedRole, selectedTeamId]);
+
+    useEffect(() => {
+        if (!hasResolvedSession || !isAdmin) return;
+        void familyRequestsApi.teamCodes()
+            .then((rows) => setTeams(rows.map(({ id, name }) => ({ id, name }))))
+            .catch(() => setTeams([]));
+    }, [hasResolvedSession, isAdmin]);
 
     const regenerateInviteLink = useCallback(async (role: InviteRole, interval = refreshIntervalMinutes): Promise<boolean> => {
         setRegenerating(true);
@@ -131,7 +148,7 @@ export function useManageAccess() {
         try {
             // generate returns the freshly created active link, so a follow-up
             // getActiveInviteLink call would just repeat the same fetch.
-            const nextLink = await manageAccessApi.generateInviteLink(role, interval);
+            const nextLink = await manageAccessApi.generateInviteLink(role, interval, role === 'parent' ? selectedTeamId : null);
             setInviteLink(nextLink);
             setRefreshIntervalMinutes(nextLink.refreshIntervalMinutes);
             return true;
@@ -142,7 +159,7 @@ export function useManageAccess() {
             setRegenerating(false);
             setInviteLoading(false);
         }
-    }, [refreshIntervalMinutes]);
+    }, [refreshIntervalMinutes, selectedTeamId]);
 
     useEffect(() => {
         if (!inviteLink || !isAdmin) {
@@ -218,9 +235,12 @@ export function useManageAccess() {
         inviteError,
         regenerating,
         selectedRole,
+        selectedTeamId,
+        teams,
         refreshIntervalMinutes,
         requestAction,
         setSelectedRole,
+        setSelectedTeamId,
         setRefreshIntervalMinutes,
         refreshAccessState: resolveAccessState,
         loadRequests,

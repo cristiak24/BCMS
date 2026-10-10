@@ -12,11 +12,8 @@ import { publicUser } from '../lib/publicUser';
 
 const router = Router();
 
-type ClubAdminInviteRole = 'coach' | 'player';
-// Roles an admin may assign to an existing member from this screen. `parent` is
-// assignable (a member can be reclassified) even though invitations stay limited
-// to coach/player. `accountant` too: it was the only way for a club to get its
-// accountant, and only a superadmin could do it.
+type ClubAdminInviteRole = 'coach' | 'player' | 'parent' | 'accountant';
+// Roles an admin may assign to an existing member from this screen.
 type ClubAdminAssignableRole = 'coach' | 'player' | 'parent' | 'accountant';
 // Roles that must never be demoted / deactivated from the club-admin screen —
 // this is what protects the club from an admin locking themselves (or the last
@@ -46,7 +43,7 @@ const safeUserColumns = {
 } as const;
 
 function normalizeClubAdminInviteRole(value: unknown): ClubAdminInviteRole | null {
-    return value === 'coach' || value === 'player' ? value : null;
+    return value === 'coach' || value === 'player' || value === 'parent' || value === 'accountant' ? value : null;
 }
 
 function normalizeClubAdminAssignableRole(value: unknown): ClubAdminAssignableRole | null {
@@ -181,7 +178,7 @@ router.post('/accounts/invitations', rateLimit({ bucket: 'club-admin:invite', li
     const role = normalizeClubAdminInviteRole(req.body?.role);
 
     if (!role) {
-        return res.status(400).json({ error: 'Only coach and player roles can be invited from club admin.' });
+        return res.status(400).json({ error: 'Only coach, player, parent and accountant roles can be invited from club admin.' });
     }
 
     try {

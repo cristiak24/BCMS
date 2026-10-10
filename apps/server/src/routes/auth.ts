@@ -1,17 +1,17 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { users, clubs } from '../db/schema';
+import { users, clubs, teams } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { splitDisplayName } from '../lib/password';
 import { authenticate, requireSuperadmin, AuthenticatedRequest } from '../middleware/auth';
 import { acceptInvitation, createSuperAdminInvitation, validateInvitationToken } from '../services/invitationsService';
 import { createPendingAccessRequestForSignup, validateInviteToken } from '../lib/manageAccessService';
 import { loadServerEnv } from '../lib/loadEnv';
-import { consumeInviteCode, findUsableInviteCode, looksLikeInviteCode, releaseInviteCodeUse } from '../lib/clubInviteCodes';
+import { consumeInviteCode, findClubTeam, findUsableInviteCode, looksLikeInviteCode, releaseInviteCodeUse } from '../lib/clubInviteCodes';
 import { rateLimit } from '../middleware/rateLimit';
 import { writeAuditLog } from '../services/auditService';
-import { looksLikeTeamCode, parseTeamSignup } from '../lib/familyJoin';
-import { createJoinRequests, findTeamByJoinCode } from '../lib/familyJoinService';
+import { looksLikeTeamCode, parseParentChildren, parseTeamSignup } from '../lib/familyJoin';
+import { createChildrenForParent, createJoinRequests, findTeamByJoinCode } from '../lib/familyJoinService';
 import { normalizePhone } from '../lib/contacts';
 import { resolveSelfPlayerForRequest, teamIdsOfPlayers } from '../lib/selfPlayer';
 import { findUsableGuardianInvite, looksLikeGuardianInvite, redeemGuardianInvite } from '../lib/guardianInvites';
@@ -177,6 +177,8 @@ router.get('/invites/validate', inviteValidateLimiter as any, async (req: any, r
                 clubId: code.clubId,
                 clubName: code.clubName,
                 role: code.role,
+                teamId: code.teamName ? code.teamId : null,
+                teamName: code.teamName,
                 expiresAt: code.expiresAt,
             });
         }
@@ -230,6 +232,16 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
             return res.status(400).json({ error: phoneCheck.error });
         }
         const phone = phoneCheck.value;
+
+        // Parent codes/links also carry the children typed on the form.
+        const childrenCheck = parseParentChildren(req.body);
+        if (!childrenCheck.ok) {
+            return res.status(400).json({ error: childrenCheck.error });
+        }
+        const childrenInput = childrenCheck.value;
+        if (childrenInput && !phone) {
+            return res.status(400).json({ error: 'Numărul de telefon este obligatoriu.' });
+        }
 
         // Personal parent invite: the club already chose the child, so the
         // account is active and linked right away.
@@ -344,6 +356,16 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
             }
 
             try {
+                const kids = consumed.role === 'parent' ? childrenInput : null;
+                let teamId: number | null = null;
+                if (kids && consumed.teamId != null) {
+                    const team = await findClubTeam(consumed.clubId, consumed.teamId);
+                    if (!team) {
+                        throw new Error('Echipa din acest cod nu mai există. Cere un cod nou administratorului clubului.');
+                    }
+                    teamId = team.id;
+                }
+
                 const values = {
                     firebaseUid: firebaseUser.uid,
                     email: firebaseUser.email || '',
@@ -360,6 +382,10 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
                     : await db.insert(users).values(values).returning();
                 const userRecord = saved[0];
 
+                if (kids) {
+                    await createChildrenForParent({ userId: userRecord.id, teamId, children: kids });
+                }
+
                 await writeAuditLog({
                     action: 'auth.signup_with_invite_code',
                     entityType: 'club_invite_code',
@@ -368,7 +394,7 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
                     actorUid: firebaseUser.uid,
                     actorRole: consumed.role,
                     clubId: consumed.clubId,
-                    metadata: null,
+                    metadata: kids ? { children: kids.length, teamId } : null,
                     ipAddress: req.ip ?? null,
                     userAgent: req.get('user-agent') ?? null,
                 });
@@ -429,11 +455,33 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
                 userRecord = updated[0];
             }
 
-            await createPendingAccessRequestForSignup({
-                userId: userRecord.id,
-                clubId: manageAccessInvite.clubId,
-                role: manageAccessInvite.role as 'player' | 'parent' | 'coach',
-            });
+            const kids = manageAccessInvite.role === 'parent' ? childrenInput : null;
+            const linkTeam = kids && manageAccessInvite.teamId != null
+                ? await findClubTeam(manageAccessInvite.clubId, manageAccessInvite.teamId)
+                : null;
+
+            if (kids && linkTeam) {
+                // Link tied to a team: the children wait in the team's join
+                // requests, where a club admin or the coach approves them (and
+                // that approval lets the account in).
+                const [teamRow] = await db.select().from(teams).where(eq(teams.id, linkTeam.id)).limit(1);
+                await createJoinRequests({
+                    userId: userRecord.id,
+                    team: teamRow,
+                    input: { kind: 'parent', phone: phone!, children: kids },
+                    firstName,
+                    lastName,
+                });
+            } else {
+                if (kids) {
+                    await createChildrenForParent({ userId: userRecord.id, teamId: null, children: kids });
+                }
+                await createPendingAccessRequestForSignup({
+                    userId: userRecord.id,
+                    clubId: manageAccessInvite.clubId,
+                    role: manageAccessInvite.role as 'player' | 'parent' | 'coach',
+                });
+            }
 
             result = {
                 userId: userRecord.id,

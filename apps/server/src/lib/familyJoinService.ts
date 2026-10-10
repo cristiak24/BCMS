@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, or } from 'drizzle-orm';
 import { db } from '../db';
 import { clubs, familyJoinRequests, players, playerGuardians, playersToTeams, teams, users } from '../db/schema';
-import { suggestPlayerMatches, teamCodeCandidates, type TeamSignupInput } from './familyJoin';
+import { suggestPlayerMatches, teamCodeCandidates, type ChildInput, type TeamSignupInput } from './familyJoin';
 
 /**
  * DB side of joining a team with its code: create the requests at signup,
@@ -48,6 +48,40 @@ export async function createJoinRequests(params: {
             childBirthDate: params.input.birthDate,
         }];
     return db.insert(familyJoinRequests).values(rows).returning();
+}
+
+/**
+ * A parent signed up with an admin-issued code or link: create each child as a
+ * player (in the code's team when it has one, otherwise unassigned) and link
+ * the parent. Always a new record — matching by name here would let anyone
+ * claim an existing child's record without a club admin looking at it.
+ */
+export async function createChildrenForParent(params: {
+    userId: number;
+    teamId: number | null;
+    children: ChildInput[];
+}) {
+    return db.transaction(async (tx) => {
+        const created: { id: number }[] = [];
+        for (const child of params.children) {
+            const [player] = await tx.insert(players).values({
+                name: `${child.firstName} ${child.lastName}`,
+                firstName: child.firstName,
+                lastName: child.lastName,
+                birthYear: Number(child.birthDate.slice(0, 4)),
+                status: 'active',
+                teamId: params.teamId,
+            }).returning({ id: players.id });
+            if (params.teamId != null) {
+                await tx.insert(playersToTeams).values({ playerId: player.id, teamId: params.teamId });
+            }
+            await tx.insert(playerGuardians)
+                .values({ playerId: player.id, userId: params.userId, createdBy: params.userId })
+                .onConflictDoNothing();
+            created.push(player);
+        }
+        return created;
+    });
 }
 
 /** Team ids this reviewer may decide on. null = every team of their club. */

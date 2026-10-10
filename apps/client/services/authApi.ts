@@ -66,7 +66,8 @@ export type SignupPayload = {
   phone: string;
   /** Team-code signups only: who is registering, and for whom. */
   joinAs?: 'parent' | 'player';
-  children?: { firstName: string; lastName: string; birthDate: string }[];
+  /** Team codes send birthDate; parent codes/links send birthYear. */
+  children?: { firstName: string; lastName: string; birthDate?: string; birthYear?: number }[];
   birthDate?: string;
 };
 

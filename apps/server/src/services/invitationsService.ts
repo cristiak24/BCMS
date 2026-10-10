@@ -20,7 +20,7 @@ const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 export type SuperAdminInviteInput = {
   email: string;
   fullName?: string;
-  role: 'admin' | 'coach' | 'staff' | 'player';
+  role: 'admin' | 'coach' | 'staff' | 'player' | 'parent' | 'accountant';
   clubId: number;
 };
 

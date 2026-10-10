@@ -7,6 +7,7 @@ import {
     ensureClubForUser,
     generateClubInviteLink,
     getActiveClubInviteLink,
+    InviteTeamError,
     listManageAccessRequests,
 } from '../lib/manageAccessService';
 import { rateLimit } from '../middleware/rateLimit';
@@ -17,6 +18,13 @@ import { createClubInviteCode, listClubInviteCodes, revokeClubInviteCode } from 
 const router = Router();
 
 router.use(authenticate);
+
+/** undefined = not given (any team), null = given but invalid. */
+function readTeamId(value: unknown): number | null | undefined {
+    if (value == null || value === '') return undefined;
+    const id = Number(value);
+    return Number.isInteger(id) && id > 0 ? id : null;
+}
 
 function readInviteRole(value: unknown): InviteRole | null {
     return value === 'player' || value === 'parent' || value === 'coach' ? value : null;
@@ -129,10 +137,20 @@ router.get('/invite-links/active', async (req, res) => {
         return;
     }
 
+    const teamId = readTeamId(req.query.teamId);
+    if (teamId === null || (teamId !== undefined && role !== 'parent')) {
+        res.status(400).json({ error: teamId === null ? 'Echipa nu este validă.' : 'Echipa se poate alege doar pentru invitațiile părinților.' });
+        return;
+    }
+
     try {
-        const inviteLink = await getActiveClubInviteLink(user, role);
+        const inviteLink = await getActiveClubInviteLink(user, role, teamId);
         res.json(inviteLink);
     } catch (error) {
+        if (error instanceof InviteTeamError) {
+            res.status(400).json({ error: error.message });
+            return;
+        }
         console.error('Failed to load active invite link:', error);
         res.status(500).json({ error: 'Could not load the invite link.' });
     }
@@ -157,8 +175,14 @@ router.post('/invite-links/generate', inviteLimiter, async (req: AuthenticatedRe
         return;
     }
 
+    const teamId = readTeamId(req.body?.teamId);
+    if (teamId === null || (teamId !== undefined && role !== 'parent')) {
+        res.status(400).json({ error: teamId === null ? 'Echipa nu este validă.' : 'Echipa se poate alege doar pentru invitațiile părinților.' });
+        return;
+    }
+
     try {
-        const inviteLink = await generateClubInviteLink(user, role, Number(rawInterval));
+        const inviteLink = await generateClubInviteLink(user, role, Number(rawInterval), teamId);
         await writeAuditLog({
             action: 'manage_access.invite_link_generated',
             entityType: 'invite_link',
@@ -167,12 +191,16 @@ router.post('/invite-links/generate', inviteLimiter, async (req: AuthenticatedRe
             actorUid: req.firebaseUser?.uid ?? null,
             actorRole: user.role ?? null,
             clubId: inviteLink.clubId,
-            metadata: { role: inviteLink.role, refreshIntervalMinutes: inviteLink.refreshIntervalMinutes },
+            metadata: { role: inviteLink.role, refreshIntervalMinutes: inviteLink.refreshIntervalMinutes, teamId: inviteLink.teamId },
             ipAddress: req.ip ?? null,
             userAgent: req.get('user-agent') ?? null,
         });
         res.status(201).json(inviteLink);
     } catch (error) {
+        if (error instanceof InviteTeamError) {
+            res.status(400).json({ error: error.message });
+            return;
+        }
         console.error('Failed to generate invite link:', error);
         res.status(500).json({ error: 'Could not generate the invite link.' });
     }
@@ -207,11 +235,18 @@ router.post('/invite-codes', inviteLimiter, async (req: AuthenticatedRequest, re
         return;
     }
 
+    const teamId = readTeamId(req.body?.teamId);
+    if (teamId === null || (teamId !== undefined && role !== 'parent')) {
+        res.status(400).json({ error: teamId === null ? 'Echipa nu este validă.' : 'Echipa se poate alege doar pentru invitațiile părinților.' });
+        return;
+    }
+
     try {
         const club = await ensureClubForUser(user);
         const code = await createClubInviteCode({
             clubId: club.id,
             role,
+            teamId,
             expiresInHours: Number(req.body?.expiresInHours),
             maxUses: Number(req.body?.maxUses),
             createdBy: user.id,
@@ -224,7 +259,7 @@ router.post('/invite-codes', inviteLimiter, async (req: AuthenticatedRequest, re
             actorUid: req.firebaseUser?.uid ?? null,
             actorRole: user.role ?? null,
             clubId: club.id,
-            metadata: { role: code.role, maxUses: code.maxUses, expiresAt: code.expiresAt },
+            metadata: { role: code.role, maxUses: code.maxUses, expiresAt: code.expiresAt, teamId: code.teamId },
             ipAddress: req.ip ?? null,
             userAgent: req.get('user-agent') ?? null,
         });

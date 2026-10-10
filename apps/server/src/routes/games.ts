@@ -6,6 +6,7 @@ import { db } from '../db';
 import { events, gameStatEvents, gameStats, l12Lineups, playerGuardians, players, playersToTeams, teams, users } from '../db/schema';
 import { computeBoxScore, parseEvent, parseOpponentRoster, type GameEvent, type GameMode } from '../lib/gameStats';
 import { toIso } from '../lib/dateUtils';
+import { resolveSelfPlayerForRequest, teamIdsOfPlayers } from '../lib/selfPlayer';
 
 /**
  * Live match statistics.
@@ -47,6 +48,19 @@ async function loadMatch(req: AuthenticatedRequest, res: Response) {
         res.status(404).json({ error: 'Meciul nu există.' });
         return null;
     }
+
+    // A player/parent not (yet) linked to this match's team must not read
+    // another team's live score/box score either.
+    const role = String(req.user?.role ?? '');
+    if (!isSuper && (role === 'player' || role === 'parent')) {
+        const selfPlayer = await resolveSelfPlayerForRequest(req);
+        const selfTeamIds = selfPlayer ? await teamIdsOfPlayers([selfPlayer.id]) : [];
+        if (!selfTeamIds.includes(row.team.id)) {
+            res.status(404).json({ error: 'Meciul nu există.' });
+            return null;
+        }
+    }
+
     const [game] = await db.select().from(gameStats).where(eq(gameStats.eventId, eventId)).limit(1);
     const staff = STAFF_ROLES.has(String(req.user?.role ?? ''));
     const canKeep = staff || (game != null && game.scorekeeperUserId === Number(req.user?.id));

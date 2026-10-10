@@ -4,9 +4,11 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import GlassCard from '../ui/GlassCard';
 import { clubAdminApi, type ClubAdminAccountRole } from '../../services/clubAdminApi';
 
-const ROLE_OPTIONS: { label: string; value: ClubAdminAccountRole; description: string; icon: 'sports' | 'person' }[] = [
+const ROLE_OPTIONS: { label: string; value: ClubAdminAccountRole; description: string; icon: 'sports' | 'person' | 'family-restroom' | 'account-balance' }[] = [
     { label: 'Antrenor', value: 'coach', description: 'Conduce antrenamente și ajută la organizarea clubului.', icon: 'sports' },
     { label: 'Jucător', value: 'player', description: 'Intră în lotul clubului și își finalizează înregistrarea.', icon: 'person' },
+    { label: 'Părinte', value: 'parent', description: 'Urmărește activitatea copilului în club.', icon: 'family-restroom' },
+    { label: 'Contabil', value: 'accountant', description: 'Are acces la plăți, facturi și documente financiare.', icon: 'account-balance' },
 ];
 
 type Props = {
@@ -95,7 +97,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                     <View className="flex-1">
                         <Text className="text-[18px] font-bold tracking-tight" style={{ color: 'var(--c-ink-strong)' }}>Invitație nouă</Text>
                         <Text className="text-[13px] mt-1 leading-5" style={{ color: 'var(--c-muted)' }}>
-                            Trimite o invitație securizată unui antrenor sau jucător din club.
+                            Trimite o invitație securizată unui membru nou al clubului.
                         </Text>
                     </View>
                     <View className="w-10 h-10 rounded-[10px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-tint)' } as any}>
@@ -109,7 +111,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                     <View className="flex-1">
                         <Field
                             label="Etichetă (vizibilă doar adminilor)"
-                            hint="Doar administratorii o văd. Membrul își completează numele real la crearea contului."
+                            hint="Doar administratorii o văd. Membrul își completează numele real la crearea contului. Recomandat: prenume și nume, atât."
                             error={errors.label}
                         >
                             <TextInput
@@ -118,7 +120,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                                     setLabel(value);
                                     setErrors((current) => ({ ...current, label: undefined }));
                                 }}
-                                placeholder="ex. Andrei, U14 conducător"
+                                placeholder="ex. Andrei Popescu"
                                 autoCapitalize="sentences"
                                 className="rounded-[10px] border px-3.5 h-11 text-[14px]"
                                 style={inputStyle(Boolean(errors.label))}
@@ -147,7 +149,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
 
                 <View className="gap-1.5">
                     <Text className="text-[12px] font-semibold" style={labelStyle}>Rol</Text>
-                    <View className="flex-col md:flex-row gap-3">
+                    <View className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {ROLE_OPTIONS.map((option) => {
                             const active = role === option.value;
 
@@ -157,7 +159,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                                     onPress={() => setRole(option.value)}
                                     accessibilityRole="radio"
                                     accessibilityState={{ selected: active }}
-                                    className="flex-1 rounded-[12px] border px-4 py-3.5"
+                                    className="rounded-[12px] border px-4 py-3.5"
                                     style={{
                                         backgroundColor: active ? 'var(--c-surface-tint)' : 'var(--c-surface)',
                                         borderColor: active ? 'var(--c-brand-border)' : 'var(--c-border)',

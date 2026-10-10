@@ -61,7 +61,7 @@ function isValidPhone(value: string) {
 export default function Signup() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { session, initializing, reloadSession } = useSession();
+    const { session, initializing, reloadSession, signOut } = useSession();
     const urlToken = searchParams.get('inviteToken') ?? '';
 
     const [codeInput, setCodeInput] = useState(urlToken);
@@ -85,6 +85,11 @@ export default function Signup() {
     // A signed-in parent opening a personal invite link ("fam_…") just gets the
     // child linked to the account they already have.
     const [linkingInvite, setLinkingInvite] = useState(false);
+    // Opening any other registration link while a session is still active (a
+    // stale sign-in the app never confirmed, or a different account someone
+    // is deliberately switching away from) must not bounce back into that
+    // session — the link means "sign me up as someone else". Drop it first.
+    const [droppingStaleSession, setDroppingStaleSession] = useState(false);
     useEffect(() => {
         if (initializing || !session) return;
         if (session.role === 'parent' && urlToken.startsWith('fam_')) {
@@ -95,8 +100,13 @@ export default function Signup() {
                 .finally(() => navigate(getHomeRouteForRole(session.role), { replace: true }));
             return;
         }
+        if (urlToken) {
+            setDroppingStaleSession(true);
+            void signOut().finally(() => setDroppingStaleSession(false));
+            return;
+        }
         navigate(getHomeRouteForRole(session.role), { replace: true });
-    }, [initializing, navigate, session, urlToken]);
+    }, [initializing, navigate, session, urlToken, signOut]);
 
     const validateCode = useCallback(async (raw: string) => {
         const token = extractInviteToken(raw);
@@ -139,6 +149,11 @@ export default function Signup() {
 
     const isTeamCode = invite?.source === 'team';
     const isGuardianInvite = invite?.source === 'guardian';
+    // A parent code/link from the club: the parent types their children here
+    // (name + birth year); the code or link may already carry the team.
+    const isParentInvite = (invite?.source === 'code' || invite?.source === 'manage-access') && invite.role === 'parent';
+    const collectsChildren = isParentInvite || (isTeamCode && joinAs === 'parent');
+    const currentYear = new Date().getFullYear();
     const updateChild = (index: number, patch: Partial<ChildDraft>) =>
         setChildren((list) => list.map((child, i) => (i === index ? { ...child, ...patch } : child)));
 
@@ -161,8 +176,14 @@ export default function Signup() {
             setError('Parola trebuie să aibă cel puțin 8 caractere.');
             return;
         }
-        if (isTeamCode && joinAs === 'parent' && children.some((child) => !child.firstName.trim() || !child.lastName.trim() || !child.birthDate)) {
-            setError('Completează numele, prenumele și data nașterii pentru fiecare copil.');
+        if (collectsChildren && children.some((child) => !child.firstName.trim() || !child.lastName.trim() || !child.birthDate)) {
+            setError(isParentInvite
+                ? 'Completează prenumele, numele și anul nașterii pentru fiecare copil.'
+                : 'Completează numele, prenumele și data nașterii pentru fiecare copil.');
+            return;
+        }
+        if (isParentInvite && children.some((child) => !/^\d{4}$/.test(child.birthDate) || Number(child.birthDate) > currentYear || Number(child.birthDate) < currentYear - 30)) {
+            setError('Anul nașterii trebuie să fie format din 4 cifre (ex. 2015).');
             return;
         }
         if (isTeamCode && joinAs === 'player' && !birthDate) {
@@ -183,6 +204,9 @@ export default function Signup() {
                 ...(isTeamCode && joinAs === 'parent'
                     ? { joinAs, children: children.map((child) => ({ firstName: child.firstName.trim(), lastName: child.lastName.trim(), birthDate: child.birthDate })) }
                     : {}),
+                ...(isParentInvite
+                    ? { children: children.map((child) => ({ firstName: child.firstName.trim(), lastName: child.lastName.trim(), birthYear: Number(child.birthDate) })) }
+                    : {}),
                 ...(isTeamCode && joinAs === 'player' ? { joinAs, birthDate } : {}),
             });
 
@@ -199,7 +223,7 @@ export default function Signup() {
         }
     };
 
-    if (initializing || linkingInvite) {
+    if (initializing || linkingInvite || droppingStaleSession) {
         return <LoadingScreen message="Verificăm sesiunea..." backgroundColor="var(--c-surface)" color="var(--c-blue)" />;
     }
 
@@ -240,7 +264,7 @@ export default function Signup() {
                             <label className="block">
                                 <span className={authLabelClass}>Cod de invitație</span>
                                 <span className={`${authFieldClass} border-slate-200`}>
-                                    <Ticket size={18} className="shrink-0 text-blue-700" />
+                                    <Ticket size={18} className="shrink-0 text-[var(--c-muted)]" />
                                     <input
                                         className={`ml-2.5 ${authInputClass}`}
                                         placeholder="Ex: 4KQ7-2M (echipă), K7M4-QX2P sau linkul"
@@ -284,7 +308,9 @@ export default function Signup() {
                                             ? 'Cod de echipă'
                                             : isGuardianInvite
                                                 ? `Invitație de la ${invite.clubName ?? 'club'} · contul se leagă de copil`
-                                                : 'Rol stabilit de administrator'}
+                                                : isParentInvite && invite.teamName
+                                                    ? `Copilul intră direct în echipa ${invite.teamName}`
+                                                    : 'Rol stabilit de administrator'}
                                     </p>
                                 </div>
                                 {!urlToken ? (
@@ -330,9 +356,9 @@ export default function Signup() {
 
                             {isTeamCode && !joinAs ? null : (
                                 <>
-                                    {isTeamCode ? (
+                                    {isTeamCode || isParentInvite ? (
                                         <p className="m-0 -mb-1 text-[12px] font-black uppercase tracking-wide text-slate-500">
-                                            {joinAs === 'parent' ? 'Datele tale (părinte)' : 'Datele tale'}
+                                            {joinAs === 'parent' || isParentInvite ? 'Datele tale (părinte)' : 'Datele tale'}
                                         </p>
                                     ) : null}
                                     <div className="grid grid-cols-2 gap-2.5">
@@ -397,7 +423,7 @@ export default function Signup() {
                                         </label>
                                     ) : null}
 
-                                    {isTeamCode && joinAs === 'parent' ? (
+                                    {collectsChildren ? (
                                         <div className="flex flex-col gap-2.5">
                                             {children.map((child, index) => (
                                                 <div key={index} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -425,17 +451,31 @@ export default function Signup() {
                                                         </span>
                                                     </div>
                                                     <label className="mt-2 block">
-                                                        <span className="mb-1 block text-[11.5px] font-bold text-slate-500">Data nașterii</span>
+                                                        <span className="mb-1 block text-[11.5px] font-bold text-slate-500">{isParentInvite ? 'Anul nașterii' : 'Data nașterii'}</span>
                                                         <span className={`${authFieldClass} border-slate-200 bg-white`}>
-                                                            <input
-                                                                className={authInputClass}
-                                                                type="date"
-                                                                aria-label={`Data nașterii copil ${index + 1}`}
-                                                                value={child.birthDate}
-                                                                max={new Date().toISOString().slice(0, 10)}
-                                                                onChange={(e) => updateChild(index, { birthDate: e.target.value })}
-                                                                disabled={submitting}
-                                                            />
+                                                            {isParentInvite ? (
+                                                                <input
+                                                                    className={authInputClass}
+                                                                    type="text"
+                                                                    inputMode="numeric"
+                                                                    maxLength={4}
+                                                                    placeholder={String(currentYear - 10)}
+                                                                    aria-label={`Anul nașterii copil ${index + 1}`}
+                                                                    value={child.birthDate}
+                                                                    onChange={(e) => updateChild(index, { birthDate: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                                                                    disabled={submitting}
+                                                                />
+                                                            ) : (
+                                                                <input
+                                                                    className={authInputClass}
+                                                                    type="date"
+                                                                    aria-label={`Data nașterii copil ${index + 1}`}
+                                                                    value={child.birthDate}
+                                                                    max={new Date().toISOString().slice(0, 10)}
+                                                                    onChange={(e) => updateChild(index, { birthDate: e.target.value })}
+                                                                    disabled={submitting}
+                                                                />
+                                                            )}
                                                         </span>
                                                     </label>
                                                 </div>
@@ -504,7 +544,7 @@ export default function Signup() {
                     )}
 
                     <p className="m-0 mt-5 text-center text-sm font-semibold text-slate-500">
-                        Ai deja cont? <Link to="/login" className="font-black text-blue-700 no-underline hover:underline">Autentifică-te</Link>
+                        Ai deja cont? <Link to="/login" className="font-bold text-[var(--c-brand-fg)] no-underline hover:underline">Autentifică-te</Link>
                     </p>
                 </AuthCard>
             </div>

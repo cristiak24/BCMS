@@ -5,6 +5,7 @@ import {
     generateTeamCode,
     looksLikeTeamCode,
     parseBirthDate,
+    parseParentChildren,
     parseTeamSignup,
     suggestPlayerMatches,
     teamCodeCandidates,
@@ -60,4 +61,20 @@ test('match suggestions: either name order, birth-year conflicts excluded', () =
     const result = suggestPlayerMatches({ firstName: 'matei', lastName: 'POPESCU', birthDate: '2016-04-01' }, players);
     assert.deepEqual(result.map((r) => r.id), [1, 2]);
     assert.equal(result[0].sameBirthYear, true);
+});
+
+test('parent code/link children: name + birth year, optional for older clients', () => {
+    assert.deepEqual(parseParentChildren({}, NOW), { ok: true, value: null });
+
+    const ok = parseParentChildren({ children: [{ firstName: ' Matei ', lastName: 'Popescu', birthYear: 2015 }, { firstName: 'Ana', lastName: 'Popescu', birthYear: '2012' }] }, NOW);
+    assert.deepEqual(ok, { ok: true, value: [
+        { firstName: 'Matei', lastName: 'Popescu', birthDate: '2015-01-01' },
+        { firstName: 'Ana', lastName: 'Popescu', birthDate: '2012-01-01' },
+    ] });
+
+    assert.equal(parseParentChildren({ children: [] }, NOW).ok, false);
+    assert.equal(parseParentChildren({ children: [{ firstName: 'Matei', lastName: '', birthYear: 2015 }] }, NOW).ok, false);
+    assert.equal(parseParentChildren({ children: [{ firstName: 'Matei', lastName: 'P', birthYear: 1990 }] }, NOW).ok, false);
+    assert.equal(parseParentChildren({ children: [{ firstName: 'Matei', lastName: 'P', birthYear: 2026 }] }, NOW).ok, false);
+    assert.equal(parseParentChildren({ children: Array.from({ length: 6 }, () => ({ firstName: 'A', lastName: 'B', birthYear: 2015 })) }, NOW).ok, false);
 });

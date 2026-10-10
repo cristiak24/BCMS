@@ -24,6 +24,9 @@ export type InviteLinkItem = {
     refreshIntervalMinutes: number;
     createdAt: string;
     isActive: boolean;
+    /** Parents who register with this link land their children in this team. */
+    teamId: number | null;
+    teamName: string | null;
 };
 
 export type RefreshIntervalOption = {
@@ -39,6 +42,8 @@ export type InviteCodeItem = {
     /** Display form, e.g. "K7M4-QX2P". */
     code: string;
     role: InviteRole;
+    teamId: number | null;
+    teamName: string | null;
     expiresAt: string;
     maxUses: number;
     useCount: number;

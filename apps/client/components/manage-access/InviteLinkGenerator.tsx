@@ -9,7 +9,7 @@ import {
     MIN_REFRESH_INTERVAL_MINUTES,
     PRESET_REFRESH_INTERVALS,
 } from '../../utils/manageAccess';
-import RoleSelector, { AccessButton, AccessCard, FieldLabel, OptionChip, ROLE_LABELS } from './RoleSelector';
+import RoleSelector, { AccessButton, AccessCard, FieldLabel, OptionChip, ROLE_LABELS, TeamPicker, type TeamOption } from './RoleSelector';
 import CountdownTimer from './CountdownTimer';
 
 type Props = {
@@ -18,6 +18,9 @@ type Props = {
     regenerating: boolean;
     error?: string | null;
     selectedRole: InviteRole;
+    teams: TeamOption[];
+    selectedTeamId: number | null;
+    onTeamChange: (teamId: number | null) => void;
     refreshIntervalMinutes: number;
     onRoleChange: (role: InviteRole) => void;
     onRefreshIntervalChange: (minutes: number) => void;
@@ -52,6 +55,9 @@ export default function InviteLinkGenerator({
     regenerating,
     error,
     selectedRole,
+    teams,
+    selectedTeamId,
+    onTeamChange,
     refreshIntervalMinutes,
     onRoleChange,
     onRefreshIntervalChange,
@@ -111,6 +117,8 @@ export default function InviteLinkGenerator({
                     <RoleSelector selectedRole={selectedRole} onSelectRole={onRoleChange} />
                 </View>
 
+                {selectedRole === 'parent' ? <TeamPicker teams={teams} selectedTeamId={selectedTeamId} onSelect={onTeamChange} /> : null}
+
                 <View>
                     <FieldLabel hint="după expirare linkul nu mai funcționează">Valabil</FieldLabel>
                     <View className="flex-row flex-wrap items-center gap-1.5">
@@ -167,7 +175,7 @@ export default function InviteLinkGenerator({
                             <View className="flex-row items-center gap-2">
                                 <View className="w-2 h-2 rounded-full ui-ping" style={{ backgroundColor: 'var(--c-success-fg)' }} />
                                 <Text className="text-[12.5px] font-semibold flex-1" style={{ color: 'var(--c-ink-soft)' }} numberOfLines={1}>
-                                    Link activ · {ROLE_LABELS[inviteLink.role]}
+                                    Link activ · {ROLE_LABELS[inviteLink.role]}{inviteLink.teamName ? ` · ${inviteLink.teamName}` : ''}
                                 </Text>
                                 <Text className="text-[12px]" style={{ color: 'var(--c-faint)' }}>expiră în</Text>
                                 <CountdownTimer expiresAt={inviteLink.expiresAt} />
@@ -202,7 +210,7 @@ export default function InviteLinkGenerator({
                             <View className="flex-row items-center gap-2.5">
                                 <MaterialIcons name="link-off" size={18} color="var(--c-faint)" />
                                 <Text className="text-[13px] flex-1" style={{ color: 'var(--c-muted)' }}>
-                                    Niciun link activ pentru {ROLE_LABELS[selectedRole].toLowerCase()}.
+                                    Niciun link activ pentru {ROLE_LABELS[selectedRole].toLowerCase()}{selectedTeamId != null ? ' din această echipă' : ''}.
                                 </Text>
                             </View>
                             <AccessButton

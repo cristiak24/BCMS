@@ -34,4 +34,6 @@ export type InviteLinkRecord = {
     refreshIntervalMinutes: number;
     createdAt: string;
     isActive: boolean;
+    teamId: number | null;
+    teamName: string | null;
 };

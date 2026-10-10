@@ -1,7 +1,7 @@
 import { toIso } from './dateUtils';
 import { db } from '../db';
 import { users, clubs, teams, accessRequests, inviteLinks } from '../db/schema';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, isNull, sql } from 'drizzle-orm';
 import type { AccessRequestRecord, InviteRole } from '../types/manageAccess';
 import { decryptInviteToken, encryptInviteToken } from './manageAccessTokens';
 
@@ -16,6 +16,7 @@ type InviteLinkRow = {
     createdBy: number | null;
     createdAt: string;
     isActive: number;
+    teamId: number | null;
 };
 
 /** Return the row with its `token` decrypted back to the raw invite token. */
@@ -47,6 +48,7 @@ function inviteLinkSelection() {
         createdBy: inviteLinks.createdBy,
         createdAt: sql<string>`${inviteLinks.createdAt} AT TIME ZONE 'UTC'`.as('created_at'),
         isActive: inviteLinks.isActive,
+        teamId: inviteLinks.teamId,
     };
 }
 
@@ -173,12 +175,18 @@ export async function updateUserAccess(userId: number, payload: { clubId: number
     return updated.length > 0 ? (updated[0] as unknown as UserDoc) : null;
 }
 
-export async function deactivateActiveInviteLinks(clubId: number, role: InviteRole) {
+function sameTeam(teamId: number | null) {
+    return teamId == null ? isNull(inviteLinks.teamId) : eq(inviteLinks.teamId, teamId);
+}
+
+/** One active link per role and team (or per role, when no team is chosen). */
+export async function deactivateActiveInviteLinks(clubId: number, role: InviteRole, teamId: number | null = null) {
     await db.update(inviteLinks)
         .set({ isActive: 0 })
         .where(and(
             eq(inviteLinks.clubId, clubId),
             eq(inviteLinks.role, role as any),
+            sameTeam(teamId),
             eq(inviteLinks.isActive, 1)
         ));
 }
@@ -191,10 +199,12 @@ export async function createInviteLink(payload: {
     expiresAt: Date;
     refreshIntervalMinutes: number;
     createdBy: number | null;
+    teamId?: number | null;
 }) {
     const record = {
         clubId: payload.clubId,
         role: payload.role as any,
+        teamId: payload.teamId ?? null,
         token: encryptInviteToken(payload.token),
         tokenHash: payload.tokenHash,
         expiresAt: payload.expiresAt.toISOString(),
@@ -227,11 +237,12 @@ export async function getLatestInviteLinkForClubRole(clubId: number, role: Invit
     return withDecryptedToken(rows[0] as InviteLinkRow | undefined);
 }
 
-export async function getActiveInviteLinkForClubRole(clubId: number, role: InviteRole) {
+export async function getActiveInviteLinkForClubRole(clubId: number, role: InviteRole, teamId: number | null = null) {
     const rows = await db.select(inviteLinkSelection()).from(inviteLinks)
         .where(and(
             eq(inviteLinks.clubId, clubId),
             eq(inviteLinks.role, role as any),
+            sameTeam(teamId),
             eq(inviteLinks.isActive, 1)
         ))
         .orderBy(desc(inviteLinks.createdAt))
@@ -251,9 +262,15 @@ export async function findInviteLinkByTokenHash(tokenHash: string) {
     }
 
     const club = await getClubById(invite.clubId);
+    const teamRows = invite.teamId != null
+        ? await db.select({ name: teams.name, isActive: teams.isActive }).from(teams)
+            .where(and(eq(teams.id, invite.teamId), eq(teams.clubId, invite.clubId))).limit(1)
+        : [];
 
     return {
         ...invite,
         clubName: club?.name ?? null,
+        // A team that has since been archived or deleted no longer counts.
+        teamName: teamRows[0]?.isActive ? teamRows[0].name : null,
     };
 }

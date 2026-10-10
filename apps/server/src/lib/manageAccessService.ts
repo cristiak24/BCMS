@@ -16,6 +16,7 @@ import {
 import { generateInviteToken, hashInviteToken, isInviteExpired, normalizeRefreshIntervalMinutes } from './manageAccessTokens';
 import type { AppUserContext, InviteLinkRecord, InviteRole } from '../types/manageAccess';
 import { toIso } from './dateUtils';
+import { findClubTeam } from './clubInviteCodes';
 
 export async function ensureClubForUser(user: AppUserContext) {
     if (user.clubId != null) {
@@ -100,6 +101,8 @@ function toInviteLinkRecord(params: {
     refreshIntervalMinutes: number;
     createdAt: unknown;
     isActive: boolean;
+    teamId?: number | null;
+    teamName?: string | null;
 }): InviteLinkRecord {
     return {
         id: params.id,
@@ -111,19 +114,32 @@ function toInviteLinkRecord(params: {
         refreshIntervalMinutes: params.refreshIntervalMinutes,
         createdAt: toIso(params.createdAt) ?? new Date().toISOString(),
         isActive: params.isActive,
+        teamId: params.teamId ?? null,
+        teamName: params.teamName ?? null,
     };
 }
 
-export async function generateClubInviteLink(user: AppUserContext, role: InviteRole, refreshIntervalMinutes?: number) {
+export class InviteTeamError extends Error {}
+
+async function resolveInviteTeam(clubId: number, teamId: number | null | undefined) {
+    if (teamId == null) return null;
+    const team = await findClubTeam(clubId, teamId);
+    if (!team) throw new InviteTeamError('Echipa aleasă nu există în acest club.');
+    return team;
+}
+
+export async function generateClubInviteLink(user: AppUserContext, role: InviteRole, refreshIntervalMinutes?: number, teamId?: number | null) {
     const club = await ensureClubForUser(user);
+    const team = await resolveInviteTeam(club.id, teamId);
     const interval = normalizeRefreshIntervalMinutes(refreshIntervalMinutes);
     const token = generateInviteToken(role, interval);
 
-    await deactivateActiveInviteLinks(club.id, role);
+    await deactivateActiveInviteLinks(club.id, role, team?.id ?? null);
 
     const created = await createInviteLink({
         clubId: club.id,
         role,
+        teamId: team?.id ?? null,
         token: token.rawToken,
         tokenHash: token.tokenHash,
         expiresAt: token.expiresAt,
@@ -145,12 +161,15 @@ export async function generateClubInviteLink(user: AppUserContext, role: InviteR
         refreshIntervalMinutes: created.refreshIntervalMinutes,
         createdAt: created.createdAt,
         isActive: created.isActive === 1,
+        teamId: team?.id ?? null,
+        teamName: team?.name ?? null,
     });
 }
 
-export async function getActiveClubInviteLink(user: AppUserContext, role: InviteRole) {
+export async function getActiveClubInviteLink(user: AppUserContext, role: InviteRole, teamId?: number | null) {
     const club = await ensureClubForUser(user);
-    const active = await getActiveInviteLinkForClubRole(club.id, role);
+    const team = await resolveInviteTeam(club.id, teamId);
+    const active = await getActiveInviteLinkForClubRole(club.id, role, team?.id ?? null);
 
     if (active && !isInviteExpired(active.expiresAt)) {
         return toInviteLinkRecord({
@@ -163,11 +182,13 @@ export async function getActiveClubInviteLink(user: AppUserContext, role: Invite
             refreshIntervalMinutes: active.refreshIntervalMinutes,
             createdAt: active.createdAt,
             isActive: active.isActive === 1,
+            teamId: team?.id ?? null,
+            teamName: team?.name ?? null,
         });
     }
 
     if (active) {
-        await deactivateActiveInviteLinks(club.id, role);
+        await deactivateActiveInviteLinks(club.id, role, team?.id ?? null);
     }
 
     return null;
@@ -190,6 +211,8 @@ export async function validateInviteToken(rawToken: string) {
         role: invite.role,
         expiresAt: toIso(invite.expiresAt) ?? new Date().toISOString(),
         refreshIntervalMinutes: invite.refreshIntervalMinutes,
+        teamId: invite.teamName ? invite.teamId : null,
+        teamName: invite.teamName,
         isExpired: false,
     };
 }

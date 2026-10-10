@@ -14,15 +14,16 @@ export const manageAccessApi = {
         return apiFetch<void>(`/manage-access/requests/${id}/deny`, { method: 'POST' }, 'void');
     },
 
-    getActiveInviteLink(role: InviteRole) {
-        return apiFetch<InviteLinkItem | null>(`/manage-access/invite-links/active?role=${encodeURIComponent(role)}`);
+    getActiveInviteLink(role: InviteRole, teamId: number | null = null) {
+        const team = teamId != null ? `&teamId=${teamId}` : '';
+        return apiFetch<InviteLinkItem | null>(`/manage-access/invite-links/active?role=${encodeURIComponent(role)}${team}`);
     },
 
-    generateInviteLink(role: InviteRole, refreshIntervalMinutes: number) {
+    generateInviteLink(role: InviteRole, refreshIntervalMinutes: number, teamId: number | null = null) {
         return apiFetch<InviteLinkItem>('/manage-access/invite-links/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role, refreshIntervalMinutes }),
+            body: JSON.stringify({ role, refreshIntervalMinutes, ...(teamId != null ? { teamId } : {}) }),
         });
     },
 
@@ -30,7 +31,7 @@ export const manageAccessApi = {
         return apiFetch<InviteCodeItem[]>('/manage-access/invite-codes');
     },
 
-    createInviteCode(payload: { role: InviteRole; expiresInHours: number; maxUses: number }) {
+    createInviteCode(payload: { role: InviteRole; teamId?: number | null; expiresInHours: number; maxUses: number }) {
         return apiFetch<InviteCodeItem>('/manage-access/invite-codes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

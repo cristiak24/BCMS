@@ -76,9 +76,12 @@ export default function ManageAccessScreen() {
         inviteError,
         regenerating,
         selectedRole,
+        selectedTeamId,
+        teams,
         refreshIntervalMinutes,
         requestAction,
         setSelectedRole,
+        setSelectedTeamId,
         setRefreshIntervalMinutes,
         loadRequests,
         approveRequest,
@@ -295,6 +298,9 @@ export default function ManageAccessScreen() {
                                 regenerating={regenerating}
                                 error={inviteError}
                                 selectedRole={selectedRole}
+                                teams={teams}
+                                selectedTeamId={selectedTeamId}
+                                onTeamChange={setSelectedTeamId}
                                 refreshIntervalMinutes={refreshIntervalMinutes}
                                 onRoleChange={setSelectedRole}
                                 onRefreshIntervalChange={setRefreshIntervalMinutes}

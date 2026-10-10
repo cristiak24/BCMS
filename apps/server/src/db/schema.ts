@@ -570,6 +570,8 @@ export const inviteLinks = pgTable("invite_links", {
 	createdBy: integer("created_by"),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	isActive: integer("is_active").default(1).notNull(),
+	// Optional: parents who sign up with this link land their children in this team.
+	teamId: integer("team_id"),
 });
 
 // Short, shareable club join codes (e.g. "K7M4-QX2P"). The admin sets the role,
@@ -585,6 +587,8 @@ export const clubInviteCodes = pgTable("club_invite_codes", {
 	createdBy: integer("created_by"),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	revokedAt: timestamp("revoked_at", { mode: 'string' }),
+	// Optional: parents who sign up with this code land their children in this team.
+	teamId: integer("team_id"),
 }, (table) => [
 	unique("club_invite_codes_code_unique").on(table.code),
 	foreignKey({

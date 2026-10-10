@@ -3,8 +3,9 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { Pressable, Text, TextInput, View } from '@/src/web/reactNative';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { SkeletonList } from '../ui/Skeleton';
-import RoleSelector, { AccessButton, AccessCard, FieldLabel, OptionChip, ROLE_LABELS } from './RoleSelector';
+import RoleSelector, { AccessButton, AccessCard, FieldLabel, OptionChip, ROLE_LABELS, TeamPicker, type TeamOption } from './RoleSelector';
 import { manageAccessApi } from '../../services/manageAccessApi';
+import { familyRequestsApi } from '../../services/familyRequestsApi';
 import type { InviteCodeItem, InviteCodeStatus, InviteRole } from '../../types/manageAccess';
 
 const VALIDITY_OPTIONS: { label: string; hours: number }[] = [
@@ -46,6 +47,8 @@ type Props = {
  */
 export default function InviteCodesPanel({ onNotify }: Props) {
     const [role, setRole] = useState<InviteRole>('player');
+    const [teams, setTeams] = useState<TeamOption[]>([]);
+    const [teamId, setTeamId] = useState<number | null>(null);
     const [validityHours, setValidityHours] = useState(24 * 7);
     const [maxUsesInput, setMaxUsesInput] = useState('25');
     const [codes, setCodes] = useState<InviteCodeItem[]>([]);
@@ -71,6 +74,12 @@ export default function InviteCodesPanel({ onNotify }: Props) {
         void load();
     }, [load]);
 
+    useEffect(() => {
+        void familyRequestsApi.teamCodes()
+            .then((rows) => setTeams(rows.map(({ id, name }) => ({ id, name }))))
+            .catch(() => setTeams([]));
+    }, []);
+
     const activeCodes = useMemo(() => codes.filter((item) => item.status === 'active'), [codes]);
     const pastCodes = useMemo(() => codes.filter((item) => item.status !== 'active'), [codes]);
 
@@ -84,7 +93,7 @@ export default function InviteCodesPanel({ onNotify }: Props) {
         setCreating(true);
         setError(null);
         try {
-            const created = await manageAccessApi.createInviteCode({ role, expiresInHours: validityHours, maxUses });
+            const created = await manageAccessApi.createInviteCode({ role, teamId: role === 'parent' ? teamId : null, expiresInHours: validityHours, maxUses });
             setCodes((current) => [created, ...current]);
             setFreshId(created.id);
             onNotify?.({ variant: 'success', message: `Cod nou pentru ${ROLE_LABELS[created.role].toLowerCase()}: ${created.code}` });
@@ -168,6 +177,7 @@ export default function InviteCodesPanel({ onNotify }: Props) {
                 </View>
                 <Text className="t-meta mt-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
                     {ROLE_LABELS[item.role]}
+                    {item.teamName ? ` · ${item.teamName}` : ''}
                     {isActive ? ` · expiră ${formatExpiry(item.expiresAt)}` : item.status === 'expired' ? ` · a expirat ${formatExpiry(item.expiresAt)}` : ''}
                 </Text>
                 <View className="flex-row items-center gap-2 mt-2">
@@ -194,8 +204,16 @@ export default function InviteCodesPanel({ onNotify }: Props) {
                     <View className="gap-4">
                         <View>
                             <FieldLabel>Pentru</FieldLabel>
-                            <RoleSelector selectedRole={role} onSelectRole={setRole} />
+                            <RoleSelector
+                                selectedRole={role}
+                                onSelectRole={(next) => {
+                                    setRole(next);
+                                    if (next !== 'parent') setTeamId(null);
+                                }}
+                            />
                         </View>
+
+                        {role === 'parent' ? <TeamPicker teams={teams} selectedTeamId={teamId} onSelect={setTeamId} /> : null}
 
                         <View className="flex-col sm:flex-row gap-4">
                             <View className="sm:flex-1">

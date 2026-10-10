@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { and, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { clubInviteCodes, clubs } from '../db/schema';
+import { clubInviteCodes, clubs, teams } from '../db/schema';
 import type { InviteRole } from '../types/manageAccess';
 
 /**
@@ -28,6 +28,8 @@ export type ClubInviteCodeRecord = {
     clubId: number;
     code: string;
     role: InviteRole;
+    teamId: number | null;
+    teamName: string | null;
     expiresAt: string;
     maxUses: number;
     useCount: number;
@@ -78,12 +80,14 @@ function statusOf(row: { expiresAt: string; maxUses: number; useCount: number; r
     return 'active';
 }
 
-function toRecord(row: typeof clubInviteCodes.$inferSelect): ClubInviteCodeRecord {
+function toRecord(row: typeof clubInviteCodes.$inferSelect, teamName: string | null = null): ClubInviteCodeRecord {
     return {
         id: row.id,
         clubId: row.clubId,
         code: formatInviteCode(row.code),
         role: row.role as InviteRole,
+        teamId: row.teamId ?? null,
+        teamName: row.teamId != null ? teamName : null,
         expiresAt: dbTimeToIso(row.expiresAt),
         maxUses: row.maxUses,
         useCount: row.useCount,
@@ -96,6 +100,7 @@ function toRecord(row: typeof clubInviteCodes.$inferSelect): ClubInviteCodeRecor
 export async function createClubInviteCode(params: {
     clubId: number;
     role: InviteRole;
+    teamId?: number | null;
     expiresInHours: number;
     maxUses: number;
     createdBy: number | null;
@@ -112,6 +117,13 @@ export async function createClubInviteCode(params: {
 
     const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 
+    let teamName: string | null = null;
+    if (params.teamId != null) {
+        const team = await findClubTeam(params.clubId, params.teamId);
+        if (!team) throw new Error('Echipa aleasă nu există în acest club.');
+        teamName = team.name;
+    }
+
     // A collision is astronomically unlikely, but the unique index makes a
     // retry the correct response rather than an error.
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -120,11 +132,12 @@ export async function createClubInviteCode(params: {
                 clubId: params.clubId,
                 code: randomCode(),
                 role: params.role as any,
+                teamId: params.teamId ?? null,
                 expiresAt,
                 maxUses,
                 createdBy: params.createdBy,
             }).returning();
-            return toRecord(inserted[0]);
+            return toRecord(inserted[0], teamName);
         } catch (error: any) {
             if (error?.code !== '23505') throw error;
         }
@@ -132,12 +145,21 @@ export async function createClubInviteCode(params: {
     throw new Error('Nu am putut genera un cod unic. Încearcă din nou.');
 }
 
+/** An active team of this club, or null — never trust a team id from the client. */
+export async function findClubTeam(clubId: number, teamId: number) {
+    const rows = await db.select({ id: teams.id, name: teams.name }).from(teams)
+        .where(and(eq(teams.id, teamId), eq(teams.clubId, clubId), eq(teams.isActive, true)))
+        .limit(1);
+    return rows[0] ?? null;
+}
+
 export async function listClubInviteCodes(clubId: number) {
-    const rows = await db.select().from(clubInviteCodes)
+    const rows = await db.select({ row: clubInviteCodes, teamName: teams.name }).from(clubInviteCodes)
+        .leftJoin(teams, eq(teams.id, clubInviteCodes.teamId))
         .where(eq(clubInviteCodes.clubId, clubId))
         .orderBy(desc(clubInviteCodes.createdAt))
         .limit(50);
-    return rows.map(toRecord);
+    return rows.map(({ row, teamName }) => toRecord(row, teamName));
 }
 
 export async function revokeClubInviteCode(clubId: number, id: number) {
@@ -145,7 +167,9 @@ export async function revokeClubInviteCode(clubId: number, id: number) {
         .set({ revokedAt: new Date().toISOString() })
         .where(and(eq(clubInviteCodes.id, id), eq(clubInviteCodes.clubId, clubId), isNull(clubInviteCodes.revokedAt)))
         .returning();
-    return updated[0] ? toRecord(updated[0]) : null;
+    if (!updated[0]) return null;
+    const team = updated[0].teamId != null ? await findClubTeam(clubId, updated[0].teamId) : null;
+    return toRecord(updated[0], team?.name ?? null);
 }
 
 /** Read-only check used by the signup form before the account exists. */
@@ -154,8 +178,10 @@ export async function findUsableInviteCode(raw: string) {
     const rows = await db.select({
         row: clubInviteCodes,
         clubName: clubs.name,
+        teamName: teams.name,
     }).from(clubInviteCodes)
         .leftJoin(clubs, eq(clubs.id, clubInviteCodes.clubId))
+        .leftJoin(teams, eq(teams.id, clubInviteCodes.teamId))
         .where(eq(clubInviteCodes.code, code))
         .limit(1);
 
@@ -168,6 +194,8 @@ export async function findUsableInviteCode(raw: string) {
         clubId: hit.row.clubId,
         clubName: hit.clubName ?? null,
         role: hit.row.role as InviteRole,
+        teamId: hit.row.teamId ?? null,
+        teamName: hit.row.teamId != null ? hit.teamName ?? null : null,
         expiresAt: dbTimeToIso(hit.row.expiresAt),
         remainingUses: hit.row.maxUses - hit.row.useCount,
     };
@@ -191,7 +219,7 @@ export async function consumeInviteCode(raw: string) {
         .returning();
 
     const row = updated[0];
-    return row ? { id: row.id, clubId: row.clubId, role: row.role as InviteRole } : null;
+    return row ? { id: row.id, clubId: row.clubId, role: row.role as InviteRole, teamId: row.teamId ?? null } : null;
 }
 
 /** Gives a use back when the signup failed after the code was consumed. */
