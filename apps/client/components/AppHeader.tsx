@@ -53,7 +53,7 @@ export default function AppHeader({
   onOpenMenu,
 }: AppHeaderProps) {
   const router = useRouter();
-  const { signOut } = useSession();
+  const { signOut, session } = useSession();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   // Mobile search is collapsed to an icon by default and expands to a full
@@ -83,6 +83,8 @@ export default function AppHeader({
     // that lists the event instead.
     if (notification.type === 'payment_reminder' || notification.type === 'payment_recorded') {
       router.push('/payments');
+    } else if (notification.type === 'access_request') {
+      router.push(session?.role === 'coach' ? '/coach/requests' : '/admin/manage-access');
     } else if (notification.eventId != null) {
       router.push('/schedule');
     }

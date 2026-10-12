@@ -17,6 +17,8 @@ import { generateInviteToken, hashInviteToken, isInviteExpired, normalizeRefresh
 import type { AppUserContext, InviteLinkRecord, InviteRole } from '../types/manageAccess';
 import { toIso } from './dateUtils';
 import { findClubTeam } from './clubInviteCodes';
+import { roleLabel } from './accessNotices';
+import { notifyRequester } from './accessNotify';
 
 export async function ensureClubForUser(user: AppUserContext) {
     if (user.clubId != null) {
@@ -56,6 +58,7 @@ export async function approveManageAccessRequest(user: AppUserContext, requestId
         role: request.requestedRole as InviteRole,
         status: 'active',
     });
+    void notifyRequester({ userId: request.userId, decision: 'approved', subject: `contul de ${roleLabel(request.requestedRole)}` });
 
     return {
         requestId: request.id,
@@ -82,6 +85,7 @@ export async function denyManageAccessRequest(user: AppUserContext, requestId: n
     // still approve a later request, exactly as the UI copy promises. Disabling an
     // account is a separate, explicit action in Manage Accounts.
     await denyAccessRequest(request.id, club.id, user.id);
+    void notifyRequester({ userId: request.userId, decision: 'denied', subject: `contul de ${roleLabel(request.requestedRole)}` });
 
     return {
         requestId: request.id,

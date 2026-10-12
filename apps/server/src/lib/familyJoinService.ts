@@ -1,6 +1,8 @@
 import { and, desc, eq, inArray, or } from 'drizzle-orm';
 import { db } from '../db';
 import { clubs, familyJoinRequests, players, playerGuardians, playersToTeams, teams, users } from '../db/schema';
+import { joinSubject } from './accessNotices';
+import { notifyRequester } from './accessNotify';
 import { chooseAutoTarget, splitKnownChildren, suggestPlayerMatches, teamCodeCandidates, type ChildInput, type TeamSignupInput } from './familyJoin';
 
 /**
@@ -244,7 +246,7 @@ export async function approveJoinRequest(reviewer: Reviewer, requestId: number, 
 
     const clubTeamIds = (await db.select({ id: teams.id }).from(teams).where(eq(teams.clubId, request.clubId))).map((t) => t.id);
 
-    return db.transaction(async (tx) => {
+    const approved = await db.transaction(async (tx) => {
         let player: typeof players.$inferSelect;
         if (playerId === 'new') {
             [player] = await tx.insert(players).values({
@@ -302,6 +304,17 @@ export async function approveJoinRequest(reviewer: Reviewer, requestId: number, 
 
         return { requestId: request.id, playerId: player.id, created: playerId === 'new' };
     });
+
+    // Only the approval that lets the account in is worth an email; further
+    // children on an already-active account stay in the app.
+    const [team] = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, request.teamId)).limit(1);
+    void notifyRequester({
+        userId: request.userId,
+        decision: 'approved',
+        subject: joinSubject(request, team?.name ?? null),
+        email: requester.status === 'pending',
+    });
+    return approved;
 }
 
 export async function denyJoinRequest(reviewer: Reviewer, requestId: number) {
@@ -309,5 +322,17 @@ export async function denyJoinRequest(reviewer: Reviewer, requestId: number) {
     await db.update(familyJoinRequests)
         .set({ status: 'denied', reviewedBy: reviewer.id, reviewedAt: new Date().toISOString() })
         .where(eq(familyJoinRequests.id, request.id));
+
+    // One email once nothing else of theirs is waiting, not one per child.
+    const [team] = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, request.teamId)).limit(1);
+    const stillWaiting = await db.select({ id: familyJoinRequests.id }).from(familyJoinRequests)
+        .where(and(eq(familyJoinRequests.userId, request.userId), eq(familyJoinRequests.status, 'pending')))
+        .limit(1);
+    void notifyRequester({
+        userId: request.userId,
+        decision: 'denied',
+        subject: joinSubject(request, team?.name ?? null),
+        email: stillWaiting.length === 0,
+    });
     return { requestId: request.id };
 }

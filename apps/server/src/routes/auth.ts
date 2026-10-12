@@ -11,6 +11,7 @@ import { consumeInviteCode, findClubTeam, findUsableInviteCode, looksLikeInviteC
 import { clientIp, rateLimit } from '../middleware/rateLimit';
 import { writeAuditLog } from '../services/auditService';
 import { looksLikeTeamCode, parseParentChildren, parseTeamSignup } from '../lib/familyJoin';
+import { loadOwnRequests, notifyReviewers } from '../lib/accessNotify';
 import { createChildrenForParent, createJoinRequests, findTeamByJoinCode, placeChildrenForParent } from '../lib/familyJoinService';
 import { normalizePhone } from '../lib/contacts';
 import { resolveSelfPlayerForRequest, teamIdsOfPlayers } from '../lib/selfPlayer';
@@ -85,6 +86,21 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res: any) => {
         });
     } catch (error) {
         console.error('Error fetching /me:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// GET /api/auth/my-requests
+// What the waiting screen shows: the caller's own requests and whether every
+// one of them was turned down. Open to pending accounts (they only see theirs).
+router.get('/my-requests', authenticate, async (req: AuthenticatedRequest, res: any) => {
+    try {
+        if (!req.user) {
+            return res.status(404).json({ error: 'User profile not found' });
+        }
+        res.json(await loadOwnRequests(req.user.id));
+    } catch (error) {
+        console.error('Error fetching /my-requests:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -338,6 +354,15 @@ router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidL
                 : await db.insert(users).values(values).returning();
             const userRecord = saved[0];
             const requests = await createJoinRequests({ userId: userRecord.id, team: hit.team, input: parsed.value, firstName, lastName });
+            void notifyReviewers({
+                clubId: hit.team.clubId,
+                teamId: hit.team.id,
+                requesterId: userRecord.id,
+                requesterName: name,
+                role: parsed.value.kind,
+                teamName: hit.team.name,
+                children: parsed.value.kind === 'parent' ? parsed.value.children.map((child) => `${child.firstName} ${child.lastName}`) : [],
+            });
 
             await writeAuditLog({
                 action: 'auth.signup_with_team_code',
@@ -404,6 +429,7 @@ router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidL
 
                 if (needsApproval) {
                     await createPendingAccessRequestForSignup({ userId: userRecord.id, clubId: consumed.clubId, role: 'coach' });
+                    void notifyReviewers({ clubId: consumed.clubId, requesterId: userRecord.id, requesterName: name, role: 'coach' });
                 } else if (kids && team) {
                     const placed = await placeChildrenForParent({
                         userId: userRecord.id,
@@ -414,6 +440,17 @@ router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidL
                         children: kids,
                     });
                     requestedChildren = placed.requested.length;
+                    if (requestedChildren > 0) {
+                        void notifyReviewers({
+                            clubId: consumed.clubId,
+                            teamId: team.id,
+                            requesterId: userRecord.id,
+                            requesterName: name,
+                            role: 'parent',
+                            teamName: team.name,
+                            children: placed.requested.map((request) => `${request.childFirstName} ${request.childLastName}`),
+                        });
+                    }
                     // Every child is already on the roster (second parent of the
                     // family): in once the club confirms the link.
                     if (placed.created.length === 0 && requestedChildren > 0) {
@@ -513,6 +550,15 @@ router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidL
                     firstName,
                     lastName,
                 });
+                void notifyReviewers({
+                    clubId: manageAccessInvite.clubId,
+                    teamId: teamRow.id,
+                    requesterId: userRecord.id,
+                    requesterName: name,
+                    role: 'parent',
+                    teamName: teamRow.name,
+                    children: kids.map((child) => `${child.firstName} ${child.lastName}`),
+                });
             } else {
                 if (kids) {
                     await createChildrenForParent({ userId: userRecord.id, teamId: null, children: kids });
@@ -521,6 +567,12 @@ router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidL
                     userId: userRecord.id,
                     clubId: manageAccessInvite.clubId,
                     role: manageAccessInvite.role as 'player' | 'parent' | 'coach',
+                });
+                void notifyReviewers({
+                    clubId: manageAccessInvite.clubId,
+                    requesterId: userRecord.id,
+                    requesterName: name,
+                    role: manageAccessInvite.role,
                 });
             }
 

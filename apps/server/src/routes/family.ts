@@ -7,6 +7,7 @@ import { familyJoinRequests, playerGuardians, players, playersToTeams, teams, us
 import { guardianChildren, teamIdsOfPlayers } from '../lib/selfPlayer';
 import { parseBirthDate } from '../lib/familyJoin';
 import { createJoinRequests, findTeamByJoinCode } from '../lib/familyJoinService';
+import { notifyReviewers } from '../lib/accessNotify';
 import { createGuardianInvite, redeemGuardianInvite } from '../lib/guardianInvites';
 import { writeAuditLog } from '../services/auditService';
 
@@ -101,6 +102,15 @@ router.post('/children/request', limiter, async (req: AuthenticatedRequest, res)
             firstName: req.user.firstName ?? '',
             lastName: req.user.lastName ?? '',
             input: { kind: 'parent', phone: req.user.phone ?? '', children: [{ firstName, lastName, birthDate: birthDate.value }] },
+        });
+        void notifyReviewers({
+            clubId: hit.team.clubId,
+            teamId: hit.team.id,
+            requesterId: Number(req.user.id),
+            requesterName: req.user.name ?? `${req.user.firstName ?? ''} ${req.user.lastName ?? ''}`.trim(),
+            role: 'parent',
+            teamName: hit.team.name,
+            children: [`${firstName} ${lastName}`],
         });
         res.status(201).json({ id: request.id, teamName: hit.team.name, status: 'pending' });
     } catch (error) {
