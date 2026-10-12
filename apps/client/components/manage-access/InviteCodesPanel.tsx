@@ -215,6 +215,17 @@ export default function InviteCodesPanel({ onNotify }: Props) {
 
                         {role === 'parent' ? <TeamPicker teams={teams} selectedTeamId={teamId} onSelect={setTeamId} /> : null}
 
+                        {role === 'coach' ? (
+                            <Text className="text-[12.5px] font-medium leading-5" style={{ color: 'var(--c-muted)' }}>
+                                Antrenorii care folosesc codul intră în „Cereri". Contul se activează după ce îl aprobi.
+                            </Text>
+                        ) : null}
+                        {role === 'parent' ? (
+                            <Text className="text-[12.5px] font-medium leading-5" style={{ color: 'var(--c-muted)' }}>
+                                Un cod per familie: cel de-al doilea părinte îl folosește pe același și, dacă declară un copil deja înscris, îl legi la aprobare.
+                            </Text>
+                        ) : null}
+
                         <View className="flex-col sm:flex-row gap-4">
                             <View className="sm:flex-1">
                                 <FieldLabel>Valabil</FieldLabel>

@@ -310,7 +310,9 @@ export default function Signup() {
                                                 ? `Invitație de la ${invite.clubName ?? 'club'} · contul se leagă de copil`
                                                 : isParentInvite && invite.teamName
                                                     ? `Copilul intră direct în echipa ${invite.teamName}`
-                                                    : 'Rol stabilit de administrator'}
+                                                    : invite.role === 'coach'
+                                                        ? 'Un administrator îți aprobă contul înainte de acces'
+                                                        : 'Rol stabilit de administrator'}
                                     </p>
                                 </div>
                                 {!urlToken ? (

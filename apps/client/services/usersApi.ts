@@ -8,13 +8,31 @@ export type User = {
   role: UserRole;
 };
 
+export type AccountProfile = User & {
+  status: string;
+  phone: string | null;
+  createdAt: string;
+  lastLoginAt: string | null;
+  /** Coach: the teams they lead. Player: the teams they play in. */
+  teams: { id: number; name: string }[];
+  /** Parent: linked children, each with the other parents on that child. */
+  family: {
+    id: number;
+    name: string;
+    birthYear: number | null;
+    number: number | null;
+    teams: { id: number; name: string }[];
+    parents: { id: number; name: string; email: string }[];
+  }[];
+};
+
 export const usersApi = {
   getUsers() {
     return apiFetch<User[]>('/users');
   },
 
   getUserById(id: string | number) {
-    return apiFetch<User>(`/users/${id}`);
+    return apiFetch<AccountProfile>(`/users/${id}`);
   },
 
   updateUser(id: string | number, payload: Partial<Pick<User, 'name' | 'role'>>) {

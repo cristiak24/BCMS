@@ -166,3 +166,19 @@ export function suggestPlayerMatches<T extends MatchCandidate>(child: { firstNam
         .sort((a, b) => Number(b.exact) - Number(a.exact) || Number(b.sameYear) - Number(a.sameYear))
         .map((m) => ({ ...m.candidate, exact: m.exact, sameBirthYear: m.sameYear }));
 }
+
+/**
+ * Children typed on a parent-code signup that are already on the team's roster
+ * (same name, compatible birth year) — typically the second parent of a family
+ * using the same code. Those go to a club decision instead of becoming a
+ * duplicate player or an unchecked claim on someone else's child.
+ */
+export function splitKnownChildren(children: ChildInput[], roster: MatchCandidate[]) {
+    const known: ChildInput[] = [];
+    const fresh: ChildInput[] = [];
+    for (const child of children) {
+        const onRoster = suggestPlayerMatches(child, roster).some((match) => match.exact);
+        (onRoster ? known : fresh).push(child);
+    }
+    return { known, fresh };
+}

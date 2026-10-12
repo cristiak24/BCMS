@@ -507,6 +507,7 @@ export default function ManageAccountsScreen() {
         const isInactive = account.status === 'inactive';
         const isPrivileged = PRIVILEGED_ROLES.has(account.role);
         const actions: SheetAction[] = [];
+        if (!isInvite) actions.push({ key: 'profile', label: 'Deschide profilul', icon: 'person-outline', onPress: () => router.push(`/admin/users/${account.id}`) });
         if (!isInvite && !isPrivileged && account.status === 'active') {
             ROLE_ACTIONS.filter((option) => option.role !== account.role).forEach((option) => {
                 actions.push({ key: option.role, label: option.label, icon: option.icon, onPress: () => setPending({ kind: 'role', account, role: option.role }) });
@@ -521,7 +522,7 @@ export default function ManageAccountsScreen() {
         }
         if (!isInvite && !isPrivileged) actions.push({ key: 'delete', label: 'Șterge definitiv', icon: 'delete-forever', tone: 'danger', onPress: () => setPending({ kind: 'delete', account }) });
         return actions;
-    }, []);
+    }, [router]);
 
     const filterCounts = useMemo(() => ({
         all: accounts.length,
@@ -663,7 +664,13 @@ export default function ManageAccountsScreen() {
                                                     </Pressable>
                                                 ) : <View className="w-8 shrink-0" />}
 
-                                                <View className="flex-1 md:flex-[2.2] min-w-0 flex-row items-center gap-3 pl-1 md:pl-2">
+                                                <Pressable
+                                                    onPress={() => router.push(`/admin/users/${account.id}`)}
+                                                    disabled={isInvite}
+                                                    accessibilityRole={isInvite ? undefined : 'button'}
+                                                    accessibilityLabel={isInvite ? undefined : `Deschide profilul lui ${account.name || account.email}`}
+                                                    className="flex-1 md:flex-[2.2] min-w-0 flex-row items-center gap-3 pl-1 md:pl-2"
+                                                >
                                                     <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: isInvite ? 'var(--c-warning-bg)' : rv.tint }}>
                                                         {isInvite
                                                             ? <MaterialIcons name="mail-outline" size={17} color="var(--c-warning-fg)" />
@@ -680,7 +687,7 @@ export default function ManageAccountsScreen() {
                                                             </Text>
                                                         </View>
                                                     </View>
-                                                </View>
+                                                </Pressable>
 
                                                 <View className="hidden md:flex flex-1 min-w-0">
                                                     <View className="self-start rounded-full px-2.5 py-1" style={{ backgroundColor: rv.tint }}>

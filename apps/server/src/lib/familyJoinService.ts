@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, or } from 'drizzle-orm';
 import { db } from '../db';
 import { clubs, familyJoinRequests, players, playerGuardians, playersToTeams, teams, users } from '../db/schema';
-import { suggestPlayerMatches, teamCodeCandidates, type ChildInput, type TeamSignupInput } from './familyJoin';
+import { splitKnownChildren, suggestPlayerMatches, teamCodeCandidates, type ChildInput, type TeamSignupInput } from './familyJoin';
 
 /**
  * DB side of joining a team with its code: create the requests at signup,
@@ -28,7 +28,7 @@ export async function findTeamByJoinCode(raw: string) {
 /** Called once the account row exists; one pending request per child (or one for the player). */
 export async function createJoinRequests(params: {
     userId: number;
-    team: typeof teams.$inferSelect;
+    team: Pick<typeof teams.$inferSelect, 'id' | 'clubId'>;
     input: TeamSignupInput;
     firstName: string;
     lastName: string;
@@ -82,6 +82,45 @@ export async function createChildrenForParent(params: {
         }
         return created;
     });
+}
+
+/**
+ * A parent signed up with a team-bound club code. Children already on the
+ * team's roster wait for a club decision (the approval links the parent to the
+ * existing player); the rest are created and linked right away.
+ */
+export async function placeChildrenForParent(params: {
+    userId: number;
+    team: Pick<typeof teams.$inferSelect, 'id' | 'clubId'>;
+    phone: string;
+    firstName: string;
+    lastName: string;
+    children: ChildInput[];
+}) {
+    const [direct, viaJoin] = await Promise.all([
+        db.select().from(players).where(eq(players.teamId, params.team.id)),
+        db.select({ player: players }).from(playersToTeams)
+            .innerJoin(players, eq(players.id, playersToTeams.playerId))
+            .where(eq(playersToTeams.teamId, params.team.id)),
+    ]);
+    const roster = new Map<number, typeof players.$inferSelect>();
+    direct.forEach((row) => roster.set(row.id, row));
+    viaJoin.forEach(({ player }) => roster.set(player.id, player));
+
+    const { known, fresh } = splitKnownChildren(params.children, Array.from(roster.values()));
+    const created = fresh.length
+        ? await createChildrenForParent({ userId: params.userId, teamId: params.team.id, children: fresh })
+        : [];
+    const requested = known.length
+        ? await createJoinRequests({
+            userId: params.userId,
+            team: params.team,
+            input: { kind: 'parent', phone: params.phone, children: known },
+            firstName: params.firstName,
+            lastName: params.lastName,
+        })
+        : [];
+    return { created, requested };
 }
 
 /** Team ids this reviewer may decide on. null = every team of their club. */

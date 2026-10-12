@@ -4,6 +4,7 @@ import { users } from '../db/schema';
 import { eq, asc, and } from 'drizzle-orm';
 import { authenticate, requireRoles, type AuthenticatedRequest } from '../middleware/auth';
 import { writeAuditLog } from '../services/auditService';
+import { loadAccountProfile } from '../lib/accountProfile';
 
 const router = Router();
 
@@ -129,12 +130,7 @@ router.get('/:id', requireRoles(['admin']), async (req: AuthenticatedRequest, re
             return;
         }
 
-        res.json({
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-        });
+        res.json(await loadAccountProfile(user));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch user' });

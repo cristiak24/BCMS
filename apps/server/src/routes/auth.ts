@@ -11,7 +11,7 @@ import { consumeInviteCode, findClubTeam, findUsableInviteCode, looksLikeInviteC
 import { rateLimit } from '../middleware/rateLimit';
 import { writeAuditLog } from '../services/auditService';
 import { looksLikeTeamCode, parseParentChildren, parseTeamSignup } from '../lib/familyJoin';
-import { createChildrenForParent, createJoinRequests, findTeamByJoinCode } from '../lib/familyJoinService';
+import { createChildrenForParent, createJoinRequests, findTeamByJoinCode, placeChildrenForParent } from '../lib/familyJoinService';
 import { normalizePhone } from '../lib/contacts';
 import { resolveSelfPlayerForRequest, teamIdsOfPlayers } from '../lib/selfPlayer';
 import { findUsableGuardianInvite, looksLikeGuardianInvite, redeemGuardianInvite } from '../lib/guardianInvites';
@@ -348,7 +348,8 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
         }
 
         // Short club code: the admin already bounded who can use it (expiry +
-        // usage cap), so the account is active right away with the code's role.
+        // usage cap), so the account is active right away with the code's role
+        // — except coaches, who always wait for an admin to approve them.
         if (looksLikeInviteCode(String(inviteToken))) {
             const consumed = await consumeInviteCode(String(inviteToken));
             if (!consumed) {
@@ -357,14 +358,15 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
 
             try {
                 const kids = consumed.role === 'parent' ? childrenInput : null;
-                let teamId: number | null = null;
+                const needsApproval = consumed.role === 'coach';
+                let team: { id: number; name: string } | null = null;
                 if (kids && consumed.teamId != null) {
-                    const team = await findClubTeam(consumed.clubId, consumed.teamId);
+                    team = await findClubTeam(consumed.clubId, consumed.teamId);
                     if (!team) {
                         throw new Error('Echipa din acest cod nu mai există. Cere un cod nou administratorului clubului.');
                     }
-                    teamId = team.id;
                 }
+                const teamId = team?.id ?? null;
 
                 const values = {
                     firebaseUid: firebaseUser.uid,
@@ -373,7 +375,7 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
                     firstName,
                     lastName,
                     role: consumed.role as any,
-                    status: 'active' as const,
+                    status: needsApproval ? ('pending' as const) : ('active' as const),
                     clubId: consumed.clubId,
                     ...(phone ? { phone } : {}),
                 };
@@ -381,8 +383,28 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
                     ? await db.update(users).set({ ...values, updatedAt: new Date().toISOString() }).where(eq(users.id, req.user.id)).returning()
                     : await db.insert(users).values(values).returning();
                 const userRecord = saved[0];
+                let status: 'active' | 'pending' = values.status;
+                let requestedChildren = 0;
 
-                if (kids) {
+                if (needsApproval) {
+                    await createPendingAccessRequestForSignup({ userId: userRecord.id, clubId: consumed.clubId, role: 'coach' });
+                } else if (kids && team) {
+                    const placed = await placeChildrenForParent({
+                        userId: userRecord.id,
+                        team: { id: team.id, clubId: consumed.clubId },
+                        phone: phone!,
+                        firstName,
+                        lastName,
+                        children: kids,
+                    });
+                    requestedChildren = placed.requested.length;
+                    // Every child is already on the roster (second parent of the
+                    // family): in once the club confirms the link.
+                    if (placed.created.length === 0 && requestedChildren > 0) {
+                        await db.update(users).set({ status: 'pending' }).where(eq(users.id, userRecord.id));
+                        status = 'pending';
+                    }
+                } else if (kids) {
                     await createChildrenForParent({ userId: userRecord.id, teamId, children: kids });
                 }
 
@@ -394,14 +416,14 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
                     actorUid: firebaseUser.uid,
                     actorRole: consumed.role,
                     clubId: consumed.clubId,
-                    metadata: kids ? { children: kids.length, teamId } : null,
+                    metadata: kids ? { children: kids.length, teamId, awaitingLink: requestedChildren } : needsApproval ? { pendingApproval: true } : null,
                     ipAddress: req.ip ?? null,
                     userAgent: req.get('user-agent') ?? null,
                 });
 
                 return res.status(201).json({
                     success: true,
-                    user: { userId: userRecord.id, clubId: consumed.clubId, role: consumed.role, status: 'active' },
+                    user: { userId: userRecord.id, clubId: consumed.clubId, role: consumed.role, status },
                 });
             } catch (error) {
                 await releaseInviteCodeUse(consumed.id).catch(() => undefined);

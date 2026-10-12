@@ -7,6 +7,7 @@ import {
     parseBirthDate,
     parseParentChildren,
     parseTeamSignup,
+    splitKnownChildren,
     suggestPlayerMatches,
     teamCodeCandidates,
 } from './familyJoin';
@@ -77,4 +78,20 @@ test('parent code/link children: name + birth year, optional for older clients',
     assert.equal(parseParentChildren({ children: [{ firstName: 'Matei', lastName: 'P', birthYear: 1990 }] }, NOW).ok, false);
     assert.equal(parseParentChildren({ children: [{ firstName: 'Matei', lastName: 'P', birthYear: 2026 }] }, NOW).ok, false);
     assert.equal(parseParentChildren({ children: Array.from({ length: 6 }, () => ({ firstName: 'A', lastName: 'B', birthYear: 2015 })) }, NOW).ok, false);
+});
+
+test('second parent with the same code: children already on the roster wait for the club', () => {
+    const roster = [
+        { id: 1, firstName: 'Matei', lastName: 'Popescu', birthYear: 2016 },
+        { id: 2, firstName: 'Ana', lastName: 'Ionescu', birthYear: 2012 },
+    ];
+    const typed = [
+        { firstName: 'matei', lastName: 'POPESCU', birthDate: '2016-01-01' },
+        { firstName: 'Ana', lastName: 'Ionescu', birthDate: '2009-01-01' },
+        { firstName: 'Luca', lastName: 'Popescu', birthDate: '2018-01-01' },
+    ];
+    const { known, fresh } = splitKnownChildren(typed, roster);
+    assert.deepEqual(known.map((c) => c.firstName), ['matei']);
+    assert.deepEqual(fresh.map((c) => c.firstName), ['Ana', 'Luca']);
+    assert.deepEqual(splitKnownChildren(typed, []).fresh, typed);
 });
