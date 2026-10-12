@@ -13,6 +13,9 @@ import { chooseAutoTarget, splitKnownChildren, suggestPlayerMatches, teamCodeCan
 
 export type Reviewer = { id: number; role: string; clubId: number | null };
 
+/** The open transaction of a caller that needs several writes to land together. */
+export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 export async function findTeamByJoinCode(raw: string) {
     const candidates = teamCodeCandidates(raw);
     const rows = await db
@@ -34,6 +37,7 @@ export async function createJoinRequests(params: {
     input: TeamSignupInput;
     firstName: string;
     lastName: string;
+    tx?: Tx;
 }) {
     const base = { clubId: params.team.clubId!, teamId: params.team.id, userId: params.userId, kind: params.input.kind };
     const rows = params.input.kind === 'parent'
@@ -49,7 +53,7 @@ export async function createJoinRequests(params: {
             childLastName: params.lastName,
             childBirthDate: params.input.birthDate,
         }];
-    return db.insert(familyJoinRequests).values(rows).returning();
+    return (params.tx ?? db).insert(familyJoinRequests).values(rows).returning();
 }
 
 /**
@@ -62,8 +66,9 @@ export async function createChildrenForParent(params: {
     userId: number;
     teamId: number | null;
     children: ChildInput[];
+    tx?: Tx;
 }) {
-    return db.transaction(async (tx) => {
+    const work = async (tx: Tx) => {
         const created: { id: number }[] = [];
         for (const child of params.children) {
             const [player] = await tx.insert(players).values({
@@ -83,7 +88,8 @@ export async function createChildrenForParent(params: {
             created.push(player);
         }
         return created;
-    });
+    };
+    return params.tx ? work(params.tx) : db.transaction(work);
 }
 
 /**
@@ -98,10 +104,12 @@ export async function placeChildrenForParent(params: {
     firstName: string;
     lastName: string;
     children: ChildInput[];
+    tx?: Tx;
 }) {
+    const exec = params.tx ?? db;
     const [direct, viaJoin] = await Promise.all([
-        db.select().from(players).where(eq(players.teamId, params.team.id)),
-        db.select({ player: players }).from(playersToTeams)
+        exec.select().from(players).where(eq(players.teamId, params.team.id)),
+        exec.select({ player: players }).from(playersToTeams)
             .innerJoin(players, eq(players.id, playersToTeams.playerId))
             .where(eq(playersToTeams.teamId, params.team.id)),
     ]);
@@ -111,7 +119,7 @@ export async function placeChildrenForParent(params: {
 
     const { known, fresh } = splitKnownChildren(params.children, Array.from(roster.values()));
     const created = fresh.length
-        ? await createChildrenForParent({ userId: params.userId, teamId: params.team.id, children: fresh })
+        ? await createChildrenForParent({ userId: params.userId, teamId: params.team.id, children: fresh, tx: params.tx })
         : [];
     const requested = known.length
         ? await createJoinRequests({
@@ -120,6 +128,7 @@ export async function placeChildrenForParent(params: {
             input: { kind: 'parent', phone: params.phone, children: known },
             firstName: params.firstName,
             lastName: params.lastName,
+            tx: params.tx,
         })
         : [];
     return { created, requested };

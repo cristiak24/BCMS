@@ -12,7 +12,8 @@ import { clientIp, rateLimit } from '../middleware/rateLimit';
 import { writeAuditLog } from '../services/auditService';
 import { looksLikeTeamCode, parseParentChildren, parseTeamSignup } from '../lib/familyJoin';
 import { loadOwnRequests, notifyReviewers } from '../lib/accessNotify';
-import { createChildrenForParent, createJoinRequests, findTeamByJoinCode, placeChildrenForParent } from '../lib/familyJoinService';
+import { registerWithClubCode } from '../lib/clubCodeSignup';
+import { createChildrenForParent, createJoinRequests, findTeamByJoinCode } from '../lib/familyJoinService';
 import { normalizePhone } from '../lib/contacts';
 import { resolveSelfPlayerForRequest, teamIdsOfPlayers } from '../lib/selfPlayer';
 import { findUsableGuardianInvite, looksLikeGuardianInvite, redeemGuardianInvite } from '../lib/guardianInvites';
@@ -407,58 +408,33 @@ router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidL
                         throw new Error('Echipa din acest cod nu mai există. Cere un cod nou administratorului clubului.');
                     }
                 }
-                const teamId = team?.id ?? null;
 
-                const values = {
+                const { user: userRecord, status, requested } = await registerWithClubCode({
+                    existingUserId: req.user?.id ?? null,
                     firebaseUid: firebaseUser.uid,
                     email: firebaseUser.email || '',
                     name,
                     firstName,
                     lastName,
-                    role: consumed.role as any,
-                    status: needsApproval ? ('pending' as const) : ('active' as const),
-                    clubId: consumed.clubId,
-                    ...(phone ? { phone } : {}),
-                };
-                const saved = req.user
-                    ? await db.update(users).set({ ...values, updatedAt: new Date().toISOString() }).where(eq(users.id, req.user.id)).returning()
-                    : await db.insert(users).values(values).returning();
-                const userRecord = saved[0];
-                let status: 'active' | 'pending' = values.status;
-                let requestedChildren = 0;
+                    phone,
+                    code: { role: consumed.role, clubId: consumed.clubId },
+                    team,
+                    children: kids,
+                });
+                const requestedChildren = requested.length;
 
                 if (needsApproval) {
-                    await createPendingAccessRequestForSignup({ userId: userRecord.id, clubId: consumed.clubId, role: 'coach' });
                     void notifyReviewers({ clubId: consumed.clubId, requesterId: userRecord.id, requesterName: name, role: 'coach' });
-                } else if (kids && team) {
-                    const placed = await placeChildrenForParent({
-                        userId: userRecord.id,
-                        team: { id: team.id, clubId: consumed.clubId },
-                        phone: phone!,
-                        firstName,
-                        lastName,
-                        children: kids,
+                } else if (requestedChildren > 0 && team) {
+                    void notifyReviewers({
+                        clubId: consumed.clubId,
+                        teamId: team.id,
+                        requesterId: userRecord.id,
+                        requesterName: name,
+                        role: 'parent',
+                        teamName: team.name,
+                        children: requested.map((request) => `${request.childFirstName} ${request.childLastName}`),
                     });
-                    requestedChildren = placed.requested.length;
-                    if (requestedChildren > 0) {
-                        void notifyReviewers({
-                            clubId: consumed.clubId,
-                            teamId: team.id,
-                            requesterId: userRecord.id,
-                            requesterName: name,
-                            role: 'parent',
-                            teamName: team.name,
-                            children: placed.requested.map((request) => `${request.childFirstName} ${request.childLastName}`),
-                        });
-                    }
-                    // Every child is already on the roster (second parent of the
-                    // family): in once the club confirms the link.
-                    if (placed.created.length === 0 && requestedChildren > 0) {
-                        await db.update(users).set({ status: 'pending' }).where(eq(users.id, userRecord.id));
-                        status = 'pending';
-                    }
-                } else if (kids) {
-                    await createChildrenForParent({ userId: userRecord.id, teamId, children: kids });
                 }
 
                 await writeAuditLog({
@@ -469,7 +445,7 @@ router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidL
                     actorUid: firebaseUser.uid,
                     actorRole: consumed.role,
                     clubId: consumed.clubId,
-                    metadata: kids ? { children: kids.length, teamId, awaitingLink: requestedChildren } : needsApproval ? { pendingApproval: true } : null,
+                    metadata: kids ? { children: kids.length, teamId: team?.id ?? null, awaitingLink: requestedChildren } : needsApproval ? { pendingApproval: true } : null,
                     ipAddress: req.ip ?? null,
                     userAgent: req.get('user-agent') ?? null,
                 });
