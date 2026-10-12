@@ -22,6 +22,11 @@ const STATUS_META: Record<InviteCodeStatus, { label: string; fg: string; bg: str
     revoked: { label: 'Revocat', fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)' },
 };
 
+// A parent code is one per family (two parents); the other roles share a code across a group.
+function defaultUses(role: InviteRole) {
+    return role === 'parent' ? '2' : '25';
+}
+
 function formatExpiry(iso: string) {
     return new Date(iso).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
@@ -50,7 +55,8 @@ export default function InviteCodesPanel({ onNotify }: Props) {
     const [teams, setTeams] = useState<TeamOption[]>([]);
     const [teamId, setTeamId] = useState<number | null>(null);
     const [validityHours, setValidityHours] = useState(24 * 7);
-    const [maxUsesInput, setMaxUsesInput] = useState('25');
+    const [maxUsesInput, setMaxUsesInput] = useState(defaultUses('player'));
+    const [maxUsesEdited, setMaxUsesEdited] = useState(false);
     const [codes, setCodes] = useState<InviteCodeItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
@@ -209,6 +215,7 @@ export default function InviteCodesPanel({ onNotify }: Props) {
                                 onSelectRole={(next) => {
                                     setRole(next);
                                     if (next !== 'parent') setTeamId(null);
+                                    if (!maxUsesEdited) setMaxUsesInput(defaultUses(next));
                                 }}
                             />
                         </View>
@@ -222,7 +229,7 @@ export default function InviteCodesPanel({ onNotify }: Props) {
                         ) : null}
                         {role === 'parent' ? (
                             <Text className="text-[12.5px] font-medium leading-5" style={{ color: 'var(--c-muted)' }}>
-                                Un cod per familie: cel de-al doilea părinte îl folosește pe același și, dacă declară un copil deja înscris, îl legi la aprobare.
+                                Un cod per familie (implicit 2 conturi): cel de-al doilea părinte îl folosește pe același și, dacă declară un copil deja înscris, îl legi la aprobare.
                             </Text>
                         ) : null}
 
@@ -244,7 +251,10 @@ export default function InviteCodesPanel({ onNotify }: Props) {
                                 <FieldLabel hint="1–500">Max. conturi</FieldLabel>
                                 <TextInput
                                     value={maxUsesInput}
-                                    onChangeText={(value: string) => setMaxUsesInput(value.replace(/[^0-9]/g, '').slice(0, 3))}
+                                    onChangeText={(value: string) => {
+                                        setMaxUsesEdited(true);
+                                        setMaxUsesInput(value.replace(/[^0-9]/g, '').slice(0, 3));
+                                    }}
                                     keyboardType="number-pad"
                                     accessibilityLabel="Număr maxim de conturi"
                                     className="w-full sm:w-28 h-8 rounded-[9px] border px-3 text-[13px] font-semibold outline-none t-num"
