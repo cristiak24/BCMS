@@ -182,3 +182,19 @@ export function splitKnownChildren(children: ChildInput[], roster: MatchCandidat
     }
     return { known, fresh };
 }
+
+/**
+ * What "approve automatically" does with a join request: link the single exact
+ * match, otherwise add a new player. A parent claiming a child who already has
+ * a linked parent is never automatic — a name and birth year are public, so
+ * that link needs a person to look at it.
+ */
+export function chooseAutoTarget(
+    kind: 'parent' | 'player',
+    suggestions: { id: number; exact: boolean; guardians?: number }[],
+): number | 'new' | 'review' {
+    const exact = suggestions.filter((s) => s.exact);
+    if (exact.length !== 1) return 'new';
+    if (kind === 'parent' && (exact[0].guardians ?? 0) > 0) return 'review';
+    return exact[0].id;
+}

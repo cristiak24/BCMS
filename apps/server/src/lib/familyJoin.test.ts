@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    chooseAutoTarget,
     foldName,
     generateTeamCode,
     looksLikeTeamCode,
@@ -94,4 +95,14 @@ test('second parent with the same code: children already on the roster wait for 
     assert.deepEqual(known.map((c) => c.firstName), ['matei']);
     assert.deepEqual(fresh.map((c) => c.firstName), ['Ana', 'Luca']);
     assert.deepEqual(splitKnownChildren(typed, []).fresh, typed);
+});
+
+test('automatic approval never links a parent to a child who already has a parent', () => {
+    const match = (guardians: number, exact = true) => ({ id: 7, exact, guardians });
+    assert.equal(chooseAutoTarget('parent', [match(0)]), 7);
+    assert.equal(chooseAutoTarget('parent', [match(1)]), 'review');
+    assert.equal(chooseAutoTarget('player', [match(2)]), 7);
+    assert.equal(chooseAutoTarget('parent', [match(0, false)]), 'new');
+    assert.equal(chooseAutoTarget('parent', [match(0), { id: 8, exact: true, guardians: 0 }]), 'new');
+    assert.equal(chooseAutoTarget('parent', []), 'new');
 });

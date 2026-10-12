@@ -35,7 +35,16 @@ function timeAgo(iso: string) {
   return days === 1 ? 'ieri' : `acum ${days} zile`;
 }
 
-function defaultTarget(request: FamilyJoinRequest): number | 'new' {
+/** The single exact roster match of a parent request, when that child already has a linked parent. */
+function guardedMatch(request: FamilyJoinRequest) {
+  if (request.kind !== 'parent') return null;
+  const exact = request.suggestions.filter((s) => s.exact);
+  return exact.length === 1 && exact[0].guardians > 0 ? exact[0] : null;
+}
+
+/** null = the reviewer has to choose; a second parent is never linked by a default click. */
+function defaultTarget(request: FamilyJoinRequest): number | 'new' | null {
+  if (guardedMatch(request)) return null;
   const exact = request.suggestions.filter((s) => s.exact);
   return exact.length === 1 ? exact[0].id : 'new';
 }
@@ -51,7 +60,8 @@ function RequestCard({
   onApprove: (target: number | 'new') => void;
   onDeny: () => void;
 }) {
-  const [target, setTarget] = useState<number | 'new'>(() => defaultTarget(request));
+  const [target, setTarget] = useState<number | 'new' | null>(() => defaultTarget(request));
+  const guarded = guardedMatch(request);
   const childName = `${request.child.firstName} ${request.child.lastName}`;
   const options: { key: number | 'new'; title: string; meta: string }[] = [
     ...request.suggestions.map((s) => ({
@@ -123,6 +133,14 @@ function RequestCard({
         })}
       </View>
 
+      {target === null && guarded ? (
+        <View className="rounded-[10px] px-3 py-2.5" style={{ backgroundColor: 'var(--c-warning-bg)' }}>
+          <Text className="text-[12.5px] font-semibold leading-[18px]" style={{ color: 'var(--c-warning-fg)' }}>
+            {`${`${guarded.firstName ?? ''} ${guarded.lastName ?? ''}`.trim()} are deja ${guarded.guardians === 1 ? 'un părinte legat' : `${guarded.guardians} părinți legați`}. Alege dacă e același copil, ca să poți aproba.`}
+          </Text>
+        </View>
+      ) : null}
+
       <View className="flex-row justify-end gap-2">
         <Pressable
           onPress={onDeny}
@@ -135,12 +153,12 @@ function RequestCard({
           <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>Respinge</Text>
         </Pressable>
         <Pressable
-          onPress={() => onApprove(target)}
-          disabled={busy}
+          onPress={() => target !== null && onApprove(target)}
+          disabled={busy || target === null}
           accessibilityRole="button"
           accessibilityLabel={`Aprobă cererea pentru ${childName}`}
           className="ui-press h-10 px-4 rounded-[10px] flex-row items-center gap-1.5"
-          style={{ backgroundColor: 'var(--c-brand-surface)', opacity: busy ? 0.7 : 1 } as any}
+          style={{ backgroundColor: 'var(--c-brand-surface)', opacity: busy ? 0.7 : target === null ? 0.45 : 1 } as any}
         >
           {busy ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : <MaterialIcons name="check" size={16} color="var(--c-on-brand)" />}
           <Text className="text-[13px] font-bold" style={{ color: 'var(--c-on-brand)' }}>Aprobă</Text>
@@ -272,7 +290,7 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNot
       const { results } = await familyRequestsApi.approveAll(requests.map((r) => r.id));
       const ok = results.filter((r) => r.ok).length;
       const failed = results.length - ok;
-      onNotify({ variant: failed ? 'error' : 'success', message: failed ? `${ok} aprobate, ${failed} nu au putut fi aprobate.` : `${ok} cereri aprobate.` });
+      onNotify({ variant: failed ? 'error' : 'success', message: failed ? `${ok} aprobate, ${failed} rămân pentru verificarea ta.` : `${ok} cereri aprobate.` });
       await load();
     } catch (err) {
       onNotify({ variant: 'error', message: err instanceof Error ? err.message : 'Nu am putut aproba cererile.' });
@@ -357,7 +375,7 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNot
           ? 'Contul rămâne în așteptare, fără acces la echipă.'
           : confirm?.kind === 'rotate'
             ? 'Codul vechi nu mai funcționează. Cererile deja trimise rămân.'
-            : `Fiecare copil cu un singur jucător identic în lot e legat de el; ceilalți devin jucători noi.${ambiguous ? ` ${ambiguous} ${ambiguous === 1 ? 'cerere are' : 'cereri au'} potriviri nesigure — verifică-le una câte una înainte.` : ''}`}
+            : `Fiecare copil cu un singur jucător identic în lot e legat de el; ceilalți devin jucători noi. Dacă jucătorul are deja un părinte legat, cererea rămâne pentru tine.${ambiguous ? ` ${ambiguous} ${ambiguous === 1 ? 'cerere are' : 'cereri au'} potriviri nesigure — verifică-le una câte una înainte.` : ''}`}
         confirmLabel={confirm?.kind === 'deny' ? 'Respinge' : confirm?.kind === 'rotate' ? 'Schimbă codul' : 'Aprobă toți'}
         cancelLabel="Anulează"
         onConfirm={() => {

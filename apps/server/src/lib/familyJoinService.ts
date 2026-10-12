@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, or } from 'drizzle-orm';
 import { db } from '../db';
 import { clubs, familyJoinRequests, players, playerGuardians, playersToTeams, teams, users } from '../db/schema';
-import { splitKnownChildren, suggestPlayerMatches, teamCodeCandidates, type ChildInput, type TeamSignupInput } from './familyJoin';
+import { chooseAutoTarget, splitKnownChildren, suggestPlayerMatches, teamCodeCandidates, type ChildInput, type TeamSignupInput } from './familyJoin';
 
 /**
  * DB side of joining a team with its code: create the requests at signup,
@@ -235,8 +235,11 @@ export async function approveJoinRequest(reviewer: Reviewer, requestId: number, 
     let playerId: number | 'new' = target === 'auto' ? 'new' : target;
     if (target === 'auto') {
         const [pending] = await listJoinRequests(reviewer).then((list) => list.filter((r) => r.id === requestId));
-        const exact = pending?.suggestions.filter((s) => s.exact) ?? [];
-        if (exact.length === 1) playerId = exact[0].id;
+        const choice = chooseAutoTarget(request.kind as 'parent' | 'player', pending?.suggestions ?? []);
+        if (choice === 'review') {
+            throw new JoinRequestError('Copilul are deja un părinte legat. Alege manual dacă este același copil.', 409);
+        }
+        playerId = choice;
     }
 
     const clubTeamIds = (await db.select({ id: teams.id }).from(teams).where(eq(teams.clubId, request.clubId))).map((t) => t.id);

@@ -1,3 +1,4 @@
+import net from 'net';
 import type { Response, NextFunction } from 'express';
 import type { AuthenticatedRequest } from './auth';
 
@@ -34,12 +35,23 @@ function sweep(now: number, windowMs: number) {
     }
 }
 
-function resolveIdentity(req: AuthenticatedRequest): string {
+/** Render sits behind Cloudflare, which sets this header; req.ip would be Render's own proxy for everyone. */
+export function clientIp(req: { headers: Record<string, unknown>; ip?: string }) {
+    const header = req.headers['cf-connecting-ip'];
+    const value = String(Array.isArray(header) ? header[0] : header ?? '').trim();
+    return net.isIP(value) ? value : req.ip ?? 'unknown';
+}
+
+function resolveIdentity(req: AuthenticatedRequest, key?: (req: AuthenticatedRequest) => string | null): string {
+    const custom = key?.(req);
+    if (custom) {
+        return custom;
+    }
     const userId = req.user?.id;
     if (userId != null) {
         return `u:${userId}`;
     }
-    return `ip:${req.ip ?? 'unknown'}`;
+    return `ip:${clientIp(req)}`;
 }
 
 export type RateLimitOptions = {
@@ -49,14 +61,16 @@ export type RateLimitOptions = {
     limit: number;
     /** Sliding window size in milliseconds. */
     windowMs: number;
+    /** Custom identity (e.g. the Clerk uid before the account row exists); null falls back to user id / IP. */
+    key?: (req: AuthenticatedRequest) => string | null;
 };
 
-export function rateLimit({ bucket, limit, windowMs }: RateLimitOptions) {
+export function rateLimit({ bucket, limit, windowMs, key: identityKey }: RateLimitOptions) {
     return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         const now = Date.now();
         sweep(now, windowMs);
 
-        const key = `${bucket}|${resolveIdentity(req)}`;
+        const key = `${bucket}|${resolveIdentity(req, identityKey)}`;
         const state = buckets.get(key) ?? { hits: [] };
 
         // Drop timestamps that fell out of the sliding window.

@@ -8,7 +8,7 @@ import { acceptInvitation, createSuperAdminInvitation, validateInvitationToken }
 import { createPendingAccessRequestForSignup, validateInviteToken } from '../lib/manageAccessService';
 import { loadServerEnv } from '../lib/loadEnv';
 import { consumeInviteCode, findClubTeam, findUsableInviteCode, looksLikeInviteCode, releaseInviteCodeUse } from '../lib/clubInviteCodes';
-import { rateLimit } from '../middleware/rateLimit';
+import { clientIp, rateLimit } from '../middleware/rateLimit';
 import { writeAuditLog } from '../services/auditService';
 import { looksLikeTeamCode, parseParentChildren, parseTeamSignup } from '../lib/familyJoin';
 import { createChildrenForParent, createJoinRequests, findTeamByJoinCode, placeChildrenForParent } from '../lib/familyJoinService';
@@ -19,8 +19,19 @@ import { findUsableGuardianInvite, looksLikeGuardianInvite, redeemGuardianInvite
 const router = Router();
 loadServerEnv();
 
-// Public, unauthenticated: throttles guessing short invite codes.
-const inviteValidateLimiter = rateLimit({ bucket: 'auth:invite-validate', limit: 20, windowMs: 60_000 });
+// Public, unauthenticated: throttles guessing short invite codes. Per client IP
+// (see clientIp), so a whole team signing up from one gym wifi needs headroom.
+const inviteValidateLimiter = rateLimit({ bucket: 'auth:invite-validate', limit: 30, windowMs: 60_000 });
+// Signup redeems codes too: cap per Clerk identity and, more loosely, per IP.
+const signupIpLimiter = rateLimit({ bucket: 'auth:signup-ip', limit: 60, windowMs: 60_000, key: (req) => `ip:${clientIp(req)}` });
+const signupUidLimiter = rateLimit({
+    bucket: 'auth:signup',
+    limit: 10,
+    windowMs: 60_000,
+    key: (req) => (req.firebaseUser?.uid ? `uid:${req.firebaseUser.uid}` : null),
+});
+
+const ACTIVE_ACCOUNT_ERROR = 'Există deja un cont activ cu acest email. Autentifică-te.';
 
 async function findClubName(clubId?: number | null) {
     if (clubId == null) {
@@ -213,7 +224,7 @@ router.get('/invites/validate', inviteValidateLimiter as any, async (req: any, r
 });
 
 // POST /api/auth/complete-invite-signup
-router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRequest, res: any) => {
+router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidLimiter, async (req: AuthenticatedRequest, res: any) => {
     try {
         const { name, inviteToken } = req.body;
         const firebaseUser = req.firebaseUser;
@@ -351,6 +362,11 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
         // usage cap), so the account is active right away with the code's role
         // — except coaches, who always wait for an admin to approve them.
         if (looksLikeInviteCode(String(inviteToken))) {
+            // A working account must not have its role, club or status rewritten
+            // by a code (an admin opening a coach code would lock themselves out).
+            if (req.user && req.user.status === 'active') {
+                return res.status(409).json({ error: ACTIVE_ACCOUNT_ERROR });
+            }
             const consumed = await consumeInviteCode(String(inviteToken));
             if (!consumed) {
                 return res.status(400).json({ error: 'Codul de invitație nu este valid, a expirat sau a atins numărul maxim de utilizări.' });
@@ -446,6 +462,9 @@ router.post('/complete-invite-signup', authenticate, async (req: AuthenticatedRe
             }
         } else {
             const manageAccessInvite = await validateInviteToken(String(inviteToken));
+            if (req.user && req.user.status === 'active') {
+                return res.status(409).json({ error: ACTIVE_ACCOUNT_ERROR });
+            }
             let userRecord = req.user;
 
             if (!userRecord) {
