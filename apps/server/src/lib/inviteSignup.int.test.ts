@@ -268,6 +268,32 @@ test('an access link waits for the admin once, however often it is opened', asyn
     assert.equal((await signup(link, {}, { existing: { id: adminId, status: 'active' } })).status, 409);
 });
 
+async function adminRequestNotes() {
+    return (await db.select().from(notifications).where(and(eq(notifications.userId, adminId), eq(notifications.type, 'access_request')))).length;
+}
+
+test('opening the same link or coach code again does not notify the admin a second time', async () => {
+    const link = await accessLink('player');
+    const base = await adminRequestNotes();
+    const first = await signup(link, {}, { email: 'twice.player@mail.ro' });
+    assert.equal(first.status, 201);
+    await waitFor(async () => (await adminRequestNotes()) > base);
+    const afterFirst = await adminRequestNotes();
+    const waiting = await userByEmail('twice.player@mail.ro');
+    await signup(link, {}, { email: 'twice.player@mail.ro', existing: { id: waiting.id, status: 'pending' } });
+
+    const code = await clubCode('coach');
+    await signup(code.code, {}, { email: 'twice.coach@mail.ro' });
+    await waitFor(async () => (await adminRequestNotes()) > afterFirst);
+    const afterCoach = await adminRequestNotes();
+    const coach = await userByEmail('twice.coach@mail.ro');
+    await signup(code.code, {}, { email: 'twice.coach@mail.ro', existing: { id: coach.id, status: 'pending' } });
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.equal(afterFirst, base + 1);
+    assert.equal(await adminRequestNotes(), afterCoach);
+});
+
 test('an email invitation brings the account in with the invited role and keeps the phone', async () => {
     const token = await emailInvitation('invited.coach@mail.ro', 'coach');
     const out = await signup(token, {}, { email: 'invited.coach@mail.ro' });

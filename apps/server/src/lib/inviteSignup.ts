@@ -196,7 +196,7 @@ async function signUpWithClubCode(ctx: Ctx, { code }: Of<'club-code'>) {
             if (!team) throw new Error(INVITE_ERRORS.teamGone);
         }
 
-        const { user, status, requested } = await registerWithClubCode({
+        const { user, status, requested, requestCreated } = await registerWithClubCode({
             existingUserId: ctx.existingUserId,
             firebaseUid: ctx.uid,
             email: ctx.email,
@@ -210,7 +210,7 @@ async function signUpWithClubCode(ctx: Ctx, { code }: Of<'club-code'>) {
         });
 
         if (needsApproval) {
-            void notifyReviewers({ clubId: consumed.clubId, requesterId: user.id, requesterName: ctx.name, role: 'coach' });
+            if (requestCreated) void notifyReviewers({ clubId: consumed.clubId, requesterId: user.id, requesterName: ctx.name, role: 'coach' });
         } else if (requested.length > 0 && team) {
             void notifyReviewers({
                 clubId: consumed.clubId,
@@ -265,7 +265,7 @@ async function signUpWithAccessLink(ctx: Ctx, { link }: Of<'access-link'>) {
     const kids = parsedKids.value;
     const linkTeam = kids && link.teamId != null ? await findClubTeam(link.clubId, link.teamId) : null;
 
-    const { user, queuedForTeam } = await registerWithAccessLink({
+    const { user, queuedForTeam, requestCreated } = await registerWithAccessLink({
         existingUserId: ctx.existingUserId,
         firebaseUid: ctx.uid,
         email: ctx.email,
@@ -288,7 +288,7 @@ async function signUpWithAccessLink(ctx: Ctx, { link }: Of<'access-link'>) {
             teamName: linkTeam.name,
             children: kids.map((child) => `${child.firstName} ${child.lastName}`),
         });
-    } else {
+    } else if (requestCreated) {
         void notifyReviewers({ clubId: link.clubId, requesterId: user.id, requesterName: ctx.name, role: link.role });
     }
     return created({ userId: user.id, clubId: link.clubId, role: link.role, status: 'pending' });

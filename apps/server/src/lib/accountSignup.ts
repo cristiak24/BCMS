@@ -33,7 +33,11 @@ export async function upsertAccount(tx: Tx, existingUserId: number | null, accou
     return user;
 }
 
-/** Opening a second link or code must not stack a second request for the admin. */
+/**
+ * Opening a second link or code must not stack a second request for the admin.
+ * Returns true only when a new request was made, so callers can skip telling
+ * the admin about the same person twice.
+ */
 export async function ensurePendingAccessRequest(
     tx: Tx,
     user: { id: number; name: string | null; email: string },
@@ -48,7 +52,7 @@ export async function ensurePendingAccessRequest(
             eq(accessRequests.status, 'pending'),
         ))
         .limit(1);
-    if (waiting.length) return;
+    if (waiting.length) return false;
     await tx.insert(accessRequests).values({
         userId: user.id,
         clubId,
@@ -56,6 +60,7 @@ export async function ensurePendingAccessRequest(
         userEmail: user.email,
         requestedRole: role,
     });
+    return true;
 }
 
 export async function registerWithTeamCode(input: SignupIdentity & {
@@ -119,14 +124,14 @@ export async function registerWithAccessLink(input: SignupIdentity & {
                 lastName: input.lastName,
                 tx,
             });
-            return { user, queuedForTeam: true };
+            return { user, queuedForTeam: true, requestCreated: true };
         }
 
         if (input.children) {
             await createChildrenForParent({ userId: user.id, teamId: null, children: input.children, tx });
         }
-        await ensurePendingAccessRequest(tx, user, input.link.clubId, input.link.role as typeof accessRequests.$inferInsert.requestedRole);
-        return { user, queuedForTeam: false };
+        const requestCreated = await ensurePendingAccessRequest(tx, user, input.link.clubId, input.link.role as typeof accessRequests.$inferInsert.requestedRole);
+        return { user, queuedForTeam: false, requestCreated };
     });
 }
 

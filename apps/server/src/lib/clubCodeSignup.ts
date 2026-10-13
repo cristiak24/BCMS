@@ -37,9 +37,10 @@ export async function registerWithClubCode(input: ClubCodeSignup) {
         let status: 'active' | 'pending' = needsApproval ? 'pending' : 'active';
         let created: { id: number }[] = [];
         let requested: { childFirstName: string; childLastName: string }[] = [];
+        let requestCreated = false;
 
         if (needsApproval) {
-            await ensurePendingAccessRequest(tx, user, input.code.clubId, 'coach');
+            requestCreated = await ensurePendingAccessRequest(tx, user, input.code.clubId, 'coach');
         } else if (input.children && input.team) {
             const placed = await placeChildrenForParent({
                 userId: user.id,
@@ -62,6 +63,6 @@ export async function registerWithClubCode(input: ClubCodeSignup) {
             created = await createChildrenForParent({ userId: user.id, teamId: null, children: input.children, tx });
         }
 
-        return { user, status, created, requested };
+        return { user, status, created, requested, requestCreated };
     });
 }

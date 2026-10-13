@@ -1,7 +1,6 @@
 import {
     approveAccessRequest,
     assignUserClub,
-    createAccessRequest,
     createInviteLink,
     deactivateActiveInviteLinks,
     denyAccessRequest,
@@ -221,9 +220,3 @@ export async function validateInviteToken(rawToken: string) {
     };
 }
 
-export async function createPendingAccessRequestForSignup(params: { userId: number; clubId?: number | null; role: InviteRole; }) {
-    const club = params.clubId ? await getClubById(params.clubId) : null;
-    const fallbackClub = club ?? await ensureDefaultClub();
-    await assignUserClub(params.userId, fallbackClub.id);
-    return createAccessRequest(params.userId, fallbackClub.id, params.role);
-}

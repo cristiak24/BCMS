@@ -52,11 +52,6 @@ function inviteLinkSelection() {
     };
 }
 
-async function findUserDocByNumericId(userId: number) {
-    const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-    return rows[0] ?? null;
-}
-
 export async function getClubById(clubId: number) {
     const rows = await db.select().from(clubs).where(eq(clubs.id, clubId)).limit(1);
     return rows[0] ?? null;
@@ -91,23 +86,6 @@ export async function assignUserClub(userId: number, clubId: number) {
         .returning();
     
     return updated.length > 0 ? (updated[0] as unknown as UserDoc) : null;
-}
-
-export async function createAccessRequest(userId: number, clubId: number, requestedRole: InviteRole) {
-    const user = await findUserDocByNumericId(userId);
-    
-    const request = {
-        userId,
-        clubId,
-        userName: user?.name,
-        userEmail: user?.email,
-        requestedRole: requestedRole as any,
-        status: 'pending' as any,
-        createdAt: new Date().toISOString(),
-    };
-
-    const inserted = await db.insert(accessRequests).values(request).returning();
-    return inserted[0];
 }
 
 export async function listClubAccessRequests(clubId: number) {
