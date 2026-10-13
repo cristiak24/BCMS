@@ -1,17 +1,11 @@
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '../db';
-import { accessRequests, users } from '../db/schema';
+import { users } from '../db/schema';
+import { ensurePendingAccessRequest, upsertAccount, type SignupIdentity } from './accountSignup';
 import type { ChildInput } from './familyJoin';
 import { createChildrenForParent, placeChildrenForParent } from './familyJoinService';
 
-export type ClubCodeSignup = {
-    /** The caller's existing (not active) account row, if they already have one. */
-    existingUserId: number | null;
-    firebaseUid: string;
-    email: string;
-    name: string;
-    firstName: string;
-    lastName: string;
+export type ClubCodeSignup = SignupIdentity & {
     phone: string | null;
     code: { role: string; clubId: number };
     /** The code's team, already checked to belong to the club. */
@@ -28,44 +22,24 @@ export type ClubCodeSignup = {
 export async function registerWithClubCode(input: ClubCodeSignup) {
     const needsApproval = input.code.role === 'coach';
     return db.transaction(async (tx) => {
-        const values = {
+        const user = await upsertAccount(tx, input.existingUserId, {
             firebaseUid: input.firebaseUid,
-            email: input.email.trim().toLowerCase(),
+            email: input.email,
             name: input.name,
             firstName: input.firstName,
             lastName: input.lastName,
             role: input.code.role as typeof users.$inferInsert.role,
-            status: needsApproval ? ('pending' as const) : ('active' as const),
+            status: needsApproval ? 'pending' : 'active',
             clubId: input.code.clubId,
             ...(input.phone ? { phone: input.phone } : {}),
-        };
-        const [user] = input.existingUserId != null
-            ? await tx.update(users).set({ ...values, updatedAt: new Date().toISOString() }).where(eq(users.id, input.existingUserId)).returning()
-            : await tx.insert(users).values(values).returning();
+        });
 
-        let status: 'active' | 'pending' = values.status;
+        let status: 'active' | 'pending' = needsApproval ? 'pending' : 'active';
         let created: { id: number }[] = [];
         let requested: { childFirstName: string; childLastName: string }[] = [];
 
         if (needsApproval) {
-            // Opening a second code must not stack a second request for the admin.
-            const waiting = await tx.select({ id: accessRequests.id }).from(accessRequests)
-                .where(and(
-                    eq(accessRequests.userId, user.id),
-                    eq(accessRequests.clubId, input.code.clubId),
-                    eq(accessRequests.requestedRole, 'coach'),
-                    eq(accessRequests.status, 'pending'),
-                ))
-                .limit(1);
-            if (!waiting.length) {
-                await tx.insert(accessRequests).values({
-                    userId: user.id,
-                    clubId: input.code.clubId,
-                    userName: user.name,
-                    userEmail: user.email,
-                    requestedRole: 'coach',
-                });
-            }
+            await ensurePendingAccessRequest(tx, user, input.code.clubId, 'coach');
         } else if (input.children && input.team) {
             const placed = await placeChildrenForParent({
                 userId: user.id,

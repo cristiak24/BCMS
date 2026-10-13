@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { users, clubs, teams } from '../db/schema';
+import { users, clubs } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { splitDisplayName } from '../lib/password';
 import { authenticate, requireSuperadmin, AuthenticatedRequest } from '../middleware/auth';
 import { acceptInvitation, createSuperAdminInvitation, validateInvitationToken } from '../services/invitationsService';
-import { createPendingAccessRequestForSignup, validateInviteToken } from '../lib/manageAccessService';
+import { validateInviteToken } from '../lib/manageAccessService';
 import { loadServerEnv } from '../lib/loadEnv';
 import { consumeInviteCode, findClubTeam, findUsableInviteCode, looksLikeInviteCode, releaseInviteCodeUse } from '../lib/clubInviteCodes';
 import { clientIp, rateLimit } from '../middleware/rateLimit';
@@ -13,10 +13,11 @@ import { writeAuditLog } from '../services/auditService';
 import { looksLikeTeamCode, parseParentChildren, parseTeamSignup } from '../lib/familyJoin';
 import { loadOwnRequests, notifyReviewers } from '../lib/accessNotify';
 import { registerWithClubCode } from '../lib/clubCodeSignup';
-import { createChildrenForParent, createJoinRequests, findTeamByJoinCode } from '../lib/familyJoinService';
+import { findTeamByJoinCode } from '../lib/familyJoinService';
 import { normalizePhone } from '../lib/contacts';
 import { resolveSelfPlayerForRequest, teamIdsOfPlayers } from '../lib/selfPlayer';
-import { findUsableGuardianInvite, looksLikeGuardianInvite, redeemGuardianInvite } from '../lib/guardianInvites';
+import { findUsableGuardianInvite, looksLikeGuardianInvite } from '../lib/guardianInvites';
+import { registerWithAccessLink, registerWithGuardianInvite, registerWithTeamCode } from '../lib/accountSignup';
 
 const router = Router();
 loadServerEnv();
@@ -284,27 +285,22 @@ router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidL
             if (req.user && req.user.status === 'active') {
                 return res.status(409).json({ error: 'Există deja un cont activ cu acest email. Autentifică-te și deschide din nou linkul.' });
             }
-            const values = {
+            const signedUp = await registerWithGuardianInvite({
+                existingUserId: req.user?.id ?? null,
                 firebaseUid: firebaseUser.uid,
-                email: (firebaseUser.email || '').trim().toLowerCase(),
+                email: firebaseUser.email || '',
                 name,
                 firstName,
                 lastName,
                 phone,
-                role: 'parent' as const,
-                status: 'active' as const,
+                token: String(inviteToken),
                 clubId: invite.clubId,
-            };
-            const saved = req.user
-                ? await db.update(users).set({ ...values, updatedAt: new Date().toISOString() }).where(eq(users.id, req.user.id)).returning()
-                : await db.insert(users).values(values).returning();
-            const userRecord = saved[0];
-            const redeemed = await redeemGuardianInvite(String(inviteToken), userRecord.id);
-            if (!redeemed) {
-                // Lost a race for the last use: don't leave an active, child-less account behind.
-                await db.update(users).set({ status: 'pending' }).where(eq(users.id, userRecord.id));
+            });
+            if (!signedUp) {
+                // Lost a race for the last use: nothing of this signup was kept.
                 return res.status(400).json({ error: 'Invitația a fost deja folosită. Cere una nouă clubului.' });
             }
+            const { user: userRecord, redeemed } = signedUp;
             await writeAuditLog({
                 action: 'auth.signup_with_guardian_invite',
                 entityType: 'player',
@@ -338,23 +334,16 @@ router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidL
                 return res.status(409).json({ error: 'Există deja un cont activ cu acest email. Autentifică-te.' });
             }
 
-            const values = {
+            const { user: userRecord, requests } = await registerWithTeamCode({
+                existingUserId: req.user?.id ?? null,
                 firebaseUid: firebaseUser.uid,
-                email: (firebaseUser.email || '').trim().toLowerCase(),
+                email: firebaseUser.email || '',
                 name,
                 firstName,
                 lastName,
-                phone: parsed.value.phone,
-                role: parsed.value.kind as 'parent' | 'player',
-                // In until a club admin or the team's coach approves a request.
-                status: 'pending' as const,
-                clubId: hit.team.clubId,
-            };
-            const saved = req.user
-                ? await db.update(users).set({ ...values, updatedAt: new Date().toISOString() }).where(eq(users.id, req.user.id)).returning()
-                : await db.insert(users).values(values).returning();
-            const userRecord = saved[0];
-            const requests = await createJoinRequests({ userId: userRecord.id, team: hit.team, input: parsed.value, firstName, lastName });
+                signup: parsed.value,
+                team: hit.team,
+            });
             void notifyReviewers({
                 clubId: hit.team.clubId,
                 teamId: hit.team.id,
@@ -478,72 +467,36 @@ router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidL
             if (req.user && req.user.status === 'active') {
                 return res.status(409).json({ error: ACTIVE_ACCOUNT_ERROR });
             }
-            let userRecord = req.user;
-
-            if (!userRecord) {
-                const inserted = await db.insert(users).values({
-                    firebaseUid: firebaseUser.uid,
-                    email: firebaseUser.email || '',
-                    name,
-                    firstName,
-                    lastName,
-                    role: manageAccessInvite.role as any,
-                    status: 'pending',
-                    clubId: manageAccessInvite.clubId,
-                    ...(phone ? { phone } : {}),
-                }).returning();
-                userRecord = inserted[0];
-            } else {
-                const updated = await db.update(users).set({
-                    firebaseUid: firebaseUser.uid,
-                    email: firebaseUser.email || '',
-                    name,
-                    firstName,
-                    lastName,
-                    role: manageAccessInvite.role as any,
-                    status: 'pending',
-                    clubId: manageAccessInvite.clubId,
-                    ...(phone ? { phone } : {}),
-                    updatedAt: new Date().toISOString(),
-                }).where(eq(users.id, req.user.id)).returning();
-                userRecord = updated[0];
-            }
 
             const kids = manageAccessInvite.role === 'parent' ? childrenInput : null;
             const linkTeam = kids && manageAccessInvite.teamId != null
                 ? await findClubTeam(manageAccessInvite.clubId, manageAccessInvite.teamId)
                 : null;
 
-            if (kids && linkTeam) {
-                // Link tied to a team: the children wait in the team's join
-                // requests, where a club admin or the coach approves them (and
-                // that approval lets the account in).
-                const [teamRow] = await db.select().from(teams).where(eq(teams.id, linkTeam.id)).limit(1);
-                await createJoinRequests({
-                    userId: userRecord.id,
-                    team: teamRow,
-                    input: { kind: 'parent', phone: phone!, children: kids },
-                    firstName,
-                    lastName,
-                });
+            const { user: userRecord, queuedForTeam } = await registerWithAccessLink({
+                existingUserId: req.user?.id ?? null,
+                firebaseUid: firebaseUser.uid,
+                email: firebaseUser.email || '',
+                name,
+                firstName,
+                lastName,
+                phone,
+                link: { role: manageAccessInvite.role, clubId: manageAccessInvite.clubId },
+                team: linkTeam,
+                children: kids,
+            });
+
+            if (kids && linkTeam && queuedForTeam) {
                 void notifyReviewers({
                     clubId: manageAccessInvite.clubId,
-                    teamId: teamRow.id,
+                    teamId: linkTeam.id,
                     requesterId: userRecord.id,
                     requesterName: name,
                     role: 'parent',
-                    teamName: teamRow.name,
+                    teamName: linkTeam.name,
                     children: kids.map((child) => `${child.firstName} ${child.lastName}`),
                 });
             } else {
-                if (kids) {
-                    await createChildrenForParent({ userId: userRecord.id, teamId: null, children: kids });
-                }
-                await createPendingAccessRequestForSignup({
-                    userId: userRecord.id,
-                    clubId: manageAccessInvite.clubId,
-                    role: manageAccessInvite.role as 'player' | 'parent' | 'coach',
-                });
                 void notifyReviewers({
                     clubId: manageAccessInvite.clubId,
                     requesterId: userRecord.id,

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { clubs, guardianInvites, players, playerGuardians } from '../db/schema';
+import type { Tx } from './familyJoinService';
 
 /**
  * Personal parent invites ("Invită părinte" on a player). Token: "fam_" + 32
@@ -64,9 +65,9 @@ export async function findUsableGuardianInvite(token: string) {
  * Atomically marks the invite used and links `userId` to the child. Returns
  * null when the invite is unknown, expired or already used.
  */
-export async function redeemGuardianInvite(token: string, userId: number) {
+export async function redeemGuardianInvite(token: string, userId: number, outer?: Tx) {
     if (!looksLikeGuardianInvite(token)) return null;
-    return db.transaction(async (tx) => {
+    const work = async (tx: Tx) => {
         const [invite] = await tx.update(guardianInvites)
             .set({ usedAt: new Date().toISOString(), usedBy: userId })
             .where(and(
@@ -80,5 +81,6 @@ export async function redeemGuardianInvite(token: string, userId: number) {
             .values({ playerId: invite.playerId, userId, createdBy: invite.createdBy })
             .onConflictDoNothing();
         return { clubId: invite.clubId, playerId: invite.playerId };
-    });
+    };
+    return outer ? work(outer) : db.transaction(work);
 }
