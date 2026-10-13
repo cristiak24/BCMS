@@ -23,6 +23,7 @@ import { writeAuditLog } from '../services/auditService';
  *   POST /api/family-requests/approve-all   { ids: number[] }  — each auto-matched
  *   GET  /api/family-requests/team-codes
  *   POST /api/family-requests/team-codes/:teamId/rotate
+ *   PUT  /api/family-requests/team-codes/:teamId   { enabled: boolean } — close or reopen sign-ups with the code
  *
  * Club admins act on every team of their club; coaches on the teams they coach.
  */
@@ -116,7 +117,7 @@ async function managedTeams(reviewer: Reviewer) {
     if (reviewer.clubId == null) return [];
     const filters = [eq(teams.clubId, reviewer.clubId), eq(teams.isActive, true)];
     if (reviewer.role === 'coach') filters.push(eq(teams.coachId, reviewer.id));
-    return db.select({ id: teams.id, name: teams.name, code: teams.inviteCode }).from(teams).where(and(...filters)).orderBy(asc(teams.name));
+    return db.select({ id: teams.id, name: teams.name, code: teams.inviteCode, enabled: teams.joinCodeEnabled }).from(teams).where(and(...filters)).orderBy(asc(teams.name));
 }
 
 router.get('/team-codes', async (req: AuthenticatedRequest, res) => {
@@ -124,6 +125,38 @@ router.get('/team-codes', async (req: AuthenticatedRequest, res) => {
         res.json(await managedTeams(reviewerOf(req)));
     } catch (error) {
         fail(res, error, 'Nu am putut încărca codurile echipelor.');
+    }
+});
+
+router.put('/team-codes/:teamId', mutateLimit, async (req: AuthenticatedRequest, res) => {
+    try {
+        const teamId = Number(req.params.teamId);
+        if (typeof req.body?.enabled !== 'boolean') {
+            res.status(400).json({ error: 'Alege dacă înscrierile cu cod sunt deschise sau oprite.' });
+            return;
+        }
+        const team = (await managedTeams(reviewerOf(req))).find((t) => t.id === teamId);
+        if (!team) {
+            res.status(404).json({ error: 'Echipa nu există.' });
+            return;
+        }
+        const enabled: boolean = req.body.enabled;
+        await db.update(teams).set({ joinCodeEnabled: enabled, updatedAt: new Date().toISOString() }).where(eq(teams.id, teamId));
+        await writeAuditLog({
+            action: enabled ? 'team.join_code_open' : 'team.join_code_close',
+            entityType: 'team',
+            entityId: teamId,
+            actorUserId: req.user?.id ?? null,
+            actorUid: req.firebaseUser?.uid ?? null,
+            actorRole: req.user?.role ?? null,
+            clubId: req.user?.clubId ?? null,
+            metadata: null,
+            ipAddress: req.ip ?? null,
+            userAgent: req.get('user-agent') ?? null,
+        }).catch(() => undefined);
+        res.json({ ...team, enabled });
+    } catch (error) {
+        fail(res, error, 'Nu am putut schimba starea codului.');
     }
 });
 
@@ -140,7 +173,7 @@ router.post('/team-codes/:teamId/rotate', mutateLimit, async (req: Authenticated
                 const [updated] = await db.update(teams)
                     .set({ inviteCode: generateTeamCode(), updatedAt: new Date().toISOString() })
                     .where(eq(teams.id, teamId))
-                    .returning({ id: teams.id, name: teams.name, code: teams.inviteCode });
+                    .returning({ id: teams.id, name: teams.name, code: teams.inviteCode, enabled: teams.joinCodeEnabled });
                 await writeAuditLog({
                     action: 'team.join_code_rotate',
                     entityType: 'team',

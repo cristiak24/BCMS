@@ -27,7 +27,8 @@ export type FamilyJoinRequest = {
     suggestions: JoinSuggestion[];
 };
 
-export type TeamJoinCode = { id: number; name: string; code: string };
+/** `enabled` is missing on a server older than the on/off switch: such a code is open. */
+export type TeamJoinCode = { id: number; name: string; code: string; enabled?: boolean };
 
 export const familyRequestsApi = {
     async list() {
@@ -44,6 +45,9 @@ export const familyRequestsApi = {
     },
     async teamCodes() {
         return (await apiClient.get<TeamJoinCode[]>('/family-requests/team-codes')).data;
+    },
+    async setCodeEnabled(teamId: number, enabled: boolean) {
+        return (await apiClient.put<TeamJoinCode>(`/family-requests/team-codes/${teamId}`, { enabled })).data;
     },
     async rotateCode(teamId: number) {
         return (await apiClient.post<TeamJoinCode>(`/family-requests/team-codes/${teamId}/rotate`)).data;

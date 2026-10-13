@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from '@/src/web/reactNative';
+import { ActivityIndicator, Pressable, Switch, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { familyRequestsApi, formatTeamCode, type FamilyJoinRequest, type TeamJoinCode } from '../../services/familyRequestsApi';
 import { getPublicAppUrl } from '../../config/serverUrl';
@@ -168,7 +168,7 @@ function RequestCard({
   );
 }
 
-function TeamCodes({ codes, onRotate, onNotify }: { codes: TeamJoinCode[]; onRotate: (team: TeamJoinCode) => void; onNotify: Notify }) {
+function TeamCodes({ codes, onRotate, onToggle, onNotify }: { codes: TeamJoinCode[]; onRotate: (team: TeamJoinCode) => void; onToggle: (team: TeamJoinCode, enabled: boolean) => void; onNotify: Notify }) {
   const [open, setOpen] = useState(false);
   if (!codes.length) return null;
 
@@ -204,21 +204,40 @@ function TeamCodes({ codes, onRotate, onNotify }: { codes: TeamJoinCode[]; onRot
       </Pressable>
       {open ? (
         <View className="px-4 pb-4 gap-2">
-          {codes.map((team) => (
-            <View key={team.id} className="flex-row flex-wrap items-center gap-2 rounded-[11px] px-3 py-2.5" style={{ backgroundColor: 'var(--c-surface-2)' }}>
-              <Text className="flex-1 min-w-[140px] text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{team.name}</Text>
-              <Text className="t-num text-[15px] font-bold tracking-[0.12em]" style={{ color: 'var(--c-ink-strong)', userSelect: 'all' } as any}>
-                {formatTeamCode(team.code)}
-              </Text>
-              <Pressable onPress={() => share(team)} accessibilityRole="button" accessibilityLabel={`Trimite codul echipei ${team.name}`} className="ui-press h-8 px-2.5 rounded-[9px] flex-row items-center gap-1" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-                <MaterialIcons name="share" size={14} color="var(--c-brand-fg)" />
-                <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Trimite</Text>
-              </Pressable>
-              <Pressable onPress={() => onRotate(team)} accessibilityRole="button" accessibilityLabel={`Schimbă codul echipei ${team.name}`} className="ui-press w-8 h-8 rounded-[9px] items-center justify-center">
-                <MaterialIcons name="refresh" size={16} color="var(--c-faint)" />
-              </Pressable>
-            </View>
-          ))}
+          {codes.map((team) => {
+            const accepting = team.enabled !== false;
+            return (
+              <View key={team.id} className="flex-row flex-wrap items-center gap-2 rounded-[11px] px-3 py-2.5" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+                <View className="flex-1 min-w-[140px] flex-row items-center gap-2">
+                  <Text className="shrink text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{team.name}</Text>
+                  {accepting ? null : (
+                    <View className="px-2 h-5 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-warning-bg)' } as any}>
+                      <Text className="text-[11px] font-bold" style={{ color: 'var(--c-warning-fg)' }}>Oprit</Text>
+                    </View>
+                  )}
+                </View>
+                <Text className="t-num text-[15px] font-bold tracking-[0.12em]" style={{ color: 'var(--c-ink-strong)', opacity: accepting ? 1 : 0.4, userSelect: 'all' } as any}>
+                  {formatTeamCode(team.code)}
+                </Text>
+                <View className="flex-row items-center gap-2">
+                  {accepting ? (
+                    <Pressable onPress={() => share(team)} accessibilityRole="button" accessibilityLabel={`Trimite codul echipei ${team.name}`} className="ui-press h-8 px-2.5 rounded-[9px] flex-row items-center gap-1" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+                      <MaterialIcons name="share" size={14} color="var(--c-brand-fg)" />
+                      <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Trimite</Text>
+                    </Pressable>
+                  ) : null}
+                  <Switch
+                    value={accepting}
+                    onValueChange={(value: boolean) => onToggle(team, value)}
+                    accessibilityLabel={`Înscrieri cu codul echipei ${team.name}`}
+                  />
+                  <Pressable onPress={() => onRotate(team)} accessibilityRole="button" accessibilityLabel={`Schimbă codul echipei ${team.name}`} className="ui-press w-8 h-8 rounded-[9px] items-center justify-center">
+                    <MaterialIcons name="refresh" size={16} color="var(--c-faint)" />
+                  </Pressable>
+                </View>
+              </View>
+            );
+          })}
         </View>
       ) : null}
     </View>
@@ -309,11 +328,23 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNot
     }
   };
 
+  const toggleCode = async (team: TeamJoinCode, enabled: boolean) => {
+    setCodes((list) => list.map((t) => (t.id === team.id ? { ...t, enabled } : t)));
+    try {
+      const updated = await familyRequestsApi.setCodeEnabled(team.id, enabled);
+      setCodes((list) => list.map((t) => (t.id === team.id ? updated : t)));
+      onNotify({ variant: 'success', message: enabled ? `Înscrierile cu codul ${team.name} sunt deschise.` : `Înscrierile cu codul ${team.name} sunt oprite.` });
+    } catch (err) {
+      setCodes((list) => list.map((t) => (t.id === team.id ? team : t)));
+      onNotify({ variant: 'error', message: err instanceof Error ? err.message : 'Nu am putut schimba starea codului.' });
+    }
+  };
+
   const ambiguous = useMemo(() => (requests ?? []).filter((r) => r.suggestions.filter((s) => s.exact).length !== 1 && r.suggestions.length > 0).length, [requests]);
 
   return (
     <View>
-      <TeamCodes codes={codes} onRotate={(team) => setConfirm({ kind: 'rotate', team })} onNotify={onNotify} />
+      <TeamCodes codes={codes} onRotate={(team) => setConfirm({ kind: 'rotate', team })} onToggle={toggleCode} onNotify={onNotify} />
 
       {error ? (
         <ErrorState title="Nu am putut încărca cererile" message={error} actionLabel="Reîncearcă" onAction={load} />

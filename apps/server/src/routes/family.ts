@@ -8,6 +8,7 @@ import { guardianChildren, teamIdsOfPlayers } from '../lib/selfPlayer';
 import { parseBirthDate } from '../lib/familyJoin';
 import { createJoinRequests, findTeamByJoinCode } from '../lib/familyJoinService';
 import { notifyReviewers } from '../lib/accessNotify';
+import { INVITE_ERRORS } from '../lib/inviteResolver';
 import { createGuardianInvite, redeemGuardianInvite } from '../lib/guardianInvites';
 import { writeAuditLog } from '../services/auditService';
 
@@ -82,7 +83,11 @@ router.post('/children/request', limiter, async (req: AuthenticatedRequest, res)
         }
         const hit = await findTeamByJoinCode(String(req.body?.teamCode ?? ''));
         if (!hit || hit.team.clubId !== Number(req.user.clubId)) {
-            res.status(400).json({ error: 'Codul echipei nu este valid. Cere-l antrenorului.' });
+            res.status(400).json({ error: INVITE_ERRORS.team });
+            return;
+        }
+        if (!hit.team.joinCodeEnabled) {
+            res.status(400).json({ error: INVITE_ERRORS.teamClosed });
             return;
         }
         const firstName = String(req.body?.firstName ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
