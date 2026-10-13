@@ -103,6 +103,10 @@ router.post('/children/request', limiter, async (req: AuthenticatedRequest, res)
             lastName: req.user.lastName ?? '',
             input: { kind: 'parent', phone: req.user.phone ?? '', children: [{ firstName, lastName, birthDate: birthDate.value }] },
         });
+        if (!request) {
+            res.status(409).json({ error: 'Cererea pentru acest copil a fost deja trimisă și așteaptă aprobarea.' });
+            return;
+        }
         void notifyReviewers({
             clubId: hit.team.clubId,
             teamId: hit.team.id,
