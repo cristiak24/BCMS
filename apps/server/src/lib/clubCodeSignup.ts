@@ -55,7 +55,7 @@ export async function registerWithClubCode(input: ClubCodeSignup) {
             requested = placed.requested;
             // Every child is already on the roster (second parent of the
             // family): in once the club confirms the link.
-            if (created.length === 0 && requested.length > 0) {
+            if (created.length === 0 && placed.awaiting > 0) {
                 await tx.update(users).set({ status: 'pending' }).where(eq(users.id, user.id));
                 status = 'pending';
             }

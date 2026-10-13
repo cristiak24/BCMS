@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, integer, text, timestamp, unique, foreignKey, pgEnum, boolean, jsonb, customType, index, numeric } from "drizzle-orm/pg-core"
+import { pgTable, serial, varchar, integer, text, timestamp, unique, foreignKey, pgEnum, boolean, jsonb, customType, index, numeric, uniqueIndex } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 // Lei with bani (lib/money.ts). Read back as a JS number.
@@ -397,6 +397,9 @@ export const familyJoinRequests = pgTable("family_join_requests", {
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	index("family_join_requests_team_status_idx").on(table.teamId, table.status),
+	uniqueIndex("family_join_requests_pending_unique").on(
+		table.userId, table.teamId, table.kind, sql`lower(${table.childFirstName})`, sql`lower(${table.childLastName})`,
+	).where(sql`${table.status} = 'pending'`),
 	foreignKey({
 			columns: [table.teamId],
 			foreignColumns: [teams.id],
@@ -587,7 +590,10 @@ export const accessRequests = pgTable("access_requests", {
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	reviewedAt: timestamp("reviewed_at", { mode: 'string' }),
 	reviewedBy: integer("reviewed_by"),
-});
+}, (table) => [
+	// One waiting request per person, club and role: reopening a link or a retried signup must not stack a second one.
+	uniqueIndex("access_requests_pending_unique").on(table.userId, table.clubId, table.requestedRole).where(sql`${table.status} = 'pending'`),
+]);
 
 export const inviteLinks = pgTable("invite_links", {
 	id: serial().primaryKey().notNull(),

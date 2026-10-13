@@ -30,7 +30,11 @@ export async function findTeamByJoinCode(raw: string) {
     return { team: hit.team, clubName: hit.clubName ?? null };
 }
 
-/** Called once the account row exists; one pending request per child (or one for the player). */
+/**
+ * Called once the account row exists; one pending request per child (or one for
+ * the player). A request that is already waiting is left alone, so only the
+ * rows it actually created come back.
+ */
 export async function createJoinRequests(params: {
     userId: number;
     team: Pick<typeof teams.$inferSelect, 'id' | 'clubId'>;
@@ -53,7 +57,7 @@ export async function createJoinRequests(params: {
             childLastName: params.lastName,
             childBirthDate: params.input.birthDate,
         }];
-    return (params.tx ?? db).insert(familyJoinRequests).values(rows).returning();
+    return (params.tx ?? db).insert(familyJoinRequests).values(rows).onConflictDoNothing().returning();
 }
 
 /**
@@ -95,7 +99,8 @@ export async function createChildrenForParent(params: {
 /**
  * A parent signed up with a team-bound club code. Children already on the
  * team's roster wait for a club decision (the approval links the parent to the
- * existing player); the rest are created and linked right away.
+ * existing player); the rest are created and linked right away. `requested` is
+ * what was newly queued, `awaiting` how many children wait for a decision in total.
  */
 export async function placeChildrenForParent(params: {
     userId: number;
@@ -131,7 +136,7 @@ export async function placeChildrenForParent(params: {
             tx: params.tx,
         })
         : [];
-    return { created, requested };
+    return { created, requested, awaiting: known.length };
 }
 
 /** Team ids this reviewer may decide on. null = every team of their club. */

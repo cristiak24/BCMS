@@ -153,15 +153,18 @@ async function signUpWithTeamCode(ctx: Ctx, { hit }: Of<'team'>) {
         signup: parsed.value,
         team: hit.team,
     });
-    void notifyReviewers({
-        clubId: hit.team.clubId,
-        teamId: hit.team.id,
-        requesterId: user.id,
-        requesterName: ctx.name,
-        role: parsed.value.kind,
-        teamName: hit.team.name,
-        children: parsed.value.kind === 'parent' ? parsed.value.children.map((child) => `${child.firstName} ${child.lastName}`) : [],
-    });
+    // A retried signup finds its requests already waiting: the admin heard about them the first time.
+    if (requests.length > 0) {
+        void notifyReviewers({
+            clubId: hit.team.clubId,
+            teamId: hit.team.id,
+            requesterId: user.id,
+            requesterName: ctx.name,
+            role: parsed.value.kind,
+            teamName: hit.team.name,
+            children: parsed.value.kind === 'parent' ? requests.map((request) => `${request.childFirstName} ${request.childLastName}`) : [],
+        });
+    }
     await ctx.audit({
         action: 'auth.signup_with_team_code',
         entityType: 'team',

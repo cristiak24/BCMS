@@ -5,7 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '../db';
 import { accessRequests, clubs, familyJoinRequests, playerGuardians, players, teams, users } from '../db/schema';
 import { closeDb, createSchema } from '../test/pgliteDb';
-import { registerWithAccessLink, registerWithGuardianInvite, registerWithTeamCode, type SignupIdentity } from './accountSignup';
+import { ensurePendingAccessRequest, registerWithAccessLink, registerWithGuardianInvite, registerWithTeamCode, type SignupIdentity } from './accountSignup';
 import { registerWithClubCode } from './clubCodeSignup';
 import { createGuardianInvite } from './guardianInvites';
 
@@ -236,4 +236,96 @@ test('losing the race leaves an existing unfinished account exactly as it was', 
     const [after] = await db.select().from(users).where(eq(users.id, waiting.user.id));
     assert.equal(after.role, 'player');
     assert.equal(after.status, 'pending');
+});
+
+async function joinRequestsOf(userId: number) {
+    return db.select().from(familyJoinRequests).where(eq(familyJoinRequests.userId, userId));
+}
+
+test('retrying a team code signup queues only what is not already waiting', async () => {
+    const first = await registerWithTeamCode({
+        ...identity(),
+        signup: { kind: 'parent', phone, children: [ana] },
+        team: { id: teamId, clubId },
+    });
+    assert.equal(first.requests.length, 1);
+
+    const retry = await registerWithTeamCode({
+        ...identity({ existingUserId: first.user.id, firebaseUid: first.user.firebaseUid ?? 'uid_retry_team' }),
+        signup: { kind: 'parent', phone, children: [{ ...ana, firstName: 'ANA' }] },
+        team: { id: teamId, clubId },
+    });
+    assert.equal(retry.requests.length, 0);
+    assert.equal((await joinRequestsOf(first.user.id)).length, 1);
+
+    const extra = await registerWithTeamCode({
+        ...identity({ existingUserId: first.user.id, firebaseUid: first.user.firebaseUid ?? 'uid_retry_team' }),
+        signup: { kind: 'parent', phone, children: [ana, luca] },
+        team: { id: teamId, clubId },
+    });
+    assert.deepEqual(extra.requests.map((request) => request.childFirstName), ['Luca']);
+    assert.equal((await joinRequestsOf(first.user.id)).length, 2);
+});
+
+test('a denied request does not block asking again', async () => {
+    const first = await registerWithTeamCode({
+        ...identity(),
+        signup: { kind: 'parent', phone, children: [ana] },
+        team: { id: teamId, clubId },
+    });
+    await db.update(familyJoinRequests).set({ status: 'denied' }).where(eq(familyJoinRequests.userId, first.user.id));
+    const again = await registerWithTeamCode({
+        ...identity({ existingUserId: first.user.id, firebaseUid: first.user.firebaseUid ?? 'uid_denied_team' }),
+        signup: { kind: 'parent', phone, children: [ana] },
+        team: { id: teamId, clubId },
+    });
+    assert.equal(again.requests.length, 1);
+    assert.deepEqual((await joinRequestsOf(first.user.id)).map((request) => request.status).sort(), ['denied', 'pending']);
+
+    const waiting = await registerWithAccessLink({ ...identity(), phone, link: { role: 'player', clubId }, team: null, children: null });
+    await db.update(accessRequests).set({ status: 'denied' }).where(eq(accessRequests.userId, waiting.user.id));
+    assert.equal(await db.transaction((tx) => ensurePendingAccessRequest(tx, waiting.user, clubId, 'player')), true);
+});
+
+test('the database itself refuses a second waiting request for the same person and role', async () => {
+    const { user } = await registerWithAccessLink({ ...identity(), phone, link: { role: 'player', clubId }, team: null, children: null });
+    await assert.rejects(() => db.insert(accessRequests).values({
+        userId: user.id, clubId, userName: user.name, userEmail: user.email, requestedRole: 'player',
+    }));
+    await assert.rejects(() => db.insert(accessRequests).values({
+        userId: user.id, clubId, userName: user.name, userEmail: user.email, requestedRole: 'player', status: 'pending',
+    }));
+    // Another role is a different request.
+    await db.insert(accessRequests).values({ userId: user.id, clubId, userName: user.name, userEmail: user.email, requestedRole: 'coach' });
+});
+
+test('two parallel openings of the same link create a single admin request', async () => {
+    const { user } = await registerWithAccessLink({ ...identity(), phone, link: { role: 'player', clubId }, team: null, children: null });
+    await db.delete(accessRequests).where(eq(accessRequests.userId, user.id));
+    const results = await Promise.all([
+        db.transaction((tx) => ensurePendingAccessRequest(tx, user, clubId, 'player')),
+        db.transaction((tx) => ensurePendingAccessRequest(tx, user, clubId, 'player')),
+    ]);
+    assert.deepEqual(results.sort(), [false, true]);
+    assert.equal((await db.select().from(accessRequests).where(eq(accessRequests.userId, user.id))).length, 1);
+});
+
+test('a second parent whose signup is retried stays waiting for the club', async () => {
+    await seedChild('Vlad');
+    const signup = {
+        ...identity(),
+        phone,
+        code: { role: 'parent', clubId },
+        team: { id: teamId, name: 'U12' },
+        children: [{ firstName: 'Vlad', lastName: 'Garda', birthDate: '2012-12-12' }],
+    };
+    const first = await registerWithClubCode(signup);
+    assert.equal(first.status, 'pending');
+    assert.equal(first.requested.length, 1);
+
+    const retry = await registerWithClubCode({ ...signup, existingUserId: first.user.id });
+    assert.equal(retry.status, 'pending');
+    assert.equal(retry.requested.length, 0);
+    assert.equal((await db.select().from(users).where(eq(users.id, first.user.id)))[0].status, 'pending');
+    assert.equal((await joinRequestsOf(first.user.id)).length, 1);
 });

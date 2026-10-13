@@ -53,14 +53,15 @@ export async function ensurePendingAccessRequest(
         ))
         .limit(1);
     if (waiting.length) return false;
-    await tx.insert(accessRequests).values({
+    // The pending unique index settles a race between two openings of the same link.
+    const inserted = await tx.insert(accessRequests).values({
         userId: user.id,
         clubId,
         userName: user.name,
         userEmail: user.email,
         requestedRole: role,
-    });
-    return true;
+    }).onConflictDoNothing().returning({ id: accessRequests.id });
+    return inserted.length > 0;
 }
 
 export async function registerWithTeamCode(input: SignupIdentity & {
@@ -116,7 +117,7 @@ export async function registerWithAccessLink(input: SignupIdentity & {
             // Link tied to a team: the children wait in the team's join
             // requests, where a club admin or the coach approves them (and
             // that approval lets the account in).
-            await createJoinRequests({
+            const requests = await createJoinRequests({
                 userId: user.id,
                 team: { id: input.team.id, clubId: input.link.clubId },
                 input: { kind: 'parent', phone: input.phone ?? '', children: input.children },
@@ -124,7 +125,7 @@ export async function registerWithAccessLink(input: SignupIdentity & {
                 lastName: input.lastName,
                 tx,
             });
-            return { user, queuedForTeam: true, requestCreated: true };
+            return { user, queuedForTeam: true, requestCreated: requests.length > 0 };
         }
 
         if (input.children) {
