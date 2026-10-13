@@ -34,7 +34,7 @@ const NAV_LINKS: Array<{ id: string; label: string }> = [
     { id: 'intrebari', label: 'Întrebări' },
 ];
 
-const container = 'mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-10';
+const container = 'mx-auto w-full max-w-[1680px] px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20';
 const sectionSpacing = 'scroll-mt-20 py-16 sm:py-24';
 const primaryButton =
     'inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[var(--r-md)] border-0 bg-[var(--c-brand-surface)] px-6 text-[15px] font-bold text-white no-underline shadow-[var(--e-sm)] transition-colors hover:bg-[var(--c-brand-strong)]';
@@ -184,7 +184,7 @@ function HeroPreview() {
     const card = 'rounded-[var(--r-lg)] border border-[var(--c-border)] bg-[var(--c-surface)]';
     const label = 'm-0 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[var(--c-muted)]';
     return (
-        <div aria-hidden="true" className="relative mx-auto w-full max-w-[560px] select-none sm:pb-8 lg:mx-0 lg:pb-10">
+        <div aria-hidden="true" className="relative mx-auto w-full max-w-[560px] select-none sm:pb-8 lg:mx-0 lg:ml-auto lg:pb-10 min-[1800px]:[zoom:1.22]">
             <div className="ui-rise overflow-hidden rounded-[var(--r-xl)] border border-[var(--c-border)] bg-[var(--c-bg-alt)] shadow-[var(--e-lg)]" style={{ animationDelay: '0.12s' }}>
                 <div className="flex h-11 items-center gap-1.5 border-b border-[var(--c-border)] bg-[var(--c-surface)] px-4">
                     <span className="h-2.5 w-2.5 rounded-full bg-[var(--c-border-strong)]" />
@@ -271,11 +271,11 @@ function Hero() {
         <section className="relative isolate overflow-hidden">
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
                 <div className="absolute inset-0 bg-[var(--c-bg)]" />
-                <CourtArt className="absolute -right-24 top-6 h-[520px] w-[560px] text-[var(--c-border)] opacity-60 lg:right-[-60px]" />
+                <CourtArt className="absolute -right-24 top-6 h-[520px] w-[560px] text-[var(--c-border)] opacity-60 lg:hidden" />
                 <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-[var(--c-bg)]" />
             </div>
 
-            <div className={`${container} grid items-center gap-12 pb-14 pt-12 sm:pt-16 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10 lg:pb-24 lg:pt-24`}>
+            <div className={`${container} grid items-center gap-12 pb-14 pt-12 sm:pt-16 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10 lg:pb-24 lg:pt-24 2xl:grid-cols-2 2xl:gap-20 2xl:pb-32 2xl:pt-32`}>
                 <div>
                     <p
                         className="ui-rise m-0 inline-flex items-center gap-2 rounded-full border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-1.5 text-[12.5px] font-semibold text-[var(--c-ink-soft)]"
@@ -285,7 +285,7 @@ function Hero() {
                     </p>
                     <h1
                         className="ui-rise m-0 mt-5 text-balance font-extrabold tracking-[-0.04em] text-[var(--c-ink-strong)]"
-                        style={{ animationDelay: '0.05s', fontSize: 'clamp(38px, 6.6vw, 60px)', lineHeight: 1.04 }}
+                        style={{ animationDelay: '0.05s', fontSize: 'clamp(38px, 2.6vw + 27px, 80px)', lineHeight: 1.04 }}
                     >
                         Tot clubul de baschet,{' '}
                         <span className="text-[var(--c-brand-fg)]">
@@ -293,7 +293,7 @@ function Hero() {
                         </span>
                     </h1>
                     <p
-                        className="ui-rise m-0 mt-5 max-w-[540px] text-[17px] font-medium leading-[1.65] text-[var(--c-muted)] sm:text-[18px]"
+                        className="ui-rise m-0 mt-5 max-w-[540px] text-[17px] font-medium leading-[1.65] text-[var(--c-muted)] sm:text-[18px] 2xl:max-w-[640px] 2xl:text-[20px]"
                         style={{ animationDelay: '0.1s' }}
                     >
                         BCMS adună programul, prezența, vizele medicale, plățile și statisticile live ale meciurilor într-o
@@ -333,7 +333,12 @@ function Hero() {
                     </p>
                 </div>
 
-                <HeroPreview />
+                <div className="relative">
+                    <CourtArt
+                        className="pointer-events-none absolute left-1/2 top-1/2 -z-10 hidden h-[140%] w-auto -translate-x-[40%] -translate-y-1/2 text-[var(--c-border)] opacity-60 lg:block"
+                    />
+                    <HeroPreview />
+                </div>
             </div>
         </section>
     );

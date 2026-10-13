@@ -66,11 +66,11 @@ export function SectionHead({
     inverse?: boolean;
 }) {
     return (
-        <div className="max-w-[640px]">
+        <div className="max-w-[640px] 2xl:max-w-[760px]">
             <p className={`m-0 text-[12px] font-bold uppercase tracking-[0.1em] ${inverse ? 'text-[var(--c-tint-fg)]' : 'text-[var(--c-brand-fg)]'}`}>{eyebrow}</p>
             <h2
                 className={`m-0 mt-3 text-balance font-extrabold tracking-[-0.03em] ${inverse ? 'text-[var(--c-hero-fg)]' : 'text-[var(--c-ink-strong)]'}`}
-                style={{ fontSize: 'clamp(28px, 4.2vw, 40px)', lineHeight: 1.1 }}
+                style={{ fontSize: 'clamp(28px, 1.4vw + 22px, 48px)', lineHeight: 1.1 }}
             >
                 {title}
             </h2>
