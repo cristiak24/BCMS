@@ -130,9 +130,7 @@ function BrandSide() {
                 <p className="m-0 mt-4 max-w-[460px] text-[16.5px] font-medium leading-7 text-[var(--c-muted)]">
                     Program, prezență și plăți pentru tot clubul — într-un singur loc, pe înțelesul fiecărui rol.
                 </p>
-                <div className="hidden [@media(min-height:760px)]:block">
-                    <ProductPreview />
-                </div>
+                <ProductPreview />
             </div>
         </section>
     );
