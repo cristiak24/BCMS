@@ -1,143 +1,257 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import { useFocusEffect } from '@/src/web/reactNavigationNative';
-import CreateClubModal from '../../../components/super-admin/CreateClubModal';
+import { useRouter } from '@/src/web/expoRouter';
+import PageContainer from '../../../components/ui/PageContainer';
+import PageHeader from '../../../components/ui/PageHeader';
+import Button from '../../../components/ui/Button';
+import FilterChips from '../../../components/ui/FilterChips';
+import SelectField from '../../../components/ui/SelectField';
+import Pagination, { usePagination } from '../../../components/ui/Pagination';
+import { Skeleton } from '../../../components/ui/Skeleton';
+import { EmptyState, ErrorState } from '../../../components/ui/ScreenState';
+import { useHeader } from '../../../components/HeaderContext';
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
+import CreateClubDialog from '../../../components/super-admin/CreateClubDialog';
+import { HeaderCell, ListShell, Meter } from '../../../components/super-admin/ui';
 import {
-  getCachedSuperAdminClubs,
-  subscribeToClubs,
-  superAdminApi,
-  type SuperAdminClub,
-} from '../../../services/superAdminApi';
+  downloadCsv,
+  fold,
+  formatDate,
+  formatMoney,
+  formatNumber,
+  formatRelative,
+  monthLabel,
+  plural,
+  SUPER_ADMIN_SEARCH_PLACEHOLDER,
+} from '../../../components/super-admin/format';
+import { superAdminApi, type SuperAdminClub } from '../../../services/superAdminApi';
 
-export default function ClubsDirectoryScreen() {
-  const [clubs, setClubs] = useState<SuperAdminClub[]>(getCachedSuperAdminClubs() ?? []);
-  const [loading, setLoading] = useState(!getCachedSuperAdminClubs());
-  const [createClubOpen, setCreateClubOpen] = useState(false);
+type Filter = 'all' | 'noAdmin' | 'dormant' | 'unpriced';
+type Sort = 'active' | 'name' | 'accounts' | 'amount' | 'newest';
+
+const SORT_OPTIONS: { key: Sort; label: string }[] = [
+  { key: 'active', label: 'Cei mai activi' },
+  { key: 'amount', label: 'De facturat' },
+  { key: 'accounts', label: 'Cele mai multe conturi' },
+  { key: 'name', label: 'Alfabetic' },
+  { key: 'newest', label: 'Cele mai noi' },
+];
+
+const PAGE_SIZE = 25;
+
+function sortClubs(clubs: SuperAdminClub[], sort: Sort) {
+  const sorted = [...clubs];
+  switch (sort) {
+    case 'name': return sorted.sort((a, b) => a.name.localeCompare(b.name, 'ro'));
+    case 'accounts': return sorted.sort((a, b) => b.accounts.total - a.accounts.total);
+    case 'amount': return sorted.sort((a, b) => (b.estimatedAmount ?? -1) - (a.estimatedAmount ?? -1));
+    case 'newest': return sorted.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    case 'active':
+    default: return sorted.sort((a, b) => b.activeThisMonth - a.activeThisMonth || b.accounts.total - a.accounts.total);
+  }
+}
+
+function FlagPill({ label, tone }: { label: string; tone: 'danger' | 'warning' | 'neutral' }) {
+  const colors = tone === 'danger'
+    ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)' }
+    : tone === 'warning' ? { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' } : { bg: 'var(--c-surface-3)', fg: 'var(--c-muted)' };
+  return (
+    <View className="rounded-full px-2 py-0.5 shrink-0" style={{ backgroundColor: colors.bg }}>
+      <Text className="text-[11px] font-semibold" style={{ color: colors.fg }}>{label}</Text>
+    </View>
+  );
+}
+
+export default function ClubsScreen() {
+  const router = useRouter();
+  const { searchValue, setSearchPlaceholder } = useHeader();
+  const search = fold(useDebouncedValue(searchValue, 150).trim());
+  const [clubs, setClubs] = useState<SuperAdminClub[] | null>(null);
+  const [month, setMonth] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>('all');
+  const [sort, setSort] = useState<Sort>('active');
+  const [createOpen, setCreateOpen] = useState(false);
+
+  useEffect(() => {
+    setSearchPlaceholder('Caută un club…');
+    return () => setSearchPlaceholder(SUPER_ADMIN_SEARCH_PLACEHOLDER);
+  }, [setSearchPlaceholder]);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    setError(null);
     try {
-      const response = await superAdminApi.refreshClubs();
+      const response = await superAdminApi.listClubs();
       setClubs(response.clubs);
-    } catch (error) {
-      Alert.alert('Clubs', error instanceof Error ? error.message : 'Could not load clubs.');
-    } finally {
-      setLoading(false);
+      setMonth(response.month);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nu am putut încărca cluburile.');
     }
   }, []);
 
-  useEffect(() => {
-    const unsubscribe = subscribeToClubs((nextClubs) => {
-      setClubs(nextClubs);
-      setLoading(false);
+  useEffect(() => { void load(); }, [load]);
+
+  const counts = useMemo(() => ({
+    all: clubs?.length ?? 0,
+    noAdmin: clubs?.filter((club) => club.flags.noAdmin).length ?? 0,
+    dormant: clubs?.filter((club) => club.flags.dormant).length ?? 0,
+    unpriced: clubs?.filter((club) => club.flags.unpriced).length ?? 0,
+  }), [clubs]);
+
+  const visible = useMemo(() => {
+    const list = (clubs ?? []).filter((club) => {
+      if (filter !== 'all' && !club.flags[filter]) return false;
+      return !search || fold(club.name).includes(search);
     });
+    return sortClubs(list, sort);
+  }, [clubs, filter, search, sort]);
 
-    if (!getCachedSuperAdminClubs()) {
-      void load();
-    }
+  const pager = usePagination(visible, PAGE_SIZE, `${filter}|${sort}|${search}`);
+  const maxActive = Math.max(1, ...visible.map((club) => club.activeThisMonth));
+  const totalActive = (clubs ?? []).reduce((sum, club) => sum + club.activeThisMonth, 0);
 
-    return unsubscribe;
-  }, [load]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load]),
-  );
-
-  if (loading && clubs.length === 0) {
-    return (
-      <View className="flex-1 items-center justify-center bg-[#EEF3FF]">
-        <ActivityIndicator size="large" color="var(--c-brand-fg)" />
-      </View>
-    );
-  }
+  const exportCsv = () => {
+    downloadCsv(`cluburi-${month || 'bcms'}.csv`, [
+      ['Club', 'Conturi', 'Active', 'Dezactivate', 'Administratori', 'Antrenori', 'Jucători', 'Părinți', 'Echipe', 'Jucători în lot', `Activi ${month}`, 'Activi 30 zile', 'Preț/utilizator', 'De facturat', 'Ultima activitate', 'Creat'],
+      ...visible.map((club) => [
+        club.name, club.accounts.total, club.accounts.active, club.accounts.disabled, club.roles.admin, club.roles.coach,
+        club.roles.player, club.roles.parent, club.teams, club.rosterPlayers, club.activeThisMonth, club.active30d,
+        club.billingPricePerUser ?? '', club.estimatedAmount ?? '', club.lastActivityAt ?? '', formatDate(club.createdAt),
+      ]),
+    ]);
+  };
 
   return (
-    <>
-      <ScrollView
-        className="flex-1 bg-[#EEF3FF]"
-        contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 20, gap: 16 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="rounded-[32px] border border-[#E8EEFF] bg-white px-6 py-5 shadow-sm">
-          <View className="flex-row items-start justify-between gap-4">
-            <View className="flex-1">
-              <Text className="text-[#173AA8] text-[11px] font-black tracking-[0.3em] uppercase">
-                Club Management
-              </Text>
-              <Text className="text-[#102A72] text-[28px] font-black tracking-tight mt-2">
-                Club Directory
-              </Text>
-              <Text className="text-[#7483A6] text-[14px] mt-2 max-w-[760px] leading-6">
-                Create or inspect clubs, admins, and pending invites. Club updates are pushed instantly into the directory and the create-user dropdown.
-              </Text>
-            </View>
+    <PageContainer>
+      <PageHeader
+        title="Cluburi"
+        subtitle={clubs ? `${plural(clubs.length, 'club', 'cluburi')} · ${plural(totalActive, 'utilizator activ', 'utilizatori activi')} în ${monthLabel(month)}` : 'Toate cluburile de pe platformă'}
+        actions={(
+          <>
+            <Button label="Export CSV" icon="file-download" iconOnlyOnMobile onPress={exportCsv} disabled={!visible.length} />
+            <Button label="Club nou" icon="add" variant="primary" iconOnlyOnMobile onPress={() => setCreateOpen(true)} />
+          </>
+        )}
+      />
 
-            <Pressable
-              onPress={() => setCreateClubOpen(true)}
-              className="rounded-full bg-[#173AA8] px-4 py-3 flex-row items-center gap-2"
-            >
-              <MaterialIcons name="add" size={18} color="#fff" />
-              <Text className="text-white font-black text-[12px] tracking-[0.12em] uppercase">
-                Create Club
-              </Text>
-            </Pressable>
-          </View>
+      <View className="flex-col sm:flex-row sm:items-center gap-2 mb-3">
+        <View className="flex-1 min-w-0">
+          <FilterChips<Filter>
+            value={filter}
+            onChange={setFilter}
+            label="Filtru cluburi"
+            options={[
+              { key: 'all', label: 'Toate', count: counts.all },
+              { key: 'noAdmin', label: 'Fără administrator', count: counts.noAdmin, dot: 'var(--c-danger)' },
+              { key: 'dormant', label: 'Inactive 30 zile', count: counts.dormant, dot: 'var(--c-warning)' },
+              { key: 'unpriced', label: 'Fără preț', count: counts.unpriced, dot: 'var(--c-faint)' },
+            ]}
+          />
         </View>
+        <SelectField<Sort> label="Sortare" icon="sort" value={sort} onChange={setSort} options={SORT_OPTIONS} className="w-full sm:w-[220px]" hideIconOnMobile />
+      </View>
 
-        {clubs.length === 0 ? (
-          <View className="rounded-[28px] border border-dashed border-[#DDE6FF] bg-white px-6 py-8 items-center">
-            <MaterialIcons name="apartment" size={32} color="var(--c-brand-fg)" />
-            <Text className="text-[#102A72] text-[18px] font-black mt-4">No clubs yet</Text>
-            <Text className="text-[#7483A6] text-[13px] mt-2 text-center max-w-[520px] leading-6">
-              Create the first club so super-admin invitations can be linked to it and the Create User dropdown can populate immediately.
-            </Text>
-            <Pressable
-              onPress={() => setCreateClubOpen(true)}
-              className="mt-5 rounded-full bg-[#173AA8] px-4 py-3"
-            >
-              <Text className="text-white font-black text-[12px] tracking-[0.12em] uppercase">
-                Create Club
-              </Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View className="flex-row flex-wrap gap-4">
-            {clubs.map((club) => (
-              <View key={club.id} className="flex-1 min-w-[250px] bg-white rounded-[28px] border border-[#E8EEFF] p-5">
-                <View className="flex-row items-start justify-between gap-3">
-                  <View className="flex-1">
-                    <Text className="text-[#102A72] text-[18px] font-black">{club.name}</Text>
-                    <Text className="text-[#7483A6] text-[12px] mt-1">
-                      {club.usersCount ?? club.userCount} users • {club.adminsCount ?? club.adminCount} admins • {club.pendingInviteCount} pending invites
+      {error && !clubs ? (
+        <ErrorState message={error} actionLabel="Încearcă din nou" onAction={() => void load()} />
+      ) : !clubs ? (
+        <View className="gap-2" accessibilityRole="progressbar" accessibilityLabel="Se încarcă cluburile">
+          {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-[64px] w-full rounded-[12px]" />)}
+        </View>
+      ) : visible.length === 0 ? (
+        <EmptyState
+          icon="apartment"
+          title={clubs.length === 0 ? 'Niciun club încă' : 'Niciun club găsit'}
+          message={clubs.length === 0 ? 'Creează primul club, apoi invită-i administratorul.' : search ? `Nimic pentru „${searchValue.trim()}”.` : 'Niciun club nu se potrivește filtrului.'}
+          actionLabel={clubs.length === 0 ? 'Club nou' : undefined}
+          onAction={clubs.length === 0 ? () => setCreateOpen(true) : undefined}
+        />
+      ) : (
+        <>
+          <ListShell
+            header={(
+              <>
+                <HeaderCell flex={2.4}>Club</HeaderCell>
+                <HeaderCell>Conturi</HeaderCell>
+                <HeaderCell flex={1.4}>{`Activi în ${monthLabel(month, true)}`}</HeaderCell>
+                <HeaderCell flex={1.2}>Ultima activitate</HeaderCell>
+                <HeaderCell align="right">De facturat</HeaderCell>
+                <View className="w-7" />
+              </>
+            )}
+          >
+            {pager.pageItems.map((club, index) => (
+              <Pressable
+                key={club.id}
+                onPress={() => router.push(`/super-admin/clubs/${club.id}`)}
+                accessibilityRole="button"
+                accessibilityLabel={`Deschide ${club.name}`}
+                className="home-row flex-row items-center gap-3 px-3 md:px-3 py-3 hover:bg-[var(--c-surface-2)]"
+                style={{ borderTopWidth: index ? 1 : 0, borderTopColor: 'var(--c-border)' } as any}
+              >
+                <View className="flex-1 md:flex-[2.4] min-w-0 flex-row items-center gap-3">
+                  <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+                    <MaterialIcons name="apartment" size={17} color="var(--c-brand-fg)" />
+                  </View>
+                  <View className="flex-1 min-w-0">
+                    <View className="flex-row items-center gap-1.5 min-w-0">
+                      <Text className="text-[14px] font-semibold shrink" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{club.name}</Text>
+                      {club.flags.noAdmin ? <FlagPill label="Fără admin" tone="danger" /> : null}
+                    </View>
+                    <Text className="t-meta hidden md:flex" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+                      {plural(club.teams, 'echipă', 'echipe')} · {plural(club.rosterPlayers, 'jucător', 'jucători')} în lot
+                    </Text>
+                    {/* Phones: the numbers that matter, under the name. */}
+                    <Text className="t-meta md:hidden" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+                      {formatNumber(club.activeThisMonth)} activi / {plural(club.accounts.total, 'cont', 'conturi')}
+                      {club.estimatedAmount != null ? ` · ${formatMoney(club.estimatedAmount)}` : ''}
                     </Text>
                   </View>
-                  <View className="w-11 h-11 rounded-2xl bg-[#E7EEFF] items-center justify-center">
-                    <MaterialIcons name="verified" size={20} color="var(--c-brand-fg)" />
-                  </View>
                 </View>
 
-                <View className="mt-4 gap-2">
-                  <Text className="text-[#7483A6] text-[12px]">Status: active</Text>
-                  <Text className="text-[#7483A6] text-[12px]">Created by: {club.createdBy ?? 'System'}</Text>
-                  <Text className="text-[#7483A6] text-[12px]">Created at: {club.createdAt}</Text>
+                <View className="hidden md:flex flex-1 min-w-0">
+                  <Text className="text-[13px] font-semibold t-num" style={{ color: 'var(--c-ink)' }}>{formatNumber(club.accounts.total)}</Text>
+                  {club.accounts.disabled ? <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>{formatNumber(club.accounts.disabled)} dezactivate</Text> : null}
                 </View>
-
-                <View className="mt-4 gap-2">
-                  <Text className="text-[#7483A6] text-[12px]">Admins: {club.adminCount}</Text>
-                  <Text className="text-[#7483A6] text-[12px]">Coaches: {club.coachCount}</Text>
-                  <Text className="text-[#7483A6] text-[12px]">Staff: {club.staffCount}</Text>
-                  <Text className="text-[#7483A6] text-[12px]">Players: {club.playerCount}</Text>
+                <View className="hidden md:flex flex-[1.4] min-w-0 pr-4 gap-1">
+                  <Text className="text-[13px] font-semibold t-num" style={{ color: 'var(--c-ink)' }}>{formatNumber(club.activeThisMonth)}</Text>
+                  <Meter value={club.activeThisMonth} max={maxActive} />
                 </View>
-              </View>
+                <View className="hidden md:flex flex-[1.2] min-w-0">
+                  <Text className="text-[13px]" style={{ color: club.flags.dormant ? 'var(--c-warning-fg)' : 'var(--c-ink-soft)' }} numberOfLines={1}>
+                    {formatRelative(club.lastActivityAt)}
+                  </Text>
+                </View>
+                <View className="hidden md:flex flex-1 min-w-0 items-end">
+                  {club.estimatedAmount != null ? (
+                    <Text className="text-[13px] font-semibold t-num" style={{ color: 'var(--c-ink)' }}>{formatMoney(club.estimatedAmount)}</Text>
+                  ) : (
+                    <FlagPill label="Fără preț" tone="neutral" />
+                  )}
+                </View>
+                <View className="home-arrow w-7 items-end shrink-0">
+                  <MaterialIcons name="chevron-right" size={18} color="var(--c-faint)" />
+                </View>
+              </Pressable>
             ))}
-          </View>
-        )}
-      </ScrollView>
+          </ListShell>
+          <Pagination
+            page={pager.page}
+            totalPages={pager.totalPages}
+            onPageChange={pager.setPage}
+            rangeStart={pager.rangeStart}
+            rangeEnd={pager.rangeEnd}
+            total={pager.total}
+            itemNoun="cluburi"
+          />
+        </>
+      )}
 
-      <CreateClubModal visible={createClubOpen} onClose={() => setCreateClubOpen(false)} />
-    </>
+      <CreateClubDialog
+        visible={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(club) => router.push(`/super-admin/clubs/${club.id}`)}
+      />
+    </PageContainer>
   );
 }

@@ -543,8 +543,38 @@ export const clubs = pgTable("clubs", {
 	// platform account (routes/finance.ts). Null: the platform account, as before.
 	stripeAccountId: varchar("stripe_account_id", { length: 64 }),
 	stripeChargesEnabled: boolean("stripe_charges_enabled").default(false).notNull(),
+	// Platform billing (super admin → Facturare): what the club pays per user
+	// active in a month, in RON. Null: not priced yet.
+	billingPricePerUser: money("billing_price_per_user"),
+	// Super admin's own notes about the club (contract, contact person…).
+	internalNotes: text("internal_notes"),
 }, (table) => [
 	unique("clubs_normalized_name_unique").on(table.normalizedName),
+]);
+
+// One row per account per calendar month (Europe/Bucharest) in which it used
+// the app — written by middleware/auth.ts via lib/activityTracker.ts. It is
+// what platform billing counts: users.last_login_at alone only knows the
+// latest visit, not who was active in a past month.
+export const userActivityMonths = pgTable("user_activity_months", {
+	id: serial().primaryKey().notNull(),
+	userId: integer("user_id").notNull(),
+	// Club and role as of the latest visit that month.
+	clubId: integer("club_id"),
+	role: role(),
+	month: varchar({ length: 7 }).notNull(), // YYYY-MM
+	activeDays: integer("active_days").default(1).notNull(),
+	lastSeenDay: varchar("last_seen_day", { length: 10 }).notNull(), // YYYY-MM-DD
+	firstSeenAt: timestamp("first_seen_at", { mode: 'string' }).defaultNow().notNull(),
+	lastSeenAt: timestamp("last_seen_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("user_activity_months_user_month_unique").on(table.userId, table.month),
+	index("user_activity_months_month_idx").on(table.month),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "user_activity_months_user_id_users_id_fk"
+		}).onDelete('cascade'),
 ]);
 export const accessRequests = pgTable("access_requests", {
 	id: serial().primaryKey().notNull(),

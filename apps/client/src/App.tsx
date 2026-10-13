@@ -138,12 +138,14 @@ const loadSuperAdminDashboard = () => import('../app/super-admin/dashboard');
 const SuperAdminDashboard = lazyRoute(loadSuperAdminDashboard);
 const loadSuperAdminClubs = () => import('../app/super-admin/clubs');
 const SuperAdminClubs = lazyRoute(loadSuperAdminClubs);
+const loadSuperAdminClubDetail = () => import('../app/super-admin/clubs/[id]');
+const SuperAdminClubDetail = lazyRoute(loadSuperAdminClubDetail);
 const loadSuperAdminUsers = () => import('../app/super-admin/users');
 const SuperAdminUsers = lazyRoute(loadSuperAdminUsers);
+const loadSuperAdminBilling = () => import('../app/super-admin/billing');
+const SuperAdminBilling = lazyRoute(loadSuperAdminBilling);
 const loadSuperAdminCreateUser = () => import('../app/super-admin/create-user');
 const SuperAdminCreateUser = lazyRoute(loadSuperAdminCreateUser);
-const loadSuperAdminRoles = () => import('../app/super-admin/roles');
-const SuperAdminRoles = lazyRoute(loadSuperAdminRoles);
 const loadSuperAdminAuditLogs = () => import('../app/super-admin/audit-logs');
 const SuperAdminAuditLogs = lazyRoute(loadSuperAdminAuditLogs);
 const loadSuperAdminSettings = () => import('../app/super-admin/settings');
@@ -211,12 +213,13 @@ const ROUTE_CHUNKS: Array<[string, Loader[]]> = [
   ['/admin/users', [loadAdminLayout, loadAdminUsers]],
   ['/admin/users/:id', [loadAdminLayout, loadAdminUserDetails]],
   ['/admin/audit-log', [loadAdminLayout, loadAdminAuditLog]],
-  ['/super-admin', [loadSuperAdminLayout, loadSuperAdminIndex]],
+  ['/super-admin', [loadSuperAdminLayout, loadSuperAdminIndex, loadSuperAdminDashboard]],
   ['/super-admin/dashboard', [loadSuperAdminLayout, loadSuperAdminDashboard]],
   ['/super-admin/clubs', [loadSuperAdminLayout, loadSuperAdminClubs]],
+  ['/super-admin/clubs/:id', [loadSuperAdminLayout, loadSuperAdminClubDetail]],
   ['/super-admin/users', [loadSuperAdminLayout, loadSuperAdminUsers]],
+  ['/super-admin/billing', [loadSuperAdminLayout, loadSuperAdminBilling]],
   ['/super-admin/create-user', [loadSuperAdminLayout, loadSuperAdminCreateUser]],
-  ['/super-admin/roles', [loadSuperAdminLayout, loadSuperAdminRoles]],
   ['/super-admin/audit-logs', [loadSuperAdminLayout, loadSuperAdminAuditLogs]],
   ['/super-admin/settings', [loadSuperAdminLayout, loadSuperAdminSettings]],
   ['/super-admin/invite/:token', [loadSuperAdminLayout, loadSuperAdminInviteRedirect]],
@@ -254,7 +257,7 @@ function RoutePrefetcher() {
     } else if (role === 'player' || role === 'parent') {
       prefetchRoutes([loadPlayerLayout, loadPlayerHome, loadPlayerSchedule, loadPlayerAttendance, loadPlayerPayments, loadPlayerTeam, loadPlayerAccount]);
     } else if (role === 'superadmin') {
-      prefetchRoutes([loadSuperAdminLayout, loadSuperAdminDashboard, loadSuperAdminClubs, loadSuperAdminUsers, loadAdminLayout, loadAdminDashboard]);
+      prefetchRoutes([loadSuperAdminLayout, loadSuperAdminDashboard, loadSuperAdminClubs, loadSuperAdminClubDetail, loadSuperAdminUsers, loadSuperAdminBilling, loadSuperAdminCreateUser]);
     } else if (role === 'staff') {
       prefetchRoutes([loadAdminLayout, loadAdminSchedule, loadAdminDocuments, loadAdminContacts, loadProfile]);
     } else if (role === 'accountant') {
@@ -354,9 +357,11 @@ export default function App() {
                   <Route index element={<SuperAdminIndex />} />
                   <Route path="dashboard" element={<SuperAdminDashboard />} />
                   <Route path="clubs" element={<SuperAdminClubs />} />
+                  <Route path="clubs/:id" element={<SuperAdminClubDetail />} />
                   <Route path="users" element={<SuperAdminUsers />} />
+                  <Route path="billing" element={<SuperAdminBilling />} />
                   <Route path="create-user" element={<SuperAdminCreateUser />} />
-                  <Route path="roles" element={<SuperAdminRoles />} />
+                  <Route path="roles" element={<Navigate to="/super-admin/settings" replace />} />
                   <Route path="audit-logs" element={<SuperAdminAuditLogs />} />
                   <Route path="settings" element={<SuperAdminSettings />} />
                   <Route path="invite/:token" element={<SuperAdminInviteRedirect />} />

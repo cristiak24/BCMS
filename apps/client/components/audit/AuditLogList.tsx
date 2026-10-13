@@ -9,10 +9,11 @@ import type { AuditLogEntry, AuditLogFilters, AuditLogPage } from '../../service
  * paging. Shared by the club admin's Jurnal and the superadmin console.
  */
 
-type Category = 'all' | 'finance.' | 'club_admin.' | 'manage_access.' | 'user.' | 'invitation.' | 'auth.' | 'player.' | 'family.';
+type Category = 'all' | 'club.' | 'finance.' | 'club_admin.' | 'manage_access.' | 'user.' | 'invitation.' | 'auth.' | 'player.' | 'family.';
 
 const CATEGORY_OPTIONS: { key: Category; label: string }[] = [
     { key: 'all', label: 'Toate acțiunile' },
+    { key: 'club.', label: 'Cluburi' },
     { key: 'finance.', label: 'Finanțe' },
     { key: 'club_admin.', label: 'Conturi' },
     { key: 'user.', label: 'Utilizatori' },
@@ -28,6 +29,7 @@ const ACTION_LABELS: Record<string, string> = {
     'auth.signup_with_invite_code': 'Cont creat cu cod de invitație',
     'auth.signup_with_team_code': 'Cerere de înscriere cu codul echipei',
     'club.created': 'Club creat',
+    'club.updated': 'Club modificat (nume, preț sau notițe)',
     'club_admin.invitation_revoked': 'Invitație anulată',
     'club_admin.user_deactivated': 'Cont dezactivat',
     'club_admin.user_deleted': 'Cont șters',
@@ -54,10 +56,13 @@ const ACTION_LABELS: Record<string, string> = {
     'player.contacts_updated': 'Telefoane modificate',
     'team.join_code_rotate': 'Cod de echipă regenerat',
     'user.deactivated': 'Cont dezactivat',
+    'user.reactivated': 'Cont reactivat',
     'user.registration_completed': 'Înregistrare finalizată',
     'user.role_updated': 'Rol schimbat',
     'user.updated': 'Cont modificat',
 };
+
+export const auditActionLabel = (action: string) => ACTION_LABELS[action] ?? action;
 
 const ROLE_LABELS: Record<string, string> = {
     superadmin: 'superadmin', admin: 'admin', coach: 'antrenor', player: 'jucător', parent: 'părinte', accountant: 'contabil', staff: 'staff',
@@ -111,6 +116,8 @@ function detailOf(entry: AuditLogEntry) {
     if (meta.before !== undefined || meta.after !== undefined) parts.push(`${meta.before ?? '—'} → ${meta.after ?? '—'}`);
     if (Array.isArray(meta.fields)) parts.push((meta.fields as string[]).map((field) => FIELD_LABELS[field] ?? field).join(', '));
     if (meta.teamName) parts.push(String(meta.teamName));
+    if (meta.billingPricePerUser !== undefined) parts.push(`preț/utilizator: ${meta.billingPricePerUser ?? '—'}`);
+    if (meta.previousClubId && meta.nextClubId) parts.push('mutat în alt club');
     return parts.join(' · ');
 }
 

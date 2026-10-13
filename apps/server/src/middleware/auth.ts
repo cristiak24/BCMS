@@ -3,6 +3,7 @@ import { verifyBearerToken } from '../lib/clerkAuth';
 import { db } from '../db';
 import { users } from '../db/schema';
 import { eq, or } from 'drizzle-orm';
+import { recordActivity } from '../lib/activityTracker';
 
 export interface AuthenticatedRequest extends Request {
     user?: any; // You can type this properly based on your User model
@@ -61,6 +62,7 @@ export const authenticate = async (req: AuthenticatedRequest, res: Response, nex
             }
 
             req.user = userRows[0];
+            recordActivity(userRows[0]);
         }
 
         next();

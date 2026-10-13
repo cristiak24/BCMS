@@ -24,6 +24,8 @@ export type SuperAdminInviteInput = {
   clubId: number;
 };
 
+const INVITABLE_ROLES = new Set<string>(['admin', 'coach', 'staff', 'player', 'parent', 'accountant']);
+
 export type InvitationRecord = {
   id: number;
   token: string;
@@ -208,6 +210,11 @@ export async function createSuperAdminInvitation(
 
   if (Number.isNaN(clubId) || clubId <= 0) {
     throw new Error('A valid club is required.');
+  }
+
+  // The body is client input: never mint a superadmin (or a junk role) by invite.
+  if (!INVITABLE_ROLES.has(role)) {
+    throw new Error('Rol invalid pentru invitație.');
   }
 
   const club = await findClubById(clubId);

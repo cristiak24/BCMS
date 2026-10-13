@@ -5,6 +5,7 @@ import { verifyBearerToken } from './clerkAuth';
 import { db } from '../db';
 import { users } from '../db/schema';
 import { eq, or, sql } from 'drizzle-orm';
+import { recordActivity } from './activityTracker';
 
 type ErrorPayload = { error: string };
 
@@ -65,6 +66,8 @@ async function getBearerAuthenticatedUser(req: Request): Promise<AppUserContext 
         if (!user) {
             return null;
         }
+
+        recordActivity(user);
 
         return {
             id: user.id,

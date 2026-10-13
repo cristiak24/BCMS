@@ -29,9 +29,11 @@ export const ADMIN_MENU_ITEMS: { label: string; icon: AdminMenuIconName; href: s
 
 type SidebarProps = {
     items?: typeof ADMIN_MENU_ITEMS;
+    /** Line under the logo; defaults to the signed-in user's club. */
+    subtitle?: string;
 };
 
-export default function Sidebar({ items = ADMIN_MENU_ITEMS }: SidebarProps) {
+export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarProps) {
     const { pathname } = useLocation();
     const { session } = useSession();
     const { width } = useResponsive();
@@ -58,7 +60,7 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS }: SidebarProps) {
                 </View>
                 <View className="flex-col">
                     <Text className="text-[17px] font-black tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }}>BCMS</Text>
-                    <Text className="text-[11.5px] font-semibold mt-0.5 max-w-[160px]" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{session?.clubName ?? 'Clubul tău'}</Text>
+                    <Text className="text-[11.5px] font-semibold mt-0.5 max-w-[160px]" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{subtitle ?? session?.clubName ?? 'Clubul tău'}</Text>
                 </View>
             </View>
 
