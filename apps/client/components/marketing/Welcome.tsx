@@ -18,6 +18,7 @@ import {
 import { useTheme } from '../../context/ThemeContext';
 import { BrandGlyph } from '../auth/AuthChrome';
 import { Avatar, Chip, CourtArt, Reveal, SectionHead } from './primitives';
+import LegalLinks from '../legal/LegalLinks';
 
 /**
  * Public page shown at "/" to signed-out visitors. Pure presentation plus the
@@ -1122,6 +1123,9 @@ function Footer() {
                         Autentificare
                     </Link>
                 </nav>
+            </div>
+            <div className={`${container} border-t border-[var(--c-border-soft)] py-4`}>
+                <LegalLinks />
             </div>
         </footer>
     );

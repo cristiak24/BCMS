@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, Loader2, Lock, Eye, EyeOff, Ticket, ArrowRight, Phone, Plus, X, Users, UserRound } from 'lucide-react';
 import { authApi, type InviteDetails } from '../services/authApi';
+import { privacyApi } from '../services/privacyApi';
+import { DIGITAL_CONSENT_AGE, LEGAL_VERSION } from '../config/legal';
 import { familyApi } from '../services/familyApi';
 import { setActiveChildId } from '../services/apiClient';
 import { getHomeRouteForRole } from '../utils/authSession';
 import { useSession } from '../context/AuthContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
+import LegalLinks from '../components/legal/LegalLinks';
 import {
     AuthCard,
     AuthHeading,
@@ -51,6 +54,15 @@ type ChildDraft = { firstName: string; lastName: string; birthDate: string };
 const EMPTY_CHILD: ChildDraft = { firstName: '', lastName: '', birthDate: '' };
 const MAX_CHILDREN = 5;
 
+function ageOn(birthDate: string, today = new Date()) {
+    const born = new Date(birthDate);
+    if (Number.isNaN(born.getTime())) return null;
+    let age = today.getFullYear() - born.getFullYear();
+    const beforeBirthday = today.getMonth() < born.getMonth() || (today.getMonth() === born.getMonth() && today.getDate() < born.getDate());
+    if (beforeBirthday) age -= 1;
+    return age;
+}
+
 /** Same rule as the server (lib/contacts.ts normalizePhone). */
 function isValidPhone(value: string) {
     const text = value.trim();
@@ -79,6 +91,7 @@ export default function Signup() {
     const [children, setChildren] = useState<ChildDraft[]>([{ ...EMPTY_CHILD }]);
     const [birthDate, setBirthDate] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [acceptedLegal, setAcceptedLegal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -144,6 +157,7 @@ export default function Signup() {
         setJoinAs(null);
         setChildren([{ ...EMPTY_CHILD }]);
         setBirthDate('');
+        setAcceptedLegal(false);
         setError(null);
     };
 
@@ -190,6 +204,17 @@ export default function Signup() {
             setError('Completează data nașterii.');
             return;
         }
+        if (isTeamCode && joinAs === 'player') {
+            const age = ageOn(birthDate);
+            if (age != null && age < DIGITAL_CONSENT_AGE) {
+                setError(`Sub ${DIGITAL_CONSENT_AGE} ani contul îl creează un părinte sau tutore. Alege „Părinte” și adaugă copilul.`);
+                return;
+            }
+        }
+        if (!acceptedLegal) {
+            setError('Pentru a crea contul trebuie să accepți Termenii și condițiile și să iei act de Politica de confidențialitate.');
+            return;
+        }
 
         setSubmitting(true);
         setError(null);
@@ -215,6 +240,10 @@ export default function Signup() {
                 return;
             }
 
+            // Proof of the acceptance. If this call fails the acceptance prompt
+            // (LegalAcceptanceGate) asks again on the first screen, so the
+            // signup itself is never undone by it.
+            await privacyApi.accept(LEGAL_VERSION).catch(() => undefined);
             await reloadSession();
         } catch (signupError) {
             setError(signupError instanceof Error ? signupError.message : 'Nu am putut crea contul.');
@@ -536,6 +565,23 @@ export default function Signup() {
                                         </span>
                                     </label>
 
+                                    <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 bg-[var(--c-surface-2)] px-3 py-2.5">
+                                        <input
+                                            type="checkbox"
+                                            checked={acceptedLegal}
+                                            onChange={(e) => setAcceptedLegal(e.target.checked)}
+                                            disabled={submitting}
+                                            className="mt-0.5 h-[18px] w-[18px] shrink-0 cursor-pointer accent-[var(--c-brand-surface)]"
+                                        />
+                                        <span className="text-[12.5px] font-medium leading-5 text-[var(--c-ink-soft)]">
+                                            Am citit și accept{' '}
+                                            <Link to="/termeni" target="_blank" rel="noopener" className="font-bold text-[var(--c-brand-fg)] underline">Termenii și condițiile</Link>{' '}
+                                            și am luat act de{' '}
+                                            <Link to="/confidentialitate" target="_blank" rel="noopener" className="font-bold text-[var(--c-brand-fg)] underline">Politica de confidențialitate</Link>.
+                                            Confirm că am cel puțin {DIGITAL_CONSENT_AGE} ani sau că sunt părintele/tutorele legal al copilului pe care îl înscriu.
+                                        </span>
+                                    </label>
+
                                     <button type="submit" disabled={submitting} className={`mt-1 ${authPrimaryButtonClass}`}>
                                         {submitting ? <Loader2 className="animate-spin" size={18} /> : null}
                                         <span>{submitting ? 'Se creează contul...' : isTeamCode ? 'Trimite cererea' : 'Creează cont'}</span>
@@ -548,6 +594,7 @@ export default function Signup() {
                     <p className="m-0 mt-5 text-center text-sm font-semibold text-slate-500">
                         Ai deja cont? <Link to="/login" className="font-bold text-[var(--c-brand-fg)] no-underline hover:underline">Autentifică-te</Link>
                     </p>
+                    <LegalLinks className="mt-4 justify-center" />
                 </AuthCard>
             </div>
         </main>

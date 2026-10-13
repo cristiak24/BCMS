@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { getHomeRouteForRole } from '../utils/authSession';
 import { useLogin } from '../hooks/useLogin';
+import LegalLinks from '../components/legal/LegalLinks';
 import { useSession } from '../context/AuthContext';
 import {
     AuthCard,
@@ -376,6 +377,7 @@ export default function Login() {
                                 Ai primit o invitație?{' '}
                                 <Link to="/signup" className="font-bold text-[var(--c-brand-fg)] no-underline hover:underline">Creează cont</Link>
                             </p>
+                            <LegalLinks className="mt-4 justify-center" />
                         </AuthCard>
                     </div>
                 </section>

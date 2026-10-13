@@ -18,6 +18,7 @@ import Button from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
 import { ErrorState } from '../ui/ScreenState';
 import { ProfileCard } from './ProfileParts';
+import PrivacyCard from './PrivacyCard';
 import { InstallAppCard } from '../pwa/InstallApp';
 
 const THEME_OPTIONS: { mode: ThemeMode; label: string; icon: string }[] = [
@@ -454,6 +455,8 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
             </ProfileCard>
 
             <PasswordChangeForm onChangePassword={handlePasswordChange} />
+
+            <PrivacyCard />
 
             <ProfileCard icon="logout" tone="danger" title="Sesiune" description="Ieși din cont pe acest dispozitiv.">
               <Pressable

@@ -23,6 +23,7 @@ import familyRoutes from './routes/family';
 import fileRoutes from './routes/files';
 import gameRoutes from './routes/games';
 import notificationRoutes from './routes/notificationRoutes';
+import privacyRoutes from './routes/privacy';
 import { loadServerEnv } from './lib/loadEnv';
 import { createAllowedOrigins, isOriginAllowed } from './lib/corsOrigins';
 
@@ -92,6 +93,7 @@ export function createServerApp() {
     app.use('/api/files', fileRoutes);
     app.use('/api/games', gameRoutes);
     app.use('/api/notifications', notificationRoutes);
+    app.use('/api/privacy', privacyRoutes);
 
     app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

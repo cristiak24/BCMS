@@ -692,3 +692,36 @@ export const auditLogs = pgTable("audit_logs", {
 		name: "audit_logs_club_id_clubs_id_fk",
 	}),
 ]);
+
+// Which version of the Terms + Privacy Policy an account has accepted. A new
+// version (lib/legal.ts) makes every account accept again; old rows stay as
+// the proof of what was agreed and when.
+export const legalAcceptances = pgTable("legal_acceptances", {
+	id: serial().primaryKey().notNull(),
+	userId: integer("user_id").notNull(),
+	version: varchar({ length: 20 }).notNull(),
+	acceptedAt: timestamp("accepted_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("legal_acceptances_user_version_unique").on(table.userId, table.version),
+	foreignKey({
+		columns: [table.userId],
+		foreignColumns: [users.id],
+		name: "legal_acceptances_user_id_users_id_fk",
+	}).onDelete('cascade'),
+]);
+
+// GDPR requests a person made about their own data (today: erasure). Kept
+// after the account is gone, so userId is not a foreign key; the club or the
+// platform answers within one month and marks the row closed.
+export const privacyRequests = pgTable("privacy_requests", {
+	id: serial().primaryKey().notNull(),
+	userId: integer("user_id").notNull(),
+	clubId: integer("club_id"),
+	type: varchar({ length: 20 }).notNull(),
+	status: varchar({ length: 20 }).default('open').notNull(),
+	requesterEmail: varchar("requester_email", { length: 255 }),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	closedAt: timestamp("closed_at", { mode: 'string' }),
+}, (table) => [
+	uniqueIndex("privacy_requests_open_unique").on(table.userId, table.type).where(sql`${table.status} = 'open'`),
+]);

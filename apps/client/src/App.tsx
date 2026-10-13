@@ -9,6 +9,7 @@ import { InstallBanner } from '../components/pwa/InstallApp';
 import { useSession } from '../context/AuthContext';
 import { getHomeRouteForRole, normalizeRole, readAuthSessionSync } from '../utils/authSession';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
+import LegalAcceptanceGate from '../components/legal/LegalAcceptanceGate';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import PublicRoute from '../components/auth/PublicRoute';
 import { PLAYER_FEATURE_FLAGS } from '../config/playerFeatureFlags';
@@ -27,6 +28,12 @@ const loadProfile = () => import('../app/profile');
 const Profile = lazyRoute(loadProfile);
 const loadNotFound = () => import('../app/not-found');
 const NotFound = lazyRoute(loadNotFound);
+const loadTerms = () => import('../app/legal').then((m) => ({ default: m.TermsRoute }));
+const Terms = lazyRoute(loadTerms);
+const loadPrivacy = () => import('../app/legal').then((m) => ({ default: m.PrivacyRoute }));
+const Privacy = lazyRoute(loadPrivacy);
+const loadCookies = () => import('../app/legal').then((m) => ({ default: m.CookiesRoute }));
+const Cookies = lazyRoute(loadCookies);
 const loadInviteRegistration = () => import('../app/invite/[token]');
 const InviteRegistration = lazyRoute(loadInviteRegistration);
 
@@ -164,6 +171,9 @@ type Loader = () => Promise<{ default: unknown }>;
 const ROUTE_CHUNKS: Array<[string, Loader[]]> = [
   ['/profile', [loadProfile]],
   ['/signup', [loadSignup]],
+  ['/termeni', [loadTerms]],
+  ['/confidentialitate', [loadPrivacy]],
+  ['/cookie-uri', [loadCookies]],
   ['/invite/:token', [loadInviteRegistration]],
   ['/myclub', [loadPlayerLayout, loadPlayerHome]],
   ['/account', [loadPlayerLayout, loadPlayerAccount]],
@@ -279,6 +289,7 @@ export default function App() {
             <RouteProgress />
             <RoutePrefetcher />
             <InstallBanner />
+            <LegalAcceptanceGate />
             <Suspense fallback={<LoadingScreen message="Se încarcă..." />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
@@ -286,6 +297,9 @@ export default function App() {
                 <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/invite/:token" element={<InviteRegistration />} />
+                <Route path="/termeni" element={<Terms />} />
+                <Route path="/confidentialitate" element={<Privacy />} />
+                <Route path="/cookie-uri" element={<Cookies />} />
 
                 <Route element={<ProtectedRoute roles={['coach', 'player', 'parent']}><PlayerLayout /></ProtectedRoute>}>
                   <Route path="/myclub" element={<PlayerHome />} />
