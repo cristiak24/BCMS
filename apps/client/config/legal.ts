@@ -19,5 +19,5 @@ export const LEGAL_OPERATOR = {
     legalName: '',
     registration: '',
     address: '',
-    contactEmail: '',
+    contactEmail: 'mariusbara427@gmail.com',
 };
