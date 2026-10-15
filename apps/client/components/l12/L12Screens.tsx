@@ -381,9 +381,9 @@ export function L12HomeScreen() {
                   />
                 ) : (
                   <>
-                    <View className="grid grid-cols-1 xl:grid-cols-2 gap-x-4 gap-y-4 items-start">
+                    <View className="block xl:columns-2 xl:gap-x-4">
                       {dayGroups.map((group) => (
-                        <View key={group.key + group.label} className="gap-2">
+                        <View key={group.key + group.label} className="gap-2 mb-4 break-inside-avoid">
                           <DayHeading label={group.label} count={group.matches.length} />
                           <View className="gap-2 ui-stagger">
                             {group.matches.map((match) => {
