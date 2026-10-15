@@ -33,7 +33,7 @@ import {
   matchesAttendanceFilter,
 } from '../../components/roster/rosterHelpers';
 
-const PLAYERS_PER_PAGE = 24;
+const PLAYERS_PER_PAGE = 12;
 const UNASSIGNED_TEAM_FILTER = '__unassigned__';
 const DEFAULT_STATUS_FILTER = 'active';
 
