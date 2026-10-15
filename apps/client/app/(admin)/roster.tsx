@@ -33,7 +33,18 @@ import {
   matchesAttendanceFilter,
 } from '../../components/roster/rosterHelpers';
 
-const PLAYERS_PER_PAGE = 12;
+const PAGE_SIZE_OPTIONS = [12, 24, 48, 100];
+const DEFAULT_PAGE_SIZE = 12;
+const PAGE_SIZE_STORAGE_KEY = 'bcms.roster.pageSize';
+
+function readStoredPageSize() {
+  try {
+    const stored = Number(window.localStorage.getItem(PAGE_SIZE_STORAGE_KEY));
+    return PAGE_SIZE_OPTIONS.includes(stored) ? stored : DEFAULT_PAGE_SIZE;
+  } catch {
+    return DEFAULT_PAGE_SIZE;
+  }
+}
 const UNASSIGNED_TEAM_FILTER = '__unassigned__';
 const DEFAULT_STATUS_FILTER = 'active';
 
@@ -63,6 +74,14 @@ export default function RosterScreen() {
   const [selectedAttendance, setSelectedAttendance] = useState<AttendanceFilterValue>('all');
   const [selectedPayment, setSelectedPayment] = useState<PaymentFilterValue>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSizeState] = useState(readStoredPageSize);
+  const setPageSize = (size: number) => {
+    setPageSizeState(size);
+    setCurrentPage(1);
+    try {
+      window.localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(size));
+    } catch {}
+  };
 
   const [sortColumn, setSortColumn] = useState<RosterSortColumn | null>(null);
   const [sortDirection, setSortDirection] = useState<RosterSortDirection>('asc');
@@ -329,11 +348,11 @@ export default function RosterScreen() {
     []
   );
 
-  const totalPages = Math.max(1, Math.ceil(sortedPlayers.length / PLAYERS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(sortedPlayers.length / pageSize));
   const paginatedPlayers = useMemo(() => {
-    const start = (currentPage - 1) * PLAYERS_PER_PAGE;
-    return sortedPlayers.slice(start, start + PLAYERS_PER_PAGE);
-  }, [currentPage, sortedPlayers]);
+    const start = (currentPage - 1) * pageSize;
+    return sortedPlayers.slice(start, start + pageSize);
+  }, [currentPage, pageSize, sortedPlayers]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -477,15 +496,9 @@ export default function RosterScreen() {
     }
 
     setMobileFab(null);
-    setHeaderActions(
-      <View className="rounded-full px-3 py-2" style={{ backgroundColor: dash.lineSoft }}>
-        <Text className="text-[11px] font-black" style={{ color: dash.inkSoft }}>
-          {filteredPlayers.length} vizibili
-        </Text>
-      </View>
-    );
+    setHeaderActions(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMobile, filteredPlayers.length]);
+  }, [isMobile]);
 
   if (loading) {
     return (
@@ -694,7 +707,9 @@ export default function RosterScreen() {
           currentPage={currentPage}
           totalPages={totalPages}
           totalItems={sortedPlayers.length}
-          pageSize={PLAYERS_PER_PAGE}
+          pageSize={pageSize}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+          onPageSizeChange={setPageSize}
           onPageChange={setCurrentPage}
         />
       </View>

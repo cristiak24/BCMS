@@ -7,6 +7,8 @@ interface RosterPaginationProps {
   totalPages: number;
   totalItems: number;
   pageSize: number;
+  pageSizeOptions?: number[];
+  onPageSizeChange?: (size: number) => void;
   onPageChange: (page: number) => void;
 }
 
@@ -31,6 +33,8 @@ export default function RosterPagination({
   totalPages,
   totalItems,
   pageSize,
+  pageSizeOptions,
+  onPageSizeChange,
   onPageChange,
 }: RosterPaginationProps) {
   if (totalItems === 0) {
@@ -43,9 +47,31 @@ export default function RosterPagination({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.summary}>
-        Sportivii {start}-{end} din {totalItems}
-      </Text>
+      <View style={styles.summaryRow}>
+        <Text style={styles.summary}>
+          Sportivii {start}-{end} din {totalItems}
+        </Text>
+
+        {pageSizeOptions && onPageSizeChange ? (
+          <View style={styles.pageRow}>
+            <Text style={styles.summary}>Pe pagină</Text>
+            {pageSizeOptions.map((size) => {
+              const active = size === pageSize;
+
+              return (
+                <Pressable
+                  key={size}
+                  onPress={() => onPageSizeChange(size)}
+                  className="dash-nav-btn"
+                  style={[styles.sizeButton, active && styles.pageButtonActive]}
+                >
+                  <Text style={[styles.pageLabel, active && styles.pageLabelActive]}>{size}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+      </View>
 
       <View style={styles.controls}>
         <Pressable
@@ -91,6 +117,22 @@ const styles = StyleSheet.create({
   container: {
     marginTop: 18,
     gap: 12,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  sizeButton: {
+    minWidth: 38,
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    backgroundColor: dash.surfaceSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   summary: {
     fontSize: 13,
