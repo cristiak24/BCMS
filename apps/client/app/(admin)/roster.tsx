@@ -580,7 +580,10 @@ export default function RosterScreen() {
           selectedStatus={selectedStatus}
           selectedAttendance={selectedAttendance}
           selectedPayment={selectedPayment}
-          onTeamChange={setSelectedTeam}
+          onTeamChange={(value) => {
+            setSelectedTeam(value);
+            if (value === UNASSIGNED_TEAM_FILTER) setSelectedStatus('all');
+          }}
           onStatusChange={(value) => setSelectedStatus(value as StatusFilterValue)}
           onAttendanceChange={(value) => setSelectedAttendance(value as AttendanceFilterValue)}
           onPaymentChange={(value) => setSelectedPayment(value as PaymentFilterValue)}

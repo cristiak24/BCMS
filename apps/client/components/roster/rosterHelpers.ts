@@ -5,7 +5,7 @@ export function normalizePaymentStatus(paymentStatus?: string | null) {
 }
 
 export function getCategoryLabel(player: Player) {
-  return player.category || 'Neasignat';
+  return player.isUnassigned || !player.category || player.category === 'Unassigned' ? 'Neasignat' : player.category;
 }
 
 export function getAttendanceRate(player: Player) {
@@ -50,7 +50,9 @@ export function getPaymentBucketRank(paymentStatus?: string | null) {
 }
 
 export function getTeamLabel(player: Player) {
-  return player.teamName || player.teamNames?.[0] || 'Neasignat';
+  if (player.isUnassigned) return 'Neasignat';
+  const name = player.teamName || player.teamNames?.[0];
+  return !name || name === 'Unassigned' ? 'Neasignat' : name;
 }
 
 export function isPlayerUnassigned(player: Player) {

@@ -7,6 +7,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/search', playersController.searchPlayers);
+router.get('/browse', playersController.browsePlayers);
 router.get('/roster/summary', playersController.getRosterSummary);
 router.get('/roster', playersController.getRoster);
 router.post('/payment-reminders', playersController.sendPaymentReminders);

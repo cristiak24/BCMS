@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { players, teams, playersToTeams, attendance, playerPayments, users, events } from '../db/schema';
+import { players, teams, playersToTeams, attendance, playerPayments, users, events, playerGuardians } from '../db/schema';
 import { and, desc, eq, inArray, lte, or, sql } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { ensureClubPlayerRecords } from '../lib/clubPlayerRecords';
 import { buildPlayerUpdate } from '../lib/playerUpdate';
 import { toIso } from '../lib/dateUtils';
 import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
@@ -189,6 +190,24 @@ async function buildPlayerPaymentSummary(player: typeof players.$inferSelect, cl
     };
 }
 
+/**
+ * Players with no team and no email (a parent's child added before any team
+ * exists) belong to a club only through their guardian's — or their own —
+ * account. Without this they are on nobody's roster.
+ */
+async function clubLinkedPlayerIds(clubId: number | null): Promise<number[]> {
+    if (clubId == null) return [];
+    const [viaGuardian, viaAccount] = await Promise.all([
+        db.select({ id: playerGuardians.playerId }).from(playerGuardians)
+            .innerJoin(users, eq(users.id, playerGuardians.userId))
+            .where(eq(users.clubId, clubId)),
+        db.select({ id: players.id }).from(players)
+            .innerJoin(users, eq(users.id, players.userId))
+            .where(eq(users.clubId, clubId)),
+    ]);
+    return Array.from(new Set([...viaGuardian, ...viaAccount].map((row) => row.id)));
+}
+
 async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPlayerFacing?: boolean; withBalances?: boolean } = {}) {
     const { stripForPlayerFacing = true, withBalances = true } = options;
     const isPlayerFacing = isPlayerFacingRole(req);
@@ -228,6 +247,7 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
         // on each roster call and filter in JS — cost grew with the whole
         // platform, not with the club.
         const clubId = getRequestClubId(req);
+        if (!isPlayerFacing && clubId != null) await ensureClubPlayerRecords(clubId);
 
         // A club member who plays for no team yet is still on the club roster
         // (matched through their user account's club). NOT for player/parent
@@ -244,6 +264,10 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
 
         const playerConditions = [inArray(players.teamId, allowedTeamIds)];
         if (memberPlayerIds.length) playerConditions.push(inArray(players.id, memberPlayerIds));
+        if (!isPlayerFacing) {
+            const linkedIds = await clubLinkedPlayerIds(clubId);
+            if (linkedIds.length) playerConditions.push(inArray(players.id, linkedIds));
+        }
         if (clubEmails.length) playerConditions.push(inArray(sql<string>`lower(trim(${players.email}))`, clubEmails));
 
         const [playerRows, teamRows] = await Promise.all([
@@ -465,6 +489,34 @@ async function getTeammatesForTeam(teamId: number, selfId: number) {
         });
 }
 
+/**
+ * Same "which players can this caller see" rule for both searchPlayers and
+ * browsePlayers, so the two never drift apart. `skip` means the caller's
+ * club has no teams at all — every caller answers with an empty result,
+ * `scope` is undefined only for a superadmin (no club to scope to).
+ */
+async function buildPlayerScope(req: AuthenticatedRequest): Promise<{ skip: true } | { skip: false; scope: ReturnType<typeof or> | undefined }> {
+    const allowedTeamIds = await getAllowedTeamIds(req);
+    if (allowedTeamIds !== null && allowedTeamIds.length === 0) return { skip: true };
+
+    let scope;
+    if (allowedTeamIds !== null) {
+        const clubId = getRequestClubId(req);
+        const memberIds = (await db.select({ playerId: playersToTeams.playerId }).from(playersToTeams).where(inArray(playersToTeams.teamId, allowedTeamIds)))
+            .map((row) => row.playerId);
+        const clubEmails = clubId != null
+            ? (await db.select({ email: users.email }).from(users).where(eq(users.clubId, clubId))).map((row) => row.email.trim().toLowerCase())
+            : [];
+        const inClub = [inArray(players.teamId, allowedTeamIds)];
+        if (memberIds.length) inClub.push(inArray(players.id, memberIds));
+        if (clubEmails.length) inClub.push(inArray(sql<string>`lower(trim(${players.email}))`, clubEmails));
+        const linkedIds = await clubLinkedPlayerIds(clubId);
+        if (linkedIds.length) inClub.push(inArray(players.id, linkedIds));
+        scope = or(...inClub);
+    }
+    return { skip: false, scope };
+}
+
 export const playersController = {
     async searchPlayers(req: AuthenticatedRequest, res: Response) {
         try {
@@ -480,8 +532,8 @@ export const playersController = {
                 return res.status(400).json({ error: 'Search query is required' });
             }
 
-            const allowedTeamIds = await getAllowedTeamIds(req);
-            if (allowedTeamIds !== null && allowedTeamIds.length === 0) return res.json([]);
+            const built = await buildPlayerScope(req);
+            if (built.skip) return res.json([]);
 
             const q = query.trim().toLowerCase().slice(0, 80);
             if (!q) return res.json([]);
@@ -490,28 +542,42 @@ export const playersController = {
             const pattern = `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
             const nameMatch = sql`lower(concat_ws(' ', ${players.firstName}, ${players.lastName}, ${players.name})) like ${pattern}`;
 
-            let scope;
-            if (allowedTeamIds !== null) {
-                const clubId = getRequestClubId(req);
-                const memberIds = (await db.select({ playerId: playersToTeams.playerId }).from(playersToTeams).where(inArray(playersToTeams.teamId, allowedTeamIds)))
-                    .map((row) => row.playerId);
-                const clubEmails = clubId != null
-                    ? (await db.select({ email: users.email }).from(users).where(eq(users.clubId, clubId))).map((row) => row.email.trim().toLowerCase())
-                    : [];
-                const inClub = [inArray(players.teamId, allowedTeamIds)];
-                if (memberIds.length) inClub.push(inArray(players.id, memberIds));
-                if (clubEmails.length) inClub.push(inArray(sql<string>`lower(trim(${players.email}))`, clubEmails));
-                scope = or(...inClub);
-            }
-
             const results = await db.select().from(players)
-                .where(scope ? and(nameMatch, scope) : nameMatch)
+                .where(built.scope ? and(nameMatch, built.scope) : nameMatch)
                 .orderBy(players.lastName, players.firstName)
                 .limit(50);
 
             res.json(results);
         } catch (error) {
             console.error('Search players error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    // Same audience and visibility rule as searchPlayers, but for "show me who
+    // I could add" before the admin has typed anything — paged, newest first,
+    // so a just-created player doesn't require already knowing their name.
+    async browsePlayers(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (isPlayerFacingRole(req)) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+
+            const built = await buildPlayerScope(req);
+            if (built.skip) return res.json({ items: [], hasMore: false });
+
+            const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1), 50);
+            const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0);
+
+            const rows = await db.select().from(players)
+                .where(built.scope ?? sql`true`)
+                .orderBy(desc(players.createdAt), desc(players.id))
+                .limit(limit + 1)
+                .offset(offset);
+
+            res.json({ items: rows.slice(0, limit), hasMore: rows.length > limit });
+        } catch (error) {
+            console.error('Browse players error:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     },

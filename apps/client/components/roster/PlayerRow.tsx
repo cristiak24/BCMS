@@ -4,6 +4,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { Player } from '../../services/teamsApi';
 import AttendanceBar from './AttendanceBar';
 import StatusBadge from './StatusBadge';
+import { getTeamLabel } from './rosterHelpers';
 import RosterCheckbox from './RosterCheckbox';
 import { ROSTER_COLUMN_FLEX, ROSTER_COLUMN_WIDTHS, ROSTER_TABLE_WIDTH } from './rosterTableLayout';
 
@@ -35,7 +36,7 @@ export default function PlayerRow({
   onEdit,
 }: PlayerRowProps) {
   const fullName = `${player.firstName || 'Necunoscut'} ${player.lastName || 'Sportiv'}`.trim();
-  const subtitle = `${player.number ? `#${player.number}` : 'Fără tricou'} • ${player.teamName || player.teamNames?.[0] || 'Neasignat'}`;
+  const subtitle = `${player.number ? `#${player.number}` : 'Fără tricou'} • ${getTeamLabel(player)}`;
   const initials = `${player.firstName?.[0] || 'P'}${player.lastName?.[0] || ''}`.toUpperCase();
 
   const payTone = paymentPaid

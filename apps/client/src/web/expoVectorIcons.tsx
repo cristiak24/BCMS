@@ -1,5 +1,6 @@
 import { ComponentProps } from 'react';
 import {
+  createLucideIcon,
   AlertTriangle,
   Ticket,
   AtSign,
@@ -63,7 +64,6 @@ import {
   CalendarRange,
   ClipboardList,
   MessageSquare,
-  Volleyball,
   Zap,
   Wallet,
   Sparkles,
@@ -117,6 +117,14 @@ import {
   CloudOff,
   ChevronsRight,
 } from 'lucide-react';
+
+const Basketball = createLucideIcon('basketball', [
+  ['circle', { cx: '12', cy: '12', r: '10', key: 'ball' }],
+  ['path', { d: 'M12 2v20', key: 'v' }],
+  ['path', { d: 'M2 12h20', key: 'h' }],
+  ['path', { d: 'M5.65 5.65C9 9 9 15 5.65 18.35', key: 'l' }],
+  ['path', { d: 'M18.35 5.65C15 9 15 15 18.35 18.35', key: 'r' }],
+]);
 
 type IconProps = {
   name?: string;
@@ -227,7 +235,7 @@ const iconMap: Record<string, typeof Circle> = {
   // A ball, not a Trophy. This name means "player"/"match" at every call site
   // (role pickers, "Set player", upcoming fixtures) — a trophy was wrong for
   // all of them, and it collided with 'emoji-events', which IS the trophy.
-  'sports-basketball': Volleyball,
+  'sports-basketball': Basketball,
   scoreboard: ClipboardList,
   'calendar-month': CalendarRange,
   'chat-bubble': MessageSquare,
