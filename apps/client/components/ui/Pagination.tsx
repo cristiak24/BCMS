@@ -26,6 +26,27 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
  * wrong: two different filters can return the same number of rows, and the user
  * would be left stranded on page 3 of a list they just replaced.
  */
+export const PAGE_SIZE_OPTIONS = [12, 24, 48, 100];
+
+/** A list's page size, remembered per screen (`storageKey`) in this browser. */
+export function usePageSize(storageKey: string, defaultSize = 12) {
+  const [pageSize, setPageSizeState] = useState(() => {
+    try {
+      const stored = Number(window.localStorage.getItem(`bcms.pageSize.${storageKey}`));
+      return PAGE_SIZE_OPTIONS.includes(stored) ? stored : defaultSize;
+    } catch {
+      return defaultSize;
+    }
+  });
+  const setPageSize = (size: number) => {
+    setPageSizeState(size);
+    try {
+      window.localStorage.setItem(`bcms.pageSize.${storageKey}`, String(size));
+    } catch {}
+  };
+  return [pageSize, setPageSize] as const;
+}
+
 export function usePagination<T>(items: T[], pageSize: number, resetKey: string) {
   const [rawPage, setRawPage] = useState(1);
 
@@ -90,6 +111,8 @@ export default function Pagination({
   rangeEnd,
   total,
   itemNoun = 'rezultate',
+  pageSize,
+  onPageSizeChange,
 }: {
   page: number;
   totalPages: number;
@@ -98,8 +121,12 @@ export default function Pagination({
   rangeEnd?: number;
   total?: number;
   itemNoun?: string;
+  /** With `onPageSizeChange`, adds a "Pe pagină" picker and keeps the bar visible on one page so the size can be changed back. */
+  pageSize?: number;
+  onPageSizeChange?: (size: number) => void;
 }) {
-  if (totalPages <= 1) return null;
+  const sizePicker = pageSize != null && onPageSizeChange != null;
+  if (totalPages <= 1 && !(sizePicker && (total ?? 0) > PAGE_SIZE_OPTIONS[0])) return null;
 
   const summary =
     rangeStart != null && rangeEnd != null && total != null
@@ -117,6 +144,30 @@ export default function Pagination({
       >
         {summary}
       </Text>
+
+      {sizePicker ? (
+        <View className="flex-row items-center gap-1.5">
+          <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>Pe pagină</Text>
+          {PAGE_SIZE_OPTIONS.map((size) => {
+            const active = size === pageSize;
+            return (
+              <Pressable
+                key={size}
+                onPress={() => onPageSizeChange(size)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`${size} pe pagină`}
+                className="h-8 min-w-[36px] px-2 rounded-[9px] border items-center justify-center"
+                style={active
+                  ? { backgroundColor: 'var(--c-brand-surface)', borderColor: 'var(--c-brand-surface)' }
+                  : { backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+              >
+                <Text className="text-[12px] font-semibold" style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>{size}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
 
       <View className="flex-row items-center gap-2">
         <PageButton

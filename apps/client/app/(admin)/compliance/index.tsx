@@ -9,7 +9,7 @@ import Button from '../../../components/ui/Button';
 import FilterChips from '../../../components/ui/FilterChips';
 import SelectField from '../../../components/ui/SelectField';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
-import Pagination, { usePagination } from '../../../components/ui/Pagination';
+import Pagination, { usePageSize, usePagination } from '../../../components/ui/Pagination';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../../components/ui/ScreenState';
 import { ToastHost, useToasts } from '../../../components/ui/Toast';
@@ -22,8 +22,6 @@ import { teamsApi, type Player } from '../../../services/teamsApi';
  * who has nothing on file — and a real action to record a new expiry date for
  * one player or a selection.
  */
-
-const PAGE_SIZE = 25;
 
 type StatusFilter = 'attention' | 'all' | MedicalStatus;
 
@@ -83,6 +81,7 @@ export default function ComplianceScreen() {
   const { searchValue, setSearchValue, setSearchPlaceholder, setHeaderActions, setMobileFab } = useHeader();
   const { toasts, showToast, dismissToast } = useToasts();
 
+  const [pageSize, setPageSize] = usePageSize('compliance');
   const [players, setPlayers] = useState<Player[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('attention');
@@ -152,7 +151,7 @@ export default function ComplianceScreen() {
       || a.player.lastName.localeCompare(b.player.lastName, 'ro')),
   [teamScoped, statusFilter]);
 
-  const { page, totalPages, pageItems, setPage, rangeStart, rangeEnd, total } = usePagination(rows, PAGE_SIZE, `${statusFilter}:${teamFilter}:${query}`);
+  const { page, totalPages, pageItems, setPage, rangeStart, rangeEnd, total } = usePagination(rows, pageSize, `${statusFilter}:${teamFilter}:${query}:${pageSize}`);
 
   const pageIds = pageItems.map((r) => r.player.id);
   const allOnPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
@@ -321,7 +320,7 @@ export default function ComplianceScreen() {
                         );
                       })}
                     </View>
-                    <Pagination page={page} totalPages={totalPages} onPageChange={setPage} rangeStart={rangeStart} rangeEnd={rangeEnd} total={total} itemNoun="sportivi" />
+                    <Pagination page={page} totalPages={totalPages} onPageChange={setPage} rangeStart={rangeStart} rangeEnd={rangeEnd} total={total} itemNoun="sportivi" pageSize={pageSize} onPageSizeChange={setPageSize} />
                   </>
                 )}
               </View>
