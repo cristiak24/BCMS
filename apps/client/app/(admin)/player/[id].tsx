@@ -173,6 +173,8 @@ export default function PlayerProfile() {
   const currency = (player.paymentCurrency || 'ron').toUpperCase();
   const transactions = player.paymentTransactions ?? [];
   const amountDue = player.outstandingAmount ?? player.amountDue ?? 0;
+  // Restanță only for what is past due; the rest of the balance is „de plată”.
+  const overdue = player.overdueAmount ?? 0;
   const paid = PAID.includes(player.paymentStatus?.toLowerCase() ?? '') && amountDue <= 0;
   const money = (amount: number, cur = currency) => new Intl.NumberFormat('ro-RO', { style: 'currency', currency: cur.toUpperCase() }).format(amount);
   const attendance = player.attendanceRate;
@@ -228,10 +230,10 @@ export default function PlayerProfile() {
               />
               <GlassStat value={medMeta.label} label="Viză medicală" dot={medMeta.fg} />
               <GlassStat
-                value={paid ? 'La zi' : amountDue > 0 ? money(amountDue) : 'În așteptare'}
-                label={amountDue > 0 ? 'Restanță' : 'Plată'}
-                dot={paid ? 'var(--c-success)' : amountDue > 0 ? 'var(--c-danger)' : 'var(--c-warning)'}
-                danger={amountDue > 0}
+                value={paid ? 'La zi' : overdue > 0 ? money(overdue) : amountDue > 0 ? money(amountDue) : 'În așteptare'}
+                label={overdue > 0 ? 'Restanță' : amountDue > 0 ? 'De plată' : 'Plată'}
+                dot={paid ? 'var(--c-success)' : overdue > 0 ? 'var(--c-danger)' : 'var(--c-warning)'}
+                danger={overdue > 0}
               />
             </View>
           </PageHero>

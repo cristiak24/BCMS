@@ -100,7 +100,10 @@ export interface Player {
     clubId?: number | null;
     isUnassigned?: boolean;
     paidAmount?: number;
+    /** De plată: everything owed, due or not. */
     outstandingAmount?: number;
+    /** Restanță: the part of it that is past due. */
+    overdueAmount?: number;
     amountDue?: number;
     paymentCurrency?: string;
     paymentTransactions?: {
@@ -182,14 +185,17 @@ export interface RosterSummary {
     currentPeriodAttendance: number | null;
     previousPeriodAttendance: number | null;
     attendanceDelta: number | null;
+    /** Players with something past due (restanță). */
     pendingPayments: number;
     pendingPlayerIds: number[];
+    /** Players who owe anything, due or not (de plată). Absent on older servers. */
+    owingPayments?: number;
 }
 
 export interface PaymentReminderResponse {
     /** In-app notifications created (players and their parents). */
     sent: number;
-    /** Players who owe money. */
+    /** Players with something past due — the only ones reminded. */
     players?: number;
     /** Accounts skipped because they got a reminder in the last 7 days. */
     skipped?: number;

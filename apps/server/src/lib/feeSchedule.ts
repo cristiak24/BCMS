@@ -11,9 +11,19 @@
  * up to years of debt it never recorded here.
  *
  * Every fee is due on `paymentDueDay` of the month after it (October's fee is
- * due on 25 November with the default). Past that date it is overdue.
+ * due on 25 November with the default), at the end of that day in Romania.
+ * Past that moment it is overdue. Months and due dates are Romanian calendar
+ * dates whatever time zone the server runs in (Render: UTC).
+ *
+ * Payments are applied by amount: a fee shows what is still owed on it
+ * (`amount`) and what was already paid towards it (`paidAmount`). Money paid
+ * beyond every fee is an advance (`credit`) that covers the oldest fees owed.
+ * planPayment() decides how a new desk payment is split, and the same split
+ * is shown to the admin before saving.
  */
-import { collectPaidFeeIds, isOutstandingStatus, monthKey } from './paymentLedger';
+import { clubDateTime, clubMonth, daysInMonth } from './clubTime';
+import { roundMoney } from './money';
+import { allocationToken, collectSettlements, CREDIT_TOKEN, isOutstandingStatus, monthKey } from './paymentLedger';
 
 export const MAX_BILLED_MONTHS = 24;
 
@@ -54,7 +64,10 @@ export type ComputedFee = {
     kind: 'monthly' | 'levy' | 'facility' | 'event' | 'request';
     label: string;
     description: string;
+    /** Still owed on this fee. */
     amount: number;
+    /** Already paid towards it (partial payments, advance); absent when nothing was. */
+    paidAmount?: number;
     status: FeeStatus;
     dueDate: string | null;
     icon: 'training' | 'trophy' | 'receipt';
@@ -106,27 +119,36 @@ function fromIndex(index: number) {
     return { year: Math.floor(index / 12), month: (index % 12) + 1 };
 }
 
-/** `dueDay` of the month after (year, month), clamped to that month's length. */
+function currentMonthIndex(now: Date) {
+    const { year, month } = clubMonth(now);
+    return monthIndex(year, month);
+}
+
+/**
+ * End (23:59:59, Romanian time) of day `dueDay` of the month after (year,
+ * month), clamped to that month's length.
+ */
 export function dueDateFor(year: number, month: number, dueDay: number) {
-    const daysInNext = new Date(year, month + 1, 0).getDate();
-    const day = Math.min(Math.max(1, Math.trunc(dueDay) || 1), daysInNext);
-    return new Date(year, month, day, 23, 59, 59);
+    const next = fromIndex(monthIndex(year, month) + 1);
+    const day = Math.min(Math.max(1, Math.trunc(dueDay) || 1), daysInMonth(next.year, next.month));
+    return clubDateTime(next.year, next.month, day, 23, 59, 59);
 }
 
 function monthLabel(year: number, month: number) {
-    return new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1));
+    return new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, 15)));
 }
 
 /** Months billed for this player, oldest first. */
 export function billedMonths(settings: FeeSettings, playerSince: string | null, now: Date) {
-    const current = monthIndex(now.getFullYear(), now.getMonth() + 1);
+    const current = currentMonthIndex(now);
     const start = parseMonth(settings.billingStartMonth);
     if (!start) return [fromIndex(current)];
 
     let first = monthIndex(start.year, start.month);
     const since = playerSince ? new Date(playerSince) : null;
     if (since && !Number.isNaN(since.getTime())) {
-        first = Math.max(first, monthIndex(since.getFullYear(), since.getMonth() + 1));
+        const joined = clubMonth(since);
+        first = Math.max(first, monthIndex(joined.year, joined.month));
     }
     first = Math.max(first, current - (MAX_BILLED_MONTHS - 1));
     if (first > current) return [fromIndex(current)];
@@ -136,11 +158,43 @@ export function billedMonths(settings: FeeSettings, playerSince: string | null, 
     return months;
 }
 
+/**
+ * Oldest first: by due date, fees without one last. The sort is stable, so
+ * fees due together keep the order they were listed in (cotizație first).
+ */
+function byDueDate(a: ComputedFee, b: ComputedFee) {
+    const at = a.dueDate ? Date.parse(a.dueDate) : Number.POSITIVE_INFINITY;
+    const bt = b.dueDate ? Date.parse(b.dueDate) : Number.POSITIVE_INFINITY;
+    return at === bt ? 0 : at - bt;
+}
+
+/** Take `paid` off a fee's amount; returns what is left of `paid`. */
+function applyPaid(fee: ComputedFee, paid: number) {
+    const applied = Math.min(paid, fee.amount);
+    if (applied <= 0) return paid;
+    fee.amount = roundMoney(fee.amount - applied);
+    fee.paidAmount = roundMoney((fee.paidAmount ?? 0) + applied);
+    return roundMoney(paid - applied);
+}
+
+export type FeeLedger = {
+    /** What is still owed, fee by fee (fully paid fees left out). */
+    fees: ComputedFee[];
+    /** Advance left after covering every fee owed. */
+    credit: number;
+    /** Fees after partial payments but before the advance — what a new payment is allocated against. */
+    open: ComputedFee[];
+};
+
 export function computePlayerFees(input: FeeInput): ComputedFee[] {
+    return computePlayerLedger(input).fees;
+}
+
+export function computePlayerLedger(input: FeeInput): FeeLedger {
     const { settings, rows, events, attendedEventIds, now } = input;
-    const paid = collectPaidFeeIds(rows);
+    const { settled: paid, partial, credit } = collectSettlements(rows);
     const nowTs = now.getTime();
-    const currentIndex = monthIndex(now.getFullYear(), now.getMonth() + 1);
+    const currentIndex = currentMonthIndex(now);
     const statusFor = (due: Date, year: number, month: number): FeeStatus => {
         if (due.getTime() < nowTs) return 'overdue';
         return monthIndex(year, month) === currentIndex ? 'upcoming' : 'pending';
@@ -199,7 +253,7 @@ export function computePlayerFees(input: FeeInput): ComputedFee[] {
     // only by players who took part, and only inside the billing window.
     const windowStart = (() => {
         const start = parseMonth(settings.billingStartMonth);
-        return start ? new Date(start.year, start.month - 1, 1).getTime() : null;
+        return start ? clubDateTime(start.year, start.month, 1).getTime() : null;
     })();
     const eventFees = events
         .filter((event) => positive(event.amount) > 0 && String(event.status ?? '').toLowerCase() !== 'cancelled' && !paid.has(`event:${event.id}`))
@@ -225,11 +279,103 @@ export function computePlayerFees(input: FeeInput): ComputedFee[] {
         });
     }
 
+    // Partial payments come off their own fee; anything beyond the fee's
+    // amount (the fee was lowered since) is not turned into an advance.
+    for (const fee of fees) {
+        const paidTowards = partial.get(fee.id);
+        if (paidTowards) applyPaid(fee, paidTowards);
+    }
+    const open = fees.filter((fee) => fee.amount > 0).sort(byDueDate);
+
+    // The advance covers the oldest fees first.
+    const owed = open.map((fee) => ({ ...fee }));
+    let advance = credit;
+    for (const fee of owed) {
+        if (advance <= 0) break;
+        advance = applyPaid(fee, advance);
+    }
+
     const rank: Record<FeeStatus, number> = { overdue: 0, pending: 1, upcoming: 2 };
-    return fees.sort((a, b) => (
-        rank[a.status] - rank[b.status]
-        || (a.dueDate ? Date.parse(a.dueDate) : 0) - (b.dueDate ? Date.parse(b.dueDate) : 0)
-    ));
+    return {
+        fees: owed.filter((fee) => fee.amount > 0).sort((a, b) => (
+            rank[a.status] - rank[b.status]
+            || (a.dueDate ? Date.parse(a.dueDate) : 0) - (b.dueDate ? Date.parse(b.dueDate) : 0)
+        )),
+        credit: advance,
+        open,
+    };
+}
+
+export type PaymentAllocationLine = {
+    feeId: string;
+    label: string;
+    status: FeeStatus;
+    dueDate: string | null;
+    /** Owed on the fee before / after this payment. */
+    owedBefore: number;
+    applied: number;
+    owedAfter: number;
+};
+
+export type PaymentPlan = {
+    /** What the payment row stores in fee_ids. */
+    tokens: string[];
+    /** Fees this payment settles in full. */
+    settledIds: string[];
+    /** Every fee whose balance the payment changes, oldest first. */
+    lines: PaymentAllocationLine[];
+    /** Advance left over after this payment (owed nothing more). */
+    credit: number;
+};
+
+/**
+ * How a desk payment of `amount` is split: first over the fees the admin
+ * ticked (oldest first), then over every other fee still owed (oldest first),
+ * and whatever is left stays as an advance. Without ticked fees it is plain
+ * FIFO. A fee gets the whole of what is still owed on it or a partial sum —
+ * never more, so 5 RON can no longer settle a 150 RON fee.
+ */
+export function planPayment(input: FeeInput, amount: number, feeIds: string[] = []): PaymentPlan {
+    const before = computePlayerLedger(input);
+    const wanted = new Set(feeIds);
+    const ordered = [
+        ...before.open.filter((fee) => wanted.has(fee.id)),
+        ...before.open.filter((fee) => !wanted.has(fee.id)),
+    ];
+
+    const tokens: string[] = [];
+    const settledIds: string[] = [];
+    let left = roundMoney(Math.max(0, amount));
+    for (const fee of ordered) {
+        if (left <= 0) break;
+        const applied = Math.min(left, fee.amount);
+        if (applied >= fee.amount) {
+            tokens.push(allocationToken(fee.id, null));
+            settledIds.push(fee.id);
+        } else {
+            tokens.push(allocationToken(fee.id, applied));
+        }
+        left = roundMoney(left - applied);
+    }
+    if (left > 0) tokens.push(allocationToken(CREDIT_TOKEN, left));
+
+    // Read the books again with the payment in: the preview is the very
+    // calculation every screen will show afterwards.
+    const after = computePlayerLedger({
+        ...input,
+        rows: [...input.rows, { id: 0, status: 'paid', feeIds: tokens.join(','), month: null, year: null, amount }],
+    });
+    const afterById = new Map(after.fees.map((fee) => [fee.id, fee]));
+    const beforeById = new Map(before.fees.map((fee) => [fee.id, fee]));
+    const lines = [...before.fees, ...after.fees.filter((fee) => !beforeById.has(fee.id))]
+        .sort(byDueDate)
+        .map((fee) => {
+            const owedBefore = beforeById.get(fee.id)?.amount ?? 0;
+            const owedAfter = afterById.get(fee.id)?.amount ?? 0;
+            return { feeId: fee.id, label: fee.label, status: fee.status, dueDate: fee.dueDate, owedBefore, applied: roundMoney(owedBefore - owedAfter), owedAfter };
+        })
+        .filter((line) => line.applied !== 0);
+    return { tokens, settledIds, lines, credit: after.credit };
 }
 
 export type FeeTotals = {
@@ -243,8 +389,8 @@ export type FeeTotals = {
 
 export function summarizeFees(fees: ComputedFee[]): FeeTotals {
     const overdueFees = fees.filter((fee) => fee.status === 'overdue');
-    const outstanding = fees.reduce((sum, fee) => sum + fee.amount, 0);
-    const overdue = overdueFees.reduce((sum, fee) => sum + fee.amount, 0);
+    const outstanding = fees.reduce((sum, fee) => roundMoney(sum + fee.amount), 0);
+    const overdue = overdueFees.reduce((sum, fee) => roundMoney(sum + fee.amount), 0);
     const oldest = overdueFees
         .map((fee) => fee.dueDate)
         .filter((date): date is string => Boolean(date))

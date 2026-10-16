@@ -194,8 +194,11 @@ router.get('/summary', async (req, res) => {
         // Players who owe money, from the shared fee calculation (the same as
         // Finanțe → Restanțe). It used to count "pending" payment rows, which
         // the app no longer writes, so it sat at 0 while families owed money.
+        // „Restanțe” = something past due (overdue); owing money that is not
+        // due yet is „de plată” (owingPlayersCount). The KPI says „restante”.
         const balances = scope.clubId != null ? await clubBalances(scope.clubId, { now }) : [];
-        const pendingPaymentsCount = balances.filter((balance) => balance.outstanding > 0).length;
+        const pendingPaymentsCount = balances.filter((balance) => balance.state === 'overdue').length;
+        const owingPlayersCount = balances.filter((balance) => balance.outstanding > 0).length;
 
         const countedPgAttendanceRows = pgAttendanceRows.filter((row) => isCountedStatus(row.status));
         const postgresMonthlyAttendanceRows = countedPgAttendanceRows.filter((row) => {
@@ -347,6 +350,7 @@ router.get('/summary', async (req, res) => {
             incomeChangePercent,
             profitChangePercent,
             pendingPaymentsCount,
+            owingPlayersCount,
             attendanceRate,
             previousAttendanceRate,
             attendanceChangePoints,

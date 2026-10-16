@@ -5,6 +5,7 @@ import { attendance, clubs, events, l12Documents, playerPayments, players, playe
 import { requireRoles, authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import { foldName, generateTeamCode } from '../lib/familyJoin';
 import { clubBalances } from '../services/clubFinance';
+import { roundMoney } from '../lib/money';
 import { attendanceSummary, isAttendedStatus, isCountedStatus } from '../lib/attendanceRate';
 
 const router = Router();
@@ -447,10 +448,9 @@ router.get('/:id/stats', async (req: AuthenticatedRequest, res) => {
             const outstandingAmount = balance?.outstanding ?? 0;
             // due = overdue (Restanță), pending = owed but not late yet.
             const paymentStatus = !balance ? 'none' : balance.state === 'overdue' ? 'due' : balance.state === 'due' ? 'pending' : 'paid';
-            if (outstandingAmount > 0) {
-                playersWithArrears += 1;
-                totalOutstanding += outstandingAmount;
-            }
+            // Arrears (restanțe) = something past due; owing is counted in totalOutstanding.
+            if (balance?.state === 'overdue') playersWithArrears += 1;
+            totalOutstanding = roundMoney(totalOutstanding + outstandingAmount);
 
             return {
                 playerId: player.id,

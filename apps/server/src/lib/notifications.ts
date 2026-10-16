@@ -2,6 +2,7 @@ import { db } from '../db';
 import { notifications, playerGuardians, players, playersToTeams, users } from '../db/schema';
 import { and, eq, gte, inArray, ne, sql } from 'drizzle-orm';
 import { sendNotificationEmails } from './mailer';
+import { roundMoney } from './money';
 
 const NOTE_PREVIEW_MAX_LENGTH = 300;
 
@@ -160,7 +161,13 @@ const REMINDER_COOLDOWN_DAYS = 7;
  * got one in the last week is skipped, so pressing the button twice doesn't
  * spam anyone. Returns how many accounts were actually notified.
  */
-export async function sendPaymentReminders(owing: Array<{ playerId: number; playerName: string; outstanding: number; overdue: number }>) {
+/**
+ * A payment reminder goes only to families with something past due (audit
+ * P1-8): money that is owed but not yet due is „de plată”, not „restanță”,
+ * and a player added today must not get a „memento de plată”.
+ */
+export async function sendPaymentReminders(balances: Array<{ playerId: number; playerName: string; outstanding: number; overdue: number }>) {
+    const owing = balances.filter((row) => row.overdue > 0);
     if (!owing.length) return { notified: 0, skipped: 0 };
     const recipients = await recipientsForPlayers(owing.map((row) => row.playerId));
     const allUserIds = Array.from(new Set(Array.from(recipients.values()).flatMap((set) => Array.from(set))));
@@ -179,12 +186,13 @@ export async function sendPaymentReminders(owing: Array<{ playerId: number; play
                 skipped += 1;
                 continue;
             }
-            const amount = Math.round(row.outstanding * 100) / 100;
+            const overdue = roundMoney(row.overdue);
+            const outstanding = roundMoney(row.outstanding);
             rows.push({
                 userId,
                 type: 'payment_reminder',
-                title: row.overdue > 0 ? 'Plată restantă' : 'Plată de efectuat',
-                message: `${row.playerName}: ${amount} RON de plată${row.overdue > 0 ? `, din care ${Math.round(row.overdue * 100) / 100} RON restanți` : ''}. Poți plăti din secțiunea Plăți.`,
+                title: 'Plată restantă',
+                message: `${row.playerName}: ${overdue} RON restanți${outstanding > overdue ? ` (${outstanding} RON de plată în total)` : ''}. Poți plăti din secțiunea Plăți.`,
                 playerId: row.playerId,
             });
         }

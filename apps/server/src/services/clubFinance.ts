@@ -9,11 +9,14 @@
 import { and, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { attendance, events, financialSettings, playerPayments, players, playersToTeams, teams, users } from '../db/schema';
-import { computePlayerFees, summarizeFees, type ComputedFee, type FeeEvent, type FeeSettings, type FeeTotals, type LedgerRow } from '../lib/feeSchedule';
+import { computePlayerLedger, summarizeFees, type ComputedFee, type FeeEvent, type FeeInput, type FeeSettings, type FeeTotals, type LedgerRow } from '../lib/feeSchedule';
 import { DEFAULT_PAYMENT_DUE_DAY } from '../lib/financeDefaults';
 import { isPaidStatus } from '../lib/paymentLedger';
 
 export type ClubSettingsRow = typeof financialSettings.$inferSelect;
+
+/** The database, or an open transaction (PGlite would deadlock on a mix of both). */
+export type DbExecutor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const ATTENDED = new Set(['present', 'prezent', 'late']);
 
@@ -28,15 +31,15 @@ export function toFeeSettings(row: Pick<ClubSettingsRow, 'monthlyPlayerFee' | 't
 }
 
 /** The club's settings row, created with neutral (zero) fees on first use. */
-export async function getClubFeeSettings(clubId: number): Promise<ClubSettingsRow> {
-    const [existing] = await db.select().from(financialSettings).where(eq(financialSettings.clubId, clubId)).limit(1);
+export async function getClubFeeSettings(clubId: number, exec: DbExecutor = db): Promise<ClubSettingsRow> {
+    const [existing] = await exec.select().from(financialSettings).where(eq(financialSettings.clubId, clubId)).limit(1);
     if (existing) return existing;
 
-    await db
+    await exec
         .insert(financialSettings)
         .values({ clubId, monthlyPlayerFee: 0, trainingLevy: 0, facilityFee: 0, autoAdjust: 1, paymentDueDay: DEFAULT_PAYMENT_DUE_DAY })
         .onConflictDoNothing({ target: financialSettings.clubId });
-    const [created] = await db.select().from(financialSettings).where(eq(financialSettings.clubId, clubId)).limit(1);
+    const [created] = await exec.select().from(financialSettings).where(eq(financialSettings.clubId, clubId)).limit(1);
     return created;
 }
 
@@ -74,12 +77,12 @@ function toFeeEvent(row: typeof events.$inferSelect): FeeEvent {
 }
 
 /** Team ids per player (legacy players.team_id + memberships). */
-async function teamIdsByPlayer(playerRows: Array<{ id: number; teamId: number | null }>) {
+async function teamIdsByPlayer(playerRows: Array<{ id: number; teamId: number | null }>, exec: DbExecutor = db) {
     const map = new Map<number, Set<number>>();
     playerRows.forEach((player) => map.set(player.id, new Set(player.teamId != null ? [player.teamId] : [])));
     const ids = playerRows.map((player) => player.id);
     if (ids.length) {
-        const memberships = await db
+        const memberships = await exec
             .select({ playerId: playersToTeams.playerId, teamId: playersToTeams.teamId })
             .from(playersToTeams)
             .where(inArray(playersToTeams.playerId, ids));
@@ -89,16 +92,16 @@ async function teamIdsByPlayer(playerRows: Array<{ id: number; teamId: number | 
 }
 
 /** Fee events of the given teams, and which of the past ones each player attended. */
-async function loadFeeEvents(teamIds: number[], playerIds: number[]) {
+async function loadFeeEvents(teamIds: number[], playerIds: number[], exec: DbExecutor = db) {
     if (!teamIds.length) return { events: [] as Array<typeof events.$inferSelect>, attendedByPlayer: new Map<number, Set<number>>() };
-    const eventRows = await db
+    const eventRows = await exec
         .select()
         .from(events)
         .where(and(inArray(events.teamId, teamIds), sql`${events.amount} > 0`));
     const attendedByPlayer = new Map<number, Set<number>>();
     const eventIds = eventRows.map((event) => event.id);
     if (eventIds.length && playerIds.length) {
-        const rows = await db
+        const rows = await exec
             .select({ playerId: attendance.playerId, eventId: attendance.eventId, status: attendance.status })
             .from(attendance)
             .where(and(inArray(attendance.eventId, eventIds), inArray(attendance.playerId, playerIds)));
@@ -115,22 +118,29 @@ async function loadFeeEvents(teamIds: number[], playerIds: number[]) {
 export type PlayerFeeResult = {
     fees: ComputedFee[];
     totals: FeeTotals;
+    /** Advance paid beyond every fee owed. */
+    credit: number;
     rows: Array<typeof playerPayments.$inferSelect>;
+    /** What the calculation read — planPayment() takes the same input. */
+    input: FeeInput;
 };
 
-/** One player's fees — the player's own Plăți page. */
-export async function playerFees(player: { id: number; teamId: number | null; createdAt: string | null; status: string | null }, clubId: number | null, now = new Date()): Promise<PlayerFeeResult> {
-    const settings = clubId != null ? toFeeSettings(await getClubFeeSettings(clubId)) : toFeeSettings(null);
-    const teamIds = Array.from((await teamIdsByPlayer([player])).get(player.id) ?? []);
+type FeePlayer = { id: number; teamId: number | null; createdAt: string | null; status: string | null };
+
+/** One player's fees — the player's own Plăți page and desk payments. */
+export async function playerFees(player: FeePlayer, clubId: number | null, now = new Date(), exec: DbExecutor = db): Promise<PlayerFeeResult> {
+    const settings = clubId != null ? toFeeSettings(await getClubFeeSettings(clubId, exec)) : toFeeSettings(null);
+    const teamIds = Array.from((await teamIdsByPlayer([player], exec)).get(player.id) ?? []);
     // Only this club's teams can bill the player.
     const clubTeamIds = teamIds.length && clubId != null
-        ? (await db.select({ id: teams.id }).from(teams).where(and(inArray(teams.id, teamIds), eq(teams.clubId, clubId)))).map((row) => row.id)
+        ? (await exec.select({ id: teams.id }).from(teams).where(and(inArray(teams.id, teamIds), eq(teams.clubId, clubId)))).map((row) => row.id)
         : [];
-    const [rows, feeEvents] = await Promise.all([
-        db.select().from(playerPayments).where(eq(playerPayments.playerId, player.id)),
-        loadFeeEvents(clubTeamIds, [player.id]),
-    ]);
-    const fees = computePlayerFees({
+    const loadRows = () => exec.select().from(playerPayments).where(eq(playerPayments.playerId, player.id));
+    const [rows, feeEvents] = exec === db
+        ? await Promise.all([loadRows(), loadFeeEvents(clubTeamIds, [player.id])])
+        // A transaction runs one statement at a time.
+        : [await loadRows(), await loadFeeEvents(clubTeamIds, [player.id], exec)];
+    const input: FeeInput = {
         settings,
         rows: rows.map(toLedgerRow),
         events: feeEvents.events.map(toFeeEvent),
@@ -138,8 +148,9 @@ export async function playerFees(player: { id: number; teamId: number | null; cr
         playerSince: player.createdAt ?? null,
         now,
         billRecurring: isBillable(player),
-    });
-    return { fees, totals: summarizeFees(fees), rows };
+    };
+    const { fees, credit } = computePlayerLedger(input);
+    return { fees, totals: summarizeFees(fees), credit, rows, input };
 }
 
 export type ClubPlayer = {
@@ -193,6 +204,8 @@ export type PlayerBalance = {
     teamName: string | null;
     status: string;
     fees: ComputedFee[];
+    /** Advance paid beyond every fee owed. */
+    credit: number;
 } & FeeTotals;
 
 export function playerDisplayName(player: Pick<PlayerRow, 'name' | 'firstName' | 'lastName' | 'email'>) {
@@ -231,7 +244,7 @@ export async function clubBalances(clubId: number, options: { teamId?: number | 
     return roster.map(({ player, teamIds, teamName }) => {
         const playerEvents = new Map<number, FeeEvent>();
         teamIds.forEach((id) => (eventsByTeam.get(id) ?? []).forEach((event) => playerEvents.set(event.id, event)));
-        const fees = computePlayerFees({
+        const { fees, credit } = computePlayerLedger({
             settings,
             rows: rowsByPlayer.get(player.id) ?? [],
             events: Array.from(playerEvents.values()),
@@ -246,6 +259,7 @@ export async function clubBalances(clubId: number, options: { teamId?: number | 
             teamName,
             status: player.status ?? 'active',
             fees,
+            credit,
             ...summarizeFees(fees),
         };
     });

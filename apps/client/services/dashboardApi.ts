@@ -26,7 +26,10 @@ export interface DashboardSummary {
     previousMonthIncome: number;
     incomeChangePercent: number | null; // % față de luna trecută, null dacă nu există bază de comparație
     profitChangePercent: number | null;
+    /** Players with something past due (restanță). */
     pendingPaymentsCount: number;
+    /** Players who owe anything, due or not (de plată). Absent on older servers. */
+    owingPlayersCount?: number;
     attendanceRate: number | null;   // procent 0-100, null dacă nu există date
     previousAttendanceRate: number | null;
     attendanceChangePoints: number | null; // diferență în puncte procentuale față de luna trecută

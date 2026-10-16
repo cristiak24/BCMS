@@ -6,9 +6,12 @@
  */
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db';
-import { playerPayments as pgPlayerPayments } from '../db/schema';
-import { isOutstandingStatus, monthKey, parseFeeIds, serializeFeeIds } from '../lib/paymentLedger';
+import { playerPayments as pgPlayerPayments, players as pgPlayers } from '../db/schema';
+import { clubMonth } from '../lib/clubTime';
+import { planPayment } from '../lib/feeSchedule';
+import { isOutstandingStatus, parseFeeIds, serializeFeeIds } from '../lib/paymentLedger';
 import { roundMoney } from '../lib/money';
+import { playerFees, type DbExecutor } from './clubFinance';
 
 const ZERO_DECIMAL = new Set(['bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf']);
 
@@ -32,14 +35,15 @@ type CheckoutPaymentRecord = {
  */
 export async function recordCheckoutPayment(params: CheckoutPaymentRecord) {
     const now = new Date();
+    const { year, month } = clubMonth(now);
     const inserted = await db
         .insert(pgPlayerPayments)
         .values({
             playerId: params.playerId,
             paidByUserId: params.paidByUserId,
             amount: roundMoney(params.amount),
-            month: now.getMonth() + 1,
-            year: now.getFullYear(),
+            month,
+            year,
             status: params.status,
             date: now.toISOString(),
             createdAt: now.toISOString(),
@@ -71,21 +75,21 @@ export async function recordCheckoutPayment(params: CheckoutPaymentRecord) {
  * the new paid row, so they turn void — neither still owed nor counted as
  * money received a second time.
  */
-export async function voidSettledRequests(playerId: number, feeIds: string[]) {
+export async function voidSettledRequests(playerId: number, feeIds: string[], exec: DbExecutor = db) {
     const requestIds = feeIds
         .filter((id) => id.startsWith('payment:'))
         .map((id) => Number(id.slice('payment:'.length)))
         .filter((id) => Number.isInteger(id) && id > 0);
     if (!requestIds.length) return;
 
-    const rows = await db
+    const rows = await exec
         .select({ id: pgPlayerPayments.id, status: pgPlayerPayments.status })
         .from(pgPlayerPayments)
         .where(inArray(pgPlayerPayments.id, requestIds));
     const toVoid = rows.filter((row) => isOutstandingStatus(row.status)).map((row) => row.id);
     if (!toVoid.length) return;
 
-    await db
+    await exec
         .update(pgPlayerPayments)
         .set({ status: 'void' })
         .where(and(inArray(pgPlayerPayments.id, toVoid), eq(pgPlayerPayments.playerId, playerId)));
@@ -169,39 +173,67 @@ export async function applyCheckoutSession(
 
 const FEE_ID_PATTERN = /^(?:(?:monthly|levy|facility):\d{4}-\d{2}|(?:event|payment):\d+)$/;
 
-/**
- * A payment taken at the club desk. `feeIds` are the fees it settles (picked
- * in Finanțe → Restanțe); without any, it is the monthly fee of the month it
- * is dated in — what the app assumed before fee ids existed.
- */
-export async function recordManualPayment(input: {
+type ManualPaymentTarget = {
     playerId: number;
+    /** The player's club (its fee settings); null bills nothing, so it all becomes an advance. */
+    clubId: number | null;
     amount: number;
+    /** Fees the admin ticked; the rest of the amount goes to the oldest fees still owed. */
+    feeIds?: unknown;
+};
+
+function requestedFeeIds(value: unknown) {
+    return parseFeeIds(value).filter((id) => FEE_ID_PATTERN.test(id));
+}
+
+async function planFor(target: ManualPaymentTarget, exec: DbExecutor) {
+    const query = exec.select().from(pgPlayers).where(eq(pgPlayers.id, target.playerId));
+    // Inside a transaction the row lock makes a second desk payment for the
+    // same player wait, so both cannot be split over the same balances.
+    const [player] = exec === db ? await query : await query.for('update');
+    if (!player) throw Object.assign(new Error('Jucătorul nu a fost găsit.'), { statusCode: 404 });
+    const { input } = await playerFees(player, target.clubId, new Date(), exec);
+    return planPayment(input, target.amount, requestedFeeIds(target.feeIds));
+}
+
+/** How a desk payment would be split, without saving it — shown in „Încasează”. */
+export async function previewManualPayment(target: ManualPaymentTarget) {
+    return planFor(target, db);
+}
+
+/**
+ * A payment taken at the club desk, allocated by amount (planPayment): it
+ * settles a ticked fee only when it covers what is still owed on it, pays
+ * part of it otherwise, spills over to the oldest other fees, and keeps any
+ * excess as an advance. Without ticked fees it goes to the oldest fees first.
+ */
+export async function recordManualPayment(input: ManualPaymentTarget & {
     when: Date;
     method: string;
     description: string;
-    feeIds?: unknown;
+    /** The admin or accountant who took the money. */
+    paidByUserId: number | null;
 }) {
-    const requested = parseFeeIds(input.feeIds).filter((id) => FEE_ID_PATTERN.test(id));
-    const feeIds = requested.length
-        ? requested
-        : [`monthly:${monthKey(input.when.getFullYear(), input.when.getMonth() + 1)}`];
-    const [payment] = await db
-        .insert(pgPlayerPayments)
-        .values({
-            playerId: input.playerId,
-            amount: roundMoney(input.amount),
-            month: input.when.getMonth() + 1,
-            year: input.when.getFullYear(),
-            status: 'paid',
-            date: input.when.toISOString(),
-            createdAt: new Date().toISOString(),
-            paidByUserId: null,
-            feeIds: serializeFeeIds(feeIds),
-            method: input.method,
-            description: input.description,
-        })
-        .returning();
-    await voidSettledRequests(input.playerId, feeIds);
-    return { payment, feeIds };
+    return db.transaction(async (tx) => {
+        const plan = await planFor(input, tx);
+        const { year, month } = clubMonth(input.when);
+        const [payment] = await tx
+            .insert(pgPlayerPayments)
+            .values({
+                playerId: input.playerId,
+                amount: roundMoney(input.amount),
+                month,
+                year,
+                status: 'paid',
+                date: input.when.toISOString(),
+                createdAt: new Date().toISOString(),
+                paidByUserId: input.paidByUserId,
+                feeIds: serializeFeeIds(plan.tokens),
+                method: input.method,
+                description: input.description,
+            })
+            .returning();
+        await voidSettledRequests(input.playerId, plan.settledIds, tx);
+        return { payment, feeIds: plan.tokens, plan };
+    });
 }

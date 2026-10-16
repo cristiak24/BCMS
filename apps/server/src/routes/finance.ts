@@ -38,7 +38,7 @@ import { roundMoney } from '../lib/money';
 import { isValidBillingMonth, type ComputedFee } from '../lib/feeSchedule';
 import { clubBalances, clubPlayers, collectedInRange, getClubFeeSettings, playerFees } from '../services/clubFinance';
 import { notifyPaymentRecorded } from '../lib/notifications';
-import { applyCheckoutSession, feeIdMetadata, recordManualPayment } from '../services/payments';
+import { applyCheckoutSession, feeIdMetadata, previewManualPayment, recordManualPayment } from '../services/payments';
 
 const router = Router();
 
@@ -170,7 +170,10 @@ type PlayerPaymentFee = {
     id: string;
     label: string;
     description: string;
+    /** Still owed (what Checkout charges). */
     amount: number;
+    /** Already paid towards the fee (partial payments, advance). */
+    paidAmount?: number;
     currency: string;
     status: ComputedFee['status'];
     dueDate: string | null;
@@ -568,6 +571,7 @@ async function buildPlayerFees(player: PlayerDoc, currency: string): Promise<Pla
         label: fee.label,
         description: fee.description,
         amount: fee.amount,
+        ...(fee.paidAmount ? { paidAmount: fee.paidAmount } : {}),
         currency,
         status: fee.status,
         dueDate: fee.dueDate,
@@ -581,22 +585,28 @@ function buildTransactions(paymentRows: Array<{ data: PlayerPaymentDoc }>, curre
         .filter(({ data }) => isPaidStatus(data.status) || isFailedStatus(data.status))
         .sort((a, b) => (toDate(b.data.date ?? b.data.createdAt)?.getTime() ?? 0) - (toDate(a.data.date ?? a.data.createdAt)?.getTime() ?? 0))
         .slice(0, 12)
-        .map(({ data }) => ({
-            id: String(data.id ?? data.stripeCheckoutSessionId ?? `${data.month}-${data.year}`),
-            label: data.description || monthName(data.month, data.year),
-            description: data.paidByUserId != null && payerNames.has(data.paidByUserId)
-                ? `Plătit de ${payerNames.get(data.paidByUserId)}`
-                : data.stripeCheckoutSessionId ? 'Plată online' : 'Înregistrată de club',
-            paidByName: data.paidByUserId != null ? payerNames.get(data.paidByUserId) ?? null : null,
-            amount: asPositiveAmount(data.amount),
-            currency: data.currency || currency,
-            status: isPaidStatus(data.status) ? 'success' : 'error',
-            date: toIso(data.date ?? data.createdAt) ?? new Date().toISOString(),
-            receiptUrl: data.receiptUrl ?? null,
-        }));
+        .map(({ data }) => {
+            const online = Boolean(data.stripeCheckoutSessionId);
+            // Online, paid_by_user_id is the payer (player or parent); at the
+            // club desk it is the admin or accountant who took the money.
+            const userName = data.paidByUserId != null ? payerNames.get(data.paidByUserId) ?? null : null;
+            return {
+                id: String(data.id ?? data.stripeCheckoutSessionId ?? `${data.month}-${data.year}`),
+                label: data.description || monthName(data.month, data.year),
+                description: userName
+                    ? `${online ? 'Plătit' : 'Încasat'} de ${userName}`
+                    : online ? 'Plată online' : 'Înregistrată de club',
+                paidByName: online ? userName : null,
+                amount: asPositiveAmount(data.amount),
+                currency: data.currency || currency,
+                status: isPaidStatus(data.status) ? 'success' : 'error',
+                date: toIso(data.date ?? data.createdAt) ?? new Date().toISOString(),
+                receiptUrl: data.receiptUrl ?? null,
+            };
+        });
 }
 
-/** Who paid online, for "Plătit de …" — a player and their parents share one history. */
+/** Who paid online („Plătit de …”) or took a desk payment („Încasat de …”). */
 async function payerNamesFor(paymentRows: Array<{ data: PlayerPaymentDoc }>) {
     const ids = Array.from(new Set(paymentRows.map(({ data }) => data.paidByUserId).filter((id): id is number => id != null)));
     if (!ids.length) return new Map<number, string>();
@@ -1422,6 +1432,40 @@ router.get('/admin/summary', async (req, res) => {
 
 const MANUAL_PAYMENT_METHODS = new Set(['cash', 'transfer', 'card', 'other']);
 
+/**
+ * How a desk payment would be split over the player's fees (the same
+ * planPayment() the save uses), so „Încasează” shows it before saving.
+ */
+router.post('/admin/manual-payment/preview', async (req, res) => {
+    try {
+        const clubId = await resolveAdminFinanceClubId(req, res);
+        if (clubId === null && res.headersSent) {
+            return;
+        }
+        const body = req.body as { playerId?: unknown; amount?: unknown; feeIds?: unknown };
+        const playerId = Number(body.playerId);
+        const amount = Number(body.amount);
+        if (!Number.isFinite(playerId) || playerId <= 0) {
+            res.status(400).json({ error: 'Jucătorul selectat este invalid.' });
+            return;
+        }
+        if (!Number.isFinite(amount) || amount <= 0) {
+            res.status(400).json({ error: 'Suma trebuie să fie un număr mai mare ca 0.' });
+            return;
+        }
+        const player = await getPlayerByNumericId(playerId);
+        const playerClubId = player ? await getPlayerClubId(player) : null;
+        if (!player || (clubId !== null && playerClubId !== clubId)) {
+            res.status(404).json({ error: 'Jucătorul nu a fost găsit.' });
+            return;
+        }
+        const plan = await previewManualPayment({ playerId, clubId: clubId ?? playerClubId, amount, feeIds: body.feeIds });
+        res.json({ currency: DEFAULT_PAYMENT_CURRENCY, lines: plan.lines, credit: plan.credit });
+    } catch (error) {
+        handleRouteError(res, error, '[POST /api/finance/admin/manual-payment/preview]');
+    }
+});
+
 // Record a payment made outside Stripe (e.g. a player paying cash) so it shows
 // up in the team payment report alongside online payments.
 router.post('/admin/manual-payment', async (req, res) => {
@@ -1475,8 +1519,17 @@ router.post('/admin/manual-payment', async (req, res) => {
             return;
         }
         const currency = DEFAULT_PAYMENT_CURRENCY;
-        const { payment: inserted, feeIds } = await recordManualPayment({ playerId, amount, when, method, description, feeIds: body.feeIds });
-        res.json({ success: true, payment: inserted });
+        const { payment: inserted, feeIds, plan } = await recordManualPayment({
+            playerId,
+            clubId: clubId ?? await getPlayerClubId(player),
+            amount,
+            when,
+            method,
+            description,
+            feeIds: body.feeIds,
+            paidByUserId: (req as AuthenticatedRequest).user?.id ?? null,
+        });
+        res.json({ success: true, payment: inserted, allocation: plan });
         notifyPaymentRecorded(playerId, amount, description).catch((error) => console.error('[finance] payment notification failed:', error));
         await recordFinanceAudit({
             action: 'finance.payment.manual',
@@ -1490,8 +1543,8 @@ router.post('/admin/manual-payment', async (req, res) => {
                 method,
                 description,
                 feeIds,
-                month: when.getMonth() + 1,
-                year: when.getFullYear(),
+                month: inserted?.month ?? null,
+                year: inserted?.year ?? null,
             },
             ...financeAuditActor(req),
         });

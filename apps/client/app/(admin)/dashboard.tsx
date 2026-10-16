@@ -507,7 +507,7 @@ export default function Dashboard() {
       }
     }
     if (summary?.pendingPaymentsCount) {
-      items.push({ key: 'payments', icon: 'payments', tone: 'warning', title: `${summary.pendingPaymentsCount} ${summary.pendingPaymentsCount === 1 ? 'plată restantă' : 'plăți restante'}`, href: '/admin/roster' });
+      items.push({ key: 'payments', icon: 'payments', tone: 'warning', title: `${summary.pendingPaymentsCount} ${summary.pendingPaymentsCount === 1 ? 'jucător cu restanțe' : 'jucători cu restanțe'}`, href: '/admin/roster' });
     }
     if (pendingRequests > 0) {
       items.push({ key: 'requests', icon: 'person-add', tone: 'brand', title: `${pendingRequests} ${pendingRequests === 1 ? 'cerere de acces' : 'cereri de acces'} de aprobat`, href: '/admin/manage-access' });
@@ -662,9 +662,9 @@ export default function Dashboard() {
                   <KpiCard
                     icon="receipt-long"
                     tone={summary.pendingPaymentsCount > 0 ? 'warning' : 'success'}
-                    label="Plăți restante"
+                    label="Cu restanțe"
                     value={summary.pendingPaymentsCount}
-                    hint={summary.pendingPaymentsCount > 0 ? 'Vezi în Lot' : 'Toți sunt la zi'}
+                    hint={summary.pendingPaymentsCount > 0 ? 'Vezi în Lot' : summary.owingPlayersCount ? `${summary.owingPlayersCount} cu plăți nescadente` : 'Toți sunt la zi'}
                     onPress={() => go('/admin/roster')}
                   />
                 </View>

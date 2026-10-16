@@ -217,8 +217,8 @@ export default function RosterScreen() {
       Alert.alert(
         owing ? 'Mementouri trimise' : 'Nicio plată de amintit',
         owing
-          ? `${result.sent} ${result.sent === 1 ? 'notificare trimisă' : 'notificări trimise'} pentru ${owing} ${owing === 1 ? 'jucător care are' : 'jucători care au'} de plată (jucătorilor și părinților lor).${skipped ? ` ${skipped} ${skipped === 1 ? 'cont a primit' : 'conturi au primit'} deja un memento în ultimele 7 zile.` : ''}`
-          : 'Toți jucătorii sunt la zi cu plățile.'
+          ? `${result.sent} ${result.sent === 1 ? 'notificare trimisă' : 'notificări trimise'} pentru ${owing} ${owing === 1 ? 'jucător cu restanțe' : 'jucători cu restanțe'} (jucătorilor și părinților lor).${skipped ? ` ${skipped} ${skipped === 1 ? 'cont a primit' : 'conturi au primit'} deja un memento în ultimele 7 zile.` : ''}`
+          : 'Nimeni nu are restanțe. Plățile care nu au ajuns la scadență nu primesc memento.'
       );
       await fetchRosterData();
     } catch (reminderError: any) {
@@ -441,15 +441,17 @@ export default function RosterScreen() {
     return Math.round((total / players.length) * 10) / 10;
   }, [players]);
 
+  // Restanțe = players with something past due, the same definition as
+  // Finanțe and the dashboard; owing a fee that is not due yet is not late.
   const fallbackPendingPayments = useMemo(
-    () => players.filter((player) => !isPaymentPaid(player.paymentStatus)).length,
+    () => players.filter((player) => getPaymentBucket(player.paymentStatus) === 'overdue').length,
     [players]
   );
 
   const attendanceValue = summary?.averageAttendance ?? fallbackAverageAttendance;
   const attendanceAthleteCount = summary?.athleteCount ?? players.length;
   const pendingPayments = summary?.pendingPayments ?? fallbackPendingPayments;
-  const paidPlayers = players.length - fallbackPendingPayments;
+  const paidPlayers = players.length - Math.min(players.length, pendingPayments);
   const rosterReadiness = players.length ? Math.round((paidPlayers / players.length) * 100) : 0;
 
   const hasActiveFilters =
@@ -557,7 +559,7 @@ export default function RosterScreen() {
           <GlassStat dot="var(--c-brand-fg)" value={`${attendanceValue.toFixed(1)}%`} label="Prezență generală" />
           <GlassStat dot="var(--c-success)" value={`${rosterReadiness}%`} label="Plăți la zi" bar={rosterReadiness} />
           <GlassStat dot="var(--c-muted)" value={players.length} label="Sportivi în lot" />
-          <GlassStat dot={pendingPayments > 0 ? 'var(--c-danger)' : 'var(--c-success)'} danger={pendingPayments > 0} value={pendingPayments} label="Plăți restante" />
+          <GlassStat dot={pendingPayments > 0 ? 'var(--c-danger)' : 'var(--c-success)'} danger={pendingPayments > 0} value={pendingPayments} label="Cu restanțe" />
         </View>
       </PageHero>
 

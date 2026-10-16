@@ -3,11 +3,13 @@ import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
-import { clubs, events, financialSettings, playerPayments, players, teams } from '../db/schema';
+import { clubs, events, financialSettings, notifications, playerPayments, players, teams, users } from '../db/schema';
 import { closeDb, createSchema } from '../test/pgliteDb';
-import { applyCheckoutSession, feeIdMetadata, recordManualPayment } from './payments';
+import { applyCheckoutSession, feeIdMetadata, previewManualPayment, recordManualPayment } from './payments';
 import { clubBalances } from './clubFinance';
 import { monthKey } from '../lib/paymentLedger';
+import { clubMonth } from '../lib/clubTime';
+import { sendPaymentReminders } from '../lib/notifications';
 
 /**
  * End-to-end money rules against a real Postgres (PGlite, in memory): the
@@ -16,15 +18,36 @@ import { monthKey } from '../lib/paymentLedger';
  */
 
 const now = new Date();
-const thisMonth = monthKey(now.getFullYear(), now.getMonth() + 1);
+// Months are Romanian calendar months, whatever TZ the test runs in.
+const current = clubMonth(now);
+const thisMonth = monthKey(current.year, current.month);
 const monthsAgo = (n: number) => {
-    const date = new Date(now.getFullYear(), now.getMonth() - n, 1);
-    return monthKey(date.getFullYear(), date.getMonth() + 1);
+    const index = current.year * 12 + current.month - 1 - n;
+    return monthKey(Math.floor(index / 12), (index % 12) + 1);
 };
 
 let clubId = 0;
 let teamId = 0;
+let deskUserId = 0;
 let seq = 0;
+
+/** A desk payment taken by the club's accountant. */
+function desk(playerId: number, amount: number, feeIds?: string[], description = 'Plată numerar') {
+    return recordManualPayment({ playerId, clubId, amount, when: now, method: 'cash', description, feeIds, paidByUserId: deskUserId });
+}
+
+function feeOf(balance: { fees: Array<{ id: string; amount: number }> }, id: string) {
+    return balance.fees.find((fee) => fee.id === id);
+}
+
+async function withBillingStart(month: string | null, run: () => Promise<void>) {
+    await db.update(financialSettings).set({ billingStartMonth: month }).where(eq(financialSettings.clubId, clubId));
+    try {
+        await run();
+    } finally {
+        await db.update(financialSettings).set({ billingStartMonth: null }).where(eq(financialSettings.clubId, clubId));
+    }
+}
 
 async function newPlayer(name: string) {
     const [player] = await db.insert(players).values({
@@ -60,6 +83,8 @@ before(async () => {
     }).returning();
     teamId = team.id;
     await db.insert(financialSettings).values({ clubId, monthlyPlayerFee: 150, trainingLevy: 0, facilityFee: 0, autoAdjust: 1, paymentDueDay: 25, billingStartMonth: null });
+    const [accountant] = await db.insert(users).values({ email: 'contabil@test.local', name: 'Contabil Test', role: 'accountant', status: 'active', clubId }).returning();
+    deskUserId = accountant.id;
 });
 
 after(async () => {
@@ -112,14 +137,100 @@ test('a paid event fee does not settle the monthly fee', async () => {
     await db.delete(events).where(eq(events.id, event.id));
 });
 
-test('desk payments keep bani and settle exactly the chosen fees', async () => {
+test('desk payments keep bani and record who took the money', async () => {
     const player = await newPlayer('Dana');
-    const { payment } = await recordManualPayment({
-        playerId: player.id, amount: 49.5, when: now, method: 'cash', description: 'Chitanța 12', feeIds: [`monthly:${thisMonth}`],
-    });
-    assert.equal(Number(payment.amount), 49.5);
+    const { payment } = await desk(player.id, 150, [`monthly:${thisMonth}`], 'Chitanța 12');
+    assert.equal(Number(payment.amount), 150);
     assert.equal(payment.method, 'cash');
-    assert.equal((await balanceOf(player.id)).fees.some((fee) => fee.id === `monthly:${thisMonth}`), false);
+    assert.equal(payment.paidByUserId, deskUserId, 'P1-11: paid_by_user_id is no longer null');
+    assert.equal(feeOf(await balanceOf(player.id), `monthly:${thisMonth}`), undefined);
+});
+
+test('5 RON cash towards a 150 RON fee leaves 145 RON owed (P0-2)', async () => {
+    const player = await newPlayer('Matei');
+    const { payment } = await desk(player.id, 5, [`monthly:${thisMonth}`]);
+    assert.equal(payment.feeIds, `monthly:${thisMonth}=5`);
+    const balance = await balanceOf(player.id);
+    assert.equal(feeOf(balance, `monthly:${thisMonth}`)?.amount, 145);
+    assert.equal(balance.outstanding, 145);
+
+    // 49,50 + 95,50 more: the fee is settled exactly when it is covered.
+    await desk(player.id, 49.5, [`monthly:${thisMonth}`]);
+    assert.equal((await balanceOf(player.id)).outstanding, 95.5);
+    const { payment: last } = await desk(player.id, 95.5, [`monthly:${thisMonth}`]);
+    assert.equal(last.feeIds, `monthly:${thisMonth}`);
+    assert.equal((await balanceOf(player.id)).outstanding, 0);
+});
+
+test('50 RON on 300 RON of arrears keeps the player in „Cu restanțe”', async () => {
+    await withBillingStart(monthsAgo(2), async () => {
+        const player = await newPlayer('Luca');
+        await desk(player.id, 50, [`monthly:${monthsAgo(2)}`, `monthly:${monthsAgo(1)}`]);
+        const balance = await balanceOf(player.id);
+        assert.equal(balance.state, 'overdue');
+        assert.equal(feeOf(balance, `monthly:${monthsAgo(2)}`)?.amount, 100);
+        assert.equal(balance.outstanding, 400);
+    });
+});
+
+test('without fee ids a desk payment pays the oldest month first, not the current one', async () => {
+    await withBillingStart(monthsAgo(2), async () => {
+        const player = await newPlayer('Ioana');
+        const { payment } = await desk(player.id, 200);
+        assert.equal(payment.feeIds, `monthly:${monthsAgo(2)},monthly:${monthsAgo(1)}=50`);
+        const balance = await balanceOf(player.id);
+        assert.equal(feeOf(balance, `monthly:${monthsAgo(2)}`), undefined);
+        assert.equal(feeOf(balance, `monthly:${monthsAgo(1)}`)?.amount, 100);
+        assert.equal(feeOf(balance, `monthly:${thisMonth}`)?.amount, 150);
+    });
+});
+
+test('an overpayment stays as an advance instead of vanishing', async () => {
+    const player = await newPlayer('Radu');
+    const { payment } = await desk(player.id, 200, [`monthly:${thisMonth}`]);
+    assert.equal(payment.feeIds, `monthly:${thisMonth},credit=50`);
+    const balance = await balanceOf(player.id);
+    assert.equal(balance.outstanding, 0);
+    assert.equal(balance.credit, 50);
+});
+
+test('the preview is exactly what the save books', async () => {
+    await withBillingStart(monthsAgo(1), async () => {
+        const player = await newPlayer('Sorin');
+        const preview = await previewManualPayment({ playerId: player.id, clubId, amount: 170, feeIds: [`monthly:${thisMonth}`] });
+        assert.deepEqual(preview.lines.map((line) => [line.feeId, line.applied, line.owedAfter]), [
+            [`monthly:${monthsAgo(1)}`, 20, 130],
+            [`monthly:${thisMonth}`, 150, 0],
+        ]);
+        assert.equal((await db.select().from(playerPayments).where(eq(playerPayments.playerId, player.id))).length, 0, 'a preview writes nothing');
+        const { plan } = await desk(player.id, 170, [`monthly:${thisMonth}`]);
+        assert.deepEqual(plan.lines, preview.lines);
+    });
+});
+
+test('two desk payments at once are split one after the other', async () => {
+    await withBillingStart(monthsAgo(1), async () => {
+        const player = await newPlayer('Tudor');
+        await Promise.all([desk(player.id, 100), desk(player.id, 100)]);
+        const balance = await balanceOf(player.id);
+        assert.equal(balance.outstanding, 100, '300 owed − 200 paid, not both on the same month');
+        assert.equal(feeOf(balance, `monthly:${monthsAgo(1)}`), undefined);
+    });
+});
+
+test('a club request paid in part is not voided', async () => {
+    const player = await newPlayer('Vlad');
+    const [request] = await db.insert(playerPayments).values({
+        playerId: player.id, amount: 80, month: current.month, year: current.year, status: 'pending', description: 'Echipament',
+    }).returning();
+    await desk(player.id, 30, [`payment:${request.id}`]);
+    const [row] = await db.select().from(playerPayments).where(eq(playerPayments.id, request.id));
+    assert.equal(row.status, 'pending');
+    assert.equal(feeOf(await balanceOf(player.id), `payment:${request.id}`)?.amount, 50);
+
+    await desk(player.id, 50, [`payment:${request.id}`]);
+    const [settled] = await db.select().from(playerPayments).where(eq(playerPayments.id, request.id));
+    assert.equal(settled.status, 'void');
 });
 
 test('arrears inside the billing window stay owed until paid', async () => {
@@ -130,7 +241,7 @@ test('arrears inside the billing window stay owed until paid', async () => {
     assert.deepEqual(owed.fees.map((fee) => fee.id).sort(), [`monthly:${monthsAgo(2)}`, `monthly:${monthsAgo(1)}`, `monthly:${thisMonth}`].sort());
     assert.equal(owed.state, 'overdue');
 
-    await recordManualPayment({ playerId: player.id, amount: 150, when: now, method: 'transfer', description: 'Restanță', feeIds: [`monthly:${monthsAgo(2)}`] });
+    await desk(player.id, 150, [`monthly:${monthsAgo(2)}`], 'Restanță');
     const left = await balanceOf(player.id);
     assert.equal(left.outstanding, 300);
     assert.equal(left.fees.some((fee) => fee.id === `monthly:${monthsAgo(2)}`), false);
@@ -141,7 +252,7 @@ test('arrears inside the billing window stay owed until paid', async () => {
 test('paying a club request voids it instead of counting it twice', async () => {
     const player = await newPlayer('Florin');
     const [request] = await db.insert(playerPayments).values({
-        playerId: player.id, amount: 80, month: now.getMonth() + 1, year: now.getFullYear(), status: 'pending', description: 'Echipament',
+        playerId: player.id, amount: 80, month: current.month, year: current.year, status: 'pending', description: 'Echipament',
     }).returning();
     assert.ok((await balanceOf(player.id)).fees.some((fee) => fee.id === `payment:${request.id}`));
 
@@ -155,4 +266,26 @@ test('an inactive player is not billed new months', async () => {
     const player = await newPlayer('Gelu');
     await db.update(players).set({ status: 'inactive' }).where(eq(players.id, player.id));
     assert.equal((await balanceOf(player.id)).outstanding, 0);
+});
+
+test('payment reminders go only to families with something past due', async () => {
+    await withBillingStart(monthsAgo(2), async () => {
+        const late = await newPlayer('Zoe');
+        // Joined this month: owes this month's fee, which is not due yet.
+        const [fresh] = await db.insert(players).values({ name: 'Yanis', firstName: 'Yanis', lastName: 'Test', status: 'active', teamId, createdAt: now.toISOString() }).returning();
+        const accounts = await db.insert(users).values([
+            { email: 'zoe@test.local', name: 'Părinte Zoe', role: 'parent', status: 'active', clubId },
+            { email: 'yanis@test.local', name: 'Părinte Yanis', role: 'parent', status: 'active', clubId },
+        ]).returning();
+        await db.update(players).set({ userId: accounts[0].id }).where(eq(players.id, late.id));
+        await db.update(players).set({ userId: accounts[1].id }).where(eq(players.id, fresh.id));
+
+        const balances = (await clubBalances(clubId, { now })).filter((row) => row.playerId === late.id || row.playerId === fresh.id);
+        assert.equal(balances.find((row) => row.playerId === fresh.id)?.state, 'due');
+        const result = await sendPaymentReminders(balances);
+        assert.equal(result.notified, 1);
+        const sent = await db.select().from(notifications).where(eq(notifications.type, 'payment_reminder'));
+        assert.deepEqual(sent.map((row) => row.userId), [accounts[0].id]);
+        assert.match(sent[0].message, /RON restanți/);
+    });
 });

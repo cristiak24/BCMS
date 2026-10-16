@@ -7,7 +7,15 @@
  * "event:42", "payment:17"). Rows written before that column existed have no
  * fee ids; a paid legacy row is read as settling the monthly fee of its own
  * month, which is what the app assumed at the time.
+ *
+ * Since desk payments are allocated by amount, a fee id can carry a sum:
+ *   "monthly:2026-10"     the fee is settled in full (every older row, Stripe);
+ *   "monthly:2026-10=50"  50 RON went towards it, the rest is still owed;
+ *   "credit=30"           30 RON paid beyond everything owed (an advance).
+ * An older server reading the new tokens matches no fee, so it shows the fee
+ * as still owed rather than settled.
  */
+import { roundMoney } from './money';
 
 const PAID_STATUSES = new Set(['paid', 'processed', 'succeeded', 'success']);
 const FAILED_STATUSES = new Set(['failed', 'error', 'rejected']);
@@ -53,19 +61,57 @@ type LedgerRow = {
     year?: number | null;
 };
 
-/** Every fee id a paid row has settled, legacy rows included. */
-export function collectPaidFeeIds(rows: LedgerRow[]) {
-    const paid = new Set<string>();
+export const CREDIT_TOKEN = 'credit';
+
+/** "monthly:2026-10=50" → { id, amount: 50 }; a bare id has amount null (settled in full). */
+export function parseAllocationToken(token: string): { id: string; amount: number | null } {
+    const at = token.lastIndexOf('=');
+    if (at < 0) return { id: token, amount: null };
+    const amount = Number(token.slice(at + 1));
+    return { id: token.slice(0, at), amount: Number.isFinite(amount) && amount > 0 ? roundMoney(amount) : 0 };
+}
+
+export function allocationToken(id: string, amount: number | null) {
+    return amount == null ? id : `${id}=${roundMoney(amount)}`;
+}
+
+export type Settlements = {
+    /** Fees settled in full. */
+    settled: Set<string>;
+    /** Money paid towards a fee that is still partly owed, summed per fee. */
+    partial: Map<string, number>;
+    /** Money paid beyond every fee (advance), applied to the oldest fees owed. */
+    credit: number;
+};
+
+/** What the paid rows have settled, legacy rows included. */
+export function collectSettlements(rows: LedgerRow[]): Settlements {
+    const settled = new Set<string>();
+    const partialSums = new Map<string, number>();
+    let credit = 0;
     for (const row of rows) {
         if (!isPaidStatus(row.status)) continue;
-        const ids = parseFeeIds(row.feeIds);
-        if (ids.length) {
-            ids.forEach((id) => paid.add(id));
-        } else if (row.month && row.year) {
-            paid.add(`monthly:${monthKey(row.year, row.month)}`);
+        const tokens = parseFeeIds(row.feeIds);
+        if (!tokens.length) {
+            if (row.month && row.year) settled.add(`monthly:${monthKey(row.year, row.month)}`);
+            continue;
+        }
+        for (const token of tokens) {
+            const { id, amount } = parseAllocationToken(token);
+            if (!id) continue;
+            if (amount == null) settled.add(id);
+            else if (id === CREDIT_TOKEN) credit = roundMoney(credit + amount);
+            else partialSums.set(id, roundMoney((partialSums.get(id) ?? 0) + amount));
         }
     }
-    return paid;
+    const partial = new Map<string, number>();
+    partialSums.forEach((sum, id) => { if (sum > 0 && !settled.has(id)) partial.set(id, sum); });
+    return { settled, partial, credit };
+}
+
+/** Every fee id a paid row has settled in full, legacy rows included. */
+export function collectPaidFeeIds(rows: LedgerRow[]) {
+    return collectSettlements(rows).settled;
 }
 
 /**

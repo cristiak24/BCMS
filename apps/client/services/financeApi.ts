@@ -28,7 +28,10 @@ export type PlayerPaymentFee = {
     id: string;
     label: string;
     description: string;
+    /** Still owed on the fee. */
     amount: number;
+    /** Already paid towards it (partial payments, advance); absent when nothing was. */
+    paidAmount?: number;
     currency: string;
     /** overdue = past its due date (restanță); upcoming = this month's fee. */
     status: 'overdue' | 'pending' | 'upcoming' | 'failed';
@@ -120,6 +123,24 @@ export type PlayerBalance = {
     oldestOverdue: string | null;
     state: 'overdue' | 'due' | 'paid';
     fees: BalanceFee[];
+    /** Advance paid beyond every fee owed (absent on older servers). */
+    credit?: number;
+};
+
+/** How a desk payment is split over the fees, before it is saved. */
+export type PaymentAllocation = {
+    currency: string;
+    lines: Array<{
+        feeId: string;
+        label: string;
+        status: 'overdue' | 'pending' | 'upcoming';
+        dueDate: string | null;
+        owedBefore: number;
+        applied: number;
+        owedAfter: number;
+    }>;
+    /** Advance left after the payment. */
+    credit: number;
 };
 
 export type FinanceSummary = {
@@ -221,6 +242,13 @@ export const financeApi = {
     /** Collected in a month (default: this one) and what is owed today. */
     async getSummary(month?: string): Promise<FinanceSummary> {
         return apiFetch<FinanceSummary>(`/finance/admin/summary${month ? `?month=${month}` : ''}`);
+    },
+
+    async previewManualPayment(payload: { playerId: number; amount: number; feeIds?: string[] }): Promise<PaymentAllocation> {
+        return apiFetch<PaymentAllocation>('/finance/admin/manual-payment/preview', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
     },
 
     async createManualPayment(payload: { playerId: number; amount: number; description?: string; method?: string; date?: string; feeIds?: string[] }): Promise<{ success: boolean }> {

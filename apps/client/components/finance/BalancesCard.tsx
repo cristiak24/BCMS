@@ -5,13 +5,15 @@ import Button from '../ui/Button';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import FilterChips from '../ui/FilterChips';
 import SelectField from '../ui/SelectField';
-import { financeApi, type BalanceFee, type PlayerBalance } from '../../services/financeApi';
+import { financeApi, type BalanceFee, type PaymentAllocation, type PlayerBalance } from '../../services/financeApi';
 import { balancesCsvRows, downloadCsv, paymentsCsvRows } from './financeCsv';
 
 /**
  * Finanțe → Restanțe și solduri. What every player owes, from the same
  * calculation as their own Plăți page, and a way to record a desk payment
- * against exactly the fees it settles (admins and the accountant).
+ * (admins and the accountant). The server splits the amount over the fees —
+ * ticked ones first, then the oldest — and the dialog shows that split
+ * before saving, so a partial payment is visibly partial.
  */
 
 type Filter = 'overdue' | 'owing' | 'all';
@@ -56,8 +58,8 @@ function todayIso() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-function rowMeta(balance: PlayerBalance) {
-    if (balance.state === 'paid') return 'La zi';
+function rowMeta(balance: PlayerBalance, currency: string) {
+    if (balance.state === 'paid') return balance.credit ? `La zi · avans ${money(balance.credit, currency)}` : 'La zi';
     if (balance.state === 'overdue') {
         const since = shortDate(balance.oldestOverdue);
         return `${balance.overdueCount} ${balance.overdueCount === 1 ? 'taxă restantă' : 'taxe restante'}${since ? ` · din ${since}` : ''}`;
@@ -83,6 +85,8 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
     const [description, setDescription] = useState('');
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
+    const [allocation, setAllocation] = useState<PaymentAllocation | null>(null);
+    const [allocating, setAllocating] = useState(false);
     const monthOptions = useMemo(exportMonths, []);
     const [exportMonth, setExportMonth] = useState(monthOptions[0].key);
     const [exporting, setExporting] = useState(false);
@@ -157,8 +161,27 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
     };
 
     const parsedAmount = Number(amount.replace(',', '.'));
+    const validAmount = Number.isFinite(parsedAmount) && parsedAmount > 0;
     const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(new Date(date).getTime()) && date <= todayIso();
-    const canSave = !saving && selectedFees.size > 0 && Number.isFinite(parsedAmount) && parsedAmount > 0 && validDate;
+    const canSave = !saving && validAmount && validDate;
+    const selectedKey = Array.from(selectedFees).sort().join(',');
+
+    // Ask the server how this amount would be split (the same calculation the
+    // save uses), a moment after the admin stops typing.
+    useEffect(() => {
+        setAllocation(null);
+        if (!target || !validAmount) return undefined;
+        let cancelled = false;
+        setAllocating(true);
+        const timer = setTimeout(() => {
+            financeApi.previewManualPayment({ playerId: target.playerId, amount: parsedAmount, feeIds: selectedKey ? selectedKey.split(',') : [] })
+                .then((result) => { if (!cancelled) setAllocation(result); })
+                // An older server has no preview: the dialog still saves.
+                .catch(() => { if (!cancelled) setAllocation(null); })
+                .finally(() => { if (!cancelled) setAllocating(false); });
+        }, 300);
+        return () => { cancelled = true; clearTimeout(timer); setAllocating(false); };
+    }, [target, validAmount, parsedAmount, selectedKey]);
 
     const savePayment = async () => {
         if (!target || !canSave) return;
@@ -255,7 +278,7 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                                         {balance.playerName}{balance.status === 'inactive' ? ' (inactiv)' : ''}
                                     </Text>
                                     <Text className="t-meta mt-0.5" style={{ color: late ? 'var(--c-danger-fg)' : 'var(--c-muted)' }} numberOfLines={1}>
-                                        {[balance.teamName, rowMeta(balance)].filter(Boolean).join(' · ')}
+                                        {[balance.teamName, rowMeta(balance, currency)].filter(Boolean).join(' · ')}
                                     </Text>
                                 </View>
                                 <View className="items-end shrink-0">
@@ -284,7 +307,7 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
             <ConfirmDialog
                 visible={target != null}
                 title={target ? `Încasare · ${target.playerName}` : ''}
-                message="Bifează taxele pe care le acoperă plata. Suma se completează din ele; o poți corecta (de ex. plată parțială)."
+                message="Bifează taxele pe care le acoperă plata. Suma se completează din ele și se împarte de la cea mai veche; o sumă mai mică le achită parțial."
                 confirmLabel="Înregistrează plata"
                 loading={saving}
                 confirmDisabled={!canSave}
@@ -305,7 +328,8 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                                         // button announces its state through aria-pressed.
                                         {...({ 'aria-pressed': checked } as any)}
                                         accessibilityLabel={`${fee.label}, ${money(fee.amount, currency)}`}
-                                        className={`flex-row items-center gap-2.5 px-3 py-2 ${index ? 'border-t' : ''}`}
+                                        // shrink-0: inside the scrolling list a row must keep its height, or its two lines overlap.
+                                        className={`flex-row items-center gap-2.5 px-3 py-2 shrink-0 ${index ? 'border-t' : ''}`}
                                         style={{ borderColor: 'var(--c-border)' } as any}
                                     >
                                         <MaterialIcons name={checked ? 'check-box' : 'check-box-outline-blank'} size={18} color={checked ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
@@ -313,6 +337,7 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                                             <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{fee.label}</Text>
                                             <Text className="text-[11.5px]" style={{ color: fee.status === 'overdue' ? 'var(--c-danger-fg)' : 'var(--c-muted)' }}>
                                                 {fee.status === 'overdue' ? 'Restanță' : 'Scadent'}{fee.dueDate ? ` · ${shortDate(fee.dueDate)}` : ''}
+                                                {fee.paidAmount ? ` · achitat ${money(fee.paidAmount, currency)} din ${money(fee.amount + fee.paidAmount, currency)}` : ''}
                                             </Text>
                                         </View>
                                         <Text className="t-num text-[13px] font-bold" style={{ color: 'var(--c-ink)' }}>{money(fee.amount, currency)}</Text>
@@ -346,6 +371,14 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                             </View>
                         </View>
 
+                        <AllocationPreview
+                            allocation={allocation}
+                            loading={allocating}
+                            visible={validAmount}
+                            noneSelected={selectedFees.size === 0}
+                            currency={currency}
+                        />
+
                         <SelectField<Method> label="Metoda de plată" value={method} onChange={setMethod} options={METHOD_OPTIONS} />
 
                         <TextInput
@@ -366,6 +399,66 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                     </View>
                 ) : null}
             </ConfirmDialog>
+        </View>
+    );
+}
+
+/** „Cum se împarte plata”: what each fee gets from the amount typed. */
+function AllocationPreview({ allocation, loading, visible, noneSelected, currency }: {
+    allocation: PaymentAllocation | null;
+    loading: boolean;
+    visible: boolean;
+    noneSelected: boolean;
+    currency: string;
+}) {
+    if (!visible) return null;
+    return (
+        <View
+            className="rounded-[10px] border px-3 py-2.5 gap-1.5"
+            style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
+            accessibilityLabel="Cum se împarte plata"
+            {...({ 'aria-live': 'polite' } as any)}
+        >
+            <View className="flex-row items-center justify-between gap-2">
+                <Text className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--c-muted)' }}>Cum se împarte plata</Text>
+                {loading ? <ActivityIndicator size="small" color="var(--c-faint)" /> : null}
+            </View>
+            {noneSelected ? (
+                <Text className="text-[12px]" style={{ color: 'var(--c-muted)' }}>Nicio taxă bifată: suma merge pe cele mai vechi taxe.</Text>
+            ) : null}
+            {allocation ? (
+                <>
+                    {allocation.lines.map((line) => {
+                        const settled = line.owedAfter <= 0;
+                        return (
+                            <View key={line.feeId} className="flex-row items-start gap-2">
+                                <MaterialIcons
+                                    name={settled ? 'check-circle' : 'access-time'}
+                                    size={15}
+                                    color={settled ? 'var(--c-success-fg)' : 'var(--c-warning-fg)'}
+                                />
+                                <View className="flex-1 min-w-0">
+                                    <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{line.label}</Text>
+                                    <Text className="text-[11.5px]" style={{ color: settled ? 'var(--c-muted)' : 'var(--c-warning-fg)' }}>
+                                        {settled ? 'Achitată integral' : `Parțial · rămân ${money(line.owedAfter, currency)}`}
+                                    </Text>
+                                </View>
+                                <Text className="t-num text-[12.5px] font-bold" style={{ color: 'var(--c-ink)' }}>{money(line.applied, currency)}</Text>
+                            </View>
+                        );
+                    })}
+                    {allocation.credit > 0 ? (
+                        <View className="flex-row items-start gap-2">
+                            <MaterialIcons name="account-balance-wallet" size={15} color="var(--c-brand-fg)" />
+                            <Text className="flex-1 text-[12px]" style={{ color: 'var(--c-ink-soft)' }}>
+                                Avans {money(allocation.credit, currency)}: depășește tot ce e de plată și acoperă automat următoarele taxe.
+                            </Text>
+                        </View>
+                    ) : null}
+                </>
+            ) : !loading ? (
+                <Text className="text-[12px]" style={{ color: 'var(--c-muted)' }}>Împărțirea nu e disponibilă acum; plata se salvează oricum.</Text>
+            ) : null}
         </View>
     );
 }

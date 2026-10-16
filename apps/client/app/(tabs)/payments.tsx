@@ -111,6 +111,8 @@ function FeeCard({
   // An older server sends 'failed' for a row whose Stripe attempt failed.
   const failed = fee.status === 'failed' || overdue;
   const upcoming = fee.status === 'upcoming';
+  // Still owed is `amount`; a partial payment already made is shown next to it.
+  const partlyPaid = fee.paidAmount ? `achitat ${formatCurrency(fee.paidAmount, fee.currency)} din ${formatCurrency(fee.amount + fee.paidAmount, fee.currency)}` : null;
 
   return (
     <View
@@ -132,10 +134,10 @@ function FeeCard({
         <Text className="text-[14.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{fee.label}</Text>
         <Text className="t-meta mt-0.5" style={{ color: failed ? 'var(--c-danger-fg)' : 'var(--c-muted)' }} numberOfLines={1}>
           {overdue
-            ? `Restanță${due ? ` din ${due}` : ''}`
+            ? [`Restanță${due ? ` din ${due}` : ''}`, partlyPaid].filter(Boolean).join(' · ')
             : failed
               ? 'Plata a eșuat — încearcă din nou'
-              : [due ? `${upcoming ? 'Scadent' : 'Scadență'} ${due}` : null, fee.description].filter(Boolean).join(' · ')}
+              : [due ? `${upcoming ? 'Scadent' : 'Scadență'} ${due}` : null, partlyPaid ?? fee.description].filter(Boolean).join(' · ')}
         </Text>
       </View>
 
@@ -528,7 +530,7 @@ function PlayerPaymentsScreen() {
 
               {/* One accent on this page: ink for the figure, indigo only on
                   the action. */}
-              <Text className="t-eyebrow mt-3" style={{ color: 'var(--c-muted)' }}>Sold restant</Text>
+              <Text className="t-eyebrow mt-3" style={{ color: 'var(--c-muted)' }}>Sold de plată</Text>
               <Text className="f-display t-num text-[28px] font-extrabold mt-0.5 leading-tight" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any}>
                 {formatCurrency(summary?.outstandingAmount ?? 0, summary?.currency ?? 'ron')}
               </Text>

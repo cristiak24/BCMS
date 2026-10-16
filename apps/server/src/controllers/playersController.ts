@@ -616,6 +616,7 @@ export const playersController = {
                     attendanceDelta: null,
                     pendingPayments: 0,
                     pendingPlayerIds: [],
+                    owingPayments: 0,
                 });
             }
 
@@ -645,7 +646,10 @@ export const playersController = {
                 : null;
 
             // Same answer as the roster's payment column (shared balances).
-            const pendingPlayerIds = rosterRows.filter(row => !isPaidStatus(row.paymentStatus)).map(row => row.id);
+            // „Restanțe” are players with something past due; owing money that
+            // is not due yet is „de plată” (owingPayments).
+            const pendingPlayerIds = rosterRows.filter(row => row.paymentStatus === 'overdue').map(row => row.id);
+            const owingPayments = rosterRows.filter(row => !isPaidStatus(row.paymentStatus)).length;
 
             res.json({
                 athleteCount: rosterRows.length,
@@ -655,6 +659,7 @@ export const playersController = {
                 attendanceDelta,
                 pendingPayments: pendingPlayerIds.length,
                 pendingPlayerIds,
+                owingPayments,
             });
         } catch (error) {
             console.error('Get roster summary error:', error);
@@ -672,16 +677,16 @@ export const playersController = {
             if (clubId == null) {
                 return res.status(400).json({ error: 'Alege un club.' });
             }
-            // Who owes money, from the shared fee calculation — then an in-app
-            // notification to the player and their parents (this used to report
-            // reminders as "sent" without sending anything).
-            const owing = (await clubBalances(clubId)).filter((balance) => balance.outstanding > 0);
-            const { notified, skipped } = await sendReminderNotifications(owing);
+            // Who is late paying (restanță = something past due), from the shared
+            // fee calculation — then an in-app notification to the player and
+            // their parents. Money owed but not yet due gets no reminder.
+            const late = (await clubBalances(clubId)).filter((balance) => balance.overdue > 0);
+            const { notified, skipped } = await sendReminderNotifications(late);
             res.json({
                 sent: notified,
-                players: owing.length,
+                players: late.length,
                 skipped,
-                recipients: owing.map((balance) => ({ id: balance.playerId, name: balance.playerName, outstanding: balance.outstanding, overdue: balance.overdue })),
+                recipients: late.map((balance) => ({ id: balance.playerId, name: balance.playerName, outstanding: balance.outstanding, overdue: balance.overdue })),
                 sentAt: new Date().toISOString(),
                 provider: 'in-app',
             });
