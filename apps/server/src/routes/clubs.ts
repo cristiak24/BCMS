@@ -4,7 +4,7 @@ import { db } from '../db';
 import { clubs, invites, users } from '../db/schema';
 import { authenticate, requireSuperadmin, type AuthenticatedRequest } from '../middleware/auth';
 import { writeAuditLog } from '../services/auditService';
-import { isVisiblePendingInvite, syncInvitationStatuses } from '../services/invitationsService';
+import { isVisiblePendingInvite } from '../services/invitationsService';
 
 const router = Router();
 
@@ -34,8 +34,6 @@ router.use(authenticate, requireSuperadmin);
 
 router.get('/', async (_req, res) => {
   try {
-    await syncInvitationStatuses();
-
     const [clubRows, userRows, inviteRows] = await Promise.all([
       db.select().from(clubs).orderBy(desc(clubs.updatedAt)),
       db.select().from(users),

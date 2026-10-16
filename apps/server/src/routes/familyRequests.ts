@@ -2,6 +2,7 @@ import { Router, type Response } from 'express';
 import { and, asc, eq } from 'drizzle-orm';
 import { authenticate, requireRoles, type AuthenticatedRequest } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
+import { clientErrorMessage } from '../lib/httpErrors';
 import { db } from '../db';
 import { teams } from '../db/schema';
 import { generateTeamCode } from '../lib/familyJoin';
@@ -78,7 +79,8 @@ router.post('/approve-all', mutateLimit, async (req: AuthenticatedRequest, res) 
             results.push({ id, ok: true, playerId: done.playerId, created: done.created });
             await audit(req, 'family_request.approve', id, { auto: true, playerId: done.playerId, created: done.created });
         } catch (error) {
-            results.push({ id, ok: false, error: error instanceof Error ? error.message : 'Eroare' });
+            if (!(error instanceof JoinRequestError)) console.error('[family-requests] approve-all:', error);
+            results.push({ id, ok: false, error: clientErrorMessage(error, 'Eroare') });
         }
     }
     res.json({ results });

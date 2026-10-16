@@ -1,4 +1,5 @@
 import type { ClubRole } from '../../services/superAdminApi';
+import { toCsv } from '../../utils/csv';
 
 /** Copy and formatting shared by the super admin screens (Romanian only). */
 
@@ -138,12 +139,8 @@ export function deltaPercent(current: number, previous: number) {
 
 /** Downloads rows as a UTF-8 CSV that Excel opens with diacritics intact. */
 export function downloadCsv(filename: string, rows: Array<Array<string | number | null | undefined>>) {
-  const escape = (value: string | number | null | undefined) => {
-    const text = value == null ? '' : String(value);
-    return /[";\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
   // Semicolons: Excel with a Romanian locale splits on ";" not ",".
-  const csv = rows.map((row) => row.map(escape).join(';')).join('\r\n');
+  const csv = toCsv(rows, ';', '\r\n');
   const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

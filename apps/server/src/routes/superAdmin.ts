@@ -18,7 +18,7 @@ import {
     users,
 } from '../db/schema';
 import { db } from '../db';
-import { isVisiblePendingInvite, syncInvitationStatuses } from '../services/invitationsService';
+import { isVisiblePendingInvite } from '../services/invitationsService';
 import { activityKeys } from '../lib/activityTracker';
 import {
     activeWithin,
@@ -129,7 +129,6 @@ async function trackingSince() {
 
 /** Everything a club list or the overview needs, loaded once. */
 async function loadPlatform(months: string[]) {
-    await syncInvitationStatuses();
     const [clubRows, userRows, inviteRows, teamCounts, playerCounts, activity] = await Promise.all([
         db.select().from(clubs).orderBy(clubs.name),
         db.select().from(users),

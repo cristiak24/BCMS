@@ -201,12 +201,6 @@ router.patch('/me', async (req, res) => {
     }
 });
 
-router.post('/me/password', async (_req, res) => {
-    res.status(400).json({
-        error: 'Password changes are handled by Firebase Auth on the client.',
-    });
-});
-
 router.post('/me/avatar', (req, res, next) => {
     upload.single('image')(req, res, (error) => {
         if (error) {

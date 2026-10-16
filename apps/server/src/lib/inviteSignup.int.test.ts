@@ -305,6 +305,6 @@ test('an email invitation brings the account in with the invited role and keeps 
 
     await assert.rejects(
         async () => signup(await emailInvitation('right@mail.ro', 'accountant'), {}, { email: 'wrong@mail.ro' }),
-        /different email/,
+        /altă adresă de email/,
     );
 });

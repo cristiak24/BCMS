@@ -7,8 +7,14 @@ import {
   listInvitations,
   validateInvitationToken,
 } from '../services/invitationsService';
+import { clientIp, rateLimit } from '../middleware/rateLimit';
+import { sendRouteError } from '../lib/httpErrors';
 
 const router = Router();
+
+// The token routes are reachable without a session (by IP then), so they are
+// throttled against token guessing and hammering.
+const publicInviteLimiter = rateLimit({ bucket: 'invitations:token', limit: 30, windowMs: 60_000, key: (req) => `ip:${clientIp(req)}` });
 
 router.get('/', authenticate, requireSuperadmin, async (_req, res) => {
   try {
@@ -39,13 +45,11 @@ router.post('/', authenticate, requireSuperadmin, async (req: AuthenticatedReque
 
     res.status(201).json({ success: true, invitation: result });
   } catch (error) {
-    console.error('Create invitation error:', error);
-    const message = error instanceof Error ? error.message : 'Could not create invitation.';
-    res.status(400).json({ error: message });
+    sendRouteError(res, error, { fallback: 'Nu am putut crea invitația.', log: 'Create invitation error:' });
   }
 });
 
-router.get('/:token', async (req, res) => {
+router.get('/:token', publicInviteLimiter, async (req, res) => {
   try {
     const token = String(req.params.token ?? '').trim();
     if (!token) {
@@ -69,7 +73,7 @@ router.get('/:token', async (req, res) => {
   }
 });
 
-router.get('/:token/validate', async (req, res) => {
+router.get('/:token/validate', publicInviteLimiter, async (req, res) => {
   try {
     const token = String(req.params.token ?? '').trim();
     if (!token) {
@@ -93,14 +97,16 @@ router.get('/:token/validate', async (req, res) => {
   }
 });
 
-router.post('/:token/accept', authenticate, async (req: AuthenticatedRequest, res) => {
+router.post('/:token/accept', publicInviteLimiter, authenticate, async (req: AuthenticatedRequest, res) => {
   try {
     const token = String(req.params.token ?? '').trim();
-    const email = String(req.body?.email ?? req.firebaseUser?.email ?? '').trim();
     const result = await acceptInvitation({
       token,
       firebaseUid: req.firebaseUser?.uid ?? '',
-      email,
+      // Only the verified email of the signed-in identity. A body `email` used
+      // to be trusted here, which let anyone holding the link claim the
+      // invited (or an existing) account.
+      email: req.firebaseUser?.email ?? null,
       firstName: req.body?.firstName ?? null,
       lastName: req.body?.lastName ?? null,
       phone: req.body?.phone ?? null,
@@ -108,9 +114,7 @@ router.post('/:token/accept', authenticate, async (req: AuthenticatedRequest, re
 
     res.status(201).json({ success: true, ...result });
   } catch (error) {
-    console.error('Accept invitation error:', error);
-    const message = error instanceof Error ? error.message : 'Could not accept invitation.';
-    res.status(400).json({ error: message });
+    sendRouteError(res, error, { fallback: 'Nu am putut accepta invitația.', log: 'Accept invitation error:' });
   }
 });
 
@@ -127,9 +131,7 @@ router.post('/registration/complete', authenticate, async (req: AuthenticatedReq
 
     res.json({ success: true, user: result });
   } catch (error) {
-    console.error('Complete registration error:', error);
-    const message = error instanceof Error ? error.message : 'Could not complete registration.';
-    res.status(400).json({ error: message });
+    sendRouteError(res, error, { fallback: 'Nu am putut finaliza înregistrarea.', log: 'Complete registration error:' });
   }
 });
 

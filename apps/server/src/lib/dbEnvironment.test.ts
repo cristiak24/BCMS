@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkDatabaseTarget } from './dbEnvironment';
+import { checkDatabaseTarget, databaseSsl } from './dbEnvironment';
 
 test('production and marked development databases pass', () => {
     assert.equal(checkDatabaseTarget({ NODE_ENV: 'production' }).level, 'ok');
@@ -17,4 +17,9 @@ test('an unmarked local database warns, or blocks when required', () => {
 test('tests can never reach a real database', () => {
     assert.equal(checkDatabaseTarget({ NODE_ENV: 'test', DATABASE_URL: 'postgres://u:p@ep-x.neon.tech/db' }).level, 'block');
     assert.equal(checkDatabaseTarget({ NODE_ENV: 'test', DATABASE_URL: 'pglite:memory' }).level, 'ok');
+});
+
+test('production verifies the database certificate', () => {
+    assert.deepEqual(databaseSsl({ NODE_ENV: 'production' }), { rejectUnauthorized: true });
+    assert.equal(databaseSsl({ NODE_ENV: 'development' }), undefined);
 });

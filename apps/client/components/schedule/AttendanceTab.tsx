@@ -27,6 +27,7 @@ import { AttendanceDetailsModal } from './AttendanceDetailsModal';
 import { useResponsive } from '../../hooks/useResponsive';
 import { RO_LOCALE, RO_MONTHS } from './scheduleShared';
 import { Skeleton } from '../ui/Skeleton';
+import { toCsv } from '../../utils/csv';
 
 interface AttendanceTabProps {
   events: CalendarEvent[];
@@ -387,9 +388,7 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
       ];
     });
 
-    const csv = [header, ...rows]
-      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
-      .join('\n');
+    const csv = toCsv([header, ...rows]);
 
     if (Platform.OS !== 'web' || typeof document === 'undefined') {
       Alert.alert('Export indisponibil', 'Exportul prezenței este disponibil doar pe web.');

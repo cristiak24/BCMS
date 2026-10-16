@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { Resend } from 'resend';
-import { and, desc, eq, lte, or } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, or, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { clubs, invites, users } from '../db/schema';
 import { writeAuditLog } from './auditService';
@@ -9,6 +9,7 @@ import { loadServerEnv } from '../lib/loadEnv';
 import { resolvePublicAppUrl } from '../lib/publicUrl';
 import { inviteTtlMinutes } from '../lib/inviteTtl';
 import { publicUser } from '../lib/publicUser';
+import { canLinkToUid } from '../lib/identityLink';
 
 loadServerEnv();
 
@@ -81,44 +82,6 @@ export function isVisiblePendingInvite(
   return !matchingUser;
 }
 
-export async function syncInvitationStatuses() {
-  const now = new Date();
-  const nowIso = now.toISOString();
-
-  await db
-    .update(invites)
-    .set({ status: 'expired' })
-    .where(and(eq(invites.status, 'pending'), lte(invites.expiresAt, nowIso)));
-
-  const [pendingInvites, userRows] = await Promise.all([
-    db.select().from(invites).where(eq(invites.status, 'pending')),
-    db.select({
-      id: users.id,
-      email: users.email,
-      clubId: users.clubId,
-    }).from(users),
-  ]);
-
-  const usersByInviteKey = new Map(userRows.map((user) => [invitationUserKey(user.email, user.clubId), user] as const));
-  const acceptedAt = new Date().toISOString();
-
-  await Promise.all(
-    pendingInvites.map((invite) => {
-      const matchingUser = usersByInviteKey.get(invitationUserKey(invite.email, invite.clubId));
-
-      if (!matchingUser) {
-        return Promise.resolve();
-      }
-
-      return db.update(invites).set({
-        status: 'accepted',
-        usedBy: matchingUser.id,
-        usedAt: invite.usedAt ?? acceptedAt,
-      }).where(eq(invites.id, invite.id));
-    }),
-  );
-}
-
 async function findClubById(clubId: number) {
   const clubRows = await db.select().from(clubs).where(eq(clubs.id, clubId)).limit(1);
   const club = clubRows[0];
@@ -187,7 +150,7 @@ async function sendInviteEmail(params: { to: string; clubName: string; role: str
         </div>
       </div>
     `,
-    text: `Ai fost invitat(ă) în ${params.clubName} cu rolul de ${ROLE_LABELS[params.role] ?? params.role}. Invitația este valabilă ${validity} (până pe ${expiresLabel}). Finalizează înregistrarea: ${params.url}`,
+    text: `Ai fost invitat(ă) în ${params.clubName} cu rolul de ${ROLE_LABELS[params.role] ?? params.role}. Invitația este valabilă ${validity} (până pe ${expiresLabel}) și poate fi folosită o singură dată. Finalizează înregistrarea: ${params.url}`,
   });
 }
 
@@ -353,9 +316,22 @@ export async function resendClubInvitation(
   };
 }
 
-export async function validateInvitationToken(token: string) {
-  await syncInvitationStatuses();
+export const INVITATION_ERRORS = {
+  notFound: 'Invitația nu există.',
+  noEmail: 'Contul tău nu are o adresă de email verificată. Verifică emailul și încearcă din nou.',
+  wrongEmail: 'Invitația este pentru o altă adresă de email.',
+  revoked: 'Invitația a fost anulată.',
+  expired: 'Invitația a expirat. Cere una nouă.',
+  used: 'Invitația a fost deja folosită.',
+  otherAccount: 'Există deja un cont pentru acest email. Autentifică-te cu el.',
+} as const;
 
+/**
+ * Reads one invitation by its token. Read-only: the public signup page calls
+ * this without a session, so it must never write (expiry is computed here,
+ * not stored) nor scan anything beyond the requested invite.
+ */
+export async function validateInvitationToken(token: string) {
   const tokenHash = hashInviteToken(token);
   const rows = await db.select({
     id: invites.id,
@@ -367,33 +343,25 @@ export async function validateInvitationToken(token: string) {
     createdAt: invites.createdAt,
     usedAt: invites.usedAt,
     usedBy: invites.usedBy,
-  }).from(invites).where(eq(invites.tokenHash, tokenHash)).limit(1);
+    clubName: clubs.name,
+  }).from(invites).leftJoin(clubs, eq(invites.clubId, clubs.id)).where(eq(invites.tokenHash, tokenHash)).limit(1);
 
   const invite = rows[0];
   if (!invite) {
     return null;
   }
 
-  const clubRows = invite.clubId == null
-    ? []
-    : await db.select({ name: clubs.name }).from(clubs).where(eq(clubs.id, invite.clubId)).limit(1);
-
-  const clubName = clubRows[0]?.name ?? null;
-  const isExpired = new Date(invite.expiresAt).getTime() <= Date.now();
+  const isExpired = invite.status === 'expired' || (invite.status === 'pending' && isInviteExpired(invite));
   const status = isExpired ? 'expired' : invite.status;
-
-  if (isExpired && invite.status !== 'expired') {
-    await db.update(invites).set({ status: 'expired' }).where(eq(invites.id, invite.id));
-  }
-
-  const canAccept = !isExpired && (status === 'pending' || status === 'accepted');
+  // Single use: only a pending, unexpired invitation can still be accepted.
+  const canAccept = status === 'pending';
 
   return {
     id: invite.id,
     email: invite.email,
     role: invite.role,
     clubId: invite.clubId,
-    clubName,
+    clubName: invite.clubName ?? null,
     status,
     expiresAt: invite.expiresAt,
     createdAt: invite.createdAt,
@@ -402,91 +370,127 @@ export async function validateInvitationToken(token: string) {
     isExpired,
     canAccept,
     message: isExpired
-      ? 'This invitation has expired. Ask a Super Admin to send a new one.'
+      ? INVITATION_ERRORS.expired
       : status === 'revoked'
-        ? 'This invitation has been revoked.'
+        ? INVITATION_ERRORS.revoked
         : status === 'accepted'
-          ? 'This invitation was already accepted. You can finish activating the account again.'
+          ? INVITATION_ERRORS.used
           : null,
   };
 }
 
+/**
+ * Accepts an email invitation for the signed-in caller.
+ *
+ * `email` MUST be the caller's verified identity email (never request input):
+ * the invitation is bound to one address. The invite is claimed atomically
+ * (pending → accepted in one guarded UPDATE), so a link works exactly once,
+ * and an existing account bound to another sign-in is never re-pointed at the
+ * caller (lib/identityLink.ts).
+ */
 export async function acceptInvitation(params: {
   token: string;
   firebaseUid: string;
-  email: string;
+  email: string | null;
   firstName?: string | null;
   lastName?: string | null;
   phone?: string | null;
 }) {
+  if (!params.firebaseUid) {
+    throw new Error(INVITATION_ERRORS.notFound);
+  }
+  const email = normalizeEmail(params.email ?? '');
+  if (!email) {
+    throw new Error(INVITATION_ERRORS.noEmail);
+  }
+
   const tokenHash = hashInviteToken(params.token);
   const inviteRows = await db.select().from(invites).where(eq(invites.tokenHash, tokenHash)).limit(1);
   const invite = inviteRows[0];
 
   if (!invite) {
-    throw new Error('Invite not found.');
+    throw new Error(INVITATION_ERRORS.notFound);
   }
 
-  if (normalizeEmail(params.email) !== normalizeEmail(invite.email)) {
-    throw new Error('This invitation is for a different email address.');
+  if (email !== normalizeEmail(invite.email)) {
+    throw new Error(INVITATION_ERRORS.wrongEmail);
   }
 
   if (invite.status === 'revoked') {
-    throw new Error('Invite has been revoked.');
+    throw new Error(INVITATION_ERRORS.revoked);
   }
 
-  if (invite.status !== 'accepted' && new Date(invite.expiresAt).getTime() <= Date.now()) {
-    await db.update(invites).set({ status: 'expired' }).where(eq(invites.id, invite.id));
-    throw new Error('Invite expired.');
+  if (invite.status === 'accepted') {
+    throw new Error(INVITATION_ERRORS.used);
   }
 
-  const userRows = await db.select().from(users).where(
-    or(
-      eq(users.firebaseUid, params.firebaseUid),
-      eq(users.email, normalizeEmail(params.email)),
-    )
-  ).limit(1);
+  if (invite.status === 'expired' || isInviteExpired(invite)) {
+    throw new Error(INVITATION_ERRORS.expired);
+  }
 
-  const displayName = [params.firstName, params.lastName].filter(Boolean).join(' ').trim() || params.email.split('@')[0] || 'New User';
+  const [ownRows, emailRows] = await Promise.all([
+    db.select().from(users).where(or(eq(users.firebaseUid, params.firebaseUid), eq(users.uid, params.firebaseUid))).limit(1),
+    db.select().from(users).where(sql`lower(${users.email}) = ${email}`).limit(1),
+  ]);
+  const own = ownRows[0];
+  const byEmail = emailRows[0];
+
+  // The invited address already has an account: it must be the caller's own,
+  // or one nobody signs in to yet. Never someone else's.
+  if (byEmail && (own ? byEmail.id !== own.id : !canLinkToUid(byEmail, params.firebaseUid))) {
+    throw new Error(INVITATION_ERRORS.otherAccount);
+  }
+  const existing = own ?? byEmail ?? null;
+
+  const displayName = [params.firstName, params.lastName].filter(Boolean).join(' ').trim() || email.split('@')[0] || 'New User';
   const firstName = params.firstName?.trim() || null;
   const lastName = params.lastName?.trim() || null;
+  const nowIso = new Date().toISOString();
 
-  let userId: number;
+  const userId = await db.transaction(async (tx) => {
+    // Claim first: of two concurrent accepts only one gets the row back, and
+    // the loser's transaction writes nothing.
+    const claimed = await tx.update(invites)
+      .set({ status: 'accepted', usedAt: nowIso })
+      .where(and(eq(invites.id, invite.id), eq(invites.status, 'pending'), gt(invites.expiresAt, nowIso)))
+      .returning({ id: invites.id });
+    if (!claimed[0]) {
+      throw new Error(INVITATION_ERRORS.used);
+    }
 
-  if (userRows[0]) {
-    const updated = await db.update(users).set({
+    const account = {
       firebaseUid: params.firebaseUid,
-      email: normalizeEmail(params.email),
+      email,
       name: displayName,
       firstName,
       lastName,
-      role: invite.role as any,
-      status: 'active' as any,
+      role: invite.role as typeof users.$inferInsert['role'],
+      status: 'active' as const,
       clubId: invite.clubId,
       phone: params.phone ?? null,
-      updatedAt: new Date().toISOString(),
-    }).where(eq(users.id, userRows[0].id)).returning();
-    userId = updated[0].id;
-  } else {
-    const inserted = await db.insert(users).values({
-      firebaseUid: params.firebaseUid,
-      email: normalizeEmail(params.email),
-      name: displayName,
-      firstName,
-      lastName,
-      role: invite.role as any,
-      status: 'active' as any,
-      clubId: invite.clubId,
-      phone: params.phone ?? null,
-    }).returning();
-    userId = inserted[0].id;
-  }
+    };
 
-  await db.update(invites).set({
-    status: 'accepted',
-    usedBy: userId,
-    usedAt: invite.usedAt ?? new Date().toISOString(),
-  }).where(eq(invites.id, invite.id));
+    let id: number;
+    if (existing) {
+      const updated = await tx.update(users).set({ ...account, updatedAt: nowIso })
+        .where(and(
+          eq(users.id, existing.id),
+          // Same guard as the read above, against a sign-in linking the row meanwhile.
+          existing.firebaseUid ? eq(users.firebaseUid, existing.firebaseUid) : isNull(users.firebaseUid),
+        ))
+        .returning({ id: users.id });
+      if (!updated[0]) {
+        throw new Error(INVITATION_ERRORS.otherAccount);
+      }
+      id = updated[0].id;
+    } else {
+      const inserted = await tx.insert(users).values(account).returning({ id: users.id });
+      id = inserted[0].id;
+    }
+
+    await tx.update(invites).set({ usedBy: id }).where(eq(invites.id, invite.id));
+    return id;
+  });
 
   await writeAuditLog({
     action: 'invitation.accepted',
@@ -496,7 +500,7 @@ export async function acceptInvitation(params: {
     actorUid: params.firebaseUid,
     actorRole: invite.role,
     clubId: invite.clubId ?? null,
-    metadata: { email: params.email, role: invite.role, clubId: invite.clubId },
+    metadata: { email, role: invite.role, clubId: invite.clubId, existingAccount: Boolean(existing) },
   });
 
   return {
@@ -555,8 +559,6 @@ export async function completeUserRegistration(params: {
 }
 
 export async function listInvitations() {
-  await syncInvitationStatuses();
-
   const rows = await db.select({
     id: invites.id,
     email: invites.email,
@@ -570,8 +572,11 @@ export async function listInvitations() {
     clubName: clubs.name,
   }).from(invites).leftJoin(clubs, eq(invites.clubId, clubs.id)).orderBy(desc(invites.createdAt));
 
+  // Expiry is computed on read (nothing rewrites invites in the background).
+  const now = new Date();
   return rows.map((row) => ({
     ...row,
+    status: row.status === 'pending' && isInviteExpired(row, now) ? 'expired' : row.status,
     clubName: row.clubName ?? null,
   }));
 }

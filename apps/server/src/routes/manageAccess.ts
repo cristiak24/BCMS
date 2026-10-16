@@ -11,6 +11,7 @@ import {
     listManageAccessRequests,
 } from '../lib/manageAccessService';
 import { rateLimit } from '../middleware/rateLimit';
+import { sendRouteError } from '../lib/httpErrors';
 import { writeAuditLog } from '../services/auditService';
 import type { InviteRole } from '../types/manageAccess';
 import { createClubInviteCode, listClubInviteCodes, revokeClubInviteCode } from '../lib/clubInviteCodes';
@@ -83,9 +84,8 @@ router.post('/requests/:id/approve', mutateLimiter, async (req: AuthenticatedReq
         });
         res.status(204).end();
     } catch (error) {
-        const message = error instanceof Error ? error.message : 'Could not approve the request.';
-        const status = message.includes('not found') ? 404 : 400;
-        res.status(status).json({ error: message });
+        const status = error instanceof Error && error.message.includes('not found') ? 404 : 400;
+        sendRouteError(res, error, { status, fallback: 'Nu am putut aproba cererea.', log: 'Approve access request failed:' });
     }
 });
 
@@ -118,9 +118,8 @@ router.post('/requests/:id/deny', mutateLimiter, async (req: AuthenticatedReques
         });
         res.status(204).end();
     } catch (error) {
-        const message = error instanceof Error ? error.message : 'Could not deny the request.';
-        const status = message.includes('not found') ? 404 : 400;
-        res.status(status).json({ error: message });
+        const status = error instanceof Error && error.message.includes('not found') ? 404 : 400;
+        sendRouteError(res, error, { status, fallback: 'Nu am putut respinge cererea.', log: 'Deny access request failed:' });
     }
 });
 
@@ -265,9 +264,7 @@ router.post('/invite-codes', inviteLimiter, async (req: AuthenticatedRequest, re
         });
         res.status(201).json(code);
     } catch (error) {
-        const message = error instanceof Error ? error.message : 'Could not create the invite code.';
-        console.error('Failed to create invite code:', error);
-        res.status(400).json({ error: message });
+        sendRouteError(res, error, { fallback: 'Nu am putut crea codul de invitație.', log: 'Failed to create invite code:' });
     }
 });
 

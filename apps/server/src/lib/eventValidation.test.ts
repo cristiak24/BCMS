@@ -92,3 +92,9 @@ test('event update: invalid date is a validation error, not a throw', () => {
     const result = parseEventInput({ startTime: 'garbage' }, 'update');
     assert.equal(result.ok, false);
 });
+
+test('event amount: beyond numeric(12,2) is a 400, not a database error', () => {
+    const base = { title: 'Turneu', startTime: '2026-10-01T16:00:00Z', endTime: '2026-10-01T18:00:00Z', teamId: 3 };
+    assert.ok(parseEventInput({ ...base, amount: 50 }, 'create').ok);
+    assert.equal(parseEventInput({ ...base, amount: 99999999999 }, 'create').ok, false);
+});

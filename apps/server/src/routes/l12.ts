@@ -6,6 +6,7 @@ import { events, l12Lineups, players, playersToTeams, teams, users } from '../db
 import { assertTeamInClub, isSuperadmin, resolveRequestClubId } from '../lib/tenantScope';
 import { parseL12Input, type L12Input } from '../lib/l12';
 import { toIso } from '../lib/dateUtils';
+import { coachManagesEvent, coachManagesTeam } from '../lib/coachScope';
 
 /**
  * Formular L-12 per match, plus each team's "L12 constant" (template).
@@ -17,8 +18,8 @@ import { toIso } from '../lib/dateUtils';
  *   PUT  /api/l12/events/:eventId
  *   DELETE /api/l12/events/:eventId       → back to "not set" (the template stays)
  *
- * Admins and coaches of the team's club only — the same rule as marking
- * attendance. Player names are always read from the players table, never
+ * Admins and coaches of the team's club may read; a coach changes only the
+ * teams (or matches) they manage — the same rule as marking attendance. Player names are always read from the players table, never
  * taken from the request, so a sheet cannot carry a name that is not on the
  * club's books.
  */
@@ -28,7 +29,17 @@ router.use(authenticate, requireRoles(['admin', 'coach']));
 
 type TeamRow = typeof teams.$inferSelect;
 
-async function loadTeamForCaller(req: AuthenticatedRequest, res: Response, teamId: number): Promise<TeamRow | null> {
+/**
+ * The team, when the caller may see it (same club). With `write`, a coach must
+ * also manage it — coach of the team, or of the one match (`eventCoachId`) —
+ * as for events and attendance (lib/coachScope.ts).
+ */
+async function loadTeamForCaller(
+    req: AuthenticatedRequest,
+    res: Response,
+    teamId: number,
+    access: { write: boolean; eventCoachId?: unknown } = { write: false },
+): Promise<TeamRow | null> {
     if (!Number.isInteger(teamId) || teamId <= 0) {
         res.status(400).json({ error: 'Invalid team id.' });
         return null;
@@ -42,6 +53,15 @@ async function loadTeamForCaller(req: AuthenticatedRequest, res: Response, teamI
     if (scope !== 'ok') {
         res.status(403).json({ error: 'Forbidden.' });
         return null;
+    }
+    if (access.write && req.user?.role === 'coach') {
+        const allowed = access.eventCoachId === undefined
+            ? coachManagesTeam(rows[0].coachId, req.user?.id)
+            : coachManagesEvent(rows[0].coachId, access.eventCoachId, req.user?.id);
+        if (!allowed) {
+            res.status(403).json({ error: 'Poți modifica doar echipele pe care le antrenezi.' });
+            return null;
+        }
     }
     return rows[0];
 }
@@ -217,7 +237,7 @@ router.get('/teams/:teamId/template', async (req: AuthenticatedRequest, res) => 
 
 router.put('/teams/:teamId/template', async (req: AuthenticatedRequest, res) => {
     try {
-        const team = await loadTeamForCaller(req, res, Number(req.params.teamId));
+        const team = await loadTeamForCaller(req, res, Number(req.params.teamId), { write: true });
         if (!team) return;
         const values = await buildValues(req, res, team);
         if (!values) return;
@@ -233,7 +253,7 @@ router.put('/teams/:teamId/template', async (req: AuthenticatedRequest, res) => 
     }
 });
 
-async function loadMatchForCaller(req: AuthenticatedRequest, res: Response) {
+async function loadMatchForCaller(req: AuthenticatedRequest, res: Response, write = false) {
     const eventId = Number(req.params.eventId);
     if (!Number.isInteger(eventId) || eventId <= 0) {
         res.status(400).json({ error: 'Invalid event id.' });
@@ -249,7 +269,7 @@ async function loadMatchForCaller(req: AuthenticatedRequest, res: Response) {
         res.status(400).json({ error: 'This event is not linked to a team.' });
         return null;
     }
-    const team = await loadTeamForCaller(req, res, event.teamId);
+    const team = await loadTeamForCaller(req, res, event.teamId, { write, eventCoachId: event.coachId });
     if (!team) return null;
     return { event, team };
 }
@@ -277,7 +297,7 @@ router.get('/events/:eventId', async (req: AuthenticatedRequest, res) => {
 
 router.put('/events/:eventId', async (req: AuthenticatedRequest, res) => {
     try {
-        const match = await loadMatchForCaller(req, res);
+        const match = await loadMatchForCaller(req, res, true);
         if (!match) return;
         const values = await buildValues(req, res, match.team);
         if (!values) return;
@@ -296,7 +316,7 @@ router.put('/events/:eventId', async (req: AuthenticatedRequest, res) => {
 
 router.delete('/events/:eventId', async (req: AuthenticatedRequest, res) => {
     try {
-        const match = await loadMatchForCaller(req, res);
+        const match = await loadMatchForCaller(req, res, true);
         if (!match) return;
         await db.delete(l12Lineups).where(eq(l12Lineups.eventId, match.event.id));
         res.status(204).end();

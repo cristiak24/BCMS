@@ -6,6 +6,8 @@
  * the database; anything these reject is a 400, never a 500.
  */
 
+import { fitsMoneyColumn } from './money';
+
 export const EVENT_TYPES = ['training', 'match', 'camp', 'admin', 'medical'] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -192,6 +194,7 @@ export function parseEventInput(
         } else {
             const amount = Number(input.amount);
             if (!Number.isFinite(amount) || amount < 0) return { ok: false, error: 'amount must be a positive number.' };
+            if (!fitsMoneyColumn(amount)) return { ok: false, error: 'Suma este prea mare.' };
             out.amount = Math.round(amount * 100) / 100;
         }
     }

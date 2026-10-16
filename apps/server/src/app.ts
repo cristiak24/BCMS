@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
 import financeRoutes, { stripeWebhookHandler } from './routes/finance';
 import userRoutes from './routes/users';
 import authRoutes from './routes/auth';
@@ -26,11 +25,15 @@ import notificationRoutes from './routes/notificationRoutes';
 import privacyRoutes from './routes/privacy';
 import { loadServerEnv } from './lib/loadEnv';
 import { createAllowedOrigins, isOriginAllowed } from './lib/corsOrigins';
+import { securityHeaders } from './middleware/securityHeaders';
 
 loadServerEnv();
 
 export function createServerApp() {
     const app = express();
+    // No "X-Powered-By: Express" fingerprint; security headers on every answer.
+    app.disable('x-powered-by');
+    app.use(securityHeaders);
     const allowedOrigins = createAllowedOrigins(process.env);
 
     app.use(cors({
@@ -94,8 +97,6 @@ export function createServerApp() {
     app.use('/api/games', gameRoutes);
     app.use('/api/notifications', notificationRoutes);
     app.use('/api/privacy', privacyRoutes);
-
-    app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
     app.get('/', (_req, res) => {
         res.send('BCMS API is running');

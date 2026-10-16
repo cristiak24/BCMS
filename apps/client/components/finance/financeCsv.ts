@@ -1,14 +1,10 @@
 import type { PlayerBalance } from '../../services/financeApi';
+import { toCsv, type CsvValue } from '../../utils/csv';
 
 /** CSV files for the accountant (Excel-friendly: BOM, comma-separated). */
 
-function cell(value: unknown) {
-  const text = value == null ? '' : String(value);
-  return /[",\n;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-export function downloadCsv(rows: unknown[][], filename: string) {
-  const content = rows.map((row) => row.map(cell).join(',')).join('\n');
+export function downloadCsv(rows: CsvValue[][], filename: string) {
+  const content = toCsv(rows);
   const blob = new Blob([`﻿${content}`], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');

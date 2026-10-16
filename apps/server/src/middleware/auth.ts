@@ -1,8 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyBearerToken } from '../lib/clerkAuth';
-import { db } from '../db';
-import { users } from '../db/schema';
-import { eq, or } from 'drizzle-orm';
+import { findOrLinkUser } from '../lib/identityLink';
 import { recordActivity } from '../lib/activityTracker';
 
 export interface AuthenticatedRequest extends Request {
@@ -24,45 +22,21 @@ export const authenticate = async (req: AuthenticatedRequest, res: Response, nex
 
         req.firebaseUser = decodedToken;
 
-        // Fetch user from Postgres
-        let userRows = await db
-            .select()
-            .from(users)
-            .where(or(eq(users.firebaseUid, decodedToken.uid), eq(users.uid, decodedToken.uid)))
-            .limit(1);
+        // The caller's row; a first sign-in is linked by verified email only
+        // when that row isn't someone else's (lib/identityLink.ts).
+        const user = await findOrLinkUser(decodedToken);
 
-        if (userRows.length === 0 && decodedToken.email) {
-            const email = decodedToken.email.trim().toLowerCase();
-            const emailRows = await db
-                .select()
-                .from(users)
-                .where(eq(users.email, email))
-                .limit(1);
-
-            if (emailRows[0]) {
-                const updatedRows = await db
-                    .update(users)
-                    .set({
-                        firebaseUid: decodedToken.uid,
-                        updatedAt: new Date().toISOString(),
-                    })
-                    .where(eq(users.id, emailRows[0].id))
-                    .returning();
-                userRows = updatedRows;
-            }
-        }
-
-        if (userRows.length > 0) {
+        if (user) {
             // A deactivated account must not be able to act anywhere, not just on
             // the role-gated routes. Rejecting here means an admin who deactivates
             // a user revokes their access on the very next request, rather than
             // leaving them with a working session until the token expires.
-            if (userRows[0].status === 'disabled') {
+            if (user.status === 'disabled') {
                 return res.status(403).json({ error: 'This account has been disabled.' });
             }
 
-            req.user = userRows[0];
-            recordActivity(userRows[0]);
+            req.user = user;
+            recordActivity(user);
         }
 
         next();

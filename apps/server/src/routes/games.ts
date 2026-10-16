@@ -7,6 +7,7 @@ import { events, gameStatEvents, gameStats, l12Lineups, playerGuardians, players
 import { computeBoxScore, parseEvent, parseOpponentRoster, type GameEvent, type GameMode } from '../lib/gameStats';
 import { toIso } from '../lib/dateUtils';
 import { resolveSelfPlayerForRequest, teamIdsOfPlayers } from '../lib/selfPlayer';
+import { coachManagesEvent } from '../lib/coachScope';
 
 /**
  * Live match statistics.
@@ -18,8 +19,9 @@ import { resolveSelfPlayerForRequest, teamIdsOfPlayers } from '../lib/selfPlayer
  *   POST /api/games/events/:eventId/events → append/undo events (idempotent by clientId)
  *   POST /api/games/events/:eventId/finish
  *
- * Keeping stats: club admins, coaches and staff, or the person a coach
- * delegated for that match (often a parent). Setup: admins/coaches/staff only.
+ * Keeping stats: club admins and staff, the coach of the match's team, or the
+ * person a coach delegated for that match (often a parent). Setup: the same
+ * minus the delegate.
  */
 
 const router = Router();
@@ -62,7 +64,9 @@ async function loadMatch(req: AuthenticatedRequest, res: Response) {
     }
 
     const [game] = await db.select().from(gameStats).where(eq(gameStats.eventId, eventId)).limit(1);
-    const staff = STAFF_ROLES.has(String(req.user?.role ?? ''));
+    // A coach sets up and keeps only the matches of teams they coach (or the
+    // match they are assigned to), the same rule as events and attendance.
+    const staff = STAFF_ROLES.has(role) && (role !== 'coach' || coachManagesEvent(row.team.coachId, row.event.coachId, req.user?.id));
     const canKeep = staff || (game != null && game.scorekeeperUserId === Number(req.user?.id));
     return { event: row.event, team: row.team, game: game ?? null, staff, canKeep };
 }

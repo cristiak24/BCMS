@@ -35,7 +35,8 @@ import {
     serializeFeeIds,
 } from '../lib/paymentLedger';
 import { createAllowedOrigins, isOriginAllowed } from '../lib/corsOrigins';
-import { roundMoney } from '../lib/money';
+import { fitsMoneyColumn, roundMoney } from '../lib/money';
+import { sendRouteError } from '../lib/httpErrors';
 import { isValidBillingMonth, type ComputedFee } from '../lib/feeSchedule';
 import { clubBalances, clubPlayers, collectedInRange, getClubFeeSettings, playerFees } from '../services/clubFinance';
 import { notifyPaymentRecorded } from '../lib/notifications';
@@ -394,7 +395,7 @@ async function getCurrentPlayer(req: Request): Promise<CurrentPlayer> {
 
 function normalizeMoneyValue(value: unknown) {
     const amount = Number(value);
-    return Number.isFinite(amount) && amount >= 0 ? amount : null;
+    return Number.isFinite(amount) && amount >= 0 && fitsMoneyColumn(amount) ? amount : null;
 }
 
 // Day-of-month (1..31) by which the monthly fee can be paid. Returns null for
@@ -864,10 +865,8 @@ function handleRouteError(res: Response, error: unknown, fallback: string) {
         ? Number((error as { statusCode?: number }).statusCode)
         : 500;
 
-    console.error(fallback, error);
-    res.status(Number.isFinite(statusCode) ? statusCode : 500).json({
-        error: error instanceof Error ? error.message : fallback,
-    });
+    // 5xx and database errors: generic text; the details only in the log.
+    sendRouteError(res, error, { status: Number.isFinite(statusCode) ? statusCode : 500, fallback, log: fallback });
 }
 
 export async function stripeWebhookHandler(req: Request, res: Response) {
@@ -1488,6 +1487,10 @@ router.post('/admin/manual-payment', async (req, res) => {
         }
         if (!Number.isFinite(amount) || amount <= 0) {
             res.status(400).json({ error: 'Suma trebuie să fie un număr mai mare ca 0.' });
+            return;
+        }
+        if (!fitsMoneyColumn(amount)) {
+            res.status(400).json({ error: 'Suma este prea mare.' });
             return;
         }
 

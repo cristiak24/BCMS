@@ -18,6 +18,7 @@ import ThemedCheckbox from '../../components/myclub/ThemedCheckbox';
 import { NoTeamsEmptyState, NoResultsEmptyState } from '../../components/myclub/EmptyState';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
+import { toCsv } from '../../utils/csv';
 
 const VIEW_STORAGE_KEY = 'myclub.view.v1';
 
@@ -265,9 +266,7 @@ export default function MyClubAdmin() {
             t.isActive ? 'Activă' : 'Inactivă',
             t.updatedAt,
         ]);
-        const csv = [header, ...rows]
-            .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-            .join('\n');
+        const csv = toCsv([header, ...rows]);
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');

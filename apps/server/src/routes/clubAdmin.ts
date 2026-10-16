@@ -3,9 +3,10 @@ import { and, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import { accessRequests, attendance, auditLogs, clubDocuments, clubInviteCodes, clubs, events, inviteLinks, invites, notifications, playerPayments, players, playersToTeams, teams, users } from '../db/schema';
 import { db } from '../db';
-import { createSuperAdminInvitation, isVisiblePendingInvite, resendClubInvitation, syncInvitationStatuses } from '../services/invitationsService';
+import { createSuperAdminInvitation, isVisiblePendingInvite, resendClubInvitation } from '../services/invitationsService';
 import { listAuditLogs, writeAuditLog } from '../services/auditService';
 import { rateLimit } from '../middleware/rateLimit';
+import { sendRouteError } from '../lib/httpErrors';
 import { getOrCompute, invalidate } from '../lib/microCache';
 import { deleteClerkUser } from '../lib/clerkAuth';
 import { publicUser } from '../lib/publicUser';
@@ -99,8 +100,6 @@ router.get('/accounts', async (req: AuthenticatedRequest, res) => {
         const clubId = actor.clubId!;
 
         const payload = await getOrCompute(accountsCacheKey(clubId), ACCOUNTS_CACHE_TTL_MS, async () => {
-            await syncInvitationStatuses();
-
             const [clubRows, userRows, inviteRows] = await Promise.all([
                 db.select({ id: clubs.id, name: clubs.name }).from(clubs).where(eq(clubs.id, clubId)).limit(1),
                 db.select(safeUserColumns).from(users).where(eq(users.clubId, clubId)).orderBy(desc(users.createdAt)),
@@ -200,9 +199,7 @@ router.post('/accounts/invitations', rateLimit({ bucket: 'club-admin:invite', li
         invalidate(accountsCacheKey(actor.clubId!));
         res.status(201).json({ success: true, invitation: result });
     } catch (error) {
-        console.error('Club admin create invitation error:', error);
-        const message = error instanceof Error ? error.message : 'Could not create invitation.';
-        res.status(400).json({ error: message });
+        sendRouteError(res, error, { fallback: 'Nu am putut crea invitația.', log: 'Club admin create invitation error:' });
     }
 });
 
@@ -405,10 +402,8 @@ router.post('/accounts/:id/resend', rateLimit({ bucket: 'club-admin:invite', lim
         invalidate(accountsCacheKey(actor.clubId!));
         res.json({ success: true, invitation });
     } catch (error) {
-        console.error('Club admin resend invitation error:', error);
-        const message = error instanceof Error ? error.message : 'Could not resend the invitation.';
-        const status = message.includes('not found') ? 404 : 400;
-        res.status(status).json({ error: message });
+        const status = error instanceof Error && error.message.includes('not found') ? 404 : 400;
+        sendRouteError(res, error, { status, fallback: 'Nu am putut retrimite invitația.', log: 'Club admin resend invitation error:' });
     }
 });
 

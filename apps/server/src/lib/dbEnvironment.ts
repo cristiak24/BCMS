@@ -33,3 +33,13 @@ export function checkDatabaseTarget(env: Env): DatabaseTargetCheck {
         + 'pune-i URL-ul în DATABASE_URL din .env.local și setează DB_ENVIRONMENT=development.';
     return { level: env.REQUIRE_DEV_DATABASE === '1' ? 'block' : 'warn', message };
 }
+
+/**
+ * TLS options for the Postgres pool. In production the server certificate is
+ * verified: `rejectUnauthorized: false` encrypted the connection but accepted
+ * any certificate, so anyone on the path could impersonate the database.
+ * Neon serves certificates from a public CA, which Node trusts by default.
+ */
+export function databaseSsl(env: Env): { rejectUnauthorized: true } | undefined {
+    return env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : undefined;
+}

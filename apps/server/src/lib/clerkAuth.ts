@@ -1,6 +1,7 @@
 import { createClerkClient, verifyToken } from '@clerk/backend';
 import { loadServerEnv } from './loadEnv';
 import { getOrCompute } from './microCache';
+import { verifiedEmailClaim, verifiedEmailOf } from './clerkEmail';
 
 loadServerEnv();
 
@@ -14,6 +15,7 @@ const clerkClient = createClerkClient({ secretKey });
 
 export type ClerkAuthUser = {
     uid: string;
+    /** A VERIFIED email of the Clerk user, or null when they have none. */
     email: string | null;
 };
 
@@ -21,16 +23,17 @@ export type ClerkAuthUser = {
  * Verifies a Clerk session token and resolves the caller's identity.
  *
  * The email isn't in the default session token claims, so this fetches it from
- * Clerk's API. Add an `email` claim to the session token customization in the
- * Clerk dashboard to skip that round trip — this reads `payload.email` first
- * and only falls back to the API call when it's absent.
+ * Clerk's API. Add `email` + `email_verified` claims to the session token
+ * customization in the Clerk dashboard to skip that round trip — this reads
+ * them first and only falls back to the API call when they're absent.
+ * Only a verified address is ever returned (lib/clerkEmail.ts).
  */
 export async function verifyBearerToken(token: string): Promise<ClerkAuthUser> {
     const payload = await verifyToken(token, { secretKey });
     const uid = payload.sub;
-    const claimedEmail = (payload as Record<string, unknown>).email;
+    const claimedEmail = verifiedEmailClaim(payload as Record<string, unknown>);
 
-    if (typeof claimedEmail === 'string' && claimedEmail) {
+    if (claimedEmail) {
         return { uid, email: claimedEmail };
     }
 
@@ -41,9 +44,7 @@ export async function verifyBearerToken(token: string): Promise<ClerkAuthUser> {
     // is plenty; concurrent requests share one lookup.
     const email = await getOrCompute(`clerk-email:${uid}`, CLERK_EMAIL_TTL_MS, async () => {
         const clerkUser = await clerkClient.users.getUser(uid);
-        return clerkUser.primaryEmailAddress?.emailAddress
-            ?? clerkUser.emailAddresses[0]?.emailAddress
-            ?? null;
+        return verifiedEmailOf(clerkUser);
     });
 
     return { uid, email };

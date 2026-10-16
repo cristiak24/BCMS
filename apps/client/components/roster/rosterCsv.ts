@@ -1,14 +1,8 @@
 import { Player } from '../../services/teamsApi';
 import { getAttendanceRate, getCategoryLabel, getPaymentLabel, getTeamLabel, isPlayerActive } from './rosterHelpers';
+import { toCsv } from '../../utils/csv';
 
 const CSV_HEADER = ['Nume', 'Prenume', 'Număr', 'Poziție', 'Echipă', 'Categorie', 'Prezență %', 'Status plată', 'Status'];
-
-function escapeCsvCell(value: string) {
-  if (/[",\n;]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
 
 export function buildRosterCsvRows(players: Player[]): string[][] {
   const rows = players.map((player) => [
@@ -28,7 +22,7 @@ export function buildRosterCsvRows(players: Player[]): string[][] {
 
 export function downloadRosterCsv(players: Player[], filename = 'lot-jucatori.csv') {
   const rows = buildRosterCsvRows(players);
-  const csvContent = rows.map((row) => row.map(escapeCsvCell).join(',')).join('\n');
+  const csvContent = toCsv(rows);
   const blob = new Blob([`﻿${csvContent}`], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
 

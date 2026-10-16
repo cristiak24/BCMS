@@ -6,6 +6,7 @@ import { authenticate, requireSuperadmin, AuthenticatedRequest } from '../middle
 import { createSuperAdminInvitation } from '../services/invitationsService';
 import { loadServerEnv } from '../lib/loadEnv';
 import { clientIp, rateLimit } from '../middleware/rateLimit';
+import { sendRouteError } from '../lib/httpErrors';
 import { loadOwnRequests } from '../lib/accessNotify';
 import { resolveSelfPlayerForRequest, teamIdsOfPlayers } from '../lib/selfPlayer';
 import { describeInvite, resolveInvite } from '../lib/inviteResolver';
@@ -125,9 +126,7 @@ router.post('/superadmin/create-admin-invite', authenticate, requireSuperadmin, 
             message: 'Invite created successfully.'
         });
     } catch (error) {
-        console.error('Create invite error:', error);
-        const message = error instanceof Error ? error.message : 'Internal server error';
-        res.status(400).json({ error: message });
+        sendRouteError(res, error, { fallback: 'Nu am putut crea invitația.', log: 'Create invite error:' });
     }
 });
 
@@ -161,9 +160,7 @@ router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidL
         });
         res.status(outcome.status).json(outcome.body);
     } catch (error) {
-        console.error('Complete invite signup error:', error);
-        const message = error instanceof Error ? error.message : 'Internal server error';
-        res.status(400).json({ error: message });
+        sendRouteError(res, error, { fallback: 'Nu am putut finaliza înregistrarea.', log: 'Complete invite signup error:' });
     }
 });
 

@@ -2,7 +2,7 @@ import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
 import { loadServerEnv } from '../lib/loadEnv';
-import { checkDatabaseTarget } from '../lib/dbEnvironment';
+import { checkDatabaseTarget, databaseSsl } from '../lib/dbEnvironment';
 
 loadServerEnv();
 
@@ -41,7 +41,7 @@ function createDatabase() {
 
   const pgPool = new Pool({
     connectionString,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+    ssl: databaseSsl(process.env),
     // pg's default closes idle connections after 10s, so a user coming back
     // after a short pause paid a fresh TCP + TLS + auth handshake to Neon on
     // their first query. Keep warm connections around longer.

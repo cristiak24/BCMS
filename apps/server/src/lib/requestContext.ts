@@ -2,9 +2,7 @@ import { Request, Response } from 'express';
 import type { AppUserContext } from '../types/manageAccess';
 import { normalizeRole } from './requestAuth';
 import { verifyBearerToken } from './clerkAuth';
-import { db } from '../db';
-import { users } from '../db/schema';
-import { eq, or, sql } from 'drizzle-orm';
+import { findOrLinkUser } from './identityLink';
 import { recordActivity } from './activityTracker';
 
 type ErrorPayload = { error: string };
@@ -33,36 +31,9 @@ async function getBearerAuthenticatedUser(req: Request): Promise<AppUserContext 
 
     try {
         const decodedToken = await verifyBearerToken(token);
-        let userRows = await db
-            .select()
-            .from(users)
-            .where(or(
-                eq(users.firebaseUid, decodedToken.uid),
-                eq(users.uid, decodedToken.uid),
-            ))
-            .limit(1);
-
-        if (userRows.length === 0 && decodedToken.email) {
-            const email = decodedToken.email.trim().toLowerCase();
-            const emailRows = await db
-                .select()
-                .from(users)
-                .where(sql`lower(${users.email}) = ${email}`)
-                .limit(1);
-
-            if (emailRows[0]) {
-                userRows = await db
-                    .update(users)
-                    .set({
-                        firebaseUid: decodedToken.uid,
-                        updatedAt: new Date().toISOString(),
-                    })
-                    .where(eq(users.id, emailRows[0].id))
-                    .returning();
-            }
-        }
-
-        const user = userRows[0];
+        // Same lookup as the authenticate middleware: a first sign-in is linked
+        // by verified email only when the row isn't someone else's.
+        const user = await findOrLinkUser(decodedToken);
         if (!user) {
             return null;
         }
