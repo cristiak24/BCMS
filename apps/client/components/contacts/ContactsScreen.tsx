@@ -100,11 +100,14 @@ function PlayerCard({
   teamNames,
   onSave,
   onNotify,
+  readOnly = false,
 }: {
   player: PlayerContact;
   teamNames: string;
   onSave: (update: PlayerContactUpdate) => Promise<boolean>;
   onNotify: (toast: { variant: 'success' | 'error'; message: string }) => void;
+  /** The accountant sees the numbers but does not edit them or manage parents. */
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [family, setFamily] = useState(false);
@@ -146,7 +149,7 @@ function PlayerCard({
           <Text className="f-display text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.01em' } as any} numberOfLines={1}>{name}</Text>
           <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{teamNames || 'Fără echipă'}</Text>
         </View>
-        {!editing ? (
+        {!editing && !readOnly ? (
           <Pressable
             onPress={() => setFamily((v) => !v)}
             accessibilityRole="button"
@@ -158,7 +161,7 @@ function PlayerCard({
             <MaterialIcons name="family-restroom" size={15} color={family ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)'} />
           </Pressable>
         ) : null}
-        {!editing ? (
+        {!editing && !readOnly ? (
           <Pressable
             onPress={() => { setDraft(player); setEditing(true); }}
             accessibilityRole="button"
@@ -207,6 +210,8 @@ function PlayerCard({
           {player.guardianPhone || player.guardianName ? <PhoneLine label="Părinte 1" name={player.guardianName} phone={player.guardianPhone} /> : null}
           {player.guardian2Phone || player.guardian2Name ? <PhoneLine label="Părinte 2" name={player.guardian2Name} phone={player.guardian2Phone} /> : null}
         </View>
+      ) : readOnly ? (
+        <Text className="text-[13px]" style={{ color: 'var(--c-faint)' }}>Niciun număr de telefon încă.</Text>
       ) : (
         <Pressable onPress={() => { setDraft(player); setEditing(true); }} accessibilityRole="button" className="ui-press flex-row items-center gap-1.5 self-start">
           <MaterialIcons name="add" size={15} color="var(--c-brand-fg)" />
@@ -419,6 +424,7 @@ export default function ContactsScreen() {
                           teamNames={p.teamIds.map((id) => teamName.get(id)).filter(Boolean).join(', ')}
                           onSave={(update) => savePlayer(p.id, update)}
                           onNotify={showToast}
+                          readOnly={data.mode === 'staff' && data.canEdit === false}
                         />
                       ))}
                     </View>

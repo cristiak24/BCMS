@@ -1,12 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isContactStaff, normalizePhone, parsePlayerContact } from './contacts';
+import { canReadFamilyContacts, isContactStaff, normalizePhone, parsePlayerContact } from './contacts';
 
 test('only admins and coaches see family numbers', () => {
     assert.equal(isContactStaff('coach'), true);
     assert.equal(isContactStaff('admin'), true);
     assert.equal(isContactStaff('parent'), false);
     assert.equal(isContactStaff('accountant'), false);
+    // The accountant reads families' numbers (arrears follow-up) but does not edit them.
+    assert.equal(canReadFamilyContacts('accountant'), true);
+    assert.equal(canReadFamilyContacts('coach'), true);
+    assert.equal(canReadFamilyContacts('parent'), false);
+    assert.equal(canReadFamilyContacts('player'), false);
 });
 
 test('phone numbers accept the usual Romanian formats', () => {

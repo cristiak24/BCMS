@@ -6,14 +6,15 @@ import { writeAuditLog } from '../services/auditService';
 import { db } from '../db';
 import { playerGuardians, players, playersToTeams, teams, users } from '../db/schema';
 import { resolveRequestClubId } from '../lib/tenantScope';
-import { isContactStaff, parsePlayerContact } from '../lib/contacts';
+import { canReadFamilyContacts, isContactStaff, parsePlayerContact } from '../lib/contacts';
 import { guardianChildren, resolveSelfPlayer, teamIdsOfPlayers } from '../lib/selfPlayer';
 
 /**
  * Club contact book.
  *
  *   GET /api/contacts
- *     admin/coach → { mode: 'staff', teams, players (own + parents' numbers), staff }
+ *     admin/coach/accountant → { mode: 'staff', teams, players (own + parents' numbers), staff, canEdit }
+ *                     (the accountant reads them, canEdit: false)
  *     everyone else → { mode: 'member', staff } — coaches' and admins' numbers,
  *                     their own team's coaches first. Never another family's number.
  *   PUT /api/contacts/players/:id   (admin/coach) → set a player's and parents' numbers
@@ -49,14 +50,15 @@ async function clubStaff(clubId: number) {
 router.get('/', async (req: AuthenticatedRequest, res) => {
     try {
         const clubId = resolveRequestClubId(req.user);
+        const canEdit = isContactStaff(req.user?.role);
         if (clubId == null) {
-            res.json({ mode: isContactStaff(req.user?.role) ? 'staff' : 'member', teams: [], players: [], staff: [] });
+            res.json({ mode: canReadFamilyContacts(req.user?.role) ? 'staff' : 'member', teams: [], players: [], staff: [], canEdit });
             return;
         }
         const { staff, teamRows } = await clubStaff(clubId);
         const teamIds = teamRows.map((team) => team.id);
 
-        if (!isContactStaff(req.user?.role)) {
+        if (!canReadFamilyContacts(req.user?.role)) {
             // The caller's teams: a player's own; a parent's — every linked child's.
             const selfIds = req.user?.role === 'parent'
                 ? (await guardianChildren(Number(req.user.id))).map((child) => child.id)
@@ -71,7 +73,7 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
         }
 
         if (!teamIds.length) {
-            res.json({ mode: 'staff', teams: [], players: [], staff });
+            res.json({ mode: 'staff', teams: [], players: [], staff, canEdit });
             return;
         }
 
@@ -124,7 +126,7 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
             }))
             .sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`));
 
-        res.json({ mode: 'staff', teams: teamRows.map((t) => ({ id: t.id, name: t.name })), players: list, staff });
+        res.json({ mode: 'staff', teams: teamRows.map((t) => ({ id: t.id, name: t.name })), players: list, staff, canEdit });
     } catch (error) {
         console.error('[contacts:list] error:', error);
         res.status(500).json({ error: 'Nu am putut încărca agenda.' });

@@ -13,7 +13,12 @@ function currentMonth() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export default function FeeExtrasCard({ settings, onSaved }: { settings: FinancialSettings | null; onSaved: (next: FinancialSettings) => void }) {
+export default function FeeExtrasCard({ settings, onSaved, readOnly = false }: {
+    settings: FinancialSettings | null;
+    onSaved: (next: FinancialSettings) => void;
+    /** The accountant sees the fees but only the club admin changes them. */
+    readOnly?: boolean;
+}) {
     const [levy, setLevy] = useState('');
     const [facility, setFacility] = useState('');
     const [startMonth, setStartMonth] = useState('');
@@ -66,6 +71,7 @@ export default function FeeExtrasCard({ settings, onSaved }: { settings: Financi
                     placeholder={placeholder}
                     placeholderTextColor="var(--c-faint)"
                     accessibilityLabel={label}
+                    editable={!readOnly}
                     className="flex-1 h-10 rounded-[10px] px-3 border text-[15px] font-semibold"
                     style={{ borderColor: invalid ? 'var(--c-danger-border)' : 'var(--c-border)', color: 'var(--c-ink)', backgroundColor: 'var(--c-surface)' } as any}
                 />
@@ -93,12 +99,16 @@ export default function FeeExtrasCard({ settings, onSaved }: { settings: Financi
                     : 'Necompletat: se cere doar luna curentă, iar lunile trecute neplătite nu apar ca restanțe.'}
             </Text>
 
-            <View className="flex-row items-center gap-3 flex-wrap">
-                <Button variant="primary" size="sm" icon="save" label="Salvează" loading={saving} disabled={!valid || !dirty} onPress={() => void save()} />
-                {message ? (
-                    <Text className="text-[12px] font-medium" style={{ color: message.tone === 'ok' ? 'var(--c-success-fg)' : 'var(--c-danger-fg)' }}>{message.text}</Text>
-                ) : null}
-            </View>
+            {readOnly ? (
+                <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>Doar administratorul clubului poate modifica taxele.</Text>
+            ) : (
+                <View className="flex-row items-center gap-3 flex-wrap">
+                    <Button variant="primary" size="sm" icon="save" label="Salvează" loading={saving} disabled={!valid || !dirty} onPress={() => void save()} />
+                    {message ? (
+                        <Text className="text-[12px] font-medium" style={{ color: message.tone === 'ok' ? 'var(--c-success-fg)' : 'var(--c-danger-fg)' }}>{message.text}</Text>
+                    ) : null}
+                </View>
+            )}
         </View>
     );
 }

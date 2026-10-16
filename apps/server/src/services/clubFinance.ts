@@ -45,9 +45,20 @@ export async function getClubFeeSettings(clubId: number, exec: DbExecutor = db):
 
 type PlayerRow = typeof players.$inferSelect;
 
-/** An inactive (left / archived) player is not billed new months. */
-function isBillable(player: { status: string | null }) {
-    return String(player.status ?? 'active').trim().toLowerCase() !== 'inactive';
+/**
+ * Monthly fees are billed only to an active player who is on at least one
+ * active team of the club. A player taken off every team, or left only on a
+ * deactivated team, is not billed (user decision, 2026-10-16); what they
+ * already owe through club requests and events they took part in remains.
+ */
+function billsRecurring(player: { status: string | null }, activeTeamCount: number) {
+    return String(player.status ?? 'active').trim().toLowerCase() !== 'inactive' && activeTeamCount > 0;
+}
+
+/** Fee events a player can owe: all of an active team's; only past ones of a deactivated team. */
+function billableEvents(rows: FeeEvent[], teamActive: boolean, now: Date) {
+    if (teamActive) return rows;
+    return rows.filter((event) => event.startTime != null && new Date(event.startTime).getTime() < now.getTime());
 }
 
 function toLedgerRow(row: typeof playerPayments.$inferSelect): LedgerRow {
@@ -132,9 +143,11 @@ export async function playerFees(player: FeePlayer, clubId: number | null, now =
     const settings = clubId != null ? toFeeSettings(await getClubFeeSettings(clubId, exec)) : toFeeSettings(null);
     const teamIds = Array.from((await teamIdsByPlayer([player], exec)).get(player.id) ?? []);
     // Only this club's teams can bill the player.
-    const clubTeamIds = teamIds.length && clubId != null
-        ? (await exec.select({ id: teams.id }).from(teams).where(and(inArray(teams.id, teamIds), eq(teams.clubId, clubId)))).map((row) => row.id)
+    const clubTeams = teamIds.length && clubId != null
+        ? await exec.select({ id: teams.id, isActive: teams.isActive }).from(teams).where(and(inArray(teams.id, teamIds), eq(teams.clubId, clubId)))
         : [];
+    const clubTeamIds = clubTeams.map((row) => row.id);
+    const activeTeamIds = new Set(clubTeams.filter((row) => row.isActive).map((row) => row.id));
     const loadRows = () => exec.select().from(playerPayments).where(eq(playerPayments.playerId, player.id));
     const [rows, feeEvents] = exec === db
         ? await Promise.all([loadRows(), loadFeeEvents(clubTeamIds, [player.id])])
@@ -143,11 +156,11 @@ export async function playerFees(player: FeePlayer, clubId: number | null, now =
     const input: FeeInput = {
         settings,
         rows: rows.map(toLedgerRow),
-        events: feeEvents.events.map(toFeeEvent),
+        events: feeEvents.events.flatMap((event) => billableEvents([toFeeEvent(event)], event.teamId != null && activeTeamIds.has(event.teamId), now)),
         attendedEventIds: feeEvents.attendedByPlayer.get(player.id) ?? new Set(),
         playerSince: player.createdAt ?? null,
         now,
-        billRecurring: isBillable(player),
+        billRecurring: billsRecurring(player, activeTeamIds.size),
     };
     const { fees, credit } = computePlayerLedger(input);
     return { fees, totals: summarizeFees(fees), credit, rows, input };
@@ -157,6 +170,8 @@ export type ClubPlayer = {
     player: PlayerRow;
     teamIds: number[];
     teamName: string | null;
+    /** The player's teams that are active (none → no monthly fees). */
+    activeTeamIds: number[];
 };
 
 /**
@@ -165,7 +180,7 @@ export type ClubPlayer = {
  * players stay in — an archived player can still owe money.
  */
 export async function clubPlayers(clubId: number, teamId: number | null = null): Promise<ClubPlayer[]> {
-    const teamRows = await db.select({ id: teams.id, name: teams.name }).from(teams).where(eq(teams.clubId, clubId));
+    const teamRows = await db.select({ id: teams.id, name: teams.name, isActive: teams.isActive }).from(teams).where(eq(teams.clubId, clubId));
     const scopedTeams = teamId != null ? teamRows.filter((team) => team.id === teamId) : teamRows;
     const teamName = new Map(scopedTeams.map((team) => [team.id, team.name]));
     const teamIds = scopedTeams.map((team) => team.id);
@@ -191,10 +206,16 @@ export async function clubPlayers(clubId: number, teamId: number | null = null):
 
     const teamsOf = await teamIdsByPlayer(Array.from(byId.values()));
     const clubTeamSet = new Set(teamRows.map((team) => team.id));
+    const activeTeamSet = new Set(teamRows.filter((team) => team.isActive).map((team) => team.id));
     return Array.from(byId.values()).map((player) => {
         const ids = Array.from(teamsOf.get(player.id) ?? []).filter((id) => clubTeamSet.has(id));
         const scoped = ids.find((id) => teamName.has(id));
-        return { player, teamIds: ids, teamName: scoped != null ? teamName.get(scoped) ?? null : null };
+        return {
+            player,
+            teamIds: ids,
+            teamName: scoped != null ? teamName.get(scoped) ?? null : null,
+            activeTeamIds: ids.filter((id) => activeTeamSet.has(id)),
+        };
     });
 }
 
@@ -241,9 +262,10 @@ export async function clubBalances(clubId: number, options: { teamId?: number | 
         eventsByTeam.set(event.teamId, list);
     });
 
-    return roster.map(({ player, teamIds, teamName }) => {
+    return roster.map(({ player, teamIds, teamName, activeTeamIds }) => {
+        const active = new Set(activeTeamIds);
         const playerEvents = new Map<number, FeeEvent>();
-        teamIds.forEach((id) => (eventsByTeam.get(id) ?? []).forEach((event) => playerEvents.set(event.id, event)));
+        teamIds.forEach((id) => billableEvents(eventsByTeam.get(id) ?? [], active.has(id), now).forEach((event) => playerEvents.set(event.id, event)));
         const { fees, credit } = computePlayerLedger({
             settings,
             rows: rowsByPlayer.get(player.id) ?? [],
@@ -251,7 +273,7 @@ export async function clubBalances(clubId: number, options: { teamId?: number | 
             attendedEventIds: feeEvents.attendedByPlayer.get(player.id) ?? new Set(),
             playerSince: player.createdAt ?? null,
             now,
-            billRecurring: isBillable(player),
+            billRecurring: billsRecurring(player, active.size),
         });
         return {
             playerId: player.id,

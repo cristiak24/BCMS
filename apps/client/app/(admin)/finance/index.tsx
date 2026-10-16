@@ -9,6 +9,7 @@ import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import StripeConnectCard from '../../../components/finance/StripeConnectCard';
 import { useLocalSearchParams } from '@/src/web/expoRouter';
 import { useResponsive } from '../../../hooks/useResponsive';
+import { useSession } from '../../../context/AuthContext';
 import { buildServerUrl, resolveDocumentUrl } from '../../../config/serverUrl';
 import { apiFetch } from '../../../services/apiClient';
 import PageHero, { GlassStat } from '../../../components/admin/PageHero';
@@ -160,6 +161,9 @@ function ModalShell({ visible, onClose, children, maxWidth = 420 }: {
 
 export default function FinancialSettingsPage() {
     const { isMobile } = useResponsive();
+    // The accountant collects money but does not change the fees (the server refuses too).
+    const { session } = useSession();
+    const canEditFees = session?.role === 'admin' || session?.role === 'superadmin';
     // Back from Stripe's onboarding (?tab=online&connect=return) → the online tab.
     const params = useLocalSearchParams<{ tab?: string; connect?: string }>();
     const [activeTab, setActiveTab] = useState(params.tab === 'online' ? 'Payment Gateways' : 'Finances');
@@ -551,7 +555,7 @@ export default function FinancialSettingsPage() {
                             <View className={`rounded-[12px] p-3.5 border flex-1 ${isMobile ? 'mb-3' : ''}`} style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
                                 <View className="flex-row justify-between items-center mb-3">
                                     <Text className="font-bold text-[11px] uppercase tracking-wider shrink" style={{ color: dash.muted }}>Cotizație</Text>
-                                    {!editingFee && (
+                                    {!editingFee && canEditFees && (
                                         <Pressable onPress={() => setEditingFee(true)} className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-[10px] shrink-0" style={{ backgroundColor: 'rgba(99,91,255,0.08)' }}>
                                             <MaterialIcons name="edit" size={12} color={dash.accent} />
                                             <Text className="text-[12px] font-bold" style={{ color: dash.accent }}>Modifică</Text>
@@ -615,7 +619,7 @@ export default function FinancialSettingsPage() {
                             <View className="rounded-[12px] p-3.5 border flex-1" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
                                 <View className="flex-row justify-between items-center mb-3">
                                     <Text className="font-bold text-[11px] uppercase tracking-wider" style={{ color: dash.muted }}>Zi limită</Text>
-                                    {!editingDueDay && (
+                                    {!editingDueDay && canEditFees && (
                                         <Pressable onPress={() => setEditingDueDay(true)} className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-[10px] shrink-0" style={{ backgroundColor: 'rgba(99,91,255,0.08)' }}>
                                             <MaterialIcons name="edit" size={12} color={dash.accent} />
                                             <Text className="text-[12px] font-bold" style={{ color: dash.accent }}>Modifică</Text>
@@ -738,6 +742,7 @@ export default function FinancialSettingsPage() {
 
                     <FeeExtrasCard
                         settings={settings}
+                        readOnly={!canEditFees}
                         onSaved={(next) => { setSettings(next); void loadSummary(); }}
                     />
 

@@ -32,7 +32,14 @@ export type PlayerContact = {
 export type PlayerContactUpdate = Pick<PlayerContact, 'phone' | 'guardianName' | 'guardianPhone' | 'guardian2Name' | 'guardian2Phone'>;
 
 export type ContactsResponse =
-    | { mode: 'staff'; teams: { id: number; name: string }[]; players: PlayerContact[]; staff: StaffContact[] }
+    | {
+        mode: 'staff';
+        teams: { id: number; name: string }[];
+        players: PlayerContact[];
+        staff: StaffContact[];
+        /** False for the accountant, who reads families' numbers but does not edit them. Absent on older servers (= true). */
+        canEdit?: boolean;
+    }
     | { mode: 'member'; staff: StaffContact[] };
 
 export const contactsApi = {

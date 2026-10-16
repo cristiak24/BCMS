@@ -3,7 +3,7 @@ import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
-import { clubs, events, financialSettings, notifications, playerPayments, players, teams, users } from '../db/schema';
+import { clubs, events, financialSettings, notifications, playerPayments, players, playersToTeams, teams, users } from '../db/schema';
 import { closeDb, createSchema } from '../test/pgliteDb';
 import { applyCheckoutSession, feeIdMetadata, previewManualPayment, recordManualPayment } from './payments';
 import { clubBalances } from './clubFinance';
@@ -288,4 +288,46 @@ test('payment reminders go only to families with something past due', async () =
         assert.deepEqual(sent.map((row) => row.userId), [accounts[0].id]);
         assert.match(sent[0].message, /RON restanți/);
     });
+});
+
+// ── Who is billed (user decision 2026-10-16): only players on an active team ──
+
+async function newTeam(name: string, isActive: boolean) {
+    const [team] = await db.insert(teams).values({
+        frbTeamId: '', name, frbLeagueId: '', leagueName: 'Liga', frbSeasonId: '', seasonName: '2026', inviteCode: `T${name}`, clubId, isActive,
+    }).returning();
+    return team;
+}
+
+test('a player left only on a deactivated team is not billed', async () => {
+    const closed = await newTeam('U18', false);
+    const [player] = await db.insert(players).values({
+        name: 'Paul', firstName: 'Paul', lastName: 'Test', status: 'active', teamId: closed.id,
+        createdAt: new Date(now.getFullYear() - 1, 0, 1).toISOString(),
+    }).returning();
+    // An upcoming tournament of the deactivated team is not billed either.
+    await db.insert(events).values({
+        type: 'match', title: 'Turneu U18', startTime: new Date(now.getTime() + 5 * 864e5).toISOString(),
+        endTime: new Date(now.getTime() + 5 * 864e5 + 36e5).toISOString(), teamId: closed.id, amount: 40,
+    });
+    const balance = await balanceOf(player.id);
+    assert.equal(balance.outstanding, 0);
+    assert.deepEqual(balance.fees, []);
+
+    // Also on an active team: billed again (the active team's month, not the closed team's event).
+    await db.insert(playersToTeams).values({ playerId: player.id, teamId });
+    const billed = await balanceOf(player.id);
+    assert.deepEqual(billed.fees.map((fee) => fee.id), [`monthly:${thisMonth}`]);
+});
+
+test('a player taken off every team is not billed', async () => {
+    // Still on the club's books through their own account, but on no team.
+    await db.insert(users).values({ email: 'fara.echipa@test.local', name: 'Fără Echipă', role: 'player', status: 'active', clubId });
+    const [player] = await db.insert(players).values({
+        name: 'Ilie', firstName: 'Ilie', lastName: 'Test', status: 'active', teamId: null, email: 'fara.echipa@test.local',
+        createdAt: new Date(now.getFullYear() - 1, 0, 1).toISOString(),
+    }).returning();
+    const balance = await balanceOf(player.id);
+    assert.ok(balance, 'still listed in the club balances');
+    assert.equal(balance.outstanding, 0);
 });

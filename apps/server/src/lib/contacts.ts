@@ -2,11 +2,20 @@
  * Contact book rules (routes/contacts.ts) — pure and tested.
  */
 
-/** Roles that see families' numbers and edit them. */
+/** Roles that edit families' numbers. */
 const CONTACT_STAFF_ROLES = new Set(['admin', 'superadmin', 'coach']);
+/**
+ * Roles that see families' numbers: staff, plus the accountant, who follows
+ * up on arrears (read only — user decision, 2026-10-16).
+ */
+const CONTACT_READER_ROLES = new Set([...CONTACT_STAFF_ROLES, 'accountant']);
 
 export function isContactStaff(role: unknown) {
     return CONTACT_STAFF_ROLES.has(String(role ?? ''));
+}
+
+export function canReadFamilyContacts(role: unknown) {
+    return CONTACT_READER_ROLES.has(String(role ?? ''));
 }
 
 type Result<T> = { ok: true; value: T } | { ok: false; error: string };

@@ -6,6 +6,7 @@ import { toDate, toIso } from '../lib/dateUtils';
 import { verifyBearerToken } from '../lib/clerkAuth';
 import { requireRequestUser } from '../lib/requestContext';
 import { normalizeRole } from '../lib/requestAuth';
+import { canEditFeeSettings, canUseFinance } from '../lib/financeRoles';
 import { DEFAULT_PAYMENT_DUE_DAY, DEFAULT_SETTINGS_ROW_ID } from '../lib/financeDefaults';
 import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import { writeAuditLog, type AuditLogInput } from '../services/auditService';
@@ -465,15 +466,17 @@ async function getSettingsData(clubId?: number | null) {
     };
 }
 
-async function resolveAdminFinanceClubId(req: Request, res: Response) {
+async function resolveAdminFinanceClubId(req: Request, res: Response, allowed: (role: string) => boolean = canUseFinance) {
     const user = await requireRequestUser(req, res);
     if (!user) {
         return null;
     }
 
     const role = normalizeRole(user.role);
-    if (!['admin', 'superadmin', 'accountant'].includes(role)) {
-        res.status(403).json({ error: 'Admin finance access is required.' });
+    if (!allowed(role)) {
+        res.status(403).json({
+            error: role === 'accountant' ? 'Doar administratorul clubului poate modifica taxele.' : 'Admin finance access is required.',
+        });
         return null;
     }
 
@@ -1753,7 +1756,7 @@ router.get('/settings', async (req, res) => {
 
 router.patch('/settings', async (req, res) => {
     try {
-        const clubId = await resolveAdminFinanceClubId(req, res);
+        const clubId = await resolveAdminFinanceClubId(req, res, canEditFeeSettings);
         if (clubId === null && res.headersSent) {
             return;
         }
