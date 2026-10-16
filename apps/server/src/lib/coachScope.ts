@@ -30,3 +30,19 @@ export function coachManagesEvent(teamCoachId: unknown, eventCoachId: unknown, u
 export function teamsManagedByCoach(teams: Array<{ id: number; coachId: number | null }>, userId: unknown) {
     return teams.filter((team) => coachManagesTeam(team.coachId, userId)).map((team) => team.id);
 }
+
+/**
+ * What a coach may SEE of a player's personal data (contacts, medical visa,
+ * payments, attendance notes): players of a team they manage, or players on
+ * no team yet (so they can be added to one). Another squad's players are
+ * not theirs to read — club decision on P1-5 (2026-10-16).
+ */
+export function coachSeesPlayer(playerTeamIds: Iterable<number>, managedTeamIds: Iterable<number>) {
+    const managed = new Set(managedTeamIds);
+    let onAnyTeam = false;
+    for (const teamId of playerTeamIds) {
+        if (managed.has(teamId)) return true;
+        onAnyTeam = true;
+    }
+    return !onAnyTeam;
+}

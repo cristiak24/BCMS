@@ -1,14 +1,14 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
 import { players, teams, playersToTeams, attendance, playerPayments, users, events, playerGuardians } from '../db/schema';
-import { and, desc, eq, inArray, lte, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lte, notExists, or, sql } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ensureClubPlayerRecords } from '../lib/clubPlayerRecords';
 import { buildPlayerUpdate } from '../lib/playerUpdate';
 import { toIso } from '../lib/dateUtils';
 import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
 import { isFailedStatus, isOutstandingStatus, isPaidStatus } from '../lib/paymentLedger';
-import { teamsManagedByCoach } from '../lib/coachScope';
+import { coachSeesPlayer, teamsManagedByCoach } from '../lib/coachScope';
 import { attendanceSummary, isAttendedStatus, isCountedStatus } from '../lib/attendanceRate';
 import { clubBalances, playerFees } from '../services/clubFinance';
 import { listPlayerHistory, writeAuditLog } from '../services/auditService';
@@ -106,6 +106,30 @@ async function coachMayUseTeam(req: AuthenticatedRequest, teamId: number) {
 }
 
 const COACH_SCOPE_ERROR = 'Poți modifica doar jucătorii echipelor pe care le antrenezi.';
+const COACH_READ_ERROR = 'Poți vedea doar jucătorii echipelor pe care le antrenezi.';
+
+/** For a coach, the club teams they manage (lib/coachScope.ts); null for every other role. */
+async function coachManagedTeamIds(req: AuthenticatedRequest): Promise<number[] | null> {
+    if (req.user?.role !== 'coach') return null;
+    const clubId = getRequestClubId(req);
+    if (clubId == null) return [];
+    const clubTeams = await db.select({ id: teams.id, coachId: teams.coachId }).from(teams).where(eq(teams.clubId, clubId));
+    return teamsManagedByCoach(clubTeams, req.user?.id);
+}
+
+/** SQL twin of coachSeesPlayer: on a managed team, or on no team at all. */
+function coachVisiblePlayers(managedTeamIds: number[]) {
+    const onNoTeam = and(
+        isNull(players.teamId),
+        notExists(db.select({ id: playersToTeams.id }).from(playersToTeams).where(eq(playersToTeams.playerId, players.id))),
+    );
+    if (!managedTeamIds.length) return onNoTeam;
+    return or(
+        inArray(players.teamId, managedTeamIds),
+        inArray(players.id, db.select({ id: playersToTeams.playerId }).from(playersToTeams).where(inArray(playersToTeams.teamId, managedTeamIds))),
+        onNoTeam,
+    );
+}
 
 /** One entry in the player's history (Jurnal + the player page). */
 function auditPlayer(req: AuthenticatedRequest, action: string, playerId: number, metadata: Record<string, unknown>) {
@@ -136,6 +160,9 @@ async function getPlayerClubIdByEmail(email?: string | null) {
 async function isPlayerAllowedForRequest(req: AuthenticatedRequest, player: typeof players.$inferSelect) {
     const allowedTeamIds = await getAllowedTeamIds(req);
     if (allowedTeamIds === null) return true;
+
+    const managed = await coachManagedTeamIds(req);
+    if (managed !== null && !coachSeesPlayer(await getTeamIdsForPlayer(player.id, player.teamId ?? null), managed)) return false;
 
     const allowedSet = new Set(allowedTeamIds);
     const membershipRows = await db.select().from(playersToTeams).where(eq(playersToTeams.playerId, player.id));
@@ -284,6 +311,19 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
                 .filter(m => allowedTeamsSet.has(m.teamId))
             : [];
         clubIdByUserEmail = new Map(clubId != null ? clubEmails.map(email => [email, clubId] as const) : []);
+    }
+
+    // A coach's roster: their teams' players and the club's unassigned ones,
+    // never another squad's (contacts, medical visas, payments).
+    if (req.user?.role === 'coach') {
+        const managed = teamsManagedByCoach(allTeams, req.user?.id);
+        const teamsOf = new Map<number, number[]>();
+        for (const m of membershipRows) teamsOf.set(m.playerId, [...(teamsOf.get(m.playerId) ?? []), m.teamId]);
+        const clubTeamIds = new Set(allTeams.map((t) => t.id));
+        allPlayers = allPlayers.filter((p) => coachSeesPlayer(
+            [...(teamsOf.get(p.id) ?? []), ...(p.teamId != null && clubTeamIds.has(p.teamId) ? [p.teamId] : [])],
+            managed,
+        ));
     }
 
     if (!allPlayers.length) return [];
@@ -513,6 +553,8 @@ async function buildPlayerScope(req: AuthenticatedRequest): Promise<{ skip: true
         const linkedIds = await clubLinkedPlayerIds(clubId);
         if (linkedIds.length) inClub.push(inArray(players.id, linkedIds));
         scope = or(...inClub);
+        const managed = await coachManagedTeamIds(req);
+        if (managed !== null) scope = and(scope, coachVisiblePlayers(managed));
     }
     return { skip: false, scope };
 }
@@ -877,7 +919,7 @@ export const playersController = {
             } else {
                 const allowedTeamIds = await getAllowedTeamIds(req);
                 if (allowedTeamIds !== null) {
-                    if (!await isPlayerAllowedForRequest(req, player)) return res.status(403).json({ error: 'Access denied' });
+                    if (!await isPlayerAllowedForRequest(req, player)) return res.status(403).json({ error: req.user?.role === 'coach' ? COACH_READ_ERROR : 'Access denied' });
                 }
             }
 
@@ -897,7 +939,7 @@ export const playersController = {
             const [player] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
             if (!player) return res.status(404).json({ error: 'Player not found' });
             if (!isSuperadmin(req) && !await isPlayerAllowedForRequest(req, player)) {
-                return res.status(403).json({ error: 'Access denied' });
+                return res.status(403).json({ error: req.user?.role === 'coach' ? COACH_READ_ERROR : 'Access denied' });
             }
             res.json({ logs: await listPlayerHistory(isSuperadmin(req) ? null : getRequestClubId(req), playerId) });
         } catch (error) {

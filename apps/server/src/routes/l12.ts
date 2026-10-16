@@ -18,8 +18,8 @@ import { coachManagesEvent, coachManagesTeam } from '../lib/coachScope';
  *   PUT  /api/l12/events/:eventId
  *   DELETE /api/l12/events/:eventId       → back to "not set" (the template stays)
  *
- * Admins and coaches of the team's club may read; a coach changes only the
- * teams (or matches) they manage — the same rule as marking attendance. Player names are always read from the players table, never
+ * Admins of the club, and coaches for the teams (or matches) they manage —
+ * the same rule as marking attendance. Player names are always read from the players table, never
  * taken from the request, so a sheet cannot carry a name that is not on the
  * club's books.
  */
@@ -30,15 +30,15 @@ router.use(authenticate, requireRoles(['admin', 'coach']));
 type TeamRow = typeof teams.$inferSelect;
 
 /**
- * The team, when the caller may see it (same club). With `write`, a coach must
- * also manage it — coach of the team, or of the one match (`eventCoachId`) —
- * as for events and attendance (lib/coachScope.ts).
+ * The team, when the caller may use it: same club and, for a coach, a team
+ * they manage — or the one match they are assigned to (`eventCoachId`).
+ * Reading counts too: a sheet lists the players' personal data (P1-5).
  */
 async function loadTeamForCaller(
     req: AuthenticatedRequest,
     res: Response,
     teamId: number,
-    access: { write: boolean; eventCoachId?: unknown } = { write: false },
+    access: { eventCoachId?: unknown } = {},
 ): Promise<TeamRow | null> {
     if (!Number.isInteger(teamId) || teamId <= 0) {
         res.status(400).json({ error: 'Invalid team id.' });
@@ -54,12 +54,12 @@ async function loadTeamForCaller(
         res.status(403).json({ error: 'Forbidden.' });
         return null;
     }
-    if (access.write && req.user?.role === 'coach') {
+    if (req.user?.role === 'coach') {
         const allowed = access.eventCoachId === undefined
             ? coachManagesTeam(rows[0].coachId, req.user?.id)
             : coachManagesEvent(rows[0].coachId, access.eventCoachId, req.user?.id);
         if (!allowed) {
-            res.status(403).json({ error: 'Poți modifica doar echipele pe care le antrenezi.' });
+            res.status(403).json({ error: 'Poți folosi L12 doar pentru echipele pe care le antrenezi.' });
             return null;
         }
     }
@@ -152,10 +152,13 @@ router.get('/overview', async (req: AuthenticatedRequest, res) => {
             return;
         }
 
-        const teamRows = await (superadmin
+        const clubTeams = await (superadmin
             ? db.select().from(teams).orderBy(asc(teams.name))
             : db.select().from(teams).where(eq(teams.clubId, clubId!)).orderBy(asc(teams.name)));
-        const teamIds = teamRows.map((team) => team.id);
+        const coachId = req.user?.role === 'coach' ? req.user?.id : null;
+        // A coach's page: their teams, plus other teams' matches they are assigned to.
+        const teamRows = coachId == null ? clubTeams : clubTeams.filter((team) => coachManagesTeam(team.coachId, coachId));
+        const teamIds = clubTeams.map((team) => team.id);
         if (!teamIds.length) {
             res.json({ teams: [], matches: [] });
             return;
@@ -180,10 +183,13 @@ router.get('/overview', async (req: AuthenticatedRequest, res) => {
             : [];
         const coachName = new Map(coaches.map((c) => [c.id, c.name]));
 
+        const visibleMatches = coachId == null
+            ? matchRows
+            : matchRows.filter((event) => coachManagesEvent(clubTeams.find((t) => t.id === event.teamId)?.coachId, event.coachId, coachId));
         const templates = new Map(lineups.filter((l) => l.eventId == null).map((l) => [l.teamId, l]));
         const byEvent = new Map(lineups.filter((l) => l.eventId != null).map((l) => [l.eventId!, l]));
-        const teamName = new Map(teamRows.map((t) => [t.id, t.name]));
-        const teamLevel = new Map(teamRows.map((t) => [t.id, t.level ?? null]));
+        const teamName = new Map(clubTeams.map((t) => [t.id, t.name]));
+        const teamLevel = new Map(clubTeams.map((t) => [t.id, t.level ?? null]));
 
         res.json({
             teams: teamRows.map((team) => {
@@ -199,7 +205,7 @@ router.get('/overview', async (req: AuthenticatedRequest, res) => {
                     templateUpdatedAt: template ? toIso(template.updatedAt) : null,
                 };
             }),
-            matches: matchRows.map((event) => {
+            matches: visibleMatches.map((event) => {
                 const lineup = byEvent.get(event.id);
                 return {
                     eventId: event.id,
@@ -237,7 +243,7 @@ router.get('/teams/:teamId/template', async (req: AuthenticatedRequest, res) => 
 
 router.put('/teams/:teamId/template', async (req: AuthenticatedRequest, res) => {
     try {
-        const team = await loadTeamForCaller(req, res, Number(req.params.teamId), { write: true });
+        const team = await loadTeamForCaller(req, res, Number(req.params.teamId));
         if (!team) return;
         const values = await buildValues(req, res, team);
         if (!values) return;
@@ -253,7 +259,7 @@ router.put('/teams/:teamId/template', async (req: AuthenticatedRequest, res) => 
     }
 });
 
-async function loadMatchForCaller(req: AuthenticatedRequest, res: Response, write = false) {
+async function loadMatchForCaller(req: AuthenticatedRequest, res: Response) {
     const eventId = Number(req.params.eventId);
     if (!Number.isInteger(eventId) || eventId <= 0) {
         res.status(400).json({ error: 'Invalid event id.' });
@@ -269,7 +275,7 @@ async function loadMatchForCaller(req: AuthenticatedRequest, res: Response, writ
         res.status(400).json({ error: 'This event is not linked to a team.' });
         return null;
     }
-    const team = await loadTeamForCaller(req, res, event.teamId, { write, eventCoachId: event.coachId });
+    const team = await loadTeamForCaller(req, res, event.teamId, { eventCoachId: event.coachId });
     if (!team) return null;
     return { event, team };
 }
@@ -297,7 +303,7 @@ router.get('/events/:eventId', async (req: AuthenticatedRequest, res) => {
 
 router.put('/events/:eventId', async (req: AuthenticatedRequest, res) => {
     try {
-        const match = await loadMatchForCaller(req, res, true);
+        const match = await loadMatchForCaller(req, res);
         if (!match) return;
         const values = await buildValues(req, res, match.team);
         if (!values) return;
@@ -316,7 +322,7 @@ router.put('/events/:eventId', async (req: AuthenticatedRequest, res) => {
 
 router.delete('/events/:eventId', async (req: AuthenticatedRequest, res) => {
     try {
-        const match = await loadMatchForCaller(req, res, true);
+        const match = await loadMatchForCaller(req, res);
         if (!match) return;
         await db.delete(l12Lineups).where(eq(l12Lineups.eventId, match.event.id));
         res.status(204).end();

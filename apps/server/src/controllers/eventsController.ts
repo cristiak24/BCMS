@@ -110,7 +110,16 @@ function isSuperadmin(req: AuthenticatedRequest) {
  * any authenticated user in any club read them — and their attendance rows.
  * Those events are now superadmin-only, since there is no club to scope them to.
  */
-async function ensureEventReadAccess(req: AuthenticatedRequest, event: { teamId: number | null }) {
+/**
+ * Same club (a player/parent: their own team). With `sheet` — the attendance
+ * list with the coach's per-player notes — a coach must also manage the event
+ * (lib/coachScope.ts), as for marking it.
+ */
+async function ensureEventReadAccess(
+    req: AuthenticatedRequest,
+    event: { teamId: number | null; coachId?: number | null },
+    options: { sheet?: boolean } = {},
+) {
     if (isSuperadmin(req)) {
         return null;
     }
@@ -136,6 +145,10 @@ async function ensureEventReadAccess(req: AuthenticatedRequest, event: { teamId:
         if (!selfTeamIds.includes(event.teamId)) {
             return { status: 403 as const, error: 'Access denied' };
         }
+    }
+
+    if (options.sheet && req.user?.role === 'coach' && !coachManagesEvent(teamRows[0].coachId, event.coachId, req.user?.id)) {
+        return { status: 403 as const, error: 'Poți vedea prezența doar la echipele pe care le antrenezi.' };
     }
 
     return null;
@@ -562,7 +575,7 @@ export const eventsController = {
                 return res.status(400).json({ error: 'Too many event ids (max 200).' });
             }
 
-            const eventRows = await db.select({ id: events.id, teamId: events.teamId }).from(events).where(inArray(events.id, eventIds));
+            const eventRows = await db.select({ id: events.id, teamId: events.teamId, coachId: events.coachId }).from(events).where(inArray(events.id, eventIds));
 
             let permittedIds: number[];
             if (isSuperadmin(req)) {
@@ -573,10 +586,17 @@ export const eventsController = {
                     return res.status(403).json({ error: 'Your account is not assigned to a club.' });
                 }
                 const teamIds = Array.from(new Set(eventRows.map((event) => event.teamId).filter((id): id is number => id != null)));
-                const clubTeamIds = new Set(teamIds.length
-                    ? (await db.select({ id: teams.id }).from(teams).where(and(inArray(teams.id, teamIds), eq(teams.clubId, clubId)))).map((row) => row.id)
+                const clubTeams = new Map(teamIds.length
+                    ? (await db.select({ id: teams.id, coachId: teams.coachId }).from(teams).where(and(inArray(teams.id, teamIds), eq(teams.clubId, clubId)))).map((row) => [row.id, row] as const)
                     : []);
-                permittedIds = eventRows.filter((event) => event.teamId != null && clubTeamIds.has(event.teamId)).map((event) => event.id);
+                const isCoach = req.user?.role === 'coach';
+                // A coach gets the sheets of the events they manage only.
+                permittedIds = eventRows
+                    .filter((event) => {
+                        const team = event.teamId != null ? clubTeams.get(event.teamId) : undefined;
+                        return team != null && (!isCoach || coachManagesEvent(team.coachId, event.coachId, req.user?.id));
+                    })
+                    .map((event) => event.id);
             }
 
             const result: Record<number, unknown[]> = Object.fromEntries(permittedIds.map((id) => [id, []]));
@@ -628,7 +648,7 @@ export const eventsController = {
                 return res.status(404).json({ error: 'Event not found' });
             }
 
-            const denied = await ensureEventReadAccess(req, existingEvent);
+            const denied = await ensureEventReadAccess(req, existingEvent, { sheet: true });
             if (denied) {
                 return res.status(denied.status).json({ error: denied.error });
             }

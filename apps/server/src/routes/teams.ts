@@ -7,6 +7,7 @@ import { foldName, generateTeamCode } from '../lib/familyJoin';
 import { clubBalances } from '../services/clubFinance';
 import { roundMoney } from '../lib/money';
 import { attendanceSummary, isAttendedStatus, isCountedStatus } from '../lib/attendanceRate';
+import { coachManagesTeam } from '../lib/coachScope';
 
 const router = Router();
 
@@ -74,7 +75,11 @@ async function resolveScopedClubId(req: AuthenticatedRequest, explicitClubId?: u
     throw new Error('A club is required for this action.');
 }
 
-async function ensureTeamAccess(req: AuthenticatedRequest, teamId: number) {
+/**
+ * Same club, and — with `squadData` (per-player emails, medical visas,
+ * attendance, arrears) — for a coach, a team they manage (lib/coachScope.ts).
+ */
+async function ensureTeamAccess(req: AuthenticatedRequest, teamId: number, options: { squadData?: boolean } = {}) {
     const rows = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
     const team = rows[0];
     if (!team) {
@@ -92,6 +97,10 @@ async function ensureTeamAccess(req: AuthenticatedRequest, teamId: number) {
 
     if (team.clubId !== requestClubId) {
         return { status: 403 as const, error: 'You do not have access to this team.' };
+    }
+
+    if (options.squadData && req.user?.role === 'coach' && !coachManagesTeam(team.coachId, req.user?.id)) {
+        return { status: 403 as const, error: 'Poți vedea doar jucătorii echipelor pe care le antrenezi.' };
     }
 
     return { status: 200 as const, team };
@@ -395,7 +404,7 @@ router.get('/:id/stats', async (req: AuthenticatedRequest, res) => {
             return;
         }
 
-        const access = await ensureTeamAccess(req, id);
+        const access = await ensureTeamAccess(req, id, { squadData: true });
         if (access.status !== 200) {
             res.status(access.status).json({ error: access.error });
             return;
@@ -632,7 +641,7 @@ router.get('/:id/players', async (req: AuthenticatedRequest, res) => {
             return;
         }
 
-        const access = await ensureTeamAccess(req, id);
+        const access = await ensureTeamAccess(req, id, { squadData: true });
         if (access.status !== 200) {
             res.status(access.status).json({ error: access.error });
             return;

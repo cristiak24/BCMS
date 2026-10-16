@@ -62,8 +62,9 @@ after(async () => {
 
 const sheet = { competition: 'Liga', players: [], staff: {} };
 
-test('L12: a coach cannot overwrite another team\'s template or match sheet', async () => {
+test('L12: a coach cannot read or overwrite another team\'s template or match sheet', async () => {
     assert.equal((await api.call('PUT', `/api/l12/teams/${u14}/template`, { auth: coach12, body: sheet })).status, 403);
+    assert.equal((await api.call('GET', `/api/l12/teams/${u14}/template`, { auth: coach12 })).status, 403);
     assert.equal((await api.call('PUT', `/api/l12/events/${u14Match}`, { auth: coach12, body: sheet })).status, 403);
     assert.equal((await api.call('DELETE', `/api/l12/events/${u14Match}`, { auth: coach12 })).status, 403);
     assert.equal((await db.select().from(l12Lineups).where(eq(l12Lineups.teamId, u14))).length, 0);
@@ -74,8 +75,12 @@ test('L12: the coach still manages their own team and an assigned match; the adm
     assert.equal((await api.call('PUT', `/api/l12/events/${u12Match}`, { auth: coach12, body: sheet })).status, 200);
     assert.equal((await api.call('PUT', `/api/l12/events/${u14MatchAssigned}`, { auth: coach12, body: sheet })).status, 200);
     assert.equal((await api.call('PUT', `/api/l12/teams/${u14}/template`, { auth: admin, body: sheet })).status, 200);
-    // Reading stays club-wide.
-    assert.equal((await api.call('GET', `/api/l12/events/${u14Match}`, { auth: coach12 })).status, 200);
+    // Reading too: a sheet lists the players' personal data (P1-5).
+    assert.equal((await api.call('GET', `/api/l12/events/${u14Match}`, { auth: coach12 })).status, 403);
+    assert.equal((await api.call('GET', `/api/l12/events/${u14MatchAssigned}`, { auth: coach12 })).status, 200);
+    const overview = await api.call('GET', '/api/l12/overview', { auth: coach12 });
+    assert.deepEqual(overview.body.teams.map((t: { id: number }) => t.id), [u12]);
+    assert.deepEqual(overview.body.matches.map((m: { eventId: number }) => m.eventId).sort(), [u12Match, u14MatchAssigned].sort());
 });
 
 test('scorer: a coach cannot set up or keep another team\'s match', async () => {

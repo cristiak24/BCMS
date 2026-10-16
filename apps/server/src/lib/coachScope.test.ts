@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { coachManagesEvent, coachManagesTeam, teamsManagedByCoach } from './coachScope';
+import { coachManagesEvent, coachManagesTeam, coachSeesPlayer, teamsManagedByCoach } from './coachScope';
 
 test('a coach manages their own team and unassigned teams only', () => {
     assert.equal(coachManagesTeam(7, 7), true);
@@ -23,4 +23,12 @@ test('a missing user id never matches', () => {
 test('managed teams are filtered from the club list', () => {
     const teams = [{ id: 1, coachId: 7 }, { id: 2, coachId: 8 }, { id: 3, coachId: null }];
     assert.deepEqual(teamsManagedByCoach(teams, 7), [1, 3]);
+});
+
+test('a coach sees players of the teams they manage, and players on no team', () => {
+    assert.equal(coachSeesPlayer([1], [1, 3]), true);
+    assert.equal(coachSeesPlayer([2, 3], [1, 3]), true); // also plays for a managed team
+    assert.equal(coachSeesPlayer([], [1]), true); // not on a team yet
+    assert.equal(coachSeesPlayer([2], [1, 3]), false); // another squad's player
+    assert.equal(coachSeesPlayer([2], []), false);
 });
