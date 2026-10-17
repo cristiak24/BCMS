@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Switch, Text, View, type ScrollViewHandle } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { Team } from '../../../services/teamsApi';
+import type { CalendarEvent } from '../../../services/eventsApi';
 import { useAddEventForm, type AddEventType } from '../../../hooks/useAddEventForm';
 import { FormField } from '../../ui/FormField';
 import { EVENT_TYPE_META } from '../scheduleShared';
@@ -44,6 +45,8 @@ function fromDateInput(value: string) {
   return y && m && d ? new Date(y, m - 1, d) : null;
 }
 
+const noop = () => {};
+
 const nativeInputClass = 'native-field h-11 w-full rounded-[11px] border px-3 text-[14px] font-medium';
 
 function Label({ children }: { children: ReactNode }) {
@@ -79,25 +82,36 @@ export function AddEventModal({
   isMobile,
   initialDate,
   initialTeamId,
+  editEvent,
+  onSaved,
+  canEditFee = true,
 }: {
   visible: boolean;
   onClose: () => void;
-  onCreated: (createdCount: number) => void;
-  teams: Team[];
+  onCreated?: (createdCount: number) => void;
+  teams: Array<Pick<Team, 'id' | 'name'>>;
   isMobile: boolean;
   /** Pre-filled day (from "add on this day"); null keeps the last one. */
   initialDate?: Date | null;
   /** Team scope of the schedule, if any. */
   initialTeamId?: number | null;
+  /** Opens the form on this event to edit it (`PUT /events/:id`) instead of creating one. */
+  editEvent?: CalendarEvent | null;
+  /** Edit mode: receives the saved event. */
+  onSaved?: (event: CalendarEvent) => void;
+  /** Coaches may not change an event's fee; the field is hidden and never sent. */
+  canEditFee?: boolean;
 }) {
-  const form = useAddEventForm(onCreated);
+  const form = useAddEventForm(onCreated ?? noop);
   const {
     newEventType, setNewEventType, newTitle, setNewTitle, newDescription, setNewDescription,
     newStartTime, newEndTime, newLocation, setNewLocation, newTeamId, setNewTeamId, newAmount, setNewAmount,
     addEventErrors, clearError, newStartDate, setNewStartDate, newEndDate, setNewEndDate,
     isRecurring, setIsRecurring, recurringDays, setRecurringDays, recurringWeeks, setRecurringWeeks,
     recentLocations, loadRecentLocations, addingEvent, submitError, updatePickerTime, prefillDate, submit,
+    loadEvent, submitEdit,
   } = form;
+  const editing = editEvent != null;
 
   const scrollRef = useRef<ScrollViewHandle | null>(null);
 
@@ -106,18 +120,28 @@ export function AddEventModal({
   useEffect(() => {
     if (visible && !wasVisible.current) {
       loadRecentLocations();
-      if (initialDate) prefillDate(initialDate);
-      if (initialTeamId != null) setNewTeamId(initialTeamId);
+      if (editEvent) {
+        loadEvent(editEvent);
+      } else {
+        if (initialDate) prefillDate(initialDate);
+        if (initialTeamId != null) setNewTeamId(initialTeamId);
+      }
     }
     wasVisible.current = visible;
-  }, [visible, initialDate, initialTeamId, loadRecentLocations, prefillDate, setNewTeamId]);
+  }, [visible, editEvent, initialDate, initialTeamId, loadEvent, loadRecentLocations, prefillDate, setNewTeamId]);
 
   if (!visible) return null;
 
   const close = () => { if (!addingEvent) onClose(); };
   const handleSubmit = async () => {
-    const ok = await submit();
-    if (ok) {
+    if (editEvent) {
+      const saved = await submitEdit(editEvent.id, { includeAmount: canEditFee });
+      if (saved) {
+        onSaved?.(saved);
+        onClose();
+        return;
+      }
+    } else if (await submit()) {
       onClose();
       return;
     }
@@ -159,8 +183,10 @@ export function AddEventModal({
             ) : null}
             <View className="flex-row items-center justify-between gap-3">
               <View className="flex-1 min-w-0">
-                <Text className="text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>Eveniment nou</Text>
-                <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Apare imediat în programul echipei.</Text>
+                <Text className="text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>{editing ? 'Editează evenimentul' : 'Eveniment nou'}</Text>
+                <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
+                  {editing ? 'Prezența deja notată rămâne. Familiile sunt anunțate dacă se schimbă ora sau locul.' : 'Apare imediat în programul echipei.'}
+                </Text>
               </View>
               <Pressable
                 onPress={close}
@@ -285,7 +311,7 @@ export function AddEventModal({
 
               <Section
                 title="Când"
-                trailing={isTraining ? (
+                trailing={isTraining && !editing ? (
                   <View className="flex-row items-center gap-2">
                     <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Se repetă</Text>
                     <Switch
@@ -359,7 +385,7 @@ export function AddEventModal({
                   })}
                 </View>
 
-                {isTraining && isRecurring ? (
+                {isTraining && isRecurring && !editing ? (
                   <View className="gap-3 rounded-[14px] border p-3.5" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}>
                     <View>
                       <Label>Zilele săptămânii</Label>
@@ -414,7 +440,7 @@ export function AddEventModal({
                 ) : null}
               </Section>
 
-              {newEventType === 'camp' ? (
+              {canEditFee && (newEventType === 'camp' || (editing && newAmount.trim() !== '')) ? (
                 <Section title="Cost">
                   <FormField
                     label="Taxă de participare (RON)"
@@ -476,7 +502,7 @@ export function AddEventModal({
               onPress={handleSubmit}
               disabled={addingEvent}
               accessibilityRole="button"
-              accessibilityLabel="Salvează evenimentul"
+              accessibilityLabel={editing ? 'Salvează modificările' : 'Salvează evenimentul'}
               className="ui-press flex-1 h-11 rounded-[11px] flex-row items-center justify-center gap-2"
               style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)', opacity: addingEvent ? 0.8 : 1 } as any}
             >
@@ -486,7 +512,7 @@ export function AddEventModal({
                 <MaterialIcons name="check" size={18} color="#FFFFFF" />
               )}
               <Text className="text-[14px] font-bold" style={{ color: '#FFFFFF' }}>
-                {addingEvent ? 'Se salvează…' : isTraining && isRecurring ? 'Creează seria' : 'Salvează'}
+                {addingEvent ? 'Se salvează…' : editing ? 'Salvează modificările' : isTraining && isRecurring ? 'Creează seria' : 'Salvează'}
               </Text>
             </Pressable>
           </View>

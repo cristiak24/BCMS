@@ -1,6 +1,7 @@
 import { parseApiDate } from '@/utils/dates';
 import type { CalendarEvent } from '../../services/eventsApi';
 import type { AuthUser } from '../../utils/authSession';
+import { filterCoachEvents } from '../../utils/coachEventScope';
 
 export function getEventDate(value: string) {
   const date = parseApiDate(value);
@@ -19,26 +20,17 @@ export function isUpcoming(event: CalendarEvent) {
   return !isCancelled(event) && getEventTimestamp(event) >= Date.now();
 }
 
-export function getCoachScopedEvents(events: CalendarEvent[], session: AuthUser | null) {
-  const coachId = Number(session?.id);
-  const activeEvents = events.filter((event) => !isCancelled(event));
-
-  if (!Number.isFinite(coachId)) {
-    return activeEvents;
-  }
-
-  const assignedEvents = activeEvents.filter((event) => Number(event.coachId) === coachId);
-  return assignedEvents.length ? assignedEvents : activeEvents;
-}
-
-export function getCoachScopeLabel(events: CalendarEvent[], session: AuthUser | null) {
-  const coachId = Number(session?.id);
-
-  if (!Number.isFinite(coachId)) {
-    return 'Sesiunile clubului';
-  }
-
-  return events.some((event) => Number(event.coachId) === coachId) ? 'Sesiuni atribuite' : 'Sesiunile clubului';
+/**
+ * The sessions a coach's screens show: their teams' (`team.coachId`), teams
+ * with no coach yet, and any session assigned to them — see
+ * utils/coachEventScope.ts. Pass the club's teams (`teamsApi.getTeams()`).
+ */
+export function getCoachScopedEvents(
+  events: CalendarEvent[],
+  session: AuthUser | null,
+  teams: Array<{ id: number; coachId: number | null }>,
+) {
+  return filterCoachEvents(events.filter((event) => !isCancelled(event)), teams, session?.id);
 }
 
 export function formatCoachDate(value: string) {

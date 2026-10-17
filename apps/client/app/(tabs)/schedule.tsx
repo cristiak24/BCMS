@@ -3,6 +3,9 @@ import { Pressable, ScrollView, Text, View, useWindowDimensions } from '@/src/we
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { Clock, MapPin } from 'lucide-react';
 import { eventsApi, CalendarEvent } from '../../services/eventsApi';
+import { teamsApi, type Team } from '../../services/teamsApi';
+import { AddEventModal } from '../../components/schedule/admin/AddEventModal';
+import { coachManagedTeamIds } from '../../utils/coachEventScope';
 import { AuthUser, normalizeRole } from '../../utils/authSession';
 import { useSession } from '../../context/AuthContext';
 import { getCoachScopedEvents } from '../../components/coach/coachUtils';
@@ -304,6 +307,8 @@ export default function ScheduleScreen() {
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(() => toDateKey(new Date()));
   const [selectedDay, setSelectedDay] = useState<{ date: Date; events: CalendarEvent[] } | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [clubTeams, setClubTeams] = useState<Team[]>([]);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const { width } = useWindowDimensions();
 
   const isMobile = width < 1024;
@@ -333,9 +338,14 @@ export default function ScheduleScreen() {
       // browsed in; unbounded, this grew with every season the club recorded.
       const since = new Date();
       since.setFullYear(since.getFullYear() - 1);
-      const allEvents = await eventsApi.getEvents({ start: since.toISOString() });
+      // A coach's view is scoped by the teams they coach (team.coachId).
+      const [allEvents, teamRows] = await Promise.all([
+        eventsApi.getEvents({ start: since.toISOString() }),
+        isCoach ? teamsApi.getTeams() : Promise.resolve([]),
+      ]);
       const teamIds = getSessionTeamIds(session);
-      const roleEvents = isCoach ? getCoachScopedEvents(allEvents, session) : allEvents;
+      setClubTeams(teamRows);
+      const roleEvents = isCoach ? getCoachScopedEvents(allEvents, session, teamRows) : allEvents;
       const visibleEvents = [...roleEvents]
         .filter((event) => !isCancelled(event))
         .filter((event) => isCoach || belongsToSessionTeam(event, teamIds))
@@ -602,7 +612,23 @@ export default function ScheduleScreen() {
         event={selectedEvent}
         isMobile={isMobile}
         onClose={() => setSelectedEvent(null)}
+        // A coach's list holds only sessions they manage (coachEventScope),
+        // the same rule the server applies to the edit.
+        onEdit={isCoach ? (event) => { setSelectedEvent(null); setEditingEvent(event); } : undefined}
       />
+      {isCoach ? (
+        <AddEventModal
+          visible={editingEvent !== null}
+          onClose={() => setEditingEvent(null)}
+          editEvent={editingEvent}
+          onSaved={() => { loadData(true); }}
+          // Their own teams (plus the event's, when it is assigned to them on
+          // another team); the fee stays with the admin.
+          teams={clubTeams.filter((team) => coachManagedTeamIds(clubTeams, session?.id).has(team.id) || team.id === editingEvent?.teamId)}
+          canEditFee={false}
+          isMobile={isMobile}
+        />
+      ) : null}
     </ScrollView>
   );
 }

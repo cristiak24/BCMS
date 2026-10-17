@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { familyApi } from '../../services/familyApi';
-import { parseRosterLines, type RosterOrder } from '../../utils/rosterParse';
+import { birthYearRange, ignoredBirthYears, parseRosterLines, type RosterOrder } from '../../utils/rosterParse';
 
 /**
  * Paste a roster ("Popescu Matei 2016", one per line — straight from Excel or
@@ -34,6 +34,8 @@ export default function BulkAddPlayersDialog({
 
   const rows = useMemo(() => parseRosterLines(text, order), [text, order]);
   const ignored = useMemo(() => text.split(/\r?\n/).filter((l) => l.trim()).length - rows.length, [text, rows]);
+  const droppedYears = useMemo(() => ignoredBirthYears(text, order), [text, order]);
+  const yearRange = birthYearRange();
 
   if (!visible) return null;
 
@@ -129,6 +131,19 @@ export default function BulkAddPlayersDialog({
             <Text className="text-[12px] mt-2" style={{ color: 'var(--c-warning-fg)' }}>
               {ignored} {ignored === 1 ? 'rând ignorat' : 'rânduri ignorate'} (lipsește numele sau prenumele).
             </Text>
+          ) : null}
+          {droppedYears.length ? (
+            <View
+              accessibilityRole="alert"
+              className="mt-2 flex-row items-start gap-2 rounded-[10px] border px-3 py-2"
+              style={{ backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-border)' } as any}
+            >
+              <MaterialIcons name="warning-amber" size={15} color="var(--c-warning-fg)" style={{ marginTop: 1 }} />
+              <Text className="flex-1 text-[12px] font-medium leading-[17px]" style={{ color: 'var(--c-warning-fg)' }}>
+                Anul nașterii trebuie să fie între {yearRange.min} și {yearRange.max}. Se salvează fără an:{' '}
+                {droppedYears.map((row) => `${row.name} (${row.year})`).join(', ')}.
+              </Text>
+            </View>
           ) : null}
           {error ? <Text className="text-[12.5px] font-semibold mt-2" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text> : null}
 

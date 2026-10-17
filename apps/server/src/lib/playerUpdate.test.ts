@@ -68,6 +68,17 @@ test('validates email format', () => {
     assert.match(invalid.error, /not a valid address/);
 });
 
+test('null or an empty email clears the address instead of failing the save', () => {
+    // Most children have no email; the profile form sends `null` for them.
+    const cleared = buildPlayerUpdate({ email: null, number: 12 });
+    assert.ok(cleared.ok);
+    assert.deepEqual(cleared.data, { email: null, number: 12 });
+
+    const empty = buildPlayerUpdate({ email: '  ' });
+    assert.ok(empty.ok);
+    assert.equal(empty.data.email, null);
+});
+
 test('accepts and normalises jersey number, including explicit null', () => {
     const set = buildPlayerUpdate({ number: '23' });
     assert.ok(set.ok);

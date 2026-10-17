@@ -255,6 +255,8 @@ export const attendance = pgTable("attendance", {
 			foreignColumns: [events.id],
 			name: "attendance_event_id_events_id_fk"
 		}),
+	// One row per player per session (migration 0026); saves upsert on it.
+	uniqueIndex("attendance_event_player_unique").on(table.eventId, table.playerId),
 ]);
 
 export const notifications = pgTable("notifications", {

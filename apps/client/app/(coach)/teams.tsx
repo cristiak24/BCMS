@@ -190,7 +190,7 @@ export default function CoachTeamsScreen() {
     loadData();
   }, [loadData]);
 
-  const scopedEvents = useMemo(() => getCoachScopedEvents(events, session), [events, session]);
+  const scopedEvents = useMemo(() => getCoachScopedEvents(events, session, teams), [events, session, teams]);
   const scopedTeamIds = useMemo(
     () => new Set(scopedEvents.map((event) => event.teamId).filter((id): id is number => id != null)),
     [scopedEvents],

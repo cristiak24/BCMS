@@ -14,7 +14,8 @@ export type PlayerUpdateFields = {
     firstName?: string;
     lastName?: string;
     name?: string;
-    email?: string;
+    /** `null` (or an empty string) clears the address. */
+    email?: string | null;
     status?: string;
     avatarUrl?: string;
     number?: number | null;
@@ -41,6 +42,13 @@ export function buildPlayerUpdate(body: PlayerUpdateInput | null | undefined): P
         const value = input[field];
         if (value === undefined) continue;
 
+        // Most children have no email of their own; the profile form sends
+        // `null` for an empty field, which used to fail the whole save.
+        if (field === 'email' && value === null) {
+            data.email = null;
+            continue;
+        }
+
         if (typeof value !== 'string') {
             return { ok: false, error: `${field} must be a string.` };
         }
@@ -50,14 +58,18 @@ export function buildPlayerUpdate(body: PlayerUpdateInput | null | undefined): P
             return { ok: false, error: `${field} must be at most ${MAX_TEXT_LENGTH} characters.` };
         }
 
-        data[field] = trimmed;
+        if (field === 'email') {
+            data.email = trimmed || null;
+        } else {
+            data[field] = trimmed;
+        }
     }
 
     if (data.status !== undefined && !VALID_STATUSES.has(data.status)) {
         return { ok: false, error: 'status is not a valid player status.' };
     }
 
-    if (data.email !== undefined && data.email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
         return { ok: false, error: 'email is not a valid address.' };
     }
 

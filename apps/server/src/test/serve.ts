@@ -14,12 +14,13 @@ export async function serve(mounts: Record<string, Router>) {
     });
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
-    async function call(method: string, path: string, init: { auth?: string; body?: unknown } = {}) {
+    async function call(method: string, path: string, init: { auth?: string; body?: unknown; headers?: Record<string, string> } = {}) {
         const response = await fetch(`${base}${path}`, {
             method,
             headers: {
                 'content-type': 'application/json',
                 ...(init.auth ? { authorization: init.auth } : {}),
+                ...init.headers,
             },
             body: init.body === undefined ? undefined : JSON.stringify(init.body),
         });

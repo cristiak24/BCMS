@@ -20,7 +20,6 @@ import { AttendanceRate, Chip, CoachPlayerRow, SessionRow } from '../../componen
 import { attendanceRateColor, eventTypeMeta, formatRelativeDay } from '../../components/coach/coachDisplay';
 import {
   formatCoachTimeRange,
-  getCoachScopeLabel,
   getCoachScopedEvents,
   getEventDate,
   getEventTimestamp,
@@ -326,7 +325,7 @@ export default function CoachDashboardScreen() {
   // background, instead of leaving a stale or failed load on screen.
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-  const scopedEvents = useMemo(() => getCoachScopedEvents(events, session), [events, session]);
+  const scopedEvents = useMemo(() => getCoachScopedEvents(events, session, teams), [events, session, teams]);
   const upcomingEvents = useMemo(
     () => scopedEvents.filter(isUpcoming).sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b)),
     [scopedEvents],
@@ -372,9 +371,9 @@ export default function CoachDashboardScreen() {
               className=""
               eyebrow={formatToday()}
               title={`${getGreeting()}, ${getFirstName(session?.name, session?.firstName)}`}
-              // The scope ("assigned sessions" vs "the club's sessions") changes
-              // what every number below counts, so it is stated up front.
-              subtitle={`${getCoachScopeLabel(events, session)} · ${session?.clubName ?? 'Club'}`}
+              // The scope changes what every number below counts, so it is
+              // stated up front.
+              subtitle={`Sesiunile echipelor tale · ${session?.clubName ?? 'Club'}`}
               actions={
                 <>
                   <Button variant="primary" icon="fact-check" label="Marchează prezența" onPress={goToAttendance} />

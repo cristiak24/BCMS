@@ -13,6 +13,14 @@ import { Skeleton } from '../../../components/ui/Skeleton';
 import { ErrorState } from '../../../components/ui/ScreenState';
 import { L12MatchLink } from '../../../components/l12/L12MatchLink';
 import { EVENT_TYPE_META, buildICSCalendar, triggerFileDownload } from '../../../components/schedule/scheduleShared';
+import { AddEventModal } from '../../../components/schedule/admin/AddEventModal';
+import Button from '../../../components/ui/Button';
+import { useSession } from '../../../context/AuthContext';
+import { useResponsive } from '../../../hooks/useResponsive';
+import { normalizeRole } from '../../../utils/authSession';
+
+/** Roles the server lets change an event (ensureTeamAccess); others only read it. */
+const EDITOR_ROLES = new Set(['admin', 'superadmin', 'manager']);
 
 /**
  * Admin event detail.
@@ -122,6 +130,11 @@ export default function EventDetailScreen() {
 
   const [event, setEvent] = useState<CalendarEvent | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
+  const [clubTeams, setClubTeams] = useState<Team[]>([]);
+  const [editing, setEditing] = useState(false);
+  const { session } = useSession();
+  const { isMobile } = useResponsive();
+  const canEdit = EDITOR_ROLES.has(normalizeRole(session?.role));
   const [playerCount, setPlayerCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -158,15 +171,15 @@ export default function EventDetailScreen() {
       setEvent(eventData);
       setNoteDraft(eventData.coachNote ?? '');
 
-      if (eventData.teamId) {
-        // Team + squad size in parallel; neither blocks the page.
-        const [teams, players] = await Promise.all([
-          teamsApi.getTeams().catch(() => [] as Team[]),
-          teamsApi.getTeamPlayers(eventData.teamId).catch(() => null),
-        ]);
-        setTeam(teams.find((row) => row.id === eventData.teamId) ?? null);
-        setPlayerCount(players ? players.length : null);
-      }
+      // Team + squad size in parallel; neither blocks the page. The club's
+      // teams also feed the edit form's team picker.
+      const [teams, players] = await Promise.all([
+        teamsApi.getTeams().catch(() => [] as Team[]),
+        eventData.teamId ? teamsApi.getTeamPlayers(eventData.teamId).catch(() => null) : Promise.resolve(null),
+      ]);
+      setClubTeams(teams);
+      setTeam(teams.find((row) => row.id === eventData.teamId) ?? null);
+      setPlayerCount(players ? players.length : null);
     } catch (err) {
       console.error('Event detail load error:', err);
       setError(err instanceof Error ? err.message : 'Evenimentul nu a putut fi încărcat.');
@@ -299,6 +312,9 @@ export default function EventDetailScreen() {
             title={scoreMatch && sides.length === 2 ? `${sides[0]} – ${sides[1]}` : event.title}
             subtitle={description || undefined}
             className="mb-4"
+            actions={canEdit ? (
+              <Button icon="edit" label="Editează" onPress={() => setEditing(true)} />
+            ) : undefined}
             leading={(
               <View className="w-12 h-12 md:w-14 md:h-14 rounded-[14px] items-center justify-center shrink-0" style={{ backgroundColor: meta.soft }}>
                 <MaterialIcons name={TYPE_ICON[event.type] ?? 'event'} size={24} color={meta.onSoft} />
@@ -451,6 +467,24 @@ export default function EventDetailScreen() {
           </View>
         </View>
       </PageContainer>
+
+      <AddEventModal
+        visible={editing}
+        onClose={() => setEditing(false)}
+        editEvent={event}
+        onSaved={(saved) => {
+          setEvent(saved);
+          setTeam(clubTeams.find((row) => row.id === saved.teamId) ?? null);
+          if (saved.teamId !== event.teamId) {
+            setPlayerCount(null);
+            if (saved.teamId) {
+              teamsApi.getTeamPlayers(saved.teamId).then((rows) => setPlayerCount(rows.length)).catch(() => undefined);
+            }
+          }
+        }}
+        teams={clubTeams}
+        isMobile={isMobile}
+      />
 
       <ConfirmDialog
         visible={confirmDelete}

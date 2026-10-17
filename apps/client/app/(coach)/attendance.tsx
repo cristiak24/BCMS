@@ -190,8 +190,11 @@ export default function CoachAttendanceScreen() {
     try {
       // The last month (sessions still being marked) plus everything ahead.
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const eventRows = await eventsApi.getEvents({ start: since.toISOString() });
-      const scopedEvents = getCoachScopedEvents(eventRows, session)
+      const [eventRows, teamRows] = await Promise.all([
+        eventsApi.getEvents({ start: since.toISOString() }),
+        teamsApi.getTeams(),
+      ]);
+      const scopedEvents = getCoachScopedEvents(eventRows, session, teamRows)
         .filter((event) => event.type !== 'admin')
         .sort((a, b) => {
           const aUpcoming = isUpcoming(a);

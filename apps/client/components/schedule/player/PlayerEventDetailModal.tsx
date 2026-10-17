@@ -68,10 +68,13 @@ export function PlayerEventDetailModal({
   event,
   isMobile,
   onClose,
+  onEdit,
 }: {
   event: CalendarEvent | null;
   isMobile: boolean;
   onClose: () => void;
+  /** Shown to a coach on a session they manage: opens the edit form. */
+  onEdit?: (event: CalendarEvent) => void;
 }) {
   const { session } = useSession();
   const role = normalizeRole(session?.role);
@@ -235,21 +238,35 @@ export function PlayerEventDetailModal({
                 ) : null}
               </View>
 
-              {!isPast && !cancelled ? (
+              {onEdit || (!isPast && !cancelled) ? (
                 <View
-                  className="px-5 pt-1 border-t"
+                  className="px-5 pt-1 border-t flex-row gap-2.5"
                   style={{ borderColor: 'var(--c-border-soft)', paddingBottom: isMobile ? 'max(14px, env(safe-area-inset-bottom))' : 16, paddingTop: 12 } as any}
                 >
+                  {onEdit ? (
+                    <Pressable
+                      onPress={() => onEdit(event)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Editează evenimentul"
+                      className="ui-press flex-1 h-11 rounded-[11px] flex-row items-center justify-center gap-2 border"
+                      style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
+                    >
+                      <MaterialIcons name="edit" size={17} color="var(--c-brand-fg)" />
+                      <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>Editează</Text>
+                    </Pressable>
+                  ) : null}
+                  {!isPast && !cancelled ? (
                   <Pressable
                     onPress={addToCalendar}
                     accessibilityRole="button"
                     accessibilityLabel="Adaugă în calendar"
-                    className="ui-press h-11 rounded-[11px] flex-row items-center justify-center gap-2 border"
+                    className="ui-press flex-1 h-11 rounded-[11px] flex-row items-center justify-center gap-2 border"
                     style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
                   >
                     <MaterialIcons name="event" size={17} color="var(--c-brand-fg)" />
                     <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>Adaugă în calendar</Text>
                   </Pressable>
+                  ) : null}
                 </View>
               ) : null}
             </>

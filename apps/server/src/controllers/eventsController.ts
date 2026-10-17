@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { toDate, toIso } from '../lib/dateUtils';
 import { db } from '../db';
 import { attendance, events, notifications, players, playersToTeams, teams, users } from '../db/schema';
-import { and, eq, gte, inArray, isNull, lte, or } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { buildEventQueryPlan, type EventQueryParams } from '../lib/eventQuery';
 import { createFeedbackNotification, notifyEventChange } from '../lib/notifications';
@@ -235,16 +235,20 @@ async function getSelfPlayerId(req: AuthenticatedRequest) {
  * checked against this so a request can't attach rows to another club's
  * players by guessing ids.
  */
-async function filterPlayersInClub(playerIds: number[], clubId: number) {
+/**
+ * The players, out of `playerIds`, who are on the team's roster — through their
+ * primary team or a `players_to_teams` membership, the same two sources the
+ * team's player list reads. Attendance for anyone else would count towards a
+ * squad they don't play in.
+ */
+async function filterPlayersOnTeam(playerIds: number[], teamId: number) {
     if (!playerIds.length) return new Set<number>();
-    const clubTeamIds = (await db.select({ id: teams.id }).from(teams).where(eq(teams.clubId, clubId))).map((row) => row.id);
-    if (!clubTeamIds.length) return new Set<number>();
 
     const [direct, memberships] = await Promise.all([
         db.select({ id: players.id }).from(players)
-            .where(and(inArray(players.id, playerIds), inArray(players.teamId, clubTeamIds))),
+            .where(and(inArray(players.id, playerIds), eq(players.teamId, teamId))),
         db.select({ playerId: playersToTeams.playerId }).from(playersToTeams)
-            .where(and(inArray(playersToTeams.playerId, playerIds), inArray(playersToTeams.teamId, clubTeamIds))),
+            .where(and(inArray(playersToTeams.playerId, playerIds), eq(playersToTeams.teamId, teamId))),
     ]);
 
     return new Set<number>([...direct.map((row) => row.id), ...memberships.map((row) => row.playerId)]);
@@ -727,17 +731,15 @@ export const eventsController = {
             }
 
             const playerIds = items.map((item) => item.playerId);
-            if (!isSuperadmin(req) && access.team.clubId != null) {
-                const allowed = await filterPlayersInClub(playerIds, access.team.clubId);
-                const foreign = playerIds.filter((id) => !allowed.has(id));
-                if (foreign.length) {
-                    return res.status(403).json({ error: `Players not in this club: ${foreign.join(', ')}` });
-                }
+            // Only the event's own squad. A club-wide check let a U14 player be
+            // marked at a U12 session, which then counted in her attendance.
+            const onTeam = await filterPlayersOnTeam(playerIds, event.teamId);
+            const foreign = playerIds.filter((id) => !onTeam.has(id));
+            if (foreign.length) {
+                return res.status(403).json({ error: `Jucătorii ${foreign.join(', ')} nu sunt în echipa acestui eveniment.` });
             }
 
-            // One read for the whole sheet instead of one per player, then all
-            // writes in a single transaction so a mid-batch failure can't leave
-            // half a squad marked.
+            // Read only to decide which notes are new (notifications below).
             const existingRows = await db.select().from(attendance)
                 .where(and(eq(attendance.eventId, eventId), inArray(attendance.playerId, playerIds)));
             const existingByPlayer = new Map(existingRows.map((row) => [row.playerId, row]));
@@ -745,28 +747,37 @@ export const eventsController = {
             // marked: correcting last month's sheet today used to move it into
             // this month's attendance stats.
             const sessionDate = toIso(event.startTime) ?? new Date().toISOString();
+            const teamId = event.teamId;
+            const rowsOf = (group: typeof items) => group.map((item) => ({
+                playerId: item.playerId,
+                eventId,
+                teamId,
+                status: item.status,
+                date: sessionDate,
+                note: item.note ?? null,
+            }));
+            // Note is optional: only touch it when the caller explicitly sent a
+            // `note` key, so status-only updates (quick toggles, bulk "mark
+            // present") never wipe an existing coach note.
+            const withNote = items.filter((item) => item.note !== undefined);
+            const statusOnly = items.filter((item) => item.note === undefined);
+            const target = [attendance.eventId, attendance.playerId];
 
+            // Each group is one INSERT … ON CONFLICT DO UPDATE on the unique
+            // (event_id, player_id) index: two saves at once can no longer both
+            // see "no row yet" and insert a duplicate.
             await db.transaction(async (tx) => {
-                for (const item of items) {
-                    const existing = existingByPlayer.get(item.playerId);
-                    // Note is optional: only touch it when the caller explicitly
-                    // sent a `note` key, so status-only updates (quick toggles,
-                    // bulk "mark present") never wipe an existing coach note.
-                    const noteUpdate = item.note !== undefined ? { note: item.note } : {};
-                    if (existing) {
-                        await tx.update(attendance)
-                            .set({ status: item.status, date: sessionDate, ...noteUpdate })
-                            .where(eq(attendance.id, existing.id));
-                    } else {
-                        await tx.insert(attendance).values({
-                            playerId: item.playerId,
-                            eventId,
-                            teamId: event.teamId as number,
-                            status: item.status,
-                            date: sessionDate,
-                            note: item.note ?? null,
-                        });
-                    }
+                if (withNote.length) {
+                    await tx.insert(attendance).values(rowsOf(withNote)).onConflictDoUpdate({
+                        target,
+                        set: { status: sql`excluded.status`, date: sql`excluded.date`, note: sql`excluded.note` },
+                    });
+                }
+                if (statusOnly.length) {
+                    await tx.insert(attendance).values(rowsOf(statusOnly)).onConflictDoUpdate({
+                        target,
+                        set: { status: sql`excluded.status`, date: sql`excluded.date` },
+                    });
                 }
             });
 

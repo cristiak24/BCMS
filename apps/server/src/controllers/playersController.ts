@@ -854,9 +854,9 @@ export const playersController = {
             // (lib/selfPlayer.ts). Two records with one address made the link
             // ambiguous, and a typo could hand a family someone else's child.
             const previousEmail = pRows[0].email?.trim().toLowerCase() || null;
-            const nextEmail = update.data.email !== undefined ? (update.data.email.trim().toLowerCase() || null) : previousEmail;
+            const nextEmail = update.data.email !== undefined ? (update.data.email?.trim().toLowerCase() || null) : previousEmail;
             if (update.data.email !== undefined) {
-                update.data.email = nextEmail ?? '';
+                update.data.email = nextEmail;
                 if (nextEmail && nextEmail !== previousEmail) {
                     const [taken] = await db.select({ id: players.id }).from(players)
                         .where(and(sql`lower(trim(${players.email})) = ${nextEmail}`, sql`${players.id} <> ${playerId}`))

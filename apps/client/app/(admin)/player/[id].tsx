@@ -4,6 +4,7 @@ import { ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { teamsApi, type Player } from '../../../services/teamsApi';
+import { ApiError } from '../../../services/apiClient';
 import PageContainer from '../../../components/ui/PageContainer';
 import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import Button from '../../../components/ui/Button';
@@ -137,8 +138,16 @@ export default function PlayerProfile() {
       setPlayer(next);
       hydrate(next);
       showToast({ variant: 'success', message: 'Profilul a fost salvat.' });
-    } catch {
-      showToast({ variant: 'error', message: 'Nu am putut salva modificările.' });
+    } catch (err) {
+      // Nothing was saved: the form (and the header built from it) goes back
+      // to the stored values instead of showing a number that isn't real.
+      hydrate(player);
+      showToast({
+        variant: 'error',
+        message: err instanceof ApiError && err.status === 409
+          ? err.message
+          : 'Nu am putut salva modificările. Am revenit la datele salvate.',
+      });
     } finally {
       setSaving(false);
     }

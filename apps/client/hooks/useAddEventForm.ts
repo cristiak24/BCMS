@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import AsyncStorage from '@/src/web/asyncStorage';
-import { eventsApi } from '../services/eventsApi';
+import { eventsApi, type CalendarEvent } from '../services/eventsApi';
 import { localDateTimeToIso } from '../utils/dates';
+import { buildEventUpdate, eventToFormValues } from '../utils/eventEditForm';
 
 export type AddEventType = 'training' | 'match' | 'camp' | 'admin' | 'medical';
 export type AddEventFormField = 'title' | 'description' | 'location' | 'team' | 'startTime' | 'endTime' | 'recurringDays';
@@ -123,6 +124,9 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
   // Shown inside the form. It used to be window.alert('Error', …) — a blocking
   // browser dialog, in English, on top of a Romanian form.
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Editing: an existing description shorter than the 12-character hint must
+  // not block saving a change to, say, the time.
+  const [originalDescription, setOriginalDescription] = useState('');
 
   const loadRecentLocations = useCallback(async () => {
     try {
@@ -200,7 +204,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
     }
 
     // Descrierea este opțională; validăm lungimea minimă doar dacă a fost completată.
-    if (description && description.length < 12) {
+    if (description && description.length < 12 && description !== originalDescription.trim()) {
       errors.description = 'Descrierea ar trebui să aibă cel puțin 12 caractere.';
     }
 
@@ -241,7 +245,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
 
     setAddEventErrors(errors);
     return Object.keys(errors).length === 0;
-  }, [newTitle, newDescription, newLocation, newTeamId, newStartTime, newEndTime, newStartDate, newEndDate, newEventType, isRecurring, recurringDays]);
+  }, [newTitle, newDescription, originalDescription, newLocation, newTeamId, newStartTime, newEndTime, newStartDate, newEndDate, newEventType, isRecurring, recurringDays]);
 
   const resetForm = useCallback(() => {
     setNewTitle('');
@@ -351,6 +355,69 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
     newAmount, saveLocation, onCreated, resetForm,
   ]);
 
+  /** Fills the form with an existing event, to edit it. */
+  const loadEvent = useCallback((event: CalendarEvent) => {
+    const values = eventToFormValues(event);
+    setNewEventType(values.type as AddEventType);
+    setNewTitle(values.title);
+    setNewDescription(values.description);
+    setOriginalDescription(values.description);
+    setNewLocation(values.location);
+    setNewTeamId(values.teamId);
+    setNewAmount(values.amount);
+    setNewStartDate(values.startDate);
+    setNewEndDate(values.endDate);
+    setNewStartTime(values.startTime);
+    setNewEndTime(values.endTime);
+    setIsRecurring(false);
+    setRecurringDays([]);
+    setAddEventErrors({});
+    setSubmitError(null);
+  }, []);
+
+  /**
+   * Saves the form over an existing event (`PUT /events/:id`); returns the
+   * updated event, or null when validation or the request failed. Times go
+   * out as ISO instants with an offset (utils/eventEditForm.ts).
+   */
+  const submitEdit = useCallback(async (eventId: number, options: { includeAmount: boolean }) => {
+    if (addingEvent) return null;
+
+    const effectiveStartTime = normalizeTimeValue(newStartTime, '09:00');
+    const effectiveEndTime = keepEndAfterStart(effectiveStartTime, normalizeTimeValue(newEndTime, '10:00'));
+    setNewStartTime(effectiveStartTime);
+    setNewEndTime(effectiveEndTime);
+
+    if (!validateForm()) return null;
+
+    setAddingEvent(true);
+    setSubmitError(null);
+    try {
+      const updated = await eventsApi.updateEvent(eventId, buildEventUpdate({
+        type: newEventType,
+        title: newTitle,
+        description: newDescription,
+        location: newLocation,
+        teamId: newTeamId,
+        startDate: newStartDate,
+        endDate: newEndDate,
+        startTime: effectiveStartTime,
+        endTime: effectiveEndTime,
+        amount: newAmount,
+      }, options) as Partial<CalendarEvent>);
+      if (newLocation.trim()) await saveLocation(newLocation.trim());
+      return updated;
+    } catch (error) {
+      setSubmitError(error instanceof Error && error.message ? error.message : 'Modificările nu au putut fi salvate.');
+      return null;
+    } finally {
+      setAddingEvent(false);
+    }
+  }, [
+    addingEvent, newStartTime, newEndTime, validateForm, newEventType, newTitle, newDescription, newLocation,
+    newTeamId, newStartDate, newEndDate, newAmount, saveLocation,
+  ]);
+
   return {
     newEventType, setNewEventType,
     newTitle, setNewTitle,
@@ -368,7 +435,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
     recentLocations, loadRecentLocations,
     addingEvent, submitError, setSubmitError,
     handleTimeInputChange, handleTimeInputBlur, updatePickerTime,
-    resetForm, prefillDate, submit,
+    resetForm, prefillDate, submit, loadEvent, submitEdit,
   };
 }
 

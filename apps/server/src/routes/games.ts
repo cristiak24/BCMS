@@ -51,10 +51,16 @@ async function loadMatch(req: AuthenticatedRequest, res: Response) {
         return null;
     }
 
+    const [game] = await db.select().from(gameStats).where(eq(gameStats.eventId, eventId)).limit(1);
+    const isScorekeeper = game != null && game.scorekeeperUserId === Number(req.user?.id);
+
     // A player/parent not (yet) linked to this match's team must not read
-    // another team's live score/box score either.
+    // another team's live score/box score either. The delegated scorekeeper is
+    // let in by the delegation itself, not by which child a parent has
+    // selected: with a sibling from another team selected, the match was
+    // "not found" for the very person asked to keep it.
     const role = String(req.user?.role ?? '');
-    if (!isSuper && (role === 'player' || role === 'parent')) {
+    if (!isSuper && !isScorekeeper && (role === 'player' || role === 'parent')) {
         const selfPlayer = await resolveSelfPlayerForRequest(req);
         const selfTeamIds = selfPlayer ? await teamIdsOfPlayers([selfPlayer.id]) : [];
         if (!selfTeamIds.includes(row.team.id)) {
@@ -63,11 +69,10 @@ async function loadMatch(req: AuthenticatedRequest, res: Response) {
         }
     }
 
-    const [game] = await db.select().from(gameStats).where(eq(gameStats.eventId, eventId)).limit(1);
     // A coach sets up and keeps only the matches of teams they coach (or the
     // match they are assigned to), the same rule as events and attendance.
     const staff = STAFF_ROLES.has(role) && (role !== 'coach' || coachManagesEvent(row.team.coachId, row.event.coachId, req.user?.id));
-    const canKeep = staff || (game != null && game.scorekeeperUserId === Number(req.user?.id));
+    const canKeep = staff || isScorekeeper;
     return { event: row.event, team: row.team, game: game ?? null, staff, canKeep };
 }
 

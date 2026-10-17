@@ -4,6 +4,12 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { Plus, Search, X } from 'lucide-react';
 import { Player, Team, teamsApi } from '../../services/teamsApi';
 import { useResponsive } from '../../hooks/useResponsive';
+import { familyApi } from '../../services/familyApi';
+import Button from '../ui/Button';
+import { FormField } from '../ui/FormField';
+import { birthYearRange, playerDraftFromSearch } from '../../utils/rosterParse';
+
+type PlayerDraft = { firstName: string; lastName: string; birthYear: string };
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -30,6 +36,10 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
   // Inline banner instead of window.alert: the modal stays open, the message
   // appears next to the control that caused it, and it is themeable.
   const [error, setError] = useState<string | null>(null);
+  // "Creează jucător": a search that finds nobody can create the player on
+  // the selected team (POST /teams/:id/players/bulk, one row).
+  const [draft, setDraft] = useState<PlayerDraft | null>(null);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -38,6 +48,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
       setDebouncedQuery('');
       setSearchResults([]);
       setError(null);
+      setDraft(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
@@ -96,7 +107,48 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
     }
   };
 
-  const close = () => { if (adding == null) onClose(); };
+  const yearRange = birthYearRange();
+  const draftYear = draft?.birthYear.trim() ?? '';
+  const draftYearError = draftYear && !(/^\d{4}$/.test(draftYear) && Number(draftYear) >= yearRange.min && Number(draftYear) <= yearRange.max)
+    ? `Un an între ${yearRange.min} și ${yearRange.max}.`
+    : null;
+  const selectedTeam = teams.find((team) => team.id === selectedTeamId) ?? null;
+
+  const createPlayer = async () => {
+    if (!draft || creating) return;
+    if (!selectedTeamId) {
+      setError('Alege o echipă înainte de a crea un sportiv.');
+      return;
+    }
+    const firstName = draft.firstName.trim();
+    const lastName = draft.lastName.trim();
+    if (!firstName || !lastName) {
+      setError('Completează numele și prenumele.');
+      return;
+    }
+    if (draftYearError) return;
+
+    setError(null);
+    setCreating(true);
+    try {
+      const result = await familyApi.bulkAddPlayers(selectedTeamId, [
+        { firstName, lastName, birthYear: draftYear ? Number(draftYear) : null },
+      ]);
+      if (!result.created.length) {
+        setError(`${lastName} ${firstName} este deja în lotul echipei ${selectedTeam?.name ?? 'selectate'}.`);
+        return;
+      }
+      onAdded();
+      onClose();
+    } catch (createError: any) {
+      console.error('Create player error:', createError);
+      setError(createError?.message || 'Nu am putut crea sportivul.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const close = () => { if (adding == null && !creating) onClose(); };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
@@ -225,6 +277,47 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                 </View>
               ) : null}
 
+              {draft ? (
+                <ScrollView className="flex-1 mt-3" contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
+                  <View className="rounded-[14px] border p-4 gap-3.5" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}>
+                    <View>
+                      <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>Sportiv nou</Text>
+                      <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
+                        {selectedTeam ? `Intră în lotul echipei ${selectedTeam.name}.` : 'Alege echipa destinație.'}
+                      </Text>
+                    </View>
+                    <View className="flex-col sm:flex-row gap-3">
+                      <View className="flex-1">
+                        <FormField label="Nume" value={draft.lastName} onChangeText={(value: string) => setDraft({ ...draft, lastName: value })} placeholder="Popescu" maxLength={120} />
+                      </View>
+                      <View className="flex-1">
+                        <FormField label="Prenume" value={draft.firstName} onChangeText={(value: string) => setDraft({ ...draft, firstName: value })} placeholder="Matei" maxLength={120} />
+                      </View>
+                    </View>
+                    <View className="sm:max-w-[200px]">
+                      <FormField
+                        label="An naștere (opțional)"
+                        value={draft.birthYear}
+                        onChangeText={(value: string) => setDraft({ ...draft, birthYear: value })}
+                        keyboardType="numeric"
+                        placeholder="2016"
+                        error={draftYearError}
+                      />
+                    </View>
+                    <View className="flex-row justify-end gap-2">
+                      <Button label="Înapoi la căutare" variant="ghost" onPress={() => { setDraft(null); setError(null); }} disabled={creating} />
+                      <Button
+                        icon="person-add"
+                        label="Creează jucător"
+                        variant="primary"
+                        loading={creating}
+                        disabled={!selectedTeamId || !draft.firstName.trim() || !draft.lastName.trim() || !!draftYearError}
+                        onPress={createPlayer}
+                      />
+                    </View>
+                  </View>
+                </ScrollView>
+              ) : (
               <FlatList
                 data={searchResults}
                 keyExtractor={(item: Player) => item.id.toString()}
@@ -285,8 +378,16 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                           Niciun sportiv găsit.
                         </Text>
                         <Text className="mt-1.5 text-center text-[12.5px] font-medium leading-5" style={{ color: 'var(--c-muted)' }}>
-                          Încearcă alt nume, email sau număr de tricou.
+                          Încearcă alt nume, email sau număr de tricou, ori creează sportivul.
                         </Text>
+                        <View className="mt-4">
+                          <Button
+                            icon="person-add"
+                            label="Creează jucător"
+                            variant="primary"
+                            onPress={() => { setError(null); setDraft(playerDraftFromSearch(searchQuery)); }}
+                          />
+                        </View>
                       </View>
                     );
                   }
@@ -306,6 +407,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                   );
                 }}
               />
+              )}
             </View>
           </View>
         </Pressable>
