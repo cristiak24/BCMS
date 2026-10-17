@@ -8,6 +8,10 @@ import { clubBalances } from '../services/clubFinance';
 import { roundMoney } from '../lib/money';
 import { attendanceSummary, isAttendedStatus, isCountedStatus } from '../lib/attendanceRate';
 import { coachManagesTeam } from '../lib/coachScope';
+import { toDate } from '../lib/dateUtils';
+
+/** Epoch ms of a DB timestamp (UTC text), 0 when missing — never the process zone. */
+const msOf = (value: unknown) => toDate(value)?.getTime() ?? 0;
 
 const router = Router();
 
@@ -377,7 +381,7 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
                 : Promise.resolve([]),
         ]);
         const now = Date.now();
-        const staleMedicalChecks = teamPlayers.filter((player) => !player.medicalCheckExpiry || new Date(player.medicalCheckExpiry).getTime() < now).length;
+        const staleMedicalChecks = teamPlayers.filter((player) => !player.medicalCheckExpiry || msOf(player.medicalCheckExpiry) < now).length;
 
         res.json({
             ...mapTeam(access.team, req),
@@ -429,8 +433,8 @@ router.get('/:id/stats', async (req: AuthenticatedRequest, res) => {
 
         const rateOf = (rows: { status: string | null }[]) => attendanceSummary(rows).rate;
 
-        const monthRows = attendanceRows.filter((r) => r.date && new Date(r.date) >= monthStart);
-        const prevMonthRows = attendanceRows.filter((r) => r.date && new Date(r.date) >= prevMonthStart && new Date(r.date) < monthStart);
+        const monthRows = attendanceRows.filter((r) => r.date && msOf(r.date) >= monthStart.getTime());
+        const prevMonthRows = attendanceRows.filter((r) => r.date && msOf(r.date) >= prevMonthStart.getTime() && msOf(r.date) < monthStart.getTime());
 
         const attByPlayer = new Map<number, { present: number; total: number; monthPresent: number; monthTotal: number }>();
         for (const row of attendanceRows) {
@@ -438,7 +442,7 @@ router.get('/:id/stats', async (req: AuthenticatedRequest, res) => {
             const bucket = attByPlayer.get(row.playerId) ?? { present: 0, total: 0, monthPresent: 0, monthTotal: 0 };
             bucket.total += 1;
             if (isAttendedStatus(row.status)) bucket.present += 1;
-            if (row.date && new Date(row.date) >= monthStart) {
+            if (row.date && msOf(row.date) >= monthStart.getTime()) {
                 bucket.monthTotal += 1;
                 if (isAttendedStatus(row.status)) bucket.monthPresent += 1;
             }
@@ -614,7 +618,7 @@ router.patch('/:id', requireTeamManager, async (req: AuthenticatedRequest, res) 
                 : Promise.resolve([]),
         ]);
         const now = Date.now();
-        const staleMedicalChecks = teamPlayers.filter((player) => !player.medicalCheckExpiry || new Date(player.medicalCheckExpiry).getTime() < now).length;
+        const staleMedicalChecks = teamPlayers.filter((player) => !player.medicalCheckExpiry || msOf(player.medicalCheckExpiry) < now).length;
 
         res.json({
             ...mapTeam(updated[0]),

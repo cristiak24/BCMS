@@ -1,3 +1,4 @@
+import { toCalendarDay } from '@/utils/dates';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -28,7 +29,7 @@ function Field({ label, value, onChange, placeholder, date }: { label: string; v
           type="date"
           aria-label={label}
           value={value}
-          max={new Date().toISOString().slice(0, 10)}
+          max={toCalendarDay(new Date())}
           onChange={(event) => onChange(event.target.value)}
           className={FIELD_CLASS}
           style={{ ...FIELD_STYLE, borderStyle: 'solid', borderWidth: 1 }}

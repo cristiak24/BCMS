@@ -1,3 +1,4 @@
+import { toCalendarDay } from '@/utils/dates';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, Loader2, Lock, Eye, EyeOff, Ticket, ArrowRight, Phone, Plus, X, Users, UserRound } from 'lucide-react';
@@ -446,7 +447,7 @@ export default function Signup() {
                                                     className={authInputClass}
                                                     type="date"
                                                     value={birthDate}
-                                                    max={new Date().toISOString().slice(0, 10)}
+                                                    max={toCalendarDay(new Date())}
                                                     onChange={(e) => setBirthDate(e.target.value)}
                                                     disabled={submitting}
                                                 />
@@ -502,7 +503,7 @@ export default function Signup() {
                                                                     type="date"
                                                                     aria-label={`Data nașterii copil ${index + 1}`}
                                                                     value={child.birthDate}
-                                                                    max={new Date().toISOString().slice(0, 10)}
+                                                                    max={toCalendarDay(new Date())}
                                                                     onChange={(e) => updateChild(index, { birthDate: e.target.value })}
                                                                     disabled={submitting}
                                                                 />
