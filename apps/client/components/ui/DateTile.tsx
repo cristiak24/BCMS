@@ -1,7 +1,8 @@
+import { parseApiDate } from '@/utils/dates';
 import { Text, View } from '@/src/web/reactNative';
 
 function getDateParts(value: string) {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return { month: '—', day: '--' };
   return {
     month: new Intl.DateTimeFormat('ro-RO', { month: 'short' }).format(date).replace('.', '').toUpperCase(),

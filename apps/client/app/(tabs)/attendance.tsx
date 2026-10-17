@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -51,13 +52,13 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 function formatTime(value: string) {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return '';
   return new Intl.DateTimeFormat('ro-RO', { weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
 function monthLabel(value: string) {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return '—';
   const text = new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric' }).format(date);
   return text.charAt(0).toUpperCase() + text.slice(1);

@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, ActivityIndicator, TextInput } from '@/src/web/reactNative';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -312,7 +313,7 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
                           )}
                         </View>
                         <Text className="text-[11px] font-bold text-gray-400" numberOfLines={1}>
-                          {payment.description} · {new Date(payment.date).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {payment.description} · {parseApiDate(payment.date).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </Text>
                       </View>
                       <View className="items-end">

@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -93,7 +94,7 @@ function dayPhrase(date: Date) {
 
 /** "în 2 zile" / "în 5 h" / "în 40 min" / "acum". */
 function countdown(iso: string) {
-  const diff = new Date(iso).getTime() - Date.now();
+  const diff = parseApiDate(iso).getTime() - Date.now();
   if (diff <= 0) return 'acum';
   const minutes = Math.round(diff / 60000);
   if (minutes < 60) return `în ${minutes} min`;
@@ -103,7 +104,7 @@ function countdown(iso: string) {
   return days === 1 ? 'în 1 zi' : `în ${days} zile`;
 }
 
-const time = (iso: string) => new Date(iso).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+const time = (iso: string) => parseApiDate(iso).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
 
 const money = (amount: number) => new Intl.NumberFormat('ro-RO', { maximumFractionDigits: 0 }).format(amount);
 
@@ -327,7 +328,7 @@ function NextEventPanel({ event, onPress }: { event: CalendarEvent | null | unde
       </View>
       <Text className="f-display text-[16px] font-bold mt-1.5 leading-snug" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{event.title}</Text>
       <Text className="t-meta mt-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-        {[`${dayLabel(new Date(event.startTime))}, ${time(event.startTime)}`, meta.label, event.teamName].filter(Boolean).join(' · ')}
+        {[`${dayLabel(parseApiDate(event.startTime))}, ${time(event.startTime)}`, meta.label, event.teamName].filter(Boolean).join(' · ')}
       </Text>
       {event.location ? (
         <View className="flex-row items-center gap-1 mt-1">
@@ -356,7 +357,7 @@ function WeekStrip({ events, selected, onSelect }: { events: CalendarEvent[]; se
         date: day.getDate(),
         isToday: i === 0,
         events: events.filter((e) => {
-          const t = new Date(e.startTime).getTime();
+          const t = parseApiDate(e.startTime).getTime();
           return t >= day.getTime() && t < next;
         }),
       };
@@ -465,16 +466,16 @@ export default function Dashboard() {
     const now = Date.now();
     const horizon = now + 7 * DAY;
     return events
-      .filter((e) => new Date(e.endTime || e.startTime).getTime() >= now && new Date(e.startTime).getTime() <= horizon)
+      .filter((e) => parseApiDate(e.endTime || e.startTime).getTime() >= now && parseApiDate(e.startTime).getTime() <= horizon)
       .sort((a, b) => a.startTime.localeCompare(b.startTime));
   }, [events]);
 
   const upcoming = useMemo(() => {
     if (!weekEvents) return null;
     const groups: { key: string; label: string; items: CalendarEvent[] }[] = [];
-    const shown = selectedDay ? weekEvents.filter((e) => new Date(e.startTime).toDateString() === selectedDay) : weekEvents;
+    const shown = selectedDay ? weekEvents.filter((e) => parseApiDate(e.startTime).toDateString() === selectedDay) : weekEvents;
     for (const event of shown) {
-      const date = new Date(event.startTime);
+      const date = parseApiDate(event.startTime);
       const key = date.toDateString();
       const last = groups[groups.length - 1];
       if (last?.key === key) last.items.push(event);
@@ -499,7 +500,7 @@ export default function Dashboard() {
       today.setHours(0, 0, 0, 0);
       const weekAhead = Date.now() + 7 * DAY;
       const unset = l12.matches.filter((m) => {
-        const at = new Date(m.startTime).getTime();
+        const at = parseApiDate(m.startTime).getTime();
         return !m.hasLineup && m.status !== 'cancelled' && at >= today.getTime() && at <= weekAhead;
       });
       if (unset.length > 0) {

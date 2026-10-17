@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity } from '@/src/web/reactNative';
 import { Plus } from 'lucide-react';
@@ -14,7 +15,7 @@ const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm', 'Dum'];
 const WEEK_MAX_VISIBLE = 6;
 
 function formatStart(iso: string) {
-  const date = new Date(iso);
+  const date = parseApiDate(iso);
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
@@ -83,7 +84,7 @@ export function ScheduleWeekView({
     const map = new Map<string, CalendarEvent[]>();
     weekDays.forEach((day) => {
       const key = toDateKey(day);
-      map.set(key, sortByStartTime(visible.filter((event) => toDateKey(new Date(event.startTime)) === key)));
+      map.set(key, sortByStartTime(visible.filter((event) => toDateKey(parseApiDate(event.startTime)) === key)));
     });
     return map;
   }, [events, weekDays, showCancelled, searchQuery]);

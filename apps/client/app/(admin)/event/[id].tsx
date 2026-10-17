@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -258,7 +259,7 @@ export default function EventDetailScreen() {
   }
 
   const meta = EVENT_TYPE_META[event.type as keyof typeof EVENT_TYPE_META] ?? EVENT_TYPE_META.admin;
-  const start = new Date(event.startTime);
+  const start = parseApiDate(event.startTime);
   const now = Date.now();
   const isUpcoming = start.getTime() > now;
   const cancelled = String(event.status ?? '').toLowerCase() === 'cancelled';
@@ -267,7 +268,7 @@ export default function EventDetailScreen() {
   const description = cleanDescription(event.description);
   const fromFrb = /FRB/i.test(event.description ?? '');
   const dateLabel = start.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const timeLabel = `${start.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })} – ${new Date(event.endTime).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}`;
+  const timeLabel = `${start.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })} – ${parseApiDate(event.endTime).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}`;
   const duration = formatDuration(event.startTime, event.endTime);
   const noteDirty = noteDraft.trim() !== (event.coachNote ?? '').trim();
 

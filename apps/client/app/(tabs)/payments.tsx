@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -45,7 +46,7 @@ function formatDate(value?: string | null) {
     return 'Programat';
   }
 
-  const date = new Date(value);
+  const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
@@ -86,7 +87,7 @@ function feeIcon(icon: PlayerPaymentFee['icon']) {
 
 function formatDueDate(value: string | null) {
   if (!value) return null;
-  const date = new Date(value);
+  const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return null;
   return new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'short' }).format(date);
 }

@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -73,7 +74,7 @@ function getSessionTeamIds(user: AuthUser | null) {
 }
 
 function getEventTime(value: string) {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -241,15 +242,6 @@ function parseFrbDateTime(dateValue: string, timeValue?: string) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function toIsoLocal(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hour = String(date.getHours()).padStart(2, '0');
-  const minute = String(date.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hour}:${minute}:00`;
-}
-
 function frbMatchToHubEvent(match: Match, team: Team, index: number): HubEvent | null {
   const startDate = parseFrbDateTime(match.date, match.time);
   if (!startDate) {
@@ -267,8 +259,10 @@ function frbMatchToHubEvent(match: Match, team: Team, index: number): HubEvent |
     title,
     description: scoreDescription,
     location: match.league || team.leagueName || null,
-    startTime: toIsoLocal(startDate),
-    endTime: toIsoLocal(endDate),
+    // Same shape as API events (ISO with `Z`); a zone-less string would be
+    // read as UTC by parseApiDate and shift FRB matches by 2-3 h.
+    startTime: startDate.toISOString(),
+    endTime: endDate.toISOString(),
     teamId: team.id,
     coachId: null,
     amount: null,

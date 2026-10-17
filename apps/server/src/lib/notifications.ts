@@ -3,6 +3,7 @@ import { notifications, playerGuardians, players, playersToTeams, users } from '
 import { and, eq, gte, inArray, ne, sql } from 'drizzle-orm';
 import { sendNotificationEmails } from './mailer';
 import { roundMoney } from './money';
+import { toDate } from './dateUtils';
 
 const NOTE_PREVIEW_MAX_LENGTH = 300;
 
@@ -113,8 +114,9 @@ async function teamPlayerIds(teamId: number) {
 }
 
 function formatWhen(value: string) {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime())
+    // Raw DB text is UTC; `new Date()` would read it in the process zone.
+    const date = toDate(value);
+    return !date
         ? value
         : new Intl.DateTimeFormat('ro-RO', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Bucharest' }).format(date);
 }
@@ -131,7 +133,7 @@ export async function notifyEventChange(params: {
     startTime: string;
     location?: string | null;
 }) {
-    if (params.teamId == null || new Date(params.startTime).getTime() < Date.now()) return 0;
+    if (params.teamId == null || (toDate(params.startTime)?.getTime() ?? 0) < Date.now()) return 0;
     const playerIds = await teamPlayerIds(params.teamId);
     const when = formatWhen(params.startTime);
     return notifyPlayers(playerIds, () => params.kind === 'cancelled'

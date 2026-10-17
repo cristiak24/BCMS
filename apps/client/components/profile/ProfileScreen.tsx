@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -154,7 +155,7 @@ function formatDate(value?: string | null) {
     return 'Indisponibil';
   }
 
-  const date = new Date(value);
+  const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
@@ -168,7 +169,7 @@ function formatDate(value?: string | null) {
 
 function formatShortDate(value?: string | null) {
   if (!value) return '—';
-  const date = new Date(value);
+  const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return '—';
   return new Intl.DateTimeFormat('ro-RO', { month: '2-digit', day: '2-digit', year: 'numeric' }).format(date);
 }

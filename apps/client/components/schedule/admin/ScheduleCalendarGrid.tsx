@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, useWindowDimensions } from '@/src/web/reactNative';
 import { CalendarEvent } from '../../../services/eventsApi';
@@ -249,7 +250,7 @@ export const MonthlyCalendarGrid = React.memo(({
               onSelectDay={() => dayData.date && onSelectDay({
                 date: dayData.date,
                 events: [...dayData.events].sort(
-                  (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+                  (a, b) => parseApiDate(a.startTime).getTime() - parseApiDate(b.startTime).getTime()
                 ),
               })}
             />

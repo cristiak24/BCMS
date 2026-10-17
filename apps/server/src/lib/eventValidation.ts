@@ -7,6 +7,7 @@
  */
 
 import { fitsMoneyColumn } from './money';
+import { toDate } from './dateUtils';
 
 export const EVENT_TYPES = ['training', 'match', 'camp', 'admin', 'medical'] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -97,9 +98,23 @@ export function parseAttendancePayload(body: unknown): Result<AttendanceItem[]> 
     return { ok: true, data: Array.from(byPlayer.values()) };
 }
 
-function parseDate(value: unknown, field: string): Result<string> {
-    const date = value == null || value === '' ? null : new Date(String(value));
-    if (!date || Number.isNaN(date.getTime())) {
+/**
+ * A date-time with an explicit zone: "…T16:00:00Z" or "…T19:00:00+03:00".
+ * A zone-less "2026-10-22T19:00:00" used to be read in the server's own time
+ * zone (UTC on Render), so a 19:00 training showed at 22:00 in Romania (audit
+ * P0-3). Such strings are now refused instead of guessed.
+ */
+const ZONED_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i;
+
+export function parseDate(value: unknown, field: string): Result<string> {
+    if (typeof value !== 'string' || !value.trim()) {
+        return { ok: false, error: `${field} is invalid.` };
+    }
+    if (!ZONED_DATE_TIME.test(value.trim())) {
+        return { ok: false, error: `${field} must be an ISO date-time with a time zone (e.g. 2026-10-22T16:00:00Z).` };
+    }
+    const date = new Date(value.trim());
+    if (Number.isNaN(date.getTime())) {
         return { ok: false, error: `${field} is invalid.` };
     }
     return { ok: true, data: date.toISOString() };
@@ -171,7 +186,9 @@ export function parseEventInput(
 
     const start = out.startTime ?? existing?.startTime;
     const end = out.endTime ?? existing?.endTime;
-    if (start && end && new Date(end).getTime() < new Date(start).getTime()) {
+    const startAt = toDate(start);
+    const endAt = toDate(end);
+    if (startAt && endAt && endAt.getTime() < startAt.getTime()) {
         return { ok: false, error: 'endTime must be after startTime.' };
     }
 

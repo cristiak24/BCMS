@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import type { ClubRole } from '../../services/superAdminApi';
 import { toCsv } from '../../utils/csv';
 
@@ -96,14 +97,14 @@ export function formatNumber(value: number) {
 
 export function formatDate(iso: string | null | undefined) {
   if (!iso) return '—';
-  const date = new Date(iso);
+  const date = parseApiDate(iso);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export function formatRelative(iso: string | null | undefined, never = 'Niciodată') {
   if (!iso) return never;
-  const date = new Date(iso);
+  const date = parseApiDate(iso);
   if (Number.isNaN(date.getTime())) return never;
   const minutes = Math.round((Date.now() - date.getTime()) / 60000);
   if (minutes < 2) return 'acum';
@@ -119,7 +120,7 @@ export function formatRelative(iso: string | null | undefined, never = 'Niciodat
 /** Days since a timestamp, or null when it never happened. */
 export function daysSince(iso: string | null | undefined) {
   if (!iso) return null;
-  const time = new Date(iso).getTime();
+  const time = parseApiDate(iso).getTime();
   return Number.isNaN(time) ? null : (Date.now() - time) / 86400000;
 }
 

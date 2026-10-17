@@ -1,3 +1,4 @@
+import { calendarDayToIso, parseApiDate, toCalendarDay } from '@/utils/dates';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -63,7 +64,8 @@ export default function PlayerProfile() {
     setNumber(data.number?.toString() || '');
     setBirthYear(data.birthYear?.toString() || '');
     setStatus(data.status || 'active');
-    setMedicalExpiry(data.medicalCheckExpiry ? new Date(data.medicalCheckExpiry).toISOString().slice(0, 10) : '');
+    // Romanian calendar day: the UTC day showed a midnight visa as the day before (WP3.3).
+    setMedicalExpiry(toCalendarDay(data.medicalCheckExpiry));
   };
 
   const [history, setHistory] = useState<AuditLogEntry[] | null>(null);
@@ -109,7 +111,7 @@ export default function PlayerProfile() {
       number: player.number?.toString() || '',
       birthYear: player.birthYear?.toString() || '',
       status: player.status || 'active',
-      medicalExpiry: player.medicalCheckExpiry ? new Date(player.medicalCheckExpiry).toISOString().slice(0, 10) : '',
+      medicalExpiry: toCalendarDay(player.medicalCheckExpiry),
     };
     return JSON.stringify(original) !== JSON.stringify({ firstName, lastName, email, number, birthYear, status, medicalExpiry });
   }, [player, firstName, lastName, email, number, birthYear, status, medicalExpiry]);
@@ -128,7 +130,7 @@ export default function PlayerProfile() {
         number: number ? parseInt(number, 10) : null,
         birthYear: birthYear ? parseInt(birthYear, 10) : null,
         status,
-        medicalCheckExpiry: medicalExpiry ? new Date(`${medicalExpiry}T12:00:00Z`).toISOString() : null,
+        medicalCheckExpiry: medicalExpiry ? calendarDayToIso(medicalExpiry) : null,
       };
       await teamsApi.updatePlayer(player.id, payload);
       const next = { ...player, ...payload } as Player;
@@ -319,7 +321,7 @@ export default function PlayerProfile() {
                         <View className="flex-1 min-w-0">
                           <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{t.label}</Text>
                           <Text className="t-meta" style={{ color: t.status === 'success' ? 'var(--c-muted)' : 'var(--c-danger-fg)' }}>
-                            {new Date(t.date).toLocaleDateString('ro-RO')} · {t.status === 'success' ? 'Plătit' : 'Eșuat'}
+                            {parseApiDate(t.date).toLocaleDateString('ro-RO')} · {t.status === 'success' ? 'Plătit' : 'Eșuat'}
                           </Text>
                         </View>
                         <Text className="t-num text-[13.5px] font-bold" style={{ color: 'var(--c-ink)' }}>{money(t.amount, t.currency)}</Text>

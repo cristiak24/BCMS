@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Pressable, useWindowDimensions } from '@/src/web/reactNative';
 import { useRouter, useLocalSearchParams } from '@/src/web/expoRouter';
@@ -354,17 +355,17 @@ export default function ScheduleScreen() {
 
   const monthName = currentDate.toLocaleString('ro-RO', { month: 'long' });
   const viewYear = currentDate.getFullYear();
-  const upcomingCount = visibleEvents.filter((event) => new Date(event.endTime || event.startTime) >= new Date()).length;
+  const upcomingCount = visibleEvents.filter((event) => parseApiDate(event.endTime || event.startTime) >= new Date()).length;
   const featuredUpcoming = useMemo(
     () => [...visibleEvents]
-      .filter((event) => new Date(event.endTime || event.startTime) >= new Date())
-      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+      .filter((event) => parseApiDate(event.endTime || event.startTime) >= new Date())
+      .sort((a, b) => parseApiDate(a.startTime).getTime() - parseApiDate(b.startTime).getTime())
       .slice(0, 3),
     [visibleEvents]
   );
   const nextMatch = featuredUpcoming.find((event) => event.type === 'match')
-    ?? [...visibleEvents].filter((e) => e.type === 'match' && new Date(e.endTime || e.startTime) >= new Date())
-      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0];
+    ?? [...visibleEvents].filter((e) => e.type === 'match' && parseApiDate(e.endTime || e.startTime) >= new Date())
+      .sort((a, b) => parseApiDate(a.startTime).getTime() - parseApiDate(b.startTime).getTime())[0];
 
   // Per-type counts feed the toolbar chips (which double as the calendar's
   // legend). Computed off the search-filtered set, ignoring the active type
@@ -509,7 +510,7 @@ export default function ScheduleScreen() {
                     >
                       <Text className="t-eyebrow shrink-0" style={{ color: 'var(--c-faint)' }}>Următorul meci</Text>
                       <Text className="t-meta flex-1 min-w-0" numberOfLines={1} style={{ color: 'var(--c-ink-soft)' }}>
-                        {new Date(nextMatch.startTime).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })} · {nextMatch.title}
+                        {parseApiDate(nextMatch.startTime).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })} · {nextMatch.title}
                       </Text>
                     </TouchableOpacity>
                   ) : null}

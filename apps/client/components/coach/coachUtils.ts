@@ -1,8 +1,9 @@
+import { parseApiDate } from '@/utils/dates';
 import type { CalendarEvent } from '../../services/eventsApi';
 import type { AuthUser } from '../../utils/authSession';
 
 export function getEventDate(value: string) {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 

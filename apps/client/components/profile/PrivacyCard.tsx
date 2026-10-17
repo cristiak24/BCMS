@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -15,7 +16,7 @@ const LEGAL_LINKS = [
 
 function formatDate(value: string | null) {
   if (!value) return '';
-  const date = new Date(value.includes('T') || value.endsWith('Z') ? value : `${value.replace(' ', 'T')}Z`);
+  const date = parseApiDate(value);
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 

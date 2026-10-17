@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import AsyncStorage from '@/src/web/asyncStorage';
 import { eventsApi } from '../services/eventsApi';
+import { localDateTimeToIso } from '../utils/dates';
 
 export type AddEventType = 'training' | 'match' | 'camp' | 'admin' | 'medical';
 export type AddEventFormField = 'title' | 'description' | 'location' | 'team' | 'startTime' | 'endTime' | 'recurringDays';
@@ -14,6 +15,17 @@ function toLocalDateStr(d: Date) {
 
 function getLocalDateTime(date: Date, time: string) {
   return new Date(`${toLocalDateStr(date)}T${time}:00`);
+}
+
+/**
+ * The typed wall-clock time as ISO with `Z`. The old zone-less
+ * "2026-10-22T19:00:00" was read in the server's zone (UTC on Render), so a
+ * 19:00 training was saved as 22:00 Romanian time (audit P0-3).
+ */
+function toApiTime(day: string, time: string) {
+  const iso = localDateTimeToIso(day, time);
+  if (!iso) throw new Error('Data sau ora evenimentului nu este validă.');
+  return iso;
 }
 
 function parseTimeToMinutes(value: string) {
@@ -298,8 +310,8 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
             type: newEventType,
             title: newTitle.trim(),
             description: newDescription.trim(),
-            startTime: `${dateStr}T${effectiveStartTime}:00`,
-            endTime: `${dateStr}T${effectiveEndTime}:00`,
+            startTime: toApiTime(dateStr, effectiveStartTime),
+            endTime: toApiTime(dateStr, effectiveEndTime),
             location: newLocation.trim(),
             teamId: newTeamId,
             amount: null,
@@ -313,8 +325,8 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
           type: newEventType,
           title: newTitle.trim(),
           description: newDescription.trim(),
-          startTime: `${localBaseDateStr}T${effectiveStartTime}:00`,
-          endTime: `${newEventType !== 'training' ? toLocalDateStr(newEndDate) : localBaseDateStr}T${effectiveEndTime}:00`,
+          startTime: toApiTime(localBaseDateStr, effectiveStartTime),
+          endTime: toApiTime(newEventType !== 'training' ? toLocalDateStr(newEndDate) : localBaseDateStr, effectiveEndTime),
           location: newLocation.trim(),
           teamId: newTeamId,
           amount: newAmount ? Number(newAmount.replace(',', '.')) || null : null,

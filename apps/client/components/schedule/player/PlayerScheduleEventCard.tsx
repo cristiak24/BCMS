@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import React from 'react';
 import { View, Text, TouchableOpacity } from '@/src/web/reactNative';
 import { Clock, MapPin } from 'lucide-react';
@@ -17,7 +18,7 @@ export const PlayerScheduleEventCard = React.memo(({
   isMobile: boolean;
   onPress: () => void;
 }) => {
-  const eventDate = new Date(item.startTime);
+  const eventDate = parseApiDate(item.startTime);
   const meta = EVENT_TYPE_META[item.type];
   const cancelled = isCancelledEvent(item);
 

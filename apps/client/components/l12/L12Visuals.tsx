@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import Button from '../ui/Button';
@@ -127,7 +128,7 @@ export function LineupStatus({ set, count, align = 'end' }: { set: boolean; coun
 }
 
 function DateBlock({ iso, kind, played }: { iso: string; kind: MatchKind; played: boolean }) {
-  const date = new Date(iso);
+  const date = parseApiDate(iso);
   const meta = KIND_META[kind];
   const valid = !Number.isNaN(date.getTime());
   return (
@@ -149,7 +150,7 @@ function DateBlock({ iso, kind, played }: { iso: string; kind: MatchKind; played
 }
 
 const timeOf = (iso: string) => {
-  const date = new Date(iso);
+  const date = parseApiDate(iso);
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
 };
 
@@ -362,7 +363,7 @@ export function L12Hero({
             <View className="flex-row items-center gap-1.5">
               <MaterialIcons name="event" size={14} color="var(--c-faint)" />
               <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-                {new Date(next.match.startTime).toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })} · {timeOf(next.match.startTime)}
+                {parseApiDate(next.match.startTime).toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })} · {timeOf(next.match.startTime)}
               </Text>
             </View>
             <Button

@@ -1,3 +1,4 @@
+import { calendarDayToIso, parseApiDate, toCalendarDay } from '@/utils/dates';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -39,7 +40,7 @@ function teamsOf(player: Player) {
 
 function expiryHint(iso: string | null, status: MedicalStatus) {
   if (!iso || status === 'missing') return 'Nicio viză înregistrată';
-  const days = Math.round((new Date(iso).getTime() - Date.now()) / 86400000);
+  const days = Math.round((parseApiDate(iso).getTime() - Date.now()) / 86400000);
   if (days < 0) return `Expirată de ${-days} ${-days === 1 ? 'zi' : 'zile'}`;
   if (days === 0) return 'Expiră azi';
   return `Peste ${days} ${days === 1 ? 'zi' : 'zile'}`;
@@ -73,7 +74,7 @@ function Checkbox({ checked, onPress, label }: { checked: boolean; onPress: () =
 function todayPlusYear() {
   const d = new Date();
   d.setFullYear(d.getFullYear() + 1);
-  return d.toISOString().slice(0, 10);
+  return toCalendarDay(d);
 }
 
 export default function ComplianceScreen() {
@@ -161,7 +162,7 @@ export default function ComplianceScreen() {
   const openEditor = (ids: number[]) => {
     const single = ids.length === 1 ? players?.find((p) => p.id === ids[0]) : null;
     setExpiryInput(single?.medicalCheckExpiry && medicalStatus(single.medicalCheckExpiry) === 'valid'
-      ? single.medicalCheckExpiry.slice(0, 10)
+      ? toCalendarDay(single.medicalCheckExpiry)
       : todayPlusYear());
     setEditing(ids);
   };
@@ -170,7 +171,8 @@ export default function ComplianceScreen() {
     if (!editing || !expiryInput) return;
     setSaving(true);
     try {
-      const iso = new Date(`${expiryInput}T12:00:00Z`).toISOString();
+      const iso = calendarDayToIso(expiryInput);
+      if (!iso) return;
       await Promise.all(editing.map((id) => teamsApi.updatePlayer(id, { medicalCheckExpiry: iso })));
       setPlayers((prev) => prev?.map((p) => (editing.includes(p.id) ? { ...p, medicalCheckExpiry: iso } : p)) ?? prev);
       showToast({ message: editing.length === 1 ? 'Viza a fost actualizată.' : `Vizele a ${editing.length} sportivi au fost actualizate.`, variant: 'success' });

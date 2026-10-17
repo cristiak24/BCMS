@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useEffect, useState, type ReactNode } from 'react';
 import { View, Text, Modal, Pressable, ActivityIndicator } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -79,7 +80,7 @@ export function PlayerEventDetailModal({
   const [myStatus, setMyStatus] = useState<{ status: string | null; note: string | null } | null>(null);
   const [loadingMine, setLoadingMine] = useState(false);
 
-  const isPast = event ? new Date(event.startTime).getTime() < Date.now() : false;
+  const isPast = event ? parseApiDate(event.startTime).getTime() < Date.now() : false;
   const cancelled = event ? isCancelledEvent(event) : false;
 
   useEffect(() => {
@@ -177,7 +178,7 @@ export function PlayerEventDetailModal({
               <View className="px-5 py-4 gap-3.5">
                 <DetailRow icon="schedule">
                   <Text className="text-[14px] font-semibold capitalize" style={{ color: 'var(--c-ink)' }}>
-                    {new Date(event.startTime).toLocaleDateString(RO_LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })}
+                    {parseApiDate(event.startTime).toLocaleDateString(RO_LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })}
                   </Text>
                   <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>{formatTimeRange(event.startTime, event.endTime)}</Text>
                 </DetailRow>

@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { View, Text, TextInput, Pressable, ActivityIndicator } from '@/src/web/reactNative';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { useCallback, useEffect, useState } from 'react';
@@ -32,7 +33,7 @@ const STATUS_VIEW: Record<string, { label: string; dot: string; fg: string }> = 
 
 function formatDate(iso: string | null | undefined) {
     if (!iso) return '—';
-    const date = new Date(iso.includes('T') || iso.endsWith('Z') ? iso : `${iso.replace(' ', 'T')}Z`);
+    const date = parseApiDate(iso);
     if (Number.isNaN(date.getTime())) return '—';
     return date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' });
 }

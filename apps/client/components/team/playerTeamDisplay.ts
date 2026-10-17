@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 /**
  * Display helpers shared by the two player-side "Echipa mea" screens (team
  * picker and team detail). Kept out of the screens themselves so the event
@@ -22,7 +23,7 @@ export function eventTypeMeta(type: string): EventTypeMeta {
 }
 
 export function formatEventDateTime(value: string) {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat('ro-RO', {
     weekday: 'short',
@@ -34,13 +35,13 @@ export function formatEventDateTime(value: string) {
 }
 
 export function formatEventDay(value: string) {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat('ro-RO', { day: '2-digit', month: 'short' }).format(date);
 }
 
 export function formatEventTime(value: string) {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return '';
   return new Intl.DateTimeFormat('ro-RO', { hour: '2-digit', minute: '2-digit' }).format(date);
 }

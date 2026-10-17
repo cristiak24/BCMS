@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView } from '@/src/web/reactNative';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -75,7 +76,7 @@ export function GradeTab() {
         if (!timeStr) return false;
         return new Date(timeStr).getTime() < nowTime;
       })
-      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+      .sort((a, b) => parseApiDate(b.startTime).getTime() - parseApiDate(a.startTime).getTime());
   }, [events]);
 
   const gradedEvents = pastEvents.filter(isEventGraded);
@@ -262,7 +263,7 @@ export function GradeTab() {
                 </View>
               ) : null}
               {paginatedEvents.map((item, index) => {
-                const eventDate = new Date(item.startTime);
+                const eventDate = parseApiDate(item.startTime);
                 const meta = getEventTypeMeta(item.type);
                 const graded = isEventGraded(item);
                 const checked = selectedIds.has(item.id);

@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from '@/src/web/reactNative';
 import Button from '../ui/Button';
@@ -90,9 +91,7 @@ const ENTITY_LABELS: Record<string, string> = {
 };
 
 function formatWhen(value: string) {
-    // DB timestamps arrive without a zone and are UTC ("2026-10-07 09:30:00").
-    const iso = value.includes('T') ? value : value.replace(' ', 'T');
-    const date = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`);
+    const date = parseApiDate(value);
     return Number.isNaN(date.getTime())
         ? value
         : new Intl.DateTimeFormat('ro-RO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);

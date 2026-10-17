@@ -5,7 +5,7 @@ import { and, desc, eq, inArray, isNull, lte, notExists, or, sql } from 'drizzle
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ensureClubPlayerRecords } from '../lib/clubPlayerRecords';
 import { buildPlayerUpdate } from '../lib/playerUpdate';
-import { toIso } from '../lib/dateUtils';
+import { toDate, toIso } from '../lib/dateUtils';
 import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
 import { isFailedStatus, isOutstandingStatus, isPaidStatus } from '../lib/paymentLedger';
 import { coachSeesPlayer, teamsManagedByCoach } from '../lib/coachScope';
@@ -473,8 +473,9 @@ function mapTeamEvent(event: typeof events.$inferSelect) {
         type: event.type,
         title: event.title,
         location: event.location ?? null,
-        startTime: event.startTime,
-        endTime: event.endTime,
+        // Raw DB text is zone-less; the browser read it as local time (R3-4).
+        startTime: toIso(event.startTime) ?? event.startTime,
+        endTime: toIso(event.endTime) ?? event.endTime,
         status: event.status ?? 'scheduled',
         coachNote: event.coachNote ?? null,
     };
@@ -1100,8 +1101,8 @@ export const playersController = {
             res.json(teamRows.map(team => {
                 const teamEvents = eventRows.filter(event => event.teamId === team.id && event.status !== 'cancelled');
                 const upcoming = teamEvents
-                    .filter(event => new Date(event.startTime).getTime() >= now)
-                    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+                    .filter(event => (toDate(event.startTime)?.getTime() ?? 0) >= now)
+                    .sort((a, b) => (toDate(a.startTime)?.getTime() ?? 0) - (toDate(b.startTime)?.getTime() ?? 0));
                 const ownAttendance = attendanceRows.filter(row => row.teamId === team.id);
 
                 return {
@@ -1157,13 +1158,13 @@ export const playersController = {
             const now = Date.now();
             const liveEvents = eventRows.filter(event => event.status !== 'cancelled');
             const upcomingEvents = liveEvents
-                .filter(event => new Date(event.startTime).getTime() >= now)
-                .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+                .filter(event => (toDate(event.startTime)?.getTime() ?? 0) >= now)
+                .sort((a, b) => (toDate(a.startTime)?.getTime() ?? 0) - (toDate(b.startTime)?.getTime() ?? 0))
                 .slice(0, 10)
                 .map(mapTeamEvent);
             const recentEvents = liveEvents
-                .filter(event => new Date(event.startTime).getTime() < now)
-                .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+                .filter(event => (toDate(event.startTime)?.getTime() ?? 0) < now)
+                .sort((a, b) => (toDate(b.startTime)?.getTime() ?? 0) - (toDate(a.startTime)?.getTime() ?? 0))
                 .slice(0, 10)
                 .map(event => {
                     const record = attendanceByEvent.get(event.id);

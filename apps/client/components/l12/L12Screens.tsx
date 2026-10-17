@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -30,7 +31,7 @@ import { DayHeading, KIND_META, L12Hero, MatchTicket, TeamAvatar, TeamTile, isOw
 
 function formatDate(iso: string | null | undefined, withTime = false) {
   if (!iso) return '';
-  const date = new Date(iso);
+  const date = parseApiDate(iso);
   if (Number.isNaN(date.getTime())) return '';
   const day = date.toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' });
   return withTime ? `${day}, ${date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}` : day;
@@ -131,12 +132,12 @@ type StatusFilter = 'all' | 'unset' | 'set';
 type HomeTab = 'matches' | 'teams';
 
 function dayKey(iso: string) {
-  const date = new Date(iso);
+  const date = parseApiDate(iso);
   return Number.isNaN(date.getTime()) ? '' : date.toDateString();
 }
 
 function dayLabel(iso: string) {
-  const date = new Date(iso);
+  const date = parseApiDate(iso);
   if (Number.isNaN(date.getTime())) return 'Fără dată';
   const today = new Date();
   const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
@@ -147,7 +148,7 @@ function dayLabel(iso: string) {
 }
 
 function timeLabel(iso: string) {
-  const date = new Date(iso);
+  const date = parseApiDate(iso);
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
 }
 
@@ -177,7 +178,7 @@ function Segmented<T extends string>({ value, onChange, options }: { value: T; o
 }
 
 const monthKeyOf = (iso: string) => {
-  const d = new Date(iso);
+  const d = parseApiDate(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
@@ -214,7 +215,7 @@ export function L12HomeScreen() {
   // Cancelled fixtures never need a sheet.
   const liveMatches = useMemo(() => (data?.matches ?? []).filter((m) => m.status !== 'cancelled'), [data]);
   const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }, []);
-  const isUpcoming = useCallback((m: L12OverviewMatch) => new Date(m.startTime).getTime() >= todayStart, [todayStart]);
+  const isUpcoming = useCallback((m: L12OverviewMatch) => parseApiDate(m.startTime).getTime() >= todayStart, [todayStart]);
 
   const teamScopedMatches = useMemo(() => {
     if (teamFilter === 'all') return liveMatches;

@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { CalendarEvent, EventAttendance, eventsApi } from '../services/eventsApi';
 import { ApiError } from '../services/apiClient';
 import { AuthUser } from './authSession';
@@ -128,10 +129,10 @@ export async function loadPlayerAttendanceDetails(
   const now = Date.now();
   const recentPastEvents = allEvents
     .filter((event) => {
-      const eventDate = new Date(event.startTime).getTime();
+      const eventDate = parseApiDate(event.startTime).getTime();
       return event.status !== 'cancelled' && !Number.isNaN(eventDate) && eventDate <= now;
     })
-    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+    .sort((a, b) => parseApiDate(b.startTime).getTime() - parseApiDate(a.startTime).getTime())
     .slice(0, limit);
 
   if (!user || recentPastEvents.length === 0) {

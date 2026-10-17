@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useEffect, useMemo, useState } from 'react';
 import type { Team, TeamLevel } from '../services/teamsApi';
 import { isFrbTeam } from '../components/myclub/teamDisplay';
@@ -146,8 +147,8 @@ export function useTeamFilters(teams: Team[]) {
                     return (a.staleMedicalChecks - b.staleMedicalChecks) * dir;
                 case 'updated':
                 default: {
-                    const ta = new Date(a.updatedAt).getTime() || 0;
-                    const tb = new Date(b.updatedAt).getTime() || 0;
+                    const ta = parseApiDate(a.updatedAt).getTime() || 0;
+                    const tb = parseApiDate(b.updatedAt).getTime() || 0;
                     return (ta - tb) * dir;
                 }
             }

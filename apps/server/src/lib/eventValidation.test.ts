@@ -5,6 +5,7 @@ import {
     MAX_ATTENDANCE_ITEMS,
     normalizeAttendanceStatus,
     parseAttendancePayload,
+    parseDate,
     parseEventInput,
 } from './eventValidation';
 
@@ -81,7 +82,29 @@ test('event update: only sent fields are returned, unknown fields dropped', () =
 
 test('event update: an end moved before the stored start is rejected', () => {
     const existing = { startTime: '2026-10-01 16:00:00', endTime: '2026-10-01 18:00:00' };
-    assert.equal(parseEventInput({ endTime: '2026-10-01T10:00:00' }, 'update', existing).ok, false);
+    assert.equal(parseEventInput({ endTime: '2026-10-01T10:00:00Z' }, 'update', existing).ok, false);
+    // The stored start is UTC text: an end of 17:00Z is after a 16:00 UTC start
+    // in every process zone (it used to be compared in local time).
+    assert.equal(parseEventInput({ endTime: '2026-10-01T17:00:00Z' }, 'update', existing).ok, true);
+});
+
+test('parseDate: a zone-less date-time is refused (audit P0-3)', () => {
+    for (const value of ['2026-10-22T19:00:00', '2026-10-22 19:00:00', '2026-10-22T19:00', '2026-10-22', 1761152400000]) {
+        const result = parseDate(value, 'startTime');
+        assert.equal(result.ok, false, String(value));
+    }
+    const naive = parseEventInput({ title: 'X', startTime: '2026-10-22T19:00:00', endTime: '2026-10-22T20:30:00', teamId: 1 }, 'create');
+    assert.equal(naive.ok, false);
+    assert.match(naive.ok ? '' : naive.error, /time zone/);
+});
+
+test('parseDate: Z and numeric offsets are accepted and normalised to UTC', () => {
+    assert.deepEqual(parseDate('2026-10-22T16:00:00.000Z', 'startTime'), { ok: true, data: '2026-10-22T16:00:00.000Z' });
+    assert.deepEqual(parseDate('2026-10-22T19:00:00+03:00', 'startTime'), { ok: true, data: '2026-10-22T16:00:00.000Z' });
+    assert.deepEqual(parseDate('2027-01-14T19:00+0200', 'startTime'), { ok: true, data: '2027-01-14T17:00:00.000Z' });
+    assert.equal(parseDate('2026-10-22T25:00:00Z', 'startTime').ok, false);
+    assert.equal(parseDate('', 'startTime').ok, false);
+    assert.equal(parseDate(null, 'startTime').ok, false);
 });
 
 test('event update: an empty body is rejected rather than a no-op success', () => {

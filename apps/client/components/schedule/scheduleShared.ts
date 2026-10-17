@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { Platform } from '@/src/web/reactNative';
 import { CalendarEvent } from '../../services/eventsApi';
 
@@ -74,7 +75,7 @@ export function isSameDay(a: Date, b: Date): boolean {
 
 // ── Event predicates ────────────────────────────────────────────────────────
 export function getEventDate(value: string): Date | null {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -217,7 +218,7 @@ export function triggerFileDownload(filename: string, content: string, mimeType:
 }
 
 function toICSDate(value: string): string {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 }
 

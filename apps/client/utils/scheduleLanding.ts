@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 /**
  * Decides which month the schedule should open on.
  *
@@ -40,7 +41,7 @@ export function findNextUpcomingEvent<T extends LandingEvent>(
     // Scans rather than taking [0]: the caller is not required to have sorted, and a
     // sorted-input assumption is exactly what made the original bug invisible.
     for (const event of events) {
-        const time = new Date(String(event?.startTime ?? '')).getTime();
+        const time = parseApiDate(String(event?.startTime ?? '')).getTime();
         if (!Number.isFinite(time)) {
             continue;
         }
@@ -72,6 +73,6 @@ export function resolveLandingMonth(
         return firstOfMonth(reference);
     }
 
-    const upcomingDate = new Date(String(upcoming.startTime ?? ''));
+    const upcomingDate = parseApiDate(String(upcoming.startTime ?? ''));
     return Number.isFinite(upcomingDate.getTime()) ? firstOfMonth(upcomingDate) : firstOfMonth(reference);
 }

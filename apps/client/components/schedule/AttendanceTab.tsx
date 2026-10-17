@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from '@/src/web/reactNative';
 import {
@@ -203,7 +204,7 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
   const yearStat = useMemo(() => rateOverEvents(yearEvents), [rateOverEvents, yearEvents]);
   const monthStat = useMemo(
     () => rateOverEvents(yearEvents.filter((ev) => {
-      const d = new Date(ev.startTime);
+      const d = parseApiDate(ev.startTime);
       return d.getFullYear() === viewYear && d.getMonth() === viewMonth;
     })),
     [rateOverEvents, yearEvents, viewYear, viewMonth]

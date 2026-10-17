@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity } from '@/src/web/reactNative';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -32,7 +33,7 @@ export function PlayerScheduleWeekView({
     const map = new Map<string, CalendarEvent[]>();
     weekDays.forEach((day) => {
       const key = toDateKey(day);
-      map.set(key, visible.filter((event) => toDateKey(new Date(event.startTime)) === key));
+      map.set(key, visible.filter((event) => toDateKey(parseApiDate(event.startTime)) === key));
     });
     return map;
   }, [events, weekDays]);

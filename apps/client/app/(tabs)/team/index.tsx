@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -33,7 +34,7 @@ function getMedicalStatus(expiry: string | null | undefined) {
 function MyStatusCard({ player }: { player: Player }) {
   const status = getMedicalStatus(player.medicalCheckExpiry);
   const expiryLabel = player.medicalCheckExpiry
-    ? new Date(player.medicalCheckExpiry).toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })
+    ? parseApiDate(player.medicalCheckExpiry).toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })
     : null;
 
   return (

@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -20,7 +21,7 @@ import { clearScorerCache } from './useScorer';
  */
 
 function formatWhen(iso: string) {
-  const d = new Date(iso);
+  const d = parseApiDate(iso);
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 

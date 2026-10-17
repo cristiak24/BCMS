@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -26,7 +27,7 @@ function formatBytes(bytes: number) {
 
 function formatDate(iso: string | null) {
   if (!iso) return '';
-  const date = new Date(iso);
+  const date = parseApiDate(iso);
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 

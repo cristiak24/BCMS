@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ActivityIndicator } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -49,7 +50,7 @@ function money(amount: number, currency = 'ron') {
 
 function shortDate(value: string | null) {
     if (!value) return null;
-    const date = new Date(value);
+    const date = parseApiDate(value);
     return Number.isNaN(date.getTime()) ? null : new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 }
 

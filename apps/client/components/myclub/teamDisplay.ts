@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import type { TeamGender, TeamLevel } from '../../services/teamsApi';
 
 export const LEVEL_LABELS: Record<TeamLevel, string> = {
@@ -42,14 +43,14 @@ export const MEDICAL_META: Record<MedicalStatus, { label: string; bg: string; fg
 
 export function formatDate(iso: string | null | undefined) {
     if (!iso) return '—';
-    const date = new Date(iso);
+    const date = parseApiDate(iso);
     if (Number.isNaN(date.getTime())) return '—';
     return date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export function formatRelativeDate(iso: string | null | undefined) {
     if (!iso) return '—';
-    const date = new Date(iso);
+    const date = parseApiDate(iso);
     if (Number.isNaN(date.getTime())) return '—';
 
     const diffMs = Date.now() - date.getTime();

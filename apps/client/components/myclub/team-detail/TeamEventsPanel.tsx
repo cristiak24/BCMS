@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from '@/src/web/reactNative';
 import { Dumbbell, Trophy, MapPin, CalendarDays } from 'lucide-react';
@@ -45,7 +46,7 @@ export default function TeamEventsPanel({ teamId, scope }: { teamId: number; sco
         if (!events) return [];
         const now = Date.now();
         return events.filter((e) => {
-            const end = new Date(e.endTime || e.startTime).getTime();
+            const end = parseApiDate(e.endTime || e.startTime).getTime();
             return scope === 'past' ? end < now : end >= now;
         });
     }, [events, scope]);
@@ -53,8 +54,8 @@ export default function TeamEventsPanel({ teamId, scope }: { teamId: number; sco
     const list = useMemo(() => {
         const filtered = type === 'all' ? scoped : scoped.filter((e) => e.type === type);
         return [...filtered].sort((a, b) => {
-            const da = new Date(a.startTime).getTime();
-            const db = new Date(b.startTime).getTime();
+            const da = parseApiDate(a.startTime).getTime();
+            const db = parseApiDate(b.startTime).getTime();
             return scope === 'past' ? db - da : da - db;
         });
     }, [scoped, type, scope]);

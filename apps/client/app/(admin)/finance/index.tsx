@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, Modal, Platform } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -71,7 +72,7 @@ function mapFinancialDocuments(documents: FinancialDocument[]): UploadEntry[] {
         fileName: document.documentUrl?.split('/').pop() || 'fișier',
         amount: Number(document.amount) || 0,
         documentUrl: document.documentUrl,
-        uploadedAt: new Date(document.date),
+        uploadedAt: parseApiDate(document.date),
         accountingStatus: document.status === 'processed'
             ? 'approved'
             : document.status === 'rejected'
@@ -98,7 +99,7 @@ function formatCurrency(amount: number, currency = 'ron') {
 }
 
 function formatPaymentDate(value: string) {
-    const date = new Date(value);
+    const date = parseApiDate(value);
     if (Number.isNaN(date.getTime())) {
         return value;
     }

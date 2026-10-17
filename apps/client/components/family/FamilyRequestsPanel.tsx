@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -26,7 +27,7 @@ function formatBirth(date: string | null) {
 }
 
 function timeAgo(iso: string) {
-  const then = new Date(iso.includes('T') || iso.endsWith('Z') ? iso : `${iso.replace(' ', 'T')}Z`).getTime();
+  const then = parseApiDate(iso).getTime();
   const minutes = Math.max(0, Math.round((Date.now() - then) / 60000));
   if (minutes < 60) return minutes <= 1 ? 'acum' : `acum ${minutes} min`;
   const hours = Math.round(minutes / 60);

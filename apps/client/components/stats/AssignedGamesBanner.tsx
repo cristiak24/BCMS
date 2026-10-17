@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -36,7 +37,7 @@ export default function AssignedGamesBanner() {
               {g.status === 'live' ? 'Meci în desfășurare — ții statistica' : 'Ții statistica la meci'}
             </Text>
             <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-              {g.title} · {new Date(g.startTime).toLocaleString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              {g.title} · {parseApiDate(g.startTime).toLocaleString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
             </Text>
           </View>
           <MaterialIcons name="chevron-right" size={20} color="var(--c-brand-fg)" />

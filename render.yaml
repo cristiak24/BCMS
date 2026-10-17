@@ -12,3 +12,7 @@ services:
         value: production
       - key: PORT
         value: 3000
+      # Orele din DB (`timestamp` fără fus) sunt UTC; procesul rulează explicit
+      # în UTC, ca plasă de siguranță pentru orice `new Date()` rămas (audit P1-15).
+      - key: TZ
+        value: UTC

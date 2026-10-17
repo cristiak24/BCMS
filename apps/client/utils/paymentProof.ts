@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 /**
  * "Dovadă de plată": a printable confirmation for one successful payment,
  * which the browser can print or save as PDF. Explicitly not a fiscal
@@ -16,7 +17,7 @@ function escapeHtml(value: string) {
 
 export function paymentProofHtml({ clubName, playerName, transaction }: ProofInput) {
   const amount = new Intl.NumberFormat('ro-RO', { style: 'currency', currency: transaction.currency.toUpperCase() }).format(transaction.amount);
-  const date = new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(transaction.date));
+  const date = new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' }).format(parseApiDate(transaction.date));
   const rows: Array<[string, string]> = [
     ['Club', clubName || '—'],
     ['Jucător', playerName],

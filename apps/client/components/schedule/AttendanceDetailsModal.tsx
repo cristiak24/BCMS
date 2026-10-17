@@ -1,3 +1,4 @@
+import { parseApiDate } from '@/utils/dates';
 import React from 'react';
 import { View, Text, Modal, Pressable, TouchableOpacity, ScrollView } from '@/src/web/reactNative';
 import { X, Clock, CheckCircle, XCircle, BriefcaseMedical, Clock3, ChevronRight, CalendarDays } from 'lucide-react';
@@ -111,7 +112,7 @@ export function AttendanceDetailsModal({ visible, onClose, player, date, details
                                                     <View className="flex-row items-center mt-0.5">
                                                         <Clock size={11} color="var(--c-faint)" />
                                                         <Text className="text-[10px] text-slate-500 font-bold ml-1 uppercase tracking-widest">
-                                                            {new Date(detail.startTime).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
+                                                            {parseApiDate(detail.startTime).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
                                                         </Text>
                                                     </View>
                                                 </View>
