@@ -14,10 +14,13 @@ import ProtectedRoute from '../components/auth/ProtectedRoute';
 import PublicRoute from '../components/auth/PublicRoute';
 import { PLAYER_FEATURE_FLAGS } from '../config/playerFeatureFlags';
 
-// Entry screens stay in the main chunk: they are what an unauthenticated visitor
-// hits first, so lazy-loading them would only add a round trip.
-import Landing from '../app/index';
-import Login from '../app/login';
+// "/" stays in the main chunk: it forwards a saved session home at once. The
+// pages only a visitor sees (the marketing page, inside Landing, and Login)
+// are separate chunks, preloaded below when there is no saved session — a
+// signed-in user no longer downloads them with every cold start.
+import Landing, { loadWelcome } from '../app/index';
+const loadLogin = () => import('../app/login');
+const Login = lazyRoute(loadLogin);
 
 // Everything behind a login is code-split. The app previously shipped as a single
 // ~812 kB chunk, so a player on mobile downloaded the entire super-admin console
@@ -169,6 +172,8 @@ type Loader = () => Promise<{ default: unknown }>;
  * parallel with Clerk, takes that waterfall off the critical path.
  */
 const ROUTE_CHUNKS: Array<[string, Loader[]]> = [
+  ['/', [loadWelcome]],
+  ['/login', [loadLogin]],
   ['/profile', [loadProfile]],
   ['/signup', [loadSignup]],
   ['/termeni', [loadTerms]],
@@ -238,15 +243,17 @@ const ROUTE_CHUNKS: Array<[string, Loader[]]> = [
 function preloadCurrentRoute() {
   if (typeof window === 'undefined') return;
   let pathname = window.location.pathname;
+  const cached = readAuthSessionSync();
   // "/" (the PWA start URL) and /login forward a signed-in user to their home
   // screen, so warm that one instead.
-  if (pathname === '/' || pathname === '/login') {
-    const cached = readAuthSessionSync();
-    if (!cached) return;
+  if (cached && (pathname === '/' || pathname === '/login')) {
     pathname = getHomeRouteForRole(cached.role);
   }
   const match = ROUTE_CHUNKS.find(([pattern]) => matchPath(pattern, pathname));
   if (match) preloadRoutes(match[1]);
+  // No saved session: the visitor is about to see the welcome page or Login
+  // (protected pages send them there), so warm both while the page is idle.
+  if (!cached) prefetchRoutes([loadLogin, loadWelcome]);
 }
 
 preloadCurrentRoute();

@@ -1,12 +1,12 @@
 import { parseApiDate } from '@/utils/dates';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, TextInput, ActivityIndicator } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import Button from '../ui/Button';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import FilterChips from '../ui/FilterChips';
 import SelectField from '../ui/SelectField';
-import { financeApi, type BalanceFee, type PaymentAllocation, type PlayerBalance } from '../../services/financeApi';
+import { financeApi, type BalanceFee, type PaymentAllocation, type PlayerBalanceSummary } from '../../services/financeApi';
 import { balancesCsvRows, downloadCsv, paymentsCsvRows } from './financeCsv';
 
 /**
@@ -14,7 +14,8 @@ import { balancesCsvRows, downloadCsv, paymentsCsvRows } from './financeCsv';
  * calculation as their own Plăți page, and a way to record a desk payment
  * (admins and the accountant). The server splits the amount over the fees —
  * ticked ones first, then the oldest — and the dialog shows that split
- * before saving, so a partial payment is visibly partial.
+ * before saving, so a partial payment is visibly partial. The list holds
+ * each player's totals; the dialog loads that one player's fees.
  */
 
 type Filter = 'overdue' | 'owing' | 'all';
@@ -59,18 +60,17 @@ function todayIso() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-function rowMeta(balance: PlayerBalance, currency: string) {
+function rowMeta(balance: PlayerBalanceSummary, currency: string) {
     if (balance.state === 'paid') return balance.credit ? `La zi · avans ${money(balance.credit, currency)}` : 'La zi';
     if (balance.state === 'overdue') {
         const since = shortDate(balance.oldestOverdue);
         return `${balance.overdueCount} ${balance.overdueCount === 1 ? 'taxă restantă' : 'taxe restante'}${since ? ` · din ${since}` : ''}`;
     }
-    const next = balance.fees.map((fee) => fee.dueDate).filter(Boolean).sort()[0] ?? null;
-    return next ? `Scadent ${shortDate(next)}` : 'De plată';
+    return balance.oldestDueDate ? `Scadent ${shortDate(balance.oldestDueDate)}` : 'De plată';
 }
 
 export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?: () => void }) {
-    const [balances, setBalances] = useState<PlayerBalance[]>([]);
+    const [balances, setBalances] = useState<PlayerBalanceSummary[]>([]);
     const [currency, setCurrency] = useState('ron');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -78,7 +78,12 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
     const [query, setQuery] = useState('');
     const [visibleCount, setVisibleCount] = useState(PAGE);
 
-    const [target, setTarget] = useState<PlayerBalance | null>(null);
+    const [target, setTarget] = useState<PlayerBalanceSummary | null>(null);
+    // The target's fees, loaded when the dialog opens (null while loading).
+    const [targetFees, setTargetFees] = useState<BalanceFee[] | null>(null);
+    const [feesError, setFeesError] = useState<string | null>(null);
+    const targetIdRef = useRef<number | null>(null);
+    targetIdRef.current = target?.playerId ?? null;
     const [selectedFees, setSelectedFees] = useState<Set<string>>(new Set());
     const [amount, setAmount] = useState('');
     const [method, setMethod] = useState<Method>('cash');
@@ -91,6 +96,23 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
     const monthOptions = useMemo(exportMonths, []);
     const [exportMonth, setExportMonth] = useState(monthOptions[0].key);
     const [exporting, setExporting] = useState(false);
+    const [exportingBalances, setExportingBalances] = useState(false);
+
+    // The list has totals only: the export asks for every fee once, on demand,
+    // and keeps the rows (and order) on screen.
+    const exportBalances = async () => {
+        setExportingBalances(true);
+        try {
+            const data = await financeApi.getBalancesWithFees();
+            const byId = new Map(data.players.map((balance) => [balance.playerId, balance]));
+            const rows = filtered.map((row) => byId.get(row.playerId)).filter((balance): balance is NonNullable<typeof balance> => Boolean(balance));
+            downloadCsv(balancesCsvRows(rows), 'solduri-jucatori.csv');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Nu am putut exporta soldurile.');
+        } finally {
+            setExportingBalances(false);
+        }
+    };
 
     const exportPayments = async () => {
         setExporting(true);
@@ -138,25 +160,42 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
         });
     }, [balances, filter, query]);
 
-    const openPayment = (balance: PlayerBalance) => {
-        // Pre-select what is late (or everything owed when nothing is late yet).
-        const preset = balance.fees.filter((fee) => fee.status === 'overdue');
-        const chosen = preset.length ? preset : balance.fees;
+    const loadTargetFees = useCallback(async (playerId: number) => {
+        setTargetFees(null);
+        setFeesError(null);
+        try {
+            const { fees } = await financeApi.getPlayerBalance(playerId);
+            // The admin may have closed the dialog or opened another player meanwhile.
+            if (targetIdRef.current !== playerId) return;
+            // Pre-select what is late (or everything owed when nothing is late yet).
+            const preset = fees.filter((fee) => fee.status === 'overdue');
+            const chosen = preset.length ? preset : fees;
+            setTargetFees(fees);
+            setSelectedFees(new Set(chosen.map((fee) => fee.id)));
+            setAmount(String(chosen.reduce((sum, fee) => sum + fee.amount, 0)));
+        } catch (err) {
+            if (targetIdRef.current === playerId) setFeesError(err instanceof Error ? err.message : 'Nu am putut încărca taxele jucătorului.');
+        }
+    }, []);
+
+    const openPayment = (balance: PlayerBalanceSummary) => {
+        targetIdRef.current = balance.playerId;
         setTarget(balance);
-        setSelectedFees(new Set(chosen.map((fee) => fee.id)));
-        setAmount(String(chosen.reduce((sum, fee) => sum + fee.amount, 0)));
+        setSelectedFees(new Set());
+        setAmount('');
         setMethod('cash');
         setDate(todayIso());
         setDescription('');
         setFormError(null);
+        void loadTargetFees(balance.playerId);
     };
 
     const toggleFee = (fee: BalanceFee) => {
-        if (!target) return;
+        if (!targetFees) return;
         setSelectedFees((current) => {
             const next = new Set(current);
             if (next.has(fee.id)) next.delete(fee.id); else next.add(fee.id);
-            setAmount(String(target.fees.filter((item) => next.has(item.id)).reduce((sum, item) => sum + item.amount, 0)));
+            setAmount(String(targetFees.filter((item) => next.has(item.id)).reduce((sum, item) => sum + item.amount, 0)));
             return next;
         });
     };
@@ -217,7 +256,7 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                     </Text>
                 </View>
                 <View className="flex-row items-center gap-2 flex-wrap">
-                    <Button size="sm" icon="file-download" label="Export solduri" disabled={loading || !balances.length} onPress={() => downloadCsv(balancesCsvRows(filtered), 'solduri-jucatori.csv')} />
+                    <Button size="sm" icon="file-download" label="Export solduri" loading={exportingBalances} disabled={loading || !balances.length} onPress={() => void exportBalances()} />
                     <SelectField<string> label="Luna exportului de plăți" value={exportMonth} onChange={setExportMonth} options={monthOptions} className="w-[190px]" />
                     <Button size="sm" icon="file-download" label="Export plăți" loading={exporting} onPress={() => void exportPayments()} />
                     <Button size="sm" icon="refresh" label="Reîncarcă" iconOnlyOnMobile onPress={() => void load()} disabled={loading} />
@@ -319,7 +358,18 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                 {target ? (
                     <View className="gap-3">
                         <View className="rounded-[10px] border overflow-hidden" style={{ borderColor: 'var(--c-border)', maxHeight: 220, overflowY: 'auto' } as any}>
-                            {target.fees.map((fee, index) => {
+                            {targetFees == null ? (
+                                feesError ? (
+                                    <View className="px-3 py-3 gap-2 items-start">
+                                        <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{feesError}</Text>
+                                        <Button size="sm" label="Încearcă din nou" onPress={() => void loadTargetFees(target.playerId)} />
+                                    </View>
+                                ) : (
+                                    <View className="py-4 items-center" accessibilityRole="progressbar" accessibilityLabel="Se încarcă taxele">
+                                        <ActivityIndicator size="small" color="var(--c-brand-fg)" />
+                                    </View>
+                                )
+                            ) : targetFees.map((fee, index) => {
                                 const checked = selectedFees.has(fee.id);
                                 return (
                                     <Pressable

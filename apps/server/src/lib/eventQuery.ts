@@ -24,7 +24,17 @@ export type EventQueryScope = {
     isSuperadmin: boolean;
     /** The caller's club team ids, or null for an unrestricted (superadmin) caller. */
     allowedTeamIds: number[] | null;
+    /** Clock for the default window (tests). */
+    now?: Date;
 };
+
+/**
+ * A request with neither start, end nor a team gets the last year and
+ * everything ahead, instead of every event the club ever recorded (1.8 MB on
+ * a club with two seasons, audit P2). Every screen sends its own range; this
+ * only bounds a caller that forgot to.
+ */
+export const DEFAULT_EVENT_HISTORY_DAYS = 365;
 
 export type EventQueryPlan = {
     /** True → respond `[]` without querying at all. Keeps empty arrays away from inArray. */
@@ -147,13 +157,20 @@ export function buildEventQueryPlan(params: EventQueryParams, scope: EventQueryS
         teamIds = permitted;
     }
 
+    let start = parseDateParam(params.start);
+    const end = parseDateParam(params.end);
+    if (start == null && end == null && teamIds == null) {
+        const now = scope.now ?? new Date();
+        start = new Date(now.getTime() - DEFAULT_EVENT_HISTORY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    }
+
     return {
         empty: false,
         teamIds,
         clubTeamIds: teamIds == null ? clubTeamIds : null,
         type,
         coachId,
-        start: parseDateParam(params.start),
-        end: parseDateParam(params.end),
+        start,
+        end,
     };
 }

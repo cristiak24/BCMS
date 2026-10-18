@@ -21,12 +21,25 @@ export function isCountedStatus(status?: string | null) {
 }
 
 export function attendanceSummary(rows: Array<{ status: string | null }>) {
-    const counted = rows.filter((row) => isCountedStatus(row.status));
-    const attended = counted.filter((row) => isAttendedStatus(row.status)).length;
+    return attendanceSummaryFromCounts(rows.map((row) => ({ status: row.status, count: 1 })));
+}
+
+/**
+ * The same summary from rows already counted per status (SQL `GROUP BY
+ * status`), so a screen does not have to load every attendance row.
+ */
+export function attendanceSummaryFromCounts(buckets: Array<{ status: string | null; count: number }>) {
+    let attended = 0;
+    let counted = 0;
+    for (const bucket of buckets) {
+        if (!isCountedStatus(bucket.status)) continue;
+        counted += bucket.count;
+        if (isAttendedStatus(bucket.status)) attended += bucket.count;
+    }
     return {
         attended,
-        counted: counted.length,
+        counted,
         /** Percent, one decimal; null when nothing was counted yet. */
-        rate: counted.length ? Math.round((attended / counted.length) * 1000) / 10 : null,
+        rate: counted ? Math.round((attended / counted) * 1000) / 10 : null,
     };
 }

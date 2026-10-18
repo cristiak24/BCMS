@@ -17,6 +17,29 @@ const THROTTLE_MS = 10 * 60 * 1000;
 const lastWrite = new Map<number, { at: number; day: string }>();
 let warnedFailure = false;
 
+/**
+ * An entry older than THROTTLE_MS no longer holds anything back (the next
+ * visit writes either way), so it can go: without this the map grew by one
+ * entry per account that ever signed in, for the life of the process.
+ */
+export function sweepActivity(now = Date.now(), entries: Map<number, { at: number; day: string }> = lastWrite): number {
+    let removed = 0;
+    for (const [userId, entry] of entries) {
+        if (now - entry.at >= THROTTLE_MS) {
+            entries.delete(userId);
+            removed += 1;
+        }
+    }
+    return removed;
+}
+
+let sweepTimer: ReturnType<typeof setInterval> | null = null;
+function ensureSweep() {
+    if (sweepTimer) return;
+    sweepTimer = setInterval(() => sweepActivity(), THROTTLE_MS);
+    sweepTimer.unref?.();
+}
+
 /** Calendar day and month of `date` in Romania (invoices follow local months). */
 export function activityKeys(date: Date) {
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -72,6 +95,7 @@ export function recordActivity(user: ActiveUser | null | undefined) {
     const { day } = activityKeys(new Date(now));
     if (!shouldRecord(lastWrite.get(user.id), now, day)) return;
     lastWrite.set(user.id, { at: now, day });
+    ensureSweep();
 
     void writeActivity(user, new Date(now)).catch((error) => {
         // Retry on the next request rather than waiting out the throttle.

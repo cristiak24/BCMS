@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
 import { players, teams, playersToTeams, attendance, playerPayments, users, events, playerGuardians } from '../db/schema';
-import { and, desc, eq, inArray, isNull, lte, notExists, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lte, notExists, or, sql } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ensureClubPlayerRecords } from '../lib/clubPlayerRecords';
 import { buildPlayerUpdate } from '../lib/playerUpdate';
@@ -9,10 +9,11 @@ import { toDate, toIso } from '../lib/dateUtils';
 import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
 import { isFailedStatus, isOutstandingStatus, isPaidStatus } from '../lib/paymentLedger';
 import { coachSeesPlayer, teamsManagedByCoach } from '../lib/coachScope';
-import { attendanceSummary, isAttendedStatus, isCountedStatus } from '../lib/attendanceRate';
+import { attendanceSummary, attendanceSummaryFromCounts } from '../lib/attendanceRate';
 import { clubBalances, playerFees } from '../services/clubFinance';
 import { listPlayerHistory, writeAuditLog } from '../services/auditService';
 import { sendPaymentReminders as sendReminderNotifications } from '../lib/notifications';
+import { applyRosterQuery, parseRosterQuery } from '../lib/rosterQuery';
 
 const DEFAULT_PAYMENT_CURRENCY = (process.env.STRIPE_CURRENCY || 'ron').trim().toLowerCase();
 
@@ -72,9 +73,6 @@ function getRequestClubId(req: AuthenticatedRequest) {
     return req.user?.clubId == null ? null : Number(req.user.clubId);
 }
 
-
-// One definition for every screen (lib/attendanceRate.ts).
-const isAttendancePresent = isAttendedStatus;
 
 async function getAllowedTeamIds(req: AuthenticatedRequest) {
     if (isSuperadmin(req)) return null; 
@@ -235,7 +233,37 @@ async function clubLinkedPlayerIds(clubId: number | null): Promise<number[]> {
     return Array.from(new Set([...viaGuardian, ...viaAccount].map((row) => row.id)));
 }
 
-async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPlayerFacing?: boolean; withBalances?: boolean } = {}) {
+/**
+ * Attendance per player, counted per status in SQL (GROUP BY) instead of
+ * loading every row of the club's history (~110k rows on two seasons). The
+ * statuses stay raw so lib/attendanceRate.ts alone decides what counts.
+ */
+async function attendanceCountsByPlayer(playerIds: number[]) {
+    const rows = await db
+        .select({ playerId: attendance.playerId, status: attendance.status, count: sql<number>`count(*)::int` })
+        .from(attendance)
+        .where(inArray(attendance.playerId, playerIds))
+        .groupBy(attendance.playerId, attendance.status);
+    const byPlayer = new Map<number, Array<{ status: string | null; count: number }>>();
+    for (const row of rows) {
+        const list = byPlayer.get(row.playerId) ?? [];
+        list.push({ status: row.status, count: Number(row.count) });
+        byPlayer.set(row.playerId, list);
+    }
+    return byPlayer;
+}
+
+/** Each player's latest payment row (by month, then by creation) — one row per player. */
+async function latestPaymentStatusByPlayer(playerIds: number[]) {
+    const rows = await db
+        .selectDistinctOn([playerPayments.playerId], { playerId: playerPayments.playerId, status: playerPayments.status })
+        .from(playerPayments)
+        .where(inArray(playerPayments.playerId, playerIds))
+        .orderBy(playerPayments.playerId, desc(playerPayments.year), desc(playerPayments.month), desc(playerPayments.createdAt), playerPayments.id);
+    return new Map(rows.map((row) => [row.playerId, row.status]));
+}
+
+async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPlayerFacing?: boolean; withBalances?: boolean; onlyPlayerIds?: number[] } = {}) {
     const { stripForPlayerFacing = true, withBalances = true } = options;
     const isPlayerFacing = isPlayerFacingRole(req);
     let allowedTeamIds = await getAllowedTeamIds(req);
@@ -326,13 +354,19 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
         ));
     }
 
+    // One player's page needs one row, not the whole roster's aggregates.
+    if (options.onlyPlayerIds) {
+        const only = new Set(options.onlyPlayerIds);
+        allPlayers = allPlayers.filter((p) => only.has(p.id));
+    }
+
     if (!allPlayers.length) return [];
 
     const playerIds = allPlayers.map(p => p.id);
-    
-    // Split into chunks if necessary, but Drizzle handles normal arrays
-    const attendanceRows = await db.select().from(attendance).where(inArray(attendance.playerId, playerIds));
-    const paymentRows = await db.select().from(playerPayments).where(inArray(playerPayments.playerId, playerIds));
+    const [attendanceCounts, latestPaymentStatus] = await Promise.all([
+        attendanceCountsByPlayer(playerIds),
+        latestPaymentStatusByPlayer(playerIds),
+    ]);
 
     const teamsById = new Map(allTeams.map(t => [t.id, t]));
 
@@ -359,26 +393,9 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
     }
 
     const attendanceByPlayer = new Map<number, { present: number; total: number }>();
-    for (const row of attendanceRows) {
-        if (!isCountedStatus(row.status)) continue;
-        const curr = attendanceByPlayer.get(row.playerId) || { present: 0, total: 0 };
-        curr.total += 1;
-        if (isAttendancePresent(row.status)) {
-            curr.present += 1;
-        }
-        attendanceByPlayer.set(row.playerId, curr);
-    }
-
-    const latestPaymentByPlayer = new Map<number, typeof paymentRows[0]>();
-    for (const row of paymentRows) {
-        const current = latestPaymentByPlayer.get(row.playerId);
-        if (!current) {
-            latestPaymentByPlayer.set(row.playerId, row);
-        } else {
-            if (row.year > current.year || (row.year === current.year && row.month > current.month) || (row.year === current.year && row.month === current.month && new Date(row.createdAt ?? 0).getTime() > new Date(current.createdAt ?? 0).getTime())) {
-                latestPaymentByPlayer.set(row.playerId, row);
-            }
-        }
+    for (const [playerId, buckets] of attendanceCounts) {
+        const summary = attendanceSummaryFromCounts(buckets);
+        attendanceByPlayer.set(playerId, { present: summary.attended, total: summary.counted });
     }
 
     // Staff rosters show what each player owes from the shared fee calculation.
@@ -406,8 +423,7 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
             ? Math.round((attendanceStats.present / attendanceStats.total) * 100)
             : 0;
 
-        const latestPayment = latestPaymentByPlayer.get(player.id);
-        const paymentStatus = balanceStatus.get(player.id) ?? latestPayment?.status ?? 'pending';
+        const paymentStatus = balanceStatus.get(player.id) ?? latestPaymentStatus.get(player.id) ?? 'pending';
 
         return {
             ...player,
@@ -436,7 +452,7 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
 // Shared by getPlayerById and getMe — callers must already have verified the
 // requester is allowed to see this exact player's full (unstripped) record.
 async function buildFullPlayerPayload(req: AuthenticatedRequest, player: typeof players.$inferSelect) {
-    const rosterRows = await buildRosterRows(req, { stripForPlayerFacing: false, withBalances: false });
+    const rosterRows = await buildRosterRows(req, { stripForPlayerFacing: false, withBalances: false, onlyPlayerIds: [player.id] });
     const rosterPlayer = rosterRows.find(row => row.id === player.id);
     const paymentSummary = await buildPlayerPaymentSummary(player, getRequestClubId(req) ?? rosterPlayer?.clubId ?? null);
 
@@ -450,10 +466,6 @@ async function buildFullPlayerPayload(req: AuthenticatedRequest, player: typeof 
         teamNames: rosterPlayer?.teamNames ?? [],
         category: rosterPlayer?.category ?? 'Unassigned',
     };
-}
-
-function computeAttendanceRateFromRecords(records: (typeof attendance.$inferSelect)[]) {
-    return attendanceSummary(records).rate;
 }
 
 // "Echipa mea" and the club screens now share one definition
@@ -628,7 +640,10 @@ export const playersController = {
     async getRoster(req: AuthenticatedRequest, res: Response) {
         try {
             const rosterWithData = await buildRosterRows(req);
-            res.json(rosterWithData);
+            // ?page=… (Lot): one page, searched, filtered and sorted here
+            // (lib/rosterQuery.ts). Without it: the whole list, as other screens read it.
+            const query = parseRosterQuery(req.query as Record<string, unknown>);
+            res.json(query ? applyRosterQuery(rosterWithData, query) : rosterWithData);
         } catch (error) {
             console.error('Get roster error:', error);
             res.status(500).json({ error: 'Internal server error' });
@@ -663,26 +678,27 @@ export const playersController = {
                 });
             }
 
-            const attendanceRows = await db.select().from(attendance).where(inArray(attendance.playerId, rosterPlayerIds));
-
             const now = new Date();
             const currentStart = new Date(now);
             currentStart.setDate(currentStart.getDate() - 30);
             const previousStart = new Date(currentStart);
             previousStart.setDate(previousStart.getDate() - 30);
 
-            const currentPeriodRecords = attendanceRows.filter(row => {
-                const date = row.date ? new Date(row.date) : null;
-                return date ? date >= currentStart && date <= now : false;
-            });
+            // The last two 30-day windows, counted per status in SQL: this used
+            // to load the roster's entire attendance history to read 60 days.
+            const [nowIso, currentIso, previousIso] = [now, currentStart, previousStart].map((date) => date.toISOString());
+            const periodRows = await db
+                .select({
+                    status: attendance.status,
+                    current: sql<number>`(count(*) filter (where ${attendance.date} >= ${currentIso} and ${attendance.date} <= ${nowIso}))::int`,
+                    previous: sql<number>`(count(*) filter (where ${attendance.date} < ${currentIso}))::int`,
+                })
+                .from(attendance)
+                .where(and(inArray(attendance.playerId, rosterPlayerIds), gte(attendance.date, previousIso)))
+                .groupBy(attendance.status);
 
-            const previousPeriodRecords = attendanceRows.filter(row => {
-                const date = row.date ? new Date(row.date) : null;
-                return date ? date >= previousStart && date < currentStart : false;
-            });
-
-            const currentPeriodAttendance = computeAttendanceRateFromRecords(currentPeriodRecords);
-            const previousPeriodAttendance = computeAttendanceRateFromRecords(previousPeriodRecords);
+            const currentPeriodAttendance = attendanceSummaryFromCounts(periodRows.map((row) => ({ status: row.status, count: Number(row.current) }))).rate;
+            const previousPeriodAttendance = attendanceSummaryFromCounts(periodRows.map((row) => ({ status: row.status, count: Number(row.previous) }))).rate;
 
             const attendanceDelta = currentPeriodAttendance !== null && previousPeriodAttendance !== null
                 ? Math.round((currentPeriodAttendance - previousPeriodAttendance) * 10) / 10

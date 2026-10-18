@@ -3,7 +3,13 @@ import { useRouter } from '@/src/web/expoRouter';
 import { getHomeRouteForRole, normalizeRole } from '../utils/authSession';
 import { useSession } from '../context/AuthContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
-import Welcome from '../components/marketing/Welcome';
+import { lazyRoute } from '../src/lazyRoute';
+
+// The marketing page is for visitors only: kept out of the main chunk, so a
+// signed-in user (sent straight home from here) never downloads it. App.tsx
+// preloads it for a visitor without a saved session.
+export const loadWelcome = () => import('../components/marketing/Welcome');
+const Welcome = lazyRoute(loadWelcome);
 
 export default function Landing() {
   const router = useRouter();

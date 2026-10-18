@@ -179,6 +179,33 @@ export interface MyTeamDetail {
     recentEvents: MyTeamPastEvent[];
 }
 
+/** What Lot asks the server for (search, filters, sort, page). */
+export type RosterPageQuery = {
+    q?: string;
+    team?: string;
+    status?: 'active' | 'inactive' | 'all';
+    attendance?: 'all' | 'high' | 'medium' | 'low';
+    payment?: 'all' | 'paid' | 'pending' | 'overdue';
+    sort?: 'name' | 'attendance' | 'payment';
+    dir?: 'asc' | 'desc';
+    page: number;
+    /** 'all' = every matching player (CSV export). */
+    pageSize: number | 'all';
+};
+
+export interface RosterPage {
+    items: Player[];
+    /** Players matching the search and filters. */
+    total: number;
+    page: number;
+    totalPages: number;
+    /** The whole roster, unfiltered. */
+    rosterTotal: number;
+    /** Team names on the roster, for the team filter. */
+    teams: string[];
+    hasUnassigned: boolean;
+}
+
 export interface RosterSummary {
     athleteCount: number;
     averageAttendance: number;
@@ -257,6 +284,12 @@ export const teamsApi = {
 
     async getRoster(): Promise<Player[]> {
         const { data } = await apiClient.get<Player[]>('/players/roster');
+        return data;
+    },
+
+    /** One page of Lot; the server searches, filters and sorts. */
+    async getRosterPage(query: RosterPageQuery): Promise<RosterPage> {
+        const { data } = await apiClient.get<RosterPage>('/players/roster', { params: query });
         return data;
     },
 

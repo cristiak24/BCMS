@@ -16,6 +16,8 @@ const router = Router();
 router.use(authenticate);
 
 const HEADERS = FRB_HEADERS;
+// Same bound as lib/frbMatches.ts: a silent FRB must not hold the request open forever.
+const FRB_TIMEOUT_MS = 15_000;
 
 // Bounds how fast one caller can make us hammer the upstream widget service. It is a
 // per-instance guard against accidental render loops and casual abuse, layered on top
@@ -115,7 +117,7 @@ router.get('/seasons', basketballProxyRateLimit, async (req, res) => {
 
     try {
         const url = `https://widgets.baskethotel.com/widget-service/show?api=${getFrbApiKey()}&request[0][widget]=320&request[0][param][league_id]=${leagueId}`;
-        const response = await axios.get(url, { headers: HEADERS });
+        const response = await axios.get(url, { headers: HEADERS, timeout: FRB_TIMEOUT_MS });
         const cleanData = (response.data as string).replace(/\\"/g, '"').replace(/\\\//g, '/');
 
         const regex = /value="(\d{5,7})"[^>]*>(\d{4}-\d{4})/g;
@@ -142,7 +144,7 @@ router.get('/teams', basketballProxyRateLimit, async (req, res) => {
 
     try {
         const url = `https://widgets.baskethotel.com/widget-service/show?api=${getFrbApiKey()}&request[0][widget]=201&request[0][param][league_id][0]=${leagueId}&request[0][param][season_id]=${seasonId}&request[0][param][team_link_visible]=1&request[0][param][team_link_type]=3`;
-        const response = await axios.get(url, { headers: HEADERS });
+        const response = await axios.get(url, { headers: HEADERS, timeout: FRB_TIMEOUT_MS });
         const raw = (response.data as string).replace(/\\/g, '');
 
         const teams: { id: string; name: string }[] = [];
@@ -219,7 +221,7 @@ router.get('/standings', basketballProxyRateLimit, async (req, res) => {
     try {
         const baseUrl = `https://widgets.baskethotel.com/widget-service/show?api=${getFrbApiKey()}&lang=ro`;
         const initialUrl = `${baseUrl}&request[0][widget]=300&request[0][param][league_id]=${leagueId}&request[0][param][season_id]=${seasonId}&request[0][param][template]=v2&request[0][param][show_stage_selector]=1&request[0][param][stage_selector]=dropdown&request[0][param][use_group_sort_index]=1`;
-        const initialResponse = await axios.get(initialUrl, { headers: HEADERS });
+        const initialResponse = await axios.get(initialUrl, { headers: HEADERS, timeout: FRB_TIMEOUT_MS });
         const initialRaw = String(initialResponse.data);
         const state = initialRaw.match(/state:\s*\\?'([^'\\]+)\\?'/)?.[1];
         const stageId = initialRaw.match(/activeStage\s*=\s*\\?'([^'\\]+)\\?'/)?.[1];
@@ -230,7 +232,7 @@ router.get('/standings', basketballProxyRateLimit, async (req, res) => {
         }
 
         const tableUrl = `${baseUrl}&request[0][container]=standings&request[0][widget]=300&request[0][part]=table&request[0][state]=${encodeURIComponent(state)}&request[0][param][season_id]=${seasonId}${stageId ? `&request[0][param][group_filter]=${stageId}` : ''}&request[0][param][showTeamLogo]=&request[0][param][teamLogoSize]=20x20`;
-        const tableResponse = await axios.get(tableUrl, { headers: HEADERS });
+        const tableResponse = await axios.get(tableUrl, { headers: HEADERS, timeout: FRB_TIMEOUT_MS });
         res.json(parseStandingsTable(String(tableResponse.data)));
     } catch (e) {
         console.error('[basketball/standings] error:', e);

@@ -113,3 +113,19 @@ test('type is passed through untouched and absent when not supplied', () => {
     assert.equal(buildEventQueryPlan({ type: 'match' }, club1).type, 'match');
     assert.equal(buildEventQueryPlan({}, club1).type, null);
 });
+
+test('a request without start, end or team is bounded to the last year and everything ahead', () => {
+    const now = new Date('2026-10-17T12:00:00.000Z');
+    const plan = buildEventQueryPlan({}, { ...club1, now });
+    assert.equal(plan.start, '2025-10-17T12:00:00.000Z');
+    assert.equal(plan.end, null);
+    // Also for a superadmin, who would otherwise read every club's history.
+    assert.equal(buildEventQueryPlan({ type: 'match' }, { isSuperadmin: true, allowedTeamIds: null, now }).start, '2025-10-17T12:00:00.000Z');
+});
+
+test('an explicit range or team keeps the caller\'s bounds', () => {
+    const now = new Date('2026-10-17T12:00:00.000Z');
+    assert.equal(buildEventQueryPlan({ end: '2026-03-31T00:00:00.000Z' }, { ...club1, now }).start, null);
+    assert.equal(buildEventQueryPlan({ start: '2024-01-01' }, { ...club1, now }).start, '2024-01-01T00:00:00.000Z');
+    assert.equal(buildEventQueryPlan({ teamId: '2' }, { ...club1, now }).start, null);
+});

@@ -112,7 +112,8 @@ export type AdminRecentPayment = {
 
 export type BalanceFee = PlayerPaymentFee & { kind: 'monthly' | 'levy' | 'facility' | 'event' | 'request' };
 
-export type PlayerBalance = {
+/** A Finanțe list row: the player's totals, without the fee-by-fee detail. */
+export type PlayerBalanceSummary = {
     playerId: number;
     playerName: string;
     teamName: string | null;
@@ -122,9 +123,29 @@ export type PlayerBalance = {
     overdueCount: number;
     oldestOverdue: string | null;
     state: 'overdue' | 'due' | 'paid';
-    fees: BalanceFee[];
     /** Advance paid beyond every fee owed (absent on older servers). */
     credit?: number;
+    /** Fees still owed. */
+    feeCount: number;
+    /** Earliest due date among them, overdue or not. */
+    oldestDueDate: string | null;
+};
+
+export type PlayerBalance = Omit<PlayerBalanceSummary, 'feeCount' | 'oldestDueDate'> & {
+    fees: BalanceFee[];
+};
+
+/** One player's fees, for the „Încasează” dialog. */
+export type PlayerFeeDetail = {
+    currency: string;
+    playerId: number;
+    outstanding: number;
+    overdue: number;
+    overdueCount: number;
+    oldestOverdue: string | null;
+    state: 'overdue' | 'due' | 'paid';
+    credit: number;
+    fees: BalanceFee[];
 };
 
 /** How a desk payment is split over the fees, before it is saved. */
@@ -228,10 +249,21 @@ export const financeApi = {
         return apiFetch<AdminRecentPayment[]>(`/finance/admin/recent-payments?limit=${limit}${teamQuery}`);
     },
 
-    /** What every player owes (same calculation as the player's Plăți page). */
-    async getBalances(teamId?: number | null): Promise<{ currency: string; players: PlayerBalance[] }> {
+    /** What every player owes (same calculation as the player's Plăți page): totals per player. */
+    async getBalances(teamId?: number | null): Promise<{ currency: string; players: PlayerBalanceSummary[] }> {
         const query = teamId != null ? `?teamId=${teamId}` : '';
-        return apiFetch<{ currency: string; players: PlayerBalance[] }>(`/finance/admin/balances${query}`);
+        return apiFetch<{ currency: string; players: PlayerBalanceSummary[] }>(`/finance/admin/balances${query}`);
+    },
+
+    /** The same list with every fee of every player — only for the CSV export. */
+    async getBalancesWithFees(teamId?: number | null): Promise<{ currency: string; players: PlayerBalance[] }> {
+        const query = teamId != null ? `&teamId=${teamId}` : '';
+        return apiFetch<{ currency: string; players: PlayerBalance[] }>(`/finance/admin/balances?include=fees${query}`);
+    },
+
+    /** One player's fees, fee by fee. */
+    async getPlayerBalance(playerId: number): Promise<PlayerFeeDetail> {
+        return apiFetch<PlayerFeeDetail>(`/finance/admin/balances/${playerId}`);
     },
 
     /** Every payment of the club in a date range (YYYY-MM-DD), for the CSV export. */
