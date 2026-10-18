@@ -1,0 +1,100 @@
+/**
+ * Scorer (audit runda 2, runda 5): a simple-mode match from setup to final —
+ * points, fouls, an undo, the next quarter, the final whistle — gives the
+ * right box score; actions recorded offline wait on the phone and reach the
+ * server once, without duplicates, when the connection is back.
+ */
+import type { Page } from '@playwright/test';
+import { test, expect, signIn, apiAs, seedIds } from '../support/fixtures';
+
+type GamePayload = {
+  game: { status: string; scoreUs: number; scoreThem: number; currentPeriod: number } | null;
+  events: Array<{ clientId: string; type: string; side: string; playerId: number | null; period: number; deleted: boolean }>;
+};
+
+/** A player on court, by surname (shirt numbers are editable elsewhere). */
+async function player(page: Page, surname: string, action: '+1 liber' | '+2' | '+3' | 'Fault') {
+  await page.getByRole('button', { name: new RegExp(`^#\\d+ ${surname},`) }).click();
+  await page.getByRole('button', { name: action, exact: true }).click();
+}
+
+async function opponent(page: Page, action: '+1' | '+2' | '+3' | 'Fault') {
+  await page.getByRole('button', { name: `CS Oaspeți ${action}`, exact: true }).click();
+}
+
+const synced = (page: Page) => expect(page.getByText(/salvat(e)? pe telefon/)).toHaveCount(0, { timeout: 15_000 });
+
+test('a simple match from setup to final, with an offline stretch', async ({ page, context, consoleErrors }) => {
+  const { events } = seedIds();
+  const eventId = events.u12Match;
+  await signIn(page, 'admin');
+  await page.goto(`/admin/stats/${eventId}`);
+
+  // Setup: simple mode, the first five as starters, the opponent's name.
+  await page.getByRole('button', { name: /^Simplu/ }).click();
+  for (const name of ['Marin Luca', 'Popescu Matei', 'Vasile Andrei', 'Georgescu Mihai', 'Pop Tudor']) {
+    await page.getByRole('button', { name: `${name} joacă` }).locator('xpath=..').getByRole('button', { name: 'Titular' }).click();
+  }
+  await page.getByLabel('Numele echipei adverse').fill('CS Oaspeți');
+  await page.getByRole('button', { name: 'Începe meciul' }).click();
+  await expect(page.getByText('Sfertul 1')).toBeVisible();
+
+  // Quarter 1: us 2 + 3 + 1 = 6 (a +2 undone), them 2; one foul each.
+  await player(page, 'Popescu', '+2');
+  await player(page, 'Popescu', '+3');
+  await player(page, 'Marin', '+1 liber');
+  await player(page, 'Vasile', 'Fault');
+  await opponent(page, '+2');
+  await opponent(page, 'Fault');
+  await player(page, 'Marin', '+2');
+  await page.getByRole('button', { name: 'Anulează ultima acțiune' }).click();
+  await expect(page.getByRole('button', { name: /^#\d+ Marin, 1 punct/ })).toBeVisible();
+  await synced(page);
+
+  await page.getByRole('button', { name: 'Sfertul următor' }).click();
+  await page.getByRole('button', { name: 'Începe sfertul următor' }).click();
+  await expect(page.getByText('Sfertul 2')).toBeVisible();
+  await player(page, 'Georgescu', '+2'); // us 8
+  await synced(page);
+
+  // Offline: three actions stay on the phone, then go out once.
+  await context.setOffline(true);
+  await player(page, 'Pop', '+2'); // us 10
+  await opponent(page, '+3'); // them 5
+  await player(page, 'Popescu', 'Fault');
+  await expect(page.getByText(/3 acțiuni salvate pe telefon/)).toBeVisible();
+  await context.setOffline(false);
+  await synced(page);
+  // The failed requests while offline are expected noise.
+  consoleErrors.splice(0, consoleErrors.length, ...consoleErrors.filter((e) => !/ERR_INTERNET_DISCONNECTED|Failed to fetch|NetworkError/i.test(e)));
+
+  const admin = await apiAs('admin');
+  const live = await (await admin.get(`games/events/${eventId}`)).json() as GamePayload;
+  const ids = live.events.map((e) => e.clientId);
+  expect(new Set(ids).size, 'no duplicate actions on the server').toBe(ids.length);
+  expect(live.game).toMatchObject({ scoreUs: 10, scoreThem: 5, currentPeriod: 2 });
+
+  // Final whistle → the match sheet.
+  const finish = page.getByRole('button', { name: 'Încheie meciul', exact: true });
+  await finish.click();
+  // The confirmation dialog repeats the label on its confirm button.
+  await expect(finish).toHaveCount(2);
+  await finish.last().click();
+  await expect(page.getByText('Final', { exact: true })).toBeVisible();
+
+  const final = await (await admin.get(`games/events/${eventId}`)).json() as GamePayload;
+  expect(final.game).toMatchObject({ status: 'finished', scoreUs: 10, scoreThem: 5 });
+  // Exactly one action was undone.
+  expect(final.events.filter((e) => e.deleted)).toHaveLength(1);
+
+  // The sheet: per quarter, and per player (points, fouls).
+  const row = async (name: string) => (await page.getByRole('row').filter({ hasText: name }).first().innerText()).replace(/\s+/g, ' ').trim();
+  await expect(page.getByRole('row').filter({ hasText: 'U12 Masculin' })).toBeVisible();
+  expect(await row('U12 Masculin')).toMatch(/U12 Masculin 6 4 10$/);
+  expect(await row('CS Oaspeți')).toMatch(/CS Oaspeți 2 3 5$/);
+  expect(await row('Popescu Matei')).toMatch(/Popescu Matei 5 1$/);
+  expect(await row('Marin Luca')).toMatch(/Marin Luca 1 0$/);
+  expect(await row('Vasile Andrei')).toMatch(/Vasile Andrei 0 1$/);
+  expect(await row('Georgescu Mihai')).toMatch(/Georgescu Mihai 2 0$/);
+  expect(await row('Pop Tudor')).toMatch(/Pop Tudor 2 0$/);
+});
