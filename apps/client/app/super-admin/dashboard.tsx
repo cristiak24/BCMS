@@ -25,6 +25,7 @@ import {
 import CreateClubDialog from '../../components/super-admin/CreateClubDialog';
 import { useSession } from '../../context/AuthContext';
 import { superAdminApi, type AttentionItem, type SuperAdminOverview } from '../../services/superAdminApi';
+import PrivacyRequestsBanner from '../../components/privacy/PrivacyRequestsBanner';
 
 type TrendMetric = 'activeUsers' | 'newAccounts' | 'amount';
 
@@ -128,6 +129,9 @@ export default function SuperAdminDashboard() {
   return (
     <PageContainer>
       {header}
+      <View className="mb-4 empty:hidden">
+        <PrivacyRequestsBanner path="/super-admin/privacy" />
+      </View>
 
       <View className="gap-4 ui-stagger">
         {data.trackingSince === data.month ? (

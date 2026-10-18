@@ -22,12 +22,15 @@ import {
   getEventTimestamp,
   isUpcoming,
 } from '../../components/coach/coachUtils';
+import { AttendanceNoteInput, AttendanceNoteToggle } from '../../components/attendance/AttendanceNoteField';
 
 /**
  * "Prezență" — pick a session on the left, mark the squad on the right.
  *
  * The status buttons write through one at a time (PATCH per player) so a coach
  * marking a roster courtside never loses a whole form to one failed request.
+ * Each row also carries the per-player feedback note, the same field as the
+ * admin's sheet (audit R3-5); a saved note notifies the player's family.
  */
 
 type AttendanceStatus = 'present' | 'absent' | 'medical';
@@ -38,6 +41,8 @@ type AttendancePlayer = {
   lastName: string;
   number: number | null;
   status: string | null;
+  /** The saved feedback note ('' = none). */
+  note: string;
 };
 
 /** Sessions offered in the picker — anything older lives on /schedule. */
@@ -62,6 +67,7 @@ function toAttendancePlayer(player: Player): AttendancePlayer {
     lastName: player.lastName,
     number: player.number,
     status: null,
+    note: '',
   };
 }
 
@@ -75,6 +81,7 @@ function mergeAttendance(teamPlayers: Player[], attendanceRows: EventAttendance[
       lastName: row.lastName || byPlayerId.get(row.playerId)?.lastName || '',
       number: row.number ?? byPlayerId.get(row.playerId)?.number ?? null,
       status: row.status,
+      note: row.note ?? '',
     });
   });
 
@@ -99,17 +106,32 @@ function AttendanceRow({
   player,
   busy,
   onMark,
+  onSaveNote,
 }: {
   player: AttendancePlayer;
   busy: boolean;
   onMark: (status: AttendanceStatus) => void;
+  onSaveNote: (note: string) => Promise<boolean>;
 }) {
   const current = String(player.status ?? '').toLowerCase();
   const unmarked = !player.status;
+  const [noteOpen, setNoteOpen] = useState(Boolean(player.note));
+  const [draft, setDraft] = useState(player.note);
+  const [savingNote, setSavingNote] = useState(false);
+  useEffect(() => { setDraft(player.note); }, [player.note]);
+  const noteDirty = draft.trim() !== player.note.trim();
+  const saveNote = async () => {
+    setSavingNote(true);
+    try {
+      await onSaveNote(draft.trim());
+    } finally {
+      setSavingNote(false);
+    }
+  };
 
   return (
     <View
-      className="relative overflow-hidden rounded-[14px] border pl-4 pr-3.5 py-2.5 gap-2.5 flex-col md:flex-row md:items-center md:gap-4"
+      className="relative overflow-hidden rounded-[14px] border pl-4 pr-3.5 py-2.5 gap-2.5 flex-col md:flex-row md:flex-wrap md:items-center md:gap-4"
       style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any}
     >
       {/* Status rail: the row's state is readable from the left edge alone,
@@ -118,16 +140,19 @@ function AttendanceRow({
         className="absolute left-0 top-0 bottom-0 w-[3px]"
         style={{ backgroundColor: unmarked ? 'var(--c-border-strong)' : attendanceStatusTone(player.status).fg, transition: 'background-color 0.2s ease' } as any}
       />
-      <View className="flex-1 min-w-0">
-        <CoachPlayerRow
-          bare
-          firstName={player.firstName}
-          lastName={player.lastName}
-          badge={getPlayerBadge(player)}
-          // Only the unmarked state needs saying — a marked one is already
-          // spelled out by the filled segment on the right.
-          meta={unmarked ? attendanceStatusTone(null).label : null}
-        />
+      <View className="flex-row items-center gap-2 flex-1 min-w-0">
+        <View className="flex-1 min-w-0">
+          <CoachPlayerRow
+            bare
+            firstName={player.firstName}
+            lastName={player.lastName}
+            badge={getPlayerBadge(player)}
+            // Only the unmarked state needs saying — a marked one is already
+            // spelled out by the filled segment on the right.
+            meta={unmarked ? attendanceStatusTone(null).label : null}
+          />
+        </View>
+        <AttendanceNoteToggle open={noteOpen} hasNote={Boolean(player.note.trim())} onPress={() => setNoteOpen((v) => !v)} />
       </View>
 
       {/* Full-width thirds on mobile, intrinsic width from md up — three
@@ -165,6 +190,32 @@ function AttendanceRow({
           );
         })}
       </View>
+
+      {noteOpen ? (
+        <View className="w-full md:basis-full gap-2">
+          <AttendanceNoteInput value={draft} onChange={setDraft} playerName={`${player.firstName} ${player.lastName}`} />
+          <View className="flex-row items-center justify-end gap-2.5">
+            {unmarked ? (
+              <Text className="flex-1 text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>
+                Marchează întâi prezența, apoi salvează nota.
+              </Text>
+            ) : noteDirty ? (
+              <Text className="flex-1 text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>
+                Familia primește nota ca notificare.
+              </Text>
+            ) : null}
+            <Button
+              size="sm"
+              variant={noteDirty ? 'primary' : 'secondary'}
+              icon={noteDirty ? 'save' : 'check'}
+              label={noteDirty ? 'Salvează nota' : 'Salvat'}
+              disabled={!noteDirty || unmarked || busy}
+              loading={savingNote}
+              onPress={saveNote}
+            />
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -280,6 +331,23 @@ export default function CoachAttendanceScreen() {
       Alert.alert('Prezență', err instanceof Error ? err.message : 'Nu s-a putut actualiza prezența.');
     } finally {
       setSavingPlayerId(null);
+    }
+  };
+
+  /** Saves one player's note with their current status (the API needs both). */
+  const saveNote = async (playerId: number, note: string) => {
+    if (!selectedEvent) return false;
+    const player = players.find((row) => row.playerId === playerId);
+    if (!player?.status) return false;
+    const eventId = selectedEvent.id;
+    try {
+      await eventsApi.updateEventAttendance(eventId, [{ playerId, status: player.status, note: note || null }]);
+      if (activeEventIdRef.current !== eventId) return true;
+      setPlayers((current) => current.map((row) => (row.playerId === playerId ? { ...row, note } : row)));
+      return true;
+    } catch (err) {
+      Alert.alert('Notă', err instanceof Error ? err.message : 'Nu s-a putut salva nota.');
+      return false;
     }
   };
 
@@ -467,6 +535,7 @@ export default function CoachAttendanceScreen() {
                     player={player}
                     busy={bulkSaving || savingPlayerId === player.playerId}
                     onMark={(status) => markPlayer(player.playerId, status)}
+                    onSaveNote={(note) => saveNote(player.playerId, note)}
                   />
                 ))}
               </View>

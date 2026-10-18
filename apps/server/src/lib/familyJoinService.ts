@@ -3,7 +3,7 @@ import { db } from '../db';
 import { clubs, familyJoinRequests, players, playerGuardians, playersToTeams, teams, users } from '../db/schema';
 import { joinSubject } from './accessNotices';
 import { notifyRequester } from './accessNotify';
-import { chooseAutoTarget, splitKnownChildren, suggestPlayerMatches, teamCodeCandidates, type ChildInput, type TeamSignupInput } from './familyJoin';
+import { chooseAutoTarget, fullBirthDate, splitKnownChildren, suggestPlayerMatches, teamCodeCandidates, type ChildInput, type TeamSignupInput } from './familyJoin';
 
 /**
  * DB side of joining a team with its code: create the requests at signup,
@@ -49,7 +49,9 @@ export async function createJoinRequests(params: {
             ...base,
             childFirstName: child.firstName,
             childLastName: child.lastName,
-            childBirthDate: child.birthDate,
+            // A year-only child is queued as "2015", not as 1 January of it, so
+            // the approval does not store a made-up full date.
+            childBirthDate: child.yearOnly ? child.birthDate.slice(0, 4) : child.birthDate,
         }))
         : [{
             ...base,
@@ -80,6 +82,7 @@ export async function createChildrenForParent(params: {
                 firstName: child.firstName,
                 lastName: child.lastName,
                 birthYear: Number(child.birthDate.slice(0, 4)),
+                birthDate: fullBirthDate(child),
                 status: 'active',
                 teamId: params.teamId,
             }).returning({ id: players.id });
@@ -164,6 +167,7 @@ export async function listJoinRequests(reviewer: Reviewer, status: 'pending' | '
             userName: users.name,
             userEmail: users.email,
             userPhone: users.phone,
+            userStatus: users.status,
         })
         .from(familyJoinRequests)
         .innerJoin(teams, eq(teams.id, familyJoinRequests.teamId))
@@ -199,18 +203,21 @@ export async function listJoinRequests(reviewer: Reviewer, status: 'pending' | '
         firstName: row.firstName,
         lastName: row.lastName,
         birthYear: row.birthYear,
+        birthDate: row.birthDate ?? null,
         number: row.number,
         hasAccount: Boolean(row.email),
         guardians: guardianCounts.get(row.id) ?? 0,
         teams: Array.from(memberOf).map((id) => teamNameById.get(id)).filter(Boolean) as string[],
     }));
 
-    return rows.map(({ request, teamName, userName, userEmail, userPhone }) => ({
+    return rows.map(({ request, teamName, userName, userEmail, userPhone, userStatus }) => ({
         id: request.id,
         kind: request.kind as 'parent' | 'player',
         status: request.status,
         team: { id: request.teamId, name: teamName },
-        requester: { id: request.userId, name: userName, email: userEmail, phone: userPhone },
+        // `status`: "pending" accounts wait for this approval to get in; an
+        // active parent adding a child keeps their access either way.
+        requester: { id: request.userId, name: userName, email: userEmail, phone: userPhone, status: userStatus },
         child: { firstName: request.childFirstName, lastName: request.childLastName, birthDate: request.childBirthDate },
         playerId: request.playerId,
         createdAt: request.createdAt,
@@ -253,7 +260,7 @@ export async function approveJoinRequest(reviewer: Reviewer, requestId: number, 
         const [pending] = await listJoinRequests(reviewer).then((list) => list.filter((r) => r.id === requestId));
         const choice = chooseAutoTarget(request.kind as 'parent' | 'player', pending?.suggestions ?? []);
         if (choice === 'review') {
-            throw new JoinRequestError('Copilul are deja un părinte legat. Alege manual dacă este același copil.', 409);
+            throw new JoinRequestError(`În club există deja un jucător cu numele ${request.childFirstName} ${request.childLastName}. Alege manual dacă e același copil.`, 409);
         }
         playerId = choice;
     }
@@ -268,6 +275,8 @@ export async function approveJoinRequest(reviewer: Reviewer, requestId: number, 
                 firstName: request.childFirstName,
                 lastName: request.childLastName,
                 birthYear: request.childBirthDate ? Number(request.childBirthDate.slice(0, 4)) : null,
+                // R3-12: the full date the parent typed, not just its year.
+                birthDate: fullBirthDate({ birthDate: request.childBirthDate }),
                 status: 'active',
                 teamId: request.teamId,
                 email: request.kind === 'player' ? requester.email : null,
@@ -288,11 +297,22 @@ export async function approveJoinRequest(reviewer: Reviewer, requestId: number, 
                     throw new JoinRequestError(`${player.firstName} ${player.lastName} are deja un cont de jucător.`, 409);
                 }
                 [player] = await tx.update(players)
-                    .set({ email, phone: player.phone ?? requester.phone, birthYear: player.birthYear ?? (request.childBirthDate ? Number(request.childBirthDate.slice(0, 4)) : null) })
+                    .set({
+                        email,
+                        phone: player.phone ?? requester.phone,
+                        birthYear: player.birthYear ?? (request.childBirthDate ? Number(request.childBirthDate.slice(0, 4)) : null),
+                        birthDate: player.birthDate ?? fullBirthDate({ birthDate: request.childBirthDate }),
+                    })
                     .where(eq(players.id, player.id))
                     .returning();
-            } else if (player.birthYear == null && request.childBirthDate) {
-                await tx.update(players).set({ birthYear: Number(request.childBirthDate.slice(0, 4)) }).where(eq(players.id, player.id));
+            } else if (request.childBirthDate && (player.birthYear == null || player.birthDate == null)) {
+                // Fill what the record lacks; a date already on file is never overwritten.
+                const requestedYear = Number(request.childBirthDate.slice(0, 4));
+                const sameYear = player.birthYear == null || player.birthYear === requestedYear;
+                await tx.update(players).set({
+                    birthYear: player.birthYear ?? requestedYear,
+                    birthDate: player.birthDate ?? (sameYear ? fullBirthDate({ birthDate: request.childBirthDate }) : null),
+                }).where(eq(players.id, player.id));
             }
 
             // Already on the club's books but not on this team: add them to it.

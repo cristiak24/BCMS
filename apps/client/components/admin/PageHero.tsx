@@ -100,8 +100,10 @@ export function GlassStat({
                 <View className="h-1 rounded-full overflow-hidden mt-1.5" style={{ backgroundColor: 'var(--c-surface-3)' }}>
                     <View className="ui-bar h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, bar))}%`, backgroundColor: dot }} />
                 </View>
-            ) : hint ? (
-                <Text className="text-[10.5px] mt-0.5" style={{ color: 'var(--c-faint)' }} numberOfLines={1}>{hint}</Text>
+            ) : null}
+            {/* With a bar too: an attendance rate names its period under it. */}
+            {hint ? (
+                <Text className={`text-[10.5px] ${bar != null ? 'mt-1' : 'mt-0.5'}`} style={{ color: 'var(--c-faint)' }} numberOfLines={1}>{hint}</Text>
             ) : null}
         </View>
     );

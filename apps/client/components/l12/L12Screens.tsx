@@ -15,7 +15,8 @@ import { ToastHost, useToasts } from '../ui/Toast';
 import SelectField from '../ui/SelectField';
 import FilterChips from '../ui/FilterChips';
 import Pagination, { usePagination } from '../ui/Pagination';
-import L12Editor, { EMPTY_LINEUP, L12_MIN_PLAYERS, lineupForRoster, resolveTeamGender, sortLineupPlayers, validateLineup } from './L12Editor';
+import L12Editor, { EMPTY_LINEUP, Input, L12_MIN_PLAYERS, lineupForRoster, resolveTeamGender, sortLineupPlayers, validateLineup } from './L12Editor';
+import { exportGaps, resolveMatchSides, withTeamCoach } from '../../utils/l12Export';
 import Button from '../ui/Button';
 import ActionSheet from '../ui/ActionSheet';
 import { downloadL12Word, printL12, type L12DocumentInput } from './l12Document';
@@ -63,12 +64,6 @@ function sidesOf(title: string): [string, string | null] {
   const clean = stripKindPrefix(title);
   const sides = clean.split(/\s+vs\.?\s+/i).map((part) => part.trim());
   return sides.length === 2 ? [sides[0], sides[1]] : [clean, null];
-}
-
-function splitTeams(title: string, teamName: string) {
-  const parts = stripKindPrefix(title).split(/\s+vs\.?\s+/i);
-  if (parts.length === 2) return { homeTeam: parts[0].trim(), awayTeam: parts[1].trim() };
-  return { homeTeam: teamName, awayTeam: title };
 }
 
 function useUnloadGuard(active: boolean) {
@@ -457,8 +452,9 @@ function useRoster(teamId: number | null) {
   return { roster, loading };
 }
 
+/** A new sheet: the team's league and category, and its coach as head coach. */
 function defaultLineup(team: L12Team): L12Lineup {
-  return { ...EMPTY_LINEUP, competition: team.leagueName || null, gender: resolveTeamGender(team) };
+  return withTeamCoach({ ...EMPTY_LINEUP, competition: team.leagueName || null, gender: resolveTeamGender(team) }, team.coachName);
 }
 
 /** The sheet's category always follows the team — it is not a user choice. */
@@ -513,6 +509,11 @@ export function L12MatchScreen() {
   const [baseline, setBaseline] = useState<L12Lineup | null>(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  // The match's opponent (events.opponent), saved with the sheet.
+  const [opponent, setOpponent] = useState('');
+  const [savedOpponent, setSavedOpponent] = useState('');
+  // A sheet with gaps waits for "Exportă oricum".
+  const [exportConfirm, setExportConfirm] = useState<{ kind: 'pdf' | 'word'; gaps: string[] } | null>(null);
 
   const load = useCallback(async () => {
     if (!Number.isInteger(eventId) || eventId <= 0) {
@@ -526,6 +527,8 @@ export function L12MatchScreen() {
       const data = await l12Api.getForEvent(eventId);
       setEvent(data.event);
       setTeam(data.team);
+      setOpponent(data.event.opponent ?? '');
+      setSavedOpponent(data.event.opponent ?? '');
       setTemplate(data.template);
       setSaved(data.lineup);
       setSeeded(false);
@@ -550,7 +553,7 @@ export function L12MatchScreen() {
       setBaseline(withTeamGender(saved, team));
     } else if (template) {
       // Pre-filled from the template but not yet on this match: offer the save.
-      setDraft(withTeamGender(lineupForRoster({ ...template, competition: template.competition ?? team.leagueName ?? null }, roster), team));
+      setDraft(withTeamCoach(withTeamGender(lineupForRoster({ ...template, competition: template.competition ?? team.leagueName ?? null }, roster), team), team.coachName));
       setBaseline(null);
     } else {
       setDraft(defaultLineup(team));
@@ -559,7 +562,8 @@ export function L12MatchScreen() {
     setSeeded(true);
   }, [team, saved, template, roster, rosterLoading, seeded]);
 
-  const dirty = seeded && snapshot(draft) !== snapshot(baseline);
+  const opponentDirty = opponent.trim() !== savedOpponent.trim();
+  const dirty = seeded && (snapshot(draft) !== snapshot(baseline) || opponentDirty);
   useUnloadGuard(dirty);
 
   const save = async () => {
@@ -570,7 +574,12 @@ export function L12MatchScreen() {
     }
     setSaving(true);
     try {
-      const result = await l12Api.saveForEvent(eventId, { ...(team ? withTeamGender(draft, team) : draft), players: sortLineupPlayers(draft.players) });
+      const result = await l12Api.saveForEvent(
+        eventId,
+        { ...(team ? withTeamGender(draft, team) : draft), players: sortLineupPlayers(draft.players) },
+        opponentDirty ? opponent.trim() || null : undefined,
+      );
+      if (opponentDirty) setSavedOpponent(opponent.trim());
       setSaved(result);
       setDraft(team ? withTeamGender(result, team) : result);
       setBaseline(team ? withTeamGender(result, team) : result);
@@ -611,7 +620,7 @@ export function L12MatchScreen() {
 
   const docInput = useMemo<L12DocumentInput | null>(() => {
     if (!event || !team) return null;
-    const { homeTeam, awayTeam } = splitTeams(event.title, team.name);
+    const { homeTeam, awayTeam } = resolveMatchSides(event.title, team.name, opponent);
     return {
       teamName: team.name,
       homeTeam,
@@ -621,7 +630,7 @@ export function L12MatchScreen() {
       date: formatDate(event.startTime),
       lineup: { ...draft, players: sortLineupPlayers(draft.players) },
     };
-  }, [event, team, draft]);
+  }, [event, team, draft, opponent]);
 
   if (loading) return <LoadingSheet />;
 
@@ -637,13 +646,25 @@ export function L12MatchScreen() {
   }
 
   const fromTemplate = !saved && Boolean(template);
-  const { homeTeam, awayTeam } = splitTeams(event.title, team.name);
+  const { homeTeam, awayTeam } = resolveMatchSides(event.title, team.name, opponent);
+  // FRB fixtures name both sides in the title; other matches take the opponent field.
+  const titleHasSides = /\s+vs\.?\s+/i.test(event.title);
   const teamGender = resolveTeamGender(team);
   const notify = (message: string, variant: 'error' | 'info') => showToast({ variant, message });
-  const exportAs = (kind: 'pdf' | 'word') => {
-    if (!docInput || !checkBeforeExport(docInput.lineup, notify)) return;
+  const runExport = (kind: 'pdf' | 'word') => {
+    if (!docInput) return;
     if (kind === 'pdf') printL12(docInput);
     else downloadL12Word(docInput);
+  };
+  const exportAs = (kind: 'pdf' | 'word') => {
+    if (!docInput || !checkBeforeExport(docInput.lineup, notify)) return;
+    // An official sheet with gaps reaches the referee only on purpose.
+    const gaps = exportGaps(docInput.lineup, { awayTeam: docInput.awayTeam });
+    if (gaps.length) {
+      setExportConfirm({ kind, gaps });
+      return;
+    }
+    runExport(kind);
   };
   const known = [...(template?.players ?? []), ...(saved?.players ?? [])];
 
@@ -654,7 +675,7 @@ export function L12MatchScreen() {
           label={saved ? 'Modificări nesalvate' : 'L12 nesalvat'}
           saving={saving}
           onSave={save}
-          onDiscard={saved ? () => setDraft(withTeamGender(saved, team)) : undefined}
+          onDiscard={saved ? () => { setDraft(withTeamGender(saved, team)); setOpponent(savedOpponent); } : undefined}
         />
       ) : null}
     >
@@ -684,7 +705,14 @@ export function L12MatchScreen() {
                   </>
                 ) : null}
               </View>
+              {!titleHasSides ? (
+                <View className="mt-3 max-w-[360px]">
+                  <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Adversar</Text>
+                  <Input label="Adversar" placeholder="Numele echipei adverse" maxLength={160} value={opponent} onChange={setOpponent} invalid={!opponent.trim()} />
+                </View>
+              ) : null}
               <View className="flex-row flex-wrap gap-1.5 mt-3">
+                {!titleHasSides ? <MetaChip icon="emoji-events" label={event.title} /> : null}
                 <MetaChip icon="event" label={formatDate(event.startTime, true)} />
                 {event.location ? <MetaChip icon="place" label={event.location} /> : null}
                 {teamGender ? <MetaChip icon="groups" label={teamGender === 'M' ? 'Masculin' : 'Feminin'} /> : null}
@@ -724,6 +752,20 @@ export function L12MatchScreen() {
         ]}
       />
 
+      <ConfirmDialog
+        visible={exportConfirm != null}
+        icon="warning-amber"
+        title="Foaia L12 e incompletă"
+        message={exportConfirm ? `Lipsesc: ${exportConfirm.gaps.join('; ')}. O foaie oficială incompletă poate fi refuzată de arbitru. Exporți oricum?` : ''}
+        confirmLabel={exportConfirm?.kind === 'word' ? 'Exportă Word oricum' : 'Exportă PDF oricum'}
+        cancelLabel="Completez foaia"
+        onConfirm={() => {
+          const kind = exportConfirm?.kind;
+          setExportConfirm(null);
+          if (kind) runExport(kind);
+        }}
+        onCancel={() => setExportConfirm(null)}
+      />
       <ConfirmDialog
         visible={confirm != null}
         destructive={confirm === 'reset'}

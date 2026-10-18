@@ -106,6 +106,7 @@ export function AddEventModal({
   const {
     newEventType, setNewEventType, newTitle, setNewTitle, newDescription, setNewDescription,
     newStartTime, newEndTime, newLocation, setNewLocation, newTeamId, setNewTeamId, newAmount, setNewAmount,
+    newOpponent, setNewOpponent,
     addEventErrors, clearError, newStartDate, setNewStartDate, newEndDate, setNewEndDate,
     isRecurring, setIsRecurring, recurringDays, setRecurringDays, recurringWeeks, setRecurringWeeks,
     recentLocations, loadRecentLocations, addingEvent, submitError, updatePickerTime, prefillDate, submit,
@@ -307,6 +308,17 @@ export function AddEventModal({
                     </View>
                   ) : null}
                 </View>
+
+                {newEventType === 'match' ? (
+                  <FormField
+                    label="Adversar"
+                    icon="groups"
+                    value={newOpponent}
+                    onChangeText={setNewOpponent}
+                    placeholder="ex. CSM Oradea"
+                    maxLength={160}
+                  />
+                ) : null}
               </Section>
 
               <Section

@@ -7,12 +7,16 @@ export type JoinSuggestion = {
     firstName: string | null;
     lastName: string | null;
     birthYear: number | null;
+    /** Full date of birth on file (YYYY-MM-DD), when someone gave it. */
+    birthDate?: string | null;
     number: number | null;
     hasAccount: boolean;
     guardians: number;
     teams: string[];
     exact: boolean;
     sameBirthYear: boolean;
+    /** The request's date of birth disagrees with the player's (year, or full date). */
+    birthMismatch?: boolean;
 };
 
 export type FamilyJoinRequest = {
@@ -20,7 +24,8 @@ export type FamilyJoinRequest = {
     kind: 'parent' | 'player';
     status: 'pending' | 'approved' | 'denied';
     team: { id: number; name: string };
-    requester: { id: number; name: string; email: string; phone: string | null };
+    requester: { id: number; name: string; email: string; phone: string | null; status?: string };
+    /** `birthDate`: YYYY-MM-DD, or just YYYY when the form asked for the year. */
     child: { firstName: string; lastName: string; birthDate: string | null };
     playerId: number | null;
     createdAt: string;

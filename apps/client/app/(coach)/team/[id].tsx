@@ -14,6 +14,7 @@ import { attendanceRateColor, getPlayerBadge } from '../../../components/coach/c
 import { formatCoachDate, getEventTimestamp, isUpcoming } from '../../../components/coach/coachUtils';
 import BulkAddPlayersDialog from '../../../components/family/BulkAddPlayersDialog';
 import TeamStandingsCard from '../../../components/standings/TeamStandingsCard';
+import { ATTENDANCE_PERIOD_LABEL, pooledAttendanceRate } from '../../../utils/attendanceRate';
 
 /**
  * A coach's own squad in full — the roster TeamCard on /coach/teams only
@@ -53,14 +54,23 @@ export default function CoachTeamDetailScreen() {
     try {
       const since = new Date();
       since.setHours(0, 0, 0, 0);
-      const [teamRows, playerRows, eventRows] = await Promise.all([
+      const [teamRows, playerRows, eventRows, stats] = await Promise.all([
         teamsApi.getTeams(),
         teamsApi.getTeamPlayers(teamId),
         eventsApi.getEvents({ start: since.toISOString() }),
+        // The squad list carries no attendance; the team's stats do (the
+        // shared 30-day rate, server lib/attendanceRate.ts).
+        teamsApi.getTeamStats(teamId).catch(() => null),
       ]);
 
+      const statByPlayer = new Map((stats?.players ?? []).map((row) => [row.playerId, row]));
       setTeam(teamRows.find((row) => row.id === teamId) ?? null);
-      setPlayers(playerRows);
+      setPlayers(playerRows.map((player) => {
+        const stat = statByPlayer.get(player.id);
+        return stat
+          ? { ...player, attendanceRate: stat.attendanceRate, attendanceAttended: stat.present, attendanceCounted: stat.total }
+          : player;
+      }));
       setEvents(eventRows);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Echipa nu a putut fi încărcată.');
@@ -90,10 +100,8 @@ export default function CoachTeamDetailScreen() {
     [events, teamId],
   );
 
-  const rated = players.filter((player) => player.attendanceRate != null);
-  const average = rated.length
-    ? Math.round(rated.reduce((sum, player) => sum + (player.attendanceRate ?? 0), 0) / rated.length)
-    : null;
+  // Pooled over the squad's marked sessions, last 30 days (utils/attendanceRate.ts).
+  const average = pooledAttendanceRate(players);
 
   // Lowest attendance first — the players a coach needs to see are the ones
   // slipping, not an alphabetical roster.
@@ -150,7 +158,8 @@ export default function CoachTeamDetailScreen() {
                 <GlassStat dot="var(--c-purple)" label="Lot" value={players.length} hint={players.length === 1 ? 'jucător' : 'jucători'} />
                 <GlassStat
                   dot={attendanceRateColor(average)}
-                  label="Prezență medie"
+                  label="Prezență"
+                  hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()}
                   value={average ?? '—'}
                   suffix={average == null ? undefined : '%'}
                   bar={average ?? undefined}

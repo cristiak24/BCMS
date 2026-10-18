@@ -19,6 +19,8 @@ import { manageAccessApi } from '../../services/manageAccessApi';
 import { familyRequestsApi } from '../../services/familyRequestsApi';
 import { basketballApi, type Match } from '../../services/basketballApi';
 import { teamsApi, type Team as SavedTeam } from '../../services/teamsApi';
+import PrivacyRequestsBanner from '../../components/privacy/PrivacyRequestsBanner';
+import { ATTENDANCE_PERIOD_LABEL } from '../../utils/attendanceRate';
 
 /**
  * Admin home: the club at a glance.
@@ -589,6 +591,7 @@ export default function Dashboard() {
         <View>
           <PageContainer>
             <View className="gap-4">
+              {role === 'admin' ? <PrivacyRequestsBanner /> : null}
               {/* Welcome panel */}
               <View className="ui-rise relative overflow-hidden rounded-[16px] border" style={CARD as any}>
                 <View pointerEvents="none" className="absolute rounded-full" style={{ width: 300, height: 300, right: -70, top: -130, backgroundColor: 'var(--c-surface-tint)', opacity: 0.85 }} />
@@ -647,7 +650,7 @@ export default function Dashboard() {
                     value={attendanceRate}
                     suffix={attendanceRate == null ? undefined : '%'}
                     progress={attendanceRate}
-                    hint={attendanceRate == null ? 'Fără date încă' : attendanceDelta == null ? 'Luna asta' : 'față de luna trecută'}
+                    hint={attendanceRate == null ? `Nimic marcat · ${ATTENDANCE_PERIOD_LABEL.toLowerCase()}` : attendanceDelta == null ? ATTENDANCE_PERIOD_LABEL : `${ATTENDANCE_PERIOD_LABEL} · față de cele 30 anterioare`}
                     delta={attendanceRate != null && attendanceDelta != null ? { label: `${attendanceDelta > 0 ? '+' : ''}${attendanceDelta} pp`, direction: attendanceDelta > 0 ? 'up' : attendanceDelta < 0 ? 'down' : 'flat' } : null}
                   />
                   <KpiCard

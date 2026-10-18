@@ -177,7 +177,7 @@ export const superAdminApi = {
     return apiFetch<{ success: boolean; month: string; users: SuperAdminUser[] }>('/super-admin/users');
   },
 
-  updateUser(id: number, payload: { name?: string; role?: ClubRole; status?: 'active' | 'disabled'; clubId?: number }) {
+  updateUser(id: number, payload: { name?: string; role?: ClubRole; status?: 'active' | 'disabled'; clubId?: number; /** Who takes a deactivated coach's teams (null = nobody). */ teamsReassignTo?: number | null }) {
     return apiFetch<{ success: boolean }>(`/super-admin/users/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),

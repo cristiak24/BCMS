@@ -106,6 +106,9 @@ export function parseAttendancePayload(body: unknown): Result<AttendanceItem[]> 
  */
 const ZONED_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i;
 
+/** events.opponent is varchar(160). */
+const MAX_OPPONENT_LENGTH = 160;
+
 export function parseDate(value: unknown, field: string): Result<string> {
     if (typeof value !== 'string' || !value.trim()) {
         return { ok: false, error: `${field} is invalid.` };
@@ -147,6 +150,7 @@ export type EventUpdate = Partial<{
     amount: number | null;
     status: string;
     coachNote: string | null;
+    opponent: string | null;
 }>;
 
 /**
@@ -224,7 +228,7 @@ export function parseEventInput(
         out.status = status.trim().toLowerCase();
     }
 
-    for (const [key, max] of [['description', 5000], ['location', 255], ['coachNote', MAX_NOTE_LENGTH]] as const) {
+    for (const [key, max] of [['description', 5000], ['location', 255], ['coachNote', MAX_NOTE_LENGTH], ['opponent', MAX_OPPONENT_LENGTH]] as const) {
         if (has(key)) {
             const parsed = parseOptionalText(input[key], key, max);
             if (!parsed.ok) return parsed;

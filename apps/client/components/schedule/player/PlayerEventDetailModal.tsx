@@ -5,6 +5,8 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { CalendarEvent, eventsApi } from '../../../services/eventsApi';
 import { useSession } from '../../../context/AuthContext';
 import { normalizeRole } from '../../../utils/authSession';
+import { internalMatchResult, matchSheetPath, showMatchSheetLink } from '../../../utils/matchResult';
+import { useRouter } from '@/src/web/expoRouter';
 import {
   EVENT_TYPE_META,
   buildICSCalendar,
@@ -23,7 +25,9 @@ import {
  *     "score: 78-64 · sincronizat din FRB" description;
  *   • a past session shows the player's OWN attendance and the coach's note
  *     on them (GET /players/me/attendance — only their row);
- *   • "Adaugă în calendar" exports the event as .ics.
+ *   • "Adaugă în calendar" exports the event as .ics;
+ *   • a match kept with the club's scorer shows its final score and links to
+ *     "Fișa meciului" (every role, in its own shell — utils/matchResult.ts).
  */
 
 const SCORE_RE = /score:\s*(\d{1,3})\s*[-:]\s*(\d{1,3})/i;
@@ -77,6 +81,7 @@ export function PlayerEventDetailModal({
   onEdit?: (event: CalendarEvent) => void;
 }) {
   const { session } = useSession();
+  const router = useRouter();
   const role = normalizeRole(session?.role);
   const isPlayer = role === 'player' || role === 'parent';
 
@@ -103,8 +108,17 @@ export function PlayerEventDetailModal({
   }, [event, isPlayer, isPast, cancelled]);
 
   const meta = event ? EVENT_TYPE_META[event.type] ?? EVENT_TYPE_META.admin : null;
-  const score = event && event.type === 'match' ? getScore(event) : null;
-  const teams = event && event.type === 'match' ? event.title.split(/\s+vs\s+/i) : [];
+  const own = event ? internalMatchResult(event) : null;
+  const score = own
+    ? { home: String(own.us), away: String(own.them) }
+    : event && event.type === 'match' ? getScore(event) : null;
+  const teams = own ? [own.ourName, own.theirName] : event && event.type === 'match' ? event.title.split(/\s+vs\s+/i) : [];
+  const sheetLink = event ? showMatchSheetLink(event, role) : false;
+  const openSheet = () => {
+    if (!event) return;
+    onClose();
+    router.push(matchSheetPath(role, event.id) as any);
+  };
   const description = cleanDescription(event?.description);
   const status = myStatus?.status ? STATUS_META[myStatus.status.toLowerCase()] : null;
 
@@ -238,9 +252,9 @@ export function PlayerEventDetailModal({
                 ) : null}
               </View>
 
-              {onEdit || (!isPast && !cancelled) ? (
+              {onEdit || sheetLink || (!isPast && !cancelled) ? (
                 <View
-                  className="px-5 pt-1 border-t flex-row gap-2.5"
+                  className="px-5 pt-1 border-t flex-row flex-wrap gap-2.5"
                   style={{ borderColor: 'var(--c-border-soft)', paddingBottom: isMobile ? 'max(14px, env(safe-area-inset-bottom))' : 16, paddingTop: 12 } as any}
                 >
                   {onEdit ? (
@@ -248,11 +262,25 @@ export function PlayerEventDetailModal({
                       onPress={() => onEdit(event)}
                       accessibilityRole="button"
                       accessibilityLabel="Editează evenimentul"
-                      className="ui-press flex-1 h-11 rounded-[11px] flex-row items-center justify-center gap-2 border"
+                      className="ui-press flex-1 min-w-[136px] h-11 rounded-[11px] flex-row items-center justify-center gap-2 border"
                       style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
                     >
                       <MaterialIcons name="edit" size={17} color="var(--c-brand-fg)" />
                       <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>Editează</Text>
+                    </Pressable>
+                  ) : null}
+                  {sheetLink ? (
+                    <Pressable
+                      onPress={openSheet}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Fișa meciului: ${event.title}`}
+                      className="ui-press flex-1 min-w-[136px] h-11 rounded-[11px] flex-row items-center justify-center gap-2 border"
+                      style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
+                    >
+                      <MaterialIcons name="leaderboard" size={17} color="var(--c-brand-fg)" />
+                      <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>
+                        {event.game?.status === 'live' ? 'Fișa meciului · live' : 'Fișa meciului'}
+                      </Text>
                     </Pressable>
                   ) : null}
                   {!isPast && !cancelled ? (
@@ -260,7 +288,7 @@ export function PlayerEventDetailModal({
                     onPress={addToCalendar}
                     accessibilityRole="button"
                     accessibilityLabel="Adaugă în calendar"
-                    className="ui-press flex-1 h-11 rounded-[11px] flex-row items-center justify-center gap-2 border"
+                    className="ui-press flex-1 min-w-[136px] h-11 rounded-[11px] flex-row items-center justify-center gap-2 border"
                     style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
                   >
                     <MaterialIcons name="event" size={17} color="var(--c-brand-fg)" />

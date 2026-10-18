@@ -63,6 +63,7 @@ const ADMIN_SECTION_TITLES: { prefix: string; label: string }[] = [
     { prefix: '/admin/attendance/', label: 'Prezență' },
     { prefix: '/admin/stats/', label: 'Statistică meci' },
     { prefix: '/admin/users/', label: 'Utilizator' },
+    { prefix: '/admin/privacy', label: 'Cereri date personale' },
 ];
 
 function getAdminPath(pathname: string) {

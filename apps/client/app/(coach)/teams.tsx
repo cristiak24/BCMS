@@ -14,6 +14,7 @@ import { AttendanceRate, Chip, CoachPlayerRow, StatTile } from '../../components
 import { attendanceRateColor, getPlayerBadge } from '../../components/coach/coachDisplay';
 import ProgressRing from '../../components/ui/ProgressRing';
 import { formatCoachDate, getCoachScopedEvents, getEventTimestamp, isUpcoming } from '../../components/coach/coachUtils';
+import { ATTENDANCE_PERIOD_LABEL, pooledAttendanceRate } from '../../utils/attendanceRate';
 
 /**
  * "Echipe" — the coach's squads, each card carrying the three things a coach
@@ -46,10 +47,8 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
   );
   const hidden = team.players.length - preview.length;
 
-  const rated = team.players.filter((player) => player.attendanceRate != null);
-  const average = rated.length
-    ? Math.round(rated.reduce((sum, player) => sum + (player.attendanceRate ?? 0), 0) / rated.length)
-    : null;
+  // Last 30 days, pooled over the squad's marked sessions (utils/attendanceRate.ts).
+  const average = pooledAttendanceRate(team.players);
 
   return (
     <Pressable
@@ -79,7 +78,7 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
             <Text className="t-meta mt-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{team.leagueName}</Text>
           ) : null}
         </View>
-        <ProgressRing value={average} size={52} stroke={6} color={attendanceRateColor(average)} label={average == null ? 'Fără prezență marcată' : `Prezență medie ${average}%`}>
+        <ProgressRing value={average} size={52} stroke={6} color={attendanceRateColor(average)} label={average == null ? 'Fără prezență marcată în ultimele 30 de zile' : `Prezență ${average}% în ultimele 30 de zile`}>
           <Text className="f-display t-num text-[12.5px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>{average == null ? '—' : `${average}%`}</Text>
         </ProgressRing>
       </View>
@@ -212,10 +211,7 @@ export default function CoachTeamsScreen() {
   }, [playersByTeam, scopedEvents, scopedTeamIds, teams]);
 
   const totalPlayers = visibleTeams.reduce((sum, team) => sum + team.players.length, 0);
-  const teamsRated = visibleTeams.flatMap((team) => team.players).filter((player) => player.attendanceRate != null);
-  const teamsAverage = teamsRated.length
-    ? Math.round(teamsRated.reduce((sum, player) => sum + (player.attendanceRate ?? 0), 0) / teamsRated.length)
-    : null;
+  const teamsAverage = pooledAttendanceRate(visibleTeams.flatMap((team) => team.players));
 
   const subtitle = visibleTeams.length
     ? `${visibleTeams.length} ${visibleTeams.length === 1 ? 'echipă' : 'echipe'} · ${session?.clubName ?? 'Clubul tău'}`
@@ -247,6 +243,7 @@ export default function CoachTeamsScreen() {
               <GlassStat
                 dot={teamsAverage == null ? 'var(--c-faint)' : attendanceRateColor(teamsAverage)}
                 label="Prezență"
+                hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()}
                 value={teamsAverage ?? '—'}
                 suffix={teamsAverage == null ? undefined : '%'}
                 bar={teamsAverage ?? undefined}

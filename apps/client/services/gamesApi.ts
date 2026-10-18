@@ -27,7 +27,7 @@ export type Game = {
 };
 
 export type GamePayload = {
-    event: { id: number; title: string; startTime: string; location: string | null };
+    event: { id: number; title: string; startTime: string; location: string | null; opponent?: string | null };
     team: { id: number; name: string };
     canKeep: boolean;
     canSetup: boolean;

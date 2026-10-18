@@ -22,6 +22,7 @@ const MENU_ITEMS: typeof ADMIN_MENU_ITEMS = [
   { label: 'Facturare', icon: 'payments', href: '/super-admin/billing' },
   { label: 'Invită utilizator', icon: 'person-add', href: '/super-admin/create-user' },
   { label: 'Jurnal', icon: 'history', href: '/super-admin/audit-logs' },
+  { label: 'Cereri GDPR', icon: 'verified-user', href: '/super-admin/privacy' },
   { label: 'Setări', icon: 'settings', href: '/super-admin/settings' },
 ];
 

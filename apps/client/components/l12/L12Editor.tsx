@@ -99,7 +99,7 @@ function Card({ title, meta, actions, children, padded = true }: { title: string
   );
 }
 
-function Input({
+export function Input({
   value,
   onChange,
   placeholder,

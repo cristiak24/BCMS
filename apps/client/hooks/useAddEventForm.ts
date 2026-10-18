@@ -111,6 +111,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
   const [newStartTime, setNewStartTime] = useState('09:00');
   const [newEndTime, setNewEndTime] = useState('10:00');
   const [newLocation, setNewLocation] = useState('');
+  const [newOpponent, setNewOpponent] = useState('');
   const [newTeamId, setNewTeamId] = useState<number | null>(null);
   const [newAmount, setNewAmount] = useState('');
   const [addEventErrors, setAddEventErrors] = useState<AddEventFormErrors>({});
@@ -253,6 +254,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
     setNewStartTime('09:00');
     setNewEndTime('10:00');
     setNewLocation('');
+    setNewOpponent('');
     setNewTeamId(null);
     setNewAmount('');
     setIsRecurring(false);
@@ -332,6 +334,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
           startTime: toApiTime(localBaseDateStr, effectiveStartTime),
           endTime: toApiTime(newEventType !== 'training' ? toLocalDateStr(newEndDate) : localBaseDateStr, effectiveEndTime),
           location: newLocation.trim(),
+          opponent: newEventType === 'match' ? newOpponent.trim() || null : null,
           teamId: newTeamId,
           amount: newAmount ? Number(newAmount.replace(',', '.')) || null : null,
         });
@@ -352,7 +355,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
   }, [
     addingEvent, newStartTime, newEndTime, validateForm, newEventType, isRecurring, recurringDays,
     newStartDate, recurringWeeks, newTitle, newDescription, newLocation, newTeamId, newEndDate,
-    newAmount, saveLocation, onCreated, resetForm,
+    newAmount, saveLocation, onCreated, resetForm, newOpponent,
   ]);
 
   /** Fills the form with an existing event, to edit it. */
@@ -363,6 +366,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
     setNewDescription(values.description);
     setOriginalDescription(values.description);
     setNewLocation(values.location);
+    setNewOpponent(values.opponent);
     setNewTeamId(values.teamId);
     setNewAmount(values.amount);
     setNewStartDate(values.startDate);
@@ -404,6 +408,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
         startTime: effectiveStartTime,
         endTime: effectiveEndTime,
         amount: newAmount,
+        opponent: newOpponent,
       }, options) as Partial<CalendarEvent>);
       if (newLocation.trim()) await saveLocation(newLocation.trim());
       return updated;
@@ -415,7 +420,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
     }
   }, [
     addingEvent, newStartTime, newEndTime, validateForm, newEventType, newTitle, newDescription, newLocation,
-    newTeamId, newStartDate, newEndDate, newAmount, saveLocation,
+    newTeamId, newStartDate, newEndDate, newAmount, saveLocation, newOpponent,
   ]);
 
   return {
@@ -424,6 +429,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
     newDescription, setNewDescription,
     newStartTime, newEndTime,
     newLocation, setNewLocation,
+    newOpponent, setNewOpponent,
     newTeamId, setNewTeamId,
     newAmount, setNewAmount,
     addEventErrors, clearError,

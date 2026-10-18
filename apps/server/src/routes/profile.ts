@@ -9,6 +9,7 @@ import { db } from '../db';
 import { clubs, playersToTeams, teams, users } from '../db/schema';
 import { apiOrigin, deleteStoredFile, fileKeyFromUrl, saveStoredFile, sniffMime } from '../lib/storedFiles';
 import { requestedChildId, resolveSelfPlayer } from '../lib/selfPlayer';
+import { checkProfileFields } from '../lib/profileInput';
 
 type NotificationPreferences = {
     email?: boolean;
@@ -169,6 +170,11 @@ router.patch('/me', async (req, res) => {
             }
         }
 
+        const fieldCheck = checkProfileFields({ firstName: trimmedFirstName, lastName: trimmedLastName, preferredLanguage: trimmedLanguage });
+        if (!fieldCheck.ok) {
+            return res.status(400).json({ error: fieldCheck.error });
+        }
+
         if (typeof trimmedPhone === 'string' && trimmedPhone && !/^[+()\d\s-]{6,32}$/.test(trimmedPhone)) {
             return res.status(400).json({ error: 'Phone number format is invalid.' });
         }
@@ -187,7 +193,7 @@ router.patch('/me', async (req, res) => {
             ...(trimmedFirstName !== undefined ? { firstName: trimmedFirstName } : {}),
             ...(trimmedLastName !== undefined ? { lastName: trimmedLastName } : {}),
             ...(trimmedPhone !== undefined ? { phone: trimmedPhone } : {}),
-            ...(trimmedLanguage !== undefined ? { preferredLanguage: trimmedLanguage } : {}),
+            ...(trimmedLanguage !== undefined ? { preferredLanguage: trimmedLanguage ? trimmedLanguage.toLowerCase() : null } : {}),
             ...(emailNotifications !== undefined ? { emailNotifications } : {}),
             ...(nextName ? { name: nextName } : {}),
             updatedAt: new Date().toISOString(),

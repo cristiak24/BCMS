@@ -234,7 +234,10 @@ router.get('/teams/:teamId/template', async (req: AuthenticatedRequest, res) => 
     try {
         const team = await loadTeamForCaller(req, res, Number(req.params.teamId));
         if (!team) return;
-        res.json({ team: { id: team.id, name: team.name, leagueName: team.leagueName, seasonName: team.seasonName, gender: team.gender }, template: serialize(await getTemplate(team.id)) });
+        const [coach] = team.coachId != null
+            ? await db.select({ name: users.name }).from(users).where(eq(users.id, team.coachId)).limit(1)
+            : [];
+        res.json({ team: { id: team.id, name: team.name, leagueName: team.leagueName, seasonName: team.seasonName, gender: team.gender, coachName: coach?.name ?? null }, template: serialize(await getTemplate(team.id)) });
     } catch (error) {
         console.error('[l12/template:get] error:', error);
         res.status(500).json({ error: 'Failed to load the L12 template.' });
@@ -285,13 +288,17 @@ router.get('/events/:eventId', async (req: AuthenticatedRequest, res) => {
         const match = await loadMatchForCaller(req, res);
         if (!match) return;
         const { event, team } = match;
-        const [lineupRows, template] = await Promise.all([
+        const [lineupRows, template, coachRows] = await Promise.all([
             db.select().from(l12Lineups).where(eq(l12Lineups.eventId, event.id)).limit(1),
             getTemplate(team.id),
+            // The team's coach pre-fills "Antrenor principal" on a new sheet.
+            team.coachId != null
+                ? db.select({ name: users.name }).from(users).where(eq(users.id, team.coachId)).limit(1)
+                : Promise.resolve([] as { name: string }[]),
         ]);
         res.json({
-            event: { id: event.id, title: event.title, type: event.type, startTime: toIso(event.startTime), endTime: toIso(event.endTime), location: event.location },
-            team: { id: team.id, name: team.name, leagueName: team.leagueName, seasonName: team.seasonName, gender: team.gender },
+            event: { id: event.id, title: event.title, type: event.type, startTime: toIso(event.startTime), endTime: toIso(event.endTime), location: event.location, opponent: event.opponent ?? null },
+            team: { id: team.id, name: team.name, leagueName: team.leagueName, seasonName: team.seasonName, gender: team.gender, coachName: coachRows[0]?.name ?? null },
             lineup: serialize(lineupRows[0]),
             template: serialize(template),
         });
@@ -307,13 +314,20 @@ router.put('/events/:eventId', async (req: AuthenticatedRequest, res) => {
         if (!match) return;
         const values = await buildValues(req, res, match.team);
         if (!values) return;
+        // The sheet's "Jocul: … vs. …" names the match's opponent
+        // (events.opponent), which the sheet may set or correct.
+        const hasOpponent = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'opponent');
+        const opponent = hasOpponent ? String(req.body.opponent ?? '').replace(/\s+/g, ' ').trim().slice(0, 160) || null : undefined;
 
         // event_id is unique, so an upsert keeps two quick saves from racing into two rows.
         const [saved] = await db.insert(l12Lineups)
             .values({ ...values, teamId: match.team.id, eventId: match.event.id })
             .onConflictDoUpdate({ target: l12Lineups.eventId, set: values })
             .returning();
-        res.json(serialize(saved));
+        if (opponent !== undefined && opponent !== (match.event.opponent ?? null)) {
+            await db.update(events).set({ opponent }).where(eq(events.id, match.event.id));
+        }
+        res.json({ ...serialize(saved), opponent: opponent !== undefined ? opponent : match.event.opponent ?? null });
     } catch (error) {
         console.error('[l12/event:put] error:', error);
         res.status(500).json({ error: 'Failed to save the L12.' });

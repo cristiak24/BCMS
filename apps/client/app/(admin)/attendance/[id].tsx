@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from '@/src/web/reactNative';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { eventsApi, CalendarEvent } from '../../../services/eventsApi';
@@ -18,6 +18,7 @@ import UnsavedBar from '../../../components/ui/UnsavedBar';
 import { CoachPlayerRow } from '../../../components/coach/CoachPrimitives';
 import { eventTypeMeta, getPlayerBadge } from '../../../components/coach/coachDisplay';
 import { formatCoachDate, formatCoachTimeRange } from '../../../components/coach/coachUtils';
+import { AttendanceNoteInput, AttendanceNoteToggle } from '../../../components/attendance/AttendanceNoteField';
 
 /**
  * Admin "Notare prezență" for one event.
@@ -506,39 +507,11 @@ function AttendanceRow({
         {dirty ? (
           <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: 'var(--c-warning)' }} accessibilityLabel="Modificat, nesalvat" />
         ) : null}
-        <Pressable
-          onPress={onToggleNote}
-          accessibilityRole="button"
-          accessibilityLabel={noteOpen ? 'Ascunde nota' : 'Adaugă notă'}
-          accessibilityState={{ expanded: noteOpen }}
-          className="xl:hidden ui-press w-9 h-9 rounded-[10px] border items-center justify-center shrink-0"
-          style={{
-            borderColor: hasNote ? 'color-mix(in srgb, var(--c-brand-fg) 35%, transparent)' : 'var(--c-border)',
-            backgroundColor: hasNote ? 'var(--c-surface-tint)' : 'var(--c-surface-2)',
-          } as any}
-        >
-          <MaterialIcons name={hasNote ? 'chat' : 'chat-bubble-outline'} size={16} color={hasNote ? 'var(--c-brand-fg)' : 'var(--c-muted)'} />
-        </Pressable>
+        <AttendanceNoteToggle open={noteOpen} hasNote={hasNote} onPress={onToggleNote} className="xl:hidden" />
       </View>
 
       <View className={`${noteOpen ? 'flex' : 'hidden'} xl:flex order-last xl:order-none w-full xl:w-auto xl:flex-1 min-w-0`}>
-        <TextInput
-          value={row.note}
-          onChangeText={onNote}
-          placeholder="Notă / feedback pentru jucător…"
-          placeholderTextColor="var(--c-faint)"
-          multiline
-          accessibilityLabel={`Notă pentru ${row.firstName} ${row.lastName}`}
-          className="w-full min-h-[40px] max-h-[140px] rounded-[10px] border px-3 py-2.5 text-[13px] font-medium outline-none"
-          style={{
-            backgroundColor: 'var(--c-surface-2)',
-            borderColor: 'var(--c-border)',
-            color: 'var(--c-ink)',
-            resize: 'none',
-            fieldSizing: 'content',
-            lineHeight: '18px',
-          } as any}
-        />
+        <AttendanceNoteInput value={row.note} onChange={onNote} playerName={`${row.firstName} ${row.lastName}`} />
       </View>
 
       <View className="flex-row gap-1.5 shrink-0" accessibilityRole={'radiogroup' as any} accessibilityLabel={`Prezență ${row.firstName} ${row.lastName}`}>

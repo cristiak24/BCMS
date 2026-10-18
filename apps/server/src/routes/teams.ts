@@ -6,7 +6,7 @@ import { requireRoles, authenticate, type AuthenticatedRequest } from '../middle
 import { foldName, generateTeamCode } from '../lib/familyJoin';
 import { clubBalances } from '../services/clubFinance';
 import { roundMoney } from '../lib/money';
-import { attendanceSummary, isAttendedStatus, isCountedStatus } from '../lib/attendanceRate';
+import { attendancePeriod, attendancePeriodInfo, attendanceRate as rateInPeriod, attendanceSummary } from '../lib/attendanceRate';
 import { coachManagesTeam } from '../lib/coachScope';
 import { toDate } from '../lib/dateUtils';
 
@@ -427,35 +427,21 @@ router.get('/:id/stats', async (req: AuthenticatedRequest, res) => {
         ]);
         const balanceByPlayer = new Map(balances.map((balance) => [balance.playerId, balance]));
 
-        const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-
-        const rateOf = (rows: { status: string | null }[]) => attendanceSummary(rows).rate;
-
-        const monthRows = attendanceRows.filter((r) => r.date && msOf(r.date) >= monthStart.getTime());
-        const prevMonthRows = attendanceRows.filter((r) => r.date && msOf(r.date) >= prevMonthStart.getTime() && msOf(r.date) < monthStart.getTime());
-
-        const attByPlayer = new Map<number, { present: number; total: number; monthPresent: number; monthTotal: number }>();
+        // The shared period (lib/attendanceRate.ts): the last 30 days, the
+        // same rate as the dashboard, Lot and the coach's home.
+        const period = attendancePeriod();
+        const previousPeriod = attendancePeriod(new Date(), 1);
+        const teamRate = rateInPeriod(attendanceRows, period);
+        const rowsByPlayer = new Map<number, typeof attendanceRows>();
         for (const row of attendanceRows) {
-            if (!isCountedStatus(row.status)) continue;
-            const bucket = attByPlayer.get(row.playerId) ?? { present: 0, total: 0, monthPresent: 0, monthTotal: 0 };
-            bucket.total += 1;
-            if (isAttendedStatus(row.status)) bucket.present += 1;
-            if (row.date && msOf(row.date) >= monthStart.getTime()) {
-                bucket.monthTotal += 1;
-                if (isAttendedStatus(row.status)) bucket.monthPresent += 1;
-            }
-            attByPlayer.set(row.playerId, bucket);
+            rowsByPlayer.set(row.playerId, [...(rowsByPlayer.get(row.playerId) ?? []), row]);
         }
 
         let playersWithArrears = 0;
         let totalOutstanding = 0;
 
         const playerStats = teamPlayers.map((player) => {
-            const att = attByPlayer.get(player.id);
-            const attendanceRate = att && att.total > 0 ? Math.round((att.present / att.total) * 100) : null;
-            const monthlyRate = att && att.monthTotal > 0 ? Math.round((att.monthPresent / att.monthTotal) * 100) : null;
+            const att = rateInPeriod(rowsByPlayer.get(player.id) ?? [], period);
 
             const balance = balanceByPlayer.get(player.id);
             const outstandingAmount = balance?.outstanding ?? 0;
@@ -467,19 +453,23 @@ router.get('/:id/stats', async (req: AuthenticatedRequest, res) => {
 
             return {
                 playerId: player.id,
-                attendanceRate,
-                present: att?.present ?? 0,
-                total: att?.total ?? 0,
-                monthlyRate,
+                attendanceRate: att.rate,
+                present: att.attended,
+                total: att.counted,
+                // Same value; kept for older clients.
+                monthlyRate: att.rate,
                 paymentStatus,
                 outstandingAmount,
             };
         });
 
         res.json({
-            monthlyAttendanceRate: rateOf(monthRows),
-            previousMonthAttendanceRate: rateOf(prevMonthRows),
-            overallAttendanceRate: rateOf(attendanceRows),
+            attendance: teamRate,
+            attendancePeriod: attendancePeriodInfo(period),
+            // Older names, now the shared 30-day rate (and the 30 days before).
+            monthlyAttendanceRate: teamRate.rate,
+            previousMonthAttendanceRate: rateInPeriod(attendanceRows, previousPeriod).rate,
+            overallAttendanceRate: attendanceSummary(attendanceRows).rate,
             playersWithArrears,
             totalOutstanding,
             players: playerStats,

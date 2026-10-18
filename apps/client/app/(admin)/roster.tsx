@@ -32,6 +32,7 @@ import {
   isPlayerUnassigned,
   matchesAttendanceFilter,
 } from '../../components/roster/rosterHelpers';
+import { ATTENDANCE_PERIOD_LABEL, formatAttendanceRate, pooledAttendanceRate } from '../../utils/attendanceRate';
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 100];
 const DEFAULT_PAGE_SIZE = 12;
@@ -435,11 +436,8 @@ export default function RosterScreen() {
     );
   };
 
-  const fallbackAverageAttendance = useMemo(() => {
-    if (!players.length) return 0;
-    const total = players.reduce((sum, player) => sum + getAttendanceRate(player), 0);
-    return Math.round((total / players.length) * 10) / 10;
-  }, [players]);
+  // Same rate as the dashboard: the last 30 days, pooled (utils/attendanceRate.ts).
+  const fallbackAverageAttendance = useMemo(() => pooledAttendanceRate(players), [players]);
 
   // Restanțe = players with something past due, the same definition as
   // Finanțe and the dashboard; owing a fee that is not due yet is not late.
@@ -448,7 +446,7 @@ export default function RosterScreen() {
     [players]
   );
 
-  const attendanceValue = summary?.averageAttendance ?? fallbackAverageAttendance;
+  const attendanceValue = summary ? summary.attendance?.rate ?? summary.averageAttendance ?? null : fallbackAverageAttendance;
   const attendanceAthleteCount = summary?.athleteCount ?? players.length;
   const pendingPayments = summary?.pendingPayments ?? fallbackPendingPayments;
   const paidPlayers = players.length - Math.min(players.length, pendingPayments);
@@ -556,7 +554,7 @@ export default function RosterScreen() {
         }
       >
         <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
-          <GlassStat dot="var(--c-brand-fg)" value={`${attendanceValue.toFixed(1)}%`} label="Prezență generală" />
+          <GlassStat dot="var(--c-brand-fg)" value={formatAttendanceRate(attendanceValue)} label="Prezență" hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()} />
           <GlassStat dot="var(--c-success)" value={`${rosterReadiness}%`} label="Plăți la zi" bar={rosterReadiness} />
           <GlassStat dot="var(--c-muted)" value={players.length} label="Sportivi în lot" />
           <GlassStat dot={pendingPayments > 0 ? 'var(--c-danger)' : 'var(--c-success)'} danger={pendingPayments > 0} value={pendingPayments} label="Cu restanțe" />
@@ -622,7 +620,7 @@ export default function RosterScreen() {
             ) : paginatedPlayers.length ? (
               paginatedPlayers.map((item) => {
                 const categoryLabel = getCategoryLabel(item);
-                const attendanceRate = getAttendanceRate(item);
+                const attendanceRate = typeof item.attendanceRate === 'number' ? getAttendanceRate(item) : null;
                 const paymentStatus = item.paymentStatus || 'pending';
 
                 return (
@@ -672,7 +670,7 @@ export default function RosterScreen() {
                 ) : paginatedPlayers.length ? (
                   paginatedPlayers.map((item) => {
                     const categoryLabel = getCategoryLabel(item);
-                    const attendanceRate = getAttendanceRate(item);
+                    const attendanceRate = typeof item.attendanceRate === 'number' ? getAttendanceRate(item) : null;
                     const paymentStatus = item.paymentStatus || 'pending';
 
                     return (

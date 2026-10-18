@@ -135,6 +135,8 @@ const AdminUsers = lazyRoute(loadAdminUsers);
 const loadAdminUserDetails = () => import('../app/(admin)/users/[id]');
 const loadAdminAuditLog = () => import('../app/(admin)/audit-log');
 const AdminAuditLog = lazyRoute(loadAdminAuditLog);
+const loadAdminPrivacy = () => import('../app/(admin)/privacy');
+const AdminPrivacy = lazyRoute(loadAdminPrivacy);
 const AdminUserDetails = lazyRoute(loadAdminUserDetails);
 
 const loadSuperAdminLayout = () => import('../app/super-admin/_layout');
@@ -157,6 +159,8 @@ const loadSuperAdminAuditLogs = () => import('../app/super-admin/audit-logs');
 const SuperAdminAuditLogs = lazyRoute(loadSuperAdminAuditLogs);
 const loadSuperAdminSettings = () => import('../app/super-admin/settings');
 const SuperAdminSettings = lazyRoute(loadSuperAdminSettings);
+const loadSuperAdminPrivacy = () => import('../app/super-admin/privacy');
+const SuperAdminPrivacy = lazyRoute(loadSuperAdminPrivacy);
 const loadSuperAdminInviteRedirect = () => import('../app/super-admin/invite/[token]');
 const SuperAdminInviteRedirect = lazyRoute(loadSuperAdminInviteRedirect);
 
@@ -223,6 +227,7 @@ const ROUTE_CHUNKS: Array<[string, Loader[]]> = [
   ['/admin/users', [loadAdminLayout, loadAdminUsers]],
   ['/admin/users/:id', [loadAdminLayout, loadAdminUserDetails]],
   ['/admin/audit-log', [loadAdminLayout, loadAdminAuditLog]],
+  ['/admin/privacy', [loadAdminLayout, loadAdminPrivacy]],
   ['/super-admin', [loadSuperAdminLayout, loadSuperAdminIndex, loadSuperAdminDashboard]],
   ['/super-admin/dashboard', [loadSuperAdminLayout, loadSuperAdminDashboard]],
   ['/super-admin/clubs', [loadSuperAdminLayout, loadSuperAdminClubs]],
@@ -232,6 +237,7 @@ const ROUTE_CHUNKS: Array<[string, Loader[]]> = [
   ['/super-admin/create-user', [loadSuperAdminLayout, loadSuperAdminCreateUser]],
   ['/super-admin/audit-logs', [loadSuperAdminLayout, loadSuperAdminAuditLogs]],
   ['/super-admin/settings', [loadSuperAdminLayout, loadSuperAdminSettings]],
+  ['/super-admin/privacy', [loadSuperAdminLayout, loadSuperAdminPrivacy]],
   ['/super-admin/invite/:token', [loadSuperAdminLayout, loadSuperAdminInviteRedirect]],
 ];
 
@@ -364,6 +370,7 @@ export default function App() {
                   <Route path="users" element={<AdminUsers />} />
                   <Route path="users/:id" element={<AdminUserDetails />} />
                   <Route path="audit-log" element={<AdminAuditLog />} />
+                  <Route path="privacy" element={<AdminPrivacy />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
 
@@ -378,6 +385,7 @@ export default function App() {
                   <Route path="roles" element={<Navigate to="/super-admin/settings" replace />} />
                   <Route path="audit-logs" element={<SuperAdminAuditLogs />} />
                   <Route path="settings" element={<SuperAdminSettings />} />
+                  <Route path="privacy" element={<SuperAdminPrivacy />} />
                   <Route path="invite/:token" element={<SuperAdminInviteRedirect />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>

@@ -19,6 +19,7 @@ export type EditableEvent = {
   endTime: string;
   teamId: number | null;
   amount: number | null;
+  opponent?: string | null;
 };
 
 export type EventFormValues = {
@@ -32,6 +33,8 @@ export type EventFormValues = {
   startTime: string;
   endTime: string;
   amount: string;
+  /** The other side of a match (events.opponent; L12, scorer). */
+  opponent: string;
 };
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -63,6 +66,7 @@ export function eventToFormValues(event: EditableEvent): EventFormValues {
     startTime: toLocalTime(start),
     endTime: toLocalTime(end),
     amount: event.amount != null ? String(event.amount) : '',
+    opponent: event.opponent ?? '',
   };
 }
 
@@ -88,6 +92,8 @@ export function buildEventUpdate(values: EventFormValues, options: { includeAmou
     teamId: values.teamId,
     startTime: toIso(values.startDate, values.startTime),
     endTime: toIso(endDate, values.endTime),
+    // Only a match has an opponent; changing the type clears it.
+    opponent: values.type === 'match' ? values.opponent.trim() || null : null,
   };
   if (options.includeAmount) {
     const amount = values.amount.trim() ? Number(values.amount.replace(',', '.')) : null;

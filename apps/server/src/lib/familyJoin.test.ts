@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     chooseAutoTarget,
+    fullBirthDate,
     foldName,
     generateTeamCode,
     looksLikeTeamCode,
@@ -53,16 +54,24 @@ test('names fold diacritics, case and spacing', () => {
     assert.equal(foldName('  Ștefan-Ţugui  ÎNVĂȚ '), 'stefan tugui invat');
 });
 
-test('match suggestions: either name order, birth-year conflicts excluded', () => {
+test('match suggestions: either name order; a different birth date is flagged, listed last', () => {
     const players = [
         { id: 1, firstName: 'Matei', lastName: 'Popescu', birthYear: 2016 },
         { id: 2, firstName: 'Popescu', lastName: 'Matei', birthYear: null },
         { id: 3, firstName: 'Matei', lastName: 'Popescu', birthYear: 2012 },
         { id: 4, firstName: 'Andrei', lastName: 'Popescu', birthYear: 2016 },
+        { id: 5, firstName: 'Matei', lastName: 'Popescu', birthYear: 2016, birthDate: '2016-09-30' },
     ];
     const result = suggestPlayerMatches({ firstName: 'matei', lastName: 'POPESCU', birthDate: '2016-04-01' }, players);
-    assert.deepEqual(result.map((r) => r.id), [1, 2]);
+    assert.deepEqual(result.map((r) => r.id), [1, 2, 5, 3]);
     assert.equal(result[0].sameBirthYear, true);
+    assert.deepEqual(result.map((r) => r.birthMismatch), [false, false, true, true]);
+});
+
+test('only a full date of birth is kept on the player, never the 1 January of a year', () => {
+    assert.equal(fullBirthDate({ birthDate: '2015-03-14' }), '2015-03-14');
+    assert.equal(fullBirthDate({ birthDate: '2015-01-01', yearOnly: true }), null);
+    assert.equal(fullBirthDate({ birthDate: null }), null);
 });
 
 test('parent code/link children: name + birth year, optional for older clients', () => {
@@ -70,8 +79,8 @@ test('parent code/link children: name + birth year, optional for older clients',
 
     const ok = parseParentChildren({ children: [{ firstName: ' Matei ', lastName: 'Popescu', birthYear: 2015 }, { firstName: 'Ana', lastName: 'Popescu', birthYear: '2012' }] }, NOW);
     assert.deepEqual(ok, { ok: true, value: [
-        { firstName: 'Matei', lastName: 'Popescu', birthDate: '2015-01-01' },
-        { firstName: 'Ana', lastName: 'Popescu', birthDate: '2012-01-01' },
+        { firstName: 'Matei', lastName: 'Popescu', birthDate: '2015-01-01', yearOnly: true },
+        { firstName: 'Ana', lastName: 'Popescu', birthDate: '2012-01-01', yearOnly: true },
     ] });
 
     assert.equal(parseParentChildren({ children: [] }, NOW).ok, false);
@@ -97,12 +106,12 @@ test('second parent with the same code: children already on the roster wait for 
     assert.deepEqual(splitKnownChildren(typed, []).fresh, typed);
 });
 
-test('automatic approval never links a parent to a child who already has a parent', () => {
+test('"Aprobă toți" never links anyone to an existing player: a same-name match waits for a person', () => {
     const match = (guardians: number, exact = true) => ({ id: 7, exact, guardians });
-    assert.equal(chooseAutoTarget('parent', [match(0)]), 7);
+    assert.equal(chooseAutoTarget('parent', [match(0)]), 'review');
     assert.equal(chooseAutoTarget('parent', [match(1)]), 'review');
-    assert.equal(chooseAutoTarget('player', [match(2)]), 7);
-    assert.equal(chooseAutoTarget('parent', [match(0, false)]), 'new');
-    assert.equal(chooseAutoTarget('parent', [match(0), { id: 8, exact: true, guardians: 0 }]), 'new');
+    assert.equal(chooseAutoTarget('player', [match(2)]), 'review');
+    assert.equal(chooseAutoTarget('parent', [match(0, false)]), 'review');
     assert.equal(chooseAutoTarget('parent', []), 'new');
+    assert.equal(chooseAutoTarget('player', []), 'new');
 });

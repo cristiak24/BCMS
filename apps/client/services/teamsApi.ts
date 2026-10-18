@@ -73,6 +73,9 @@ export interface TeamPlayerStat {
 }
 
 export interface TeamStats {
+    /** The shared 30-day rate of the team. */
+    attendance?: { attended: number; counted: number; rate: number | null };
+    attendancePeriod?: AttendancePeriodInfo;
     monthlyAttendanceRate: number | null;
     previousMonthAttendanceRate: number | null;
     overallAttendanceRate: number | null;
@@ -92,8 +95,13 @@ export interface Player {
     avatarUrl: string | null;
     medicalCheckExpiry: string | null;
     birthYear: number | null;
+    /** Full date of birth (YYYY-MM-DD), when a parent gave it. Staff only. */
+    birthDate?: string | null;
     category?: string;
-    attendanceRate?: number;
+    /** Last 30 days (utils/attendanceRate.ts); null = nothing marked in the period. */
+    attendanceRate?: number | null;
+    attendanceAttended?: number;
+    attendanceCounted?: number;
     paymentStatus?: string;
     teamName?: string;
     teamNames?: string[];
@@ -179,9 +187,16 @@ export interface MyTeamDetail {
     recentEvents: MyTeamPastEvent[];
 }
 
+export type AttendancePeriodInfo = { days: number; from: string; to: string };
+
 export interface RosterSummary {
     athleteCount: number;
-    averageAttendance: number;
+    /** The shared 30-day rate (same as `attendance.rate`); null = nothing marked. */
+    averageAttendance: number | null;
+    attendance?: { attended: number; counted: number; rate: number | null };
+    attendancePeriod?: AttendancePeriodInfo;
+    /** Coaches: the teams they manage. */
+    teamCount?: number | null;
     currentPeriodAttendance: number | null;
     previousPeriodAttendance: number | null;
     attendanceDelta: number | null;

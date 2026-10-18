@@ -7,6 +7,7 @@ import { getPublicAppUrl } from '../../config/serverUrl';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
+import { autoApprovableIds, defaultTarget, denyMessage, formatBirth, matchWarnings } from '../../utils/joinRequestReview';
 
 /**
  * Team-code signups waiting for a decision, plus the codes to hand out.
@@ -15,16 +16,12 @@ import { EmptyState, ErrorState } from '../ui/ScreenState';
  *
  * Each request is approved either onto an existing player (the server
  * suggests name matches so a child already on the roster isn't duplicated) or
- * as a new player in that team.
+ * as a new player in that team. "Jucător nou" is always the default: linking
+ * to a same-name child is a deliberate choice, with its warnings in view
+ * (utils/joinRequestReview.ts).
  */
 
 type Notify = (toast: { variant: 'success' | 'error'; message: string }) => void;
-
-function formatBirth(date: string | null) {
-  if (!date) return '';
-  const [y, m, d] = date.split('-');
-  return `${d}.${m}.${y}`;
-}
 
 function timeAgo(iso: string) {
   const then = parseApiDate(iso).getTime();
@@ -34,20 +31,6 @@ function timeAgo(iso: string) {
   if (hours < 24) return `acum ${hours} h`;
   const days = Math.round(hours / 24);
   return days === 1 ? 'ieri' : `acum ${days} zile`;
-}
-
-/** The single exact roster match of a parent request, when that child already has a linked parent. */
-function guardedMatch(request: FamilyJoinRequest) {
-  if (request.kind !== 'parent') return null;
-  const exact = request.suggestions.filter((s) => s.exact);
-  return exact.length === 1 && exact[0].guardians > 0 ? exact[0] : null;
-}
-
-/** null = the reviewer has to choose; a second parent is never linked by a default click. */
-function defaultTarget(request: FamilyJoinRequest): number | 'new' | null {
-  if (guardedMatch(request)) return null;
-  const exact = request.suggestions.filter((s) => s.exact);
-  return exact.length === 1 ? exact[0].id : 'new';
 }
 
 function RequestCard({
@@ -61,23 +44,22 @@ function RequestCard({
   onApprove: (target: number | 'new') => void;
   onDeny: () => void;
 }) {
-  const [target, setTarget] = useState<number | 'new' | null>(() => defaultTarget(request));
-  const guarded = guardedMatch(request);
+  const [target, setTarget] = useState<number | 'new'>(() => defaultTarget(request));
   const childName = `${request.child.firstName} ${request.child.lastName}`;
-  const options: { key: number | 'new'; title: string; meta: string }[] = [
+  const options: { key: number | 'new'; title: string; meta: string; warnings: string[] }[] = [
+    { key: 'new', title: 'Jucător nou în lot', meta: `${childName} va fi adăugat în ${request.team.name}`, warnings: [] },
     ...request.suggestions.map((s) => ({
       key: s.id,
       title: `Leagă de ${s.firstName ?? ''} ${s.lastName ?? ''}`.trim(),
       meta: [
-        s.birthYear ? `n. ${s.birthYear}` : null,
+        s.birthDate ? `n. ${formatBirth(s.birthDate)}` : s.birthYear ? `n. ${s.birthYear}` : null,
         s.number != null ? `#${s.number}` : null,
         s.teams.join(', ') || null,
-        request.kind === 'player' && s.hasAccount ? 'are deja cont' : null,
-        request.kind === 'parent' && s.guardians ? `${s.guardians} părinte${s.guardians === 1 ? '' : 'i'} legat${s.guardians === 1 ? '' : 'i'}` : null,
       ].filter(Boolean).join(' · ') || 'jucător existent în club',
+      warnings: matchWarnings(request, s),
     })),
-    { key: 'new', title: 'Jucător nou în lot', meta: `${childName} va fi adăugat în ${request.team.name}` },
   ];
+  const selectedWarnings = options.find((option) => option.key === target)?.warnings ?? [];
 
   return (
     <View
@@ -109,6 +91,17 @@ function RequestCard({
         </View>
       </View>
 
+      {request.suggestions.length ? (
+        <View className="flex-row items-start gap-2 rounded-[10px] px-3 py-2.5" style={{ backgroundColor: 'var(--c-warning-bg)' }}>
+          <MaterialIcons name="warning-amber" size={16} color="var(--c-warning-fg)" style={{ marginTop: 1 }} />
+          <Text className="flex-1 text-[12.5px] font-semibold leading-[18px]" style={{ color: 'var(--c-warning-fg)' }}>
+            {request.suggestions.length === 1
+              ? 'În club există un jucător cu același nume. Leagă-l doar dacă ești sigur că e același copil.'
+              : `În club există ${request.suggestions.length} jucători cu nume asemănător. Leagă doar dacă ești sigur că e același copil.`}
+          </Text>
+        </View>
+      ) : null}
+
       <View className="gap-1.5" accessibilityRole={'radiogroup' as any} accessibilityLabel={`Unde intră ${childName}`}>
         {options.map((option) => {
           const selected = target === option.key;
@@ -128,16 +121,22 @@ function RequestCard({
               <View className="flex-1 min-w-0">
                 <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{option.title}</Text>
                 <Text className="text-[12px]" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{option.meta}</Text>
+                {option.warnings.length ? (
+                  <Text className="text-[12px] font-semibold mt-0.5" style={{ color: 'var(--c-warning-fg)' }} numberOfLines={2}>
+                    {option.warnings.join(' ')}
+                  </Text>
+                ) : null}
               </View>
+              {option.warnings.length ? <MaterialIcons name="warning-amber" size={16} color="var(--c-warning-fg)" /> : null}
             </Pressable>
           );
         })}
       </View>
 
-      {target === null && guarded ? (
-        <View className="rounded-[10px] px-3 py-2.5" style={{ backgroundColor: 'var(--c-warning-bg)' }}>
-          <Text className="text-[12.5px] font-semibold leading-[18px]" style={{ color: 'var(--c-warning-fg)' }}>
-            {`${`${guarded.firstName ?? ''} ${guarded.lastName ?? ''}`.trim()} are deja ${guarded.guardians === 1 ? 'un părinte legat' : `${guarded.guardians} părinți legați`}. Alege dacă e același copil, ca să poți aproba.`}
+      {selectedWarnings.length ? (
+        <View className="rounded-[10px] border px-3 py-2.5" style={{ backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-border)' } as any}>
+          <Text className="text-[12.5px] font-semibold leading-[18px]" style={{ color: 'var(--c-danger-fg)' }}>
+            {`${selectedWarnings.join(' ')} La aprobare, ${request.kind === 'parent' ? request.requester.name : 'contul'} va vedea datele acestui jucător.`}
           </Text>
         </View>
       ) : null}
@@ -154,12 +153,12 @@ function RequestCard({
           <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>Respinge</Text>
         </Pressable>
         <Pressable
-          onPress={() => target !== null && onApprove(target)}
-          disabled={busy || target === null}
+          onPress={() => onApprove(target)}
+          disabled={busy}
           accessibilityRole="button"
           accessibilityLabel={`Aprobă cererea pentru ${childName}`}
           className="ui-press h-10 px-4 rounded-[10px] flex-row items-center gap-1.5"
-          style={{ backgroundColor: 'var(--c-brand-surface)', opacity: busy ? 0.7 : target === null ? 0.45 : 1 } as any}
+          style={{ backgroundColor: 'var(--c-brand-surface)', opacity: busy ? 0.7 : 1 } as any}
         >
           {busy ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : <MaterialIcons name="check" size={16} color="var(--c-on-brand)" />}
           <Text className="text-[13px] font-bold" style={{ color: 'var(--c-on-brand)' }}>Aprobă</Text>
@@ -285,13 +284,14 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNot
   };
 
   const approveAll = async () => {
-    if (!requests?.length) return;
+    const ids = autoApprovableIds(requests ?? []);
+    if (!ids.length) return;
     setBulkBusy(true);
     try {
-      const { results } = await familyRequestsApi.approveAll(requests.map((r) => r.id));
+      const { results } = await familyRequestsApi.approveAll(ids);
       const ok = results.filter((r) => r.ok).length;
-      const failed = results.length - ok;
-      onNotify({ variant: failed ? 'error' : 'success', message: failed ? `${ok} aprobate, ${failed} rămân pentru verificarea ta.` : `${ok} cereri aprobate.` });
+      const left = (requests?.length ?? 0) - ok;
+      onNotify({ variant: ok === results.length ? 'success' : 'error', message: left ? `${ok} aprobate, ${left} rămân pentru verificarea ta.` : `${ok} cereri aprobate.` });
       await load();
     } catch (err) {
       onNotify({ variant: 'error', message: err instanceof Error ? err.message : 'Nu am putut aproba cererile.' });
@@ -310,7 +310,9 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNot
     }
   };
 
-  const ambiguous = useMemo(() => (requests ?? []).filter((r) => r.suggestions.filter((s) => s.exact).length !== 1 && r.suggestions.length > 0).length, [requests]);
+  // "Aprobă toți" only covers requests with no same-name player in the club.
+  const bulkIds = useMemo(() => autoApprovableIds(requests ?? []), [requests]);
+  const matched = (requests?.length ?? 0) - bulkIds.length;
 
   return (
     <View>
@@ -336,7 +338,7 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNot
             <Text className="flex-1 text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>
               Înscrieri în echipe · {requests.length}
             </Text>
-            {requests.length > 1 ? (
+            {bulkIds.length > 1 || (bulkIds.length === 1 && requests.length > 1) ? (
               <Pressable
                 onPress={() => setConfirm({ kind: 'all' })}
                 disabled={bulkBusy}
@@ -345,7 +347,9 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNot
                 style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
               >
                 {bulkBusy ? <ActivityIndicator size="small" color="var(--c-success-fg)" /> : <MaterialIcons name="done-all" size={16} color="var(--c-success-fg)" />}
-                <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink)' }}>Aprobă toți</Text>
+                <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink)' }}>
+                  {matched ? `Aprobă toți fără potrivire (${bulkIds.length})` : 'Aprobă toți'}
+                </Text>
               </Pressable>
             ) : null}
           </View>
@@ -371,12 +375,12 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNot
           ? `Respingi cererea pentru ${confirm.request.child.firstName} ${confirm.request.child.lastName}?`
           : confirm?.kind === 'rotate'
             ? `Schimbi codul pentru ${confirm.team.name}?`
-            : `Aprobi toate cele ${requests?.length ?? 0} cereri?`}
+            : bulkIds.length === 1 ? 'Aprobi cererea fără potrivire?' : `Aprobi cele ${bulkIds.length} cereri fără potrivire?`}
         message={confirm?.kind === 'deny'
-          ? 'Contul rămâne în așteptare, fără acces la echipă.'
+          ? denyMessage(confirm.request)
           : confirm?.kind === 'rotate'
             ? 'Codul vechi nu mai funcționează. Cererile deja trimise rămân.'
-            : `Fiecare copil cu un singur jucător identic în lot e legat de el; ceilalți devin jucători noi. Dacă jucătorul are deja un părinte legat, cererea rămâne pentru tine.${ambiguous ? ` ${ambiguous} ${ambiguous === 1 ? 'cerere are' : 'cereri au'} potriviri nesigure — verifică-le una câte una înainte.` : ''}`}
+            : `Copiii fără niciun nume identic în club devin jucători noi în echipa cererii.${matched ? ` ${matched === 1 ? 'Cererea cu un jucător cu același nume rămâne' : `Cele ${matched} cereri cu un jucător cu același nume rămân`} pentru verificarea ta, una câte una.` : ''}`}
         confirmLabel={confirm?.kind === 'deny' ? 'Respinge' : confirm?.kind === 'rotate' ? 'Schimbă codul' : 'Aprobă toți'}
         cancelLabel="Anulează"
         onConfirm={() => {

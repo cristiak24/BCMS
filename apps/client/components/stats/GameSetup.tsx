@@ -54,7 +54,7 @@ export default function GameSetup({
     existing?.roster.map((p) => p.playerId)
       ?? (data.lineup.some((p) => p.onL12) ? data.lineup.filter((p) => p.onL12) : data.lineup).slice(0, 15).map((p) => p.playerId));
   const [starters, setStarters] = useState<number[]>(existing?.starters ?? []);
-  const [opponentName, setOpponentName] = useState(existing?.opponentName ?? opponentFromTitle(data.event.title, data.team.name));
+  const [opponentName, setOpponentName] = useState(existing?.opponentName ?? (data.event.opponent || opponentFromTitle(data.event.title, data.team.name)));
   const [trackOpponents, setTrackOpponents] = useState((existing?.opponentRoster.length ?? 0) > 0);
   const [opponents, setOpponents] = useState<OpponentEntry[]>(existing?.opponentRoster ?? []);
   const [numbersInput, setNumbersInput] = useState('');

@@ -33,6 +33,7 @@ import {
     type MetricUser,
     utcIso,
 } from '../lib/platformMetrics';
+import { coachedTeams, handoverRequired, parseHandover, reassignCoachedTeams, validateSuccessor } from '../lib/coachHandover';
 
 /**
  * Platform console for the superadmin role: overview, clubs, accounts and
@@ -585,10 +586,26 @@ router.patch('/users/:id', async (req: AuthenticatedRequest, res) => {
 
         if (Object.keys(patch).length === 0) return sendError(res, 400, 'Nimic de salvat.');
 
-        const [updated] = await db.update(users)
-            .set({ ...patch, updatedAt: new Date().toISOString() })
-            .where(eq(users.id, id))
-            .returning();
+        // Deactivating a coach who still leads teams: say who takes them
+        // first (lib/coachHandover.ts).
+        const deactivating = patch.status === 'disabled' && target.status !== 'disabled';
+        const handover = parseHandover(req.body);
+        if ('error' in handover) return sendError(res, 400, handover.error);
+        const ledTeams = deactivating ? await coachedTeams(id) : [];
+        if (ledTeams.length && !handover.decided) {
+            return res.status(409).json(await handoverRequired({ id, name: target.name, clubId: target.clubId }, ledTeams));
+        }
+        const reassignTo = handover.decided ? handover.reassignTo : null;
+        const successorError = ledTeams.length ? await validateSuccessor(reassignTo, target.clubId, id) : null;
+        if (successorError) return sendError(res, 400, successorError);
+
+        const [updated] = await db.transaction(async (tx) => {
+            if (ledTeams.length) await reassignCoachedTeams(tx, id, reassignTo);
+            return tx.update(users)
+                .set({ ...patch, updatedAt: new Date().toISOString() })
+                .where(eq(users.id, id))
+                .returning();
+        });
 
         await writeAuditLog({
             action: patch.status === 'disabled' ? 'user.deactivated' : patch.status === 'active' && target.status === 'disabled' ? 'user.reactivated' : 'user.updated',
@@ -602,6 +619,7 @@ router.patch('/users/:id', async (req: AuthenticatedRequest, res) => {
                 ...(patch.status ? { nextStatus: patch.status, previousStatus: target.status } : {}),
                 ...(patch.clubId ? { nextClubId: patch.clubId, previousClubId: target.clubId } : {}),
                 ...(patch.name ? { name: patch.name } : {}),
+                ...(ledTeams.length ? { teams: ledTeams.map((t) => t.id), teamsReassignedTo: reassignTo } : {}),
             },
         });
 

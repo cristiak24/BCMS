@@ -4,7 +4,9 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
 import { useFocusEffect } from '@/src/web/reactNavigationNative';
 import { CalendarEvent, eventsApi } from '../../services/eventsApi';
-import { teamsApi, type Player, type Team } from '../../services/teamsApi';
+import { teamsApi, type Player, type RosterSummary, type Team } from '../../services/teamsApi';
+import { coachManagedTeamIds } from '../../utils/coachEventScope';
+import { ATTENDANCE_PERIOD_LABEL, formatAttendanceRate, pooledAttendanceRate } from '../../utils/attendanceRate';
 import { useSession } from '../../context/AuthContext';
 import GlassCard from '../../components/ui/GlassCard';
 import Button from '../../components/ui/Button';
@@ -196,11 +198,8 @@ function WeekStrip({ events }: { events: CalendarEvent[] }) {
 }
 
 /** Squad attendance: average ring, traffic-light buckets, and who needs a look. */
-function SquadHealth({ players, onManage }: { players: Player[]; onManage: () => void }) {
+function SquadHealth({ players, average, onManage }: { players: Player[]; average: number | null; onManage: () => void }) {
   const rated = players.filter((player) => player.attendanceRate != null);
-  const average = rated.length
-    ? Math.round(rated.reduce((sum, player) => sum + (player.attendanceRate ?? 0), 0) / rated.length)
-    : null;
   const buckets = [
     { label: 'Peste 75%', color: 'var(--c-success)', count: rated.filter((p) => (p.attendanceRate ?? 0) >= 75).length },
     { label: '50–74%', color: 'var(--c-warning)', count: rated.filter((p) => (p.attendanceRate ?? 0) >= 50 && (p.attendanceRate ?? 0) < 75).length },
@@ -215,7 +214,7 @@ function SquadHealth({ players, onManage }: { players: Player[]; onManage: () =>
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1 min-w-0">
           <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Sănătate lot</Text>
-          <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Prezența recentă a jucătorilor tăi</Text>
+          <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Prezența jucătorilor tăi · {ATTENDANCE_PERIOD_LABEL.toLowerCase()}</Text>
         </View>
         <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
           <MaterialIcons name="monitor-heart" size={18} color="var(--c-brand-fg)" />
@@ -225,8 +224,8 @@ function SquadHealth({ players, onManage }: { players: Player[]; onManage: () =>
       {rated.length ? (
         <>
           <View className="flex-row items-center gap-4 rounded-[12px] border p-3" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}>
-            <ProgressRing value={average} size={68} stroke={7} color={attendanceRateColor(average)} label={`Prezență medie ${average}%`}>
-              <Text className="f-display t-num text-[17px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>{average}%</Text>
+            <ProgressRing value={average} size={68} stroke={7} color={attendanceRateColor(average)} label={average == null ? 'Fără prezență marcată' : `Prezență ${average}%`}>
+              <Text className="f-display t-num text-[17px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>{formatAttendanceRate(average)}</Text>
             </ProgressRing>
             <View className="flex-1 min-w-0 gap-1.5">
               {buckets.map((bucket) => (
@@ -292,6 +291,7 @@ export default function CoachDashboardScreen() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [summary, setSummary] = useState<RosterSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -305,14 +305,18 @@ export default function CoachDashboardScreen() {
       // this used to download the club's whole history.
       const since = new Date();
       since.setHours(0, 0, 0, 0);
-      const [eventRows, teamRows, rosterRows] = await Promise.all([
+      const [eventRows, teamRows, rosterRows, rosterSummary] = await Promise.all([
         eventsApi.getEvents({ start: since.toISOString() }),
         teamsApi.getTeams(),
         teamsApi.getRoster(),
+        teamsApi.getRosterSummary().catch(() => null),
       ]);
       setEvents(eventRows);
       setTeams(teamRows);
-      setPlayers(rosterRows);
+      // The coach's roster also lists the club's unassigned players (so they
+      // can be added to a team); the panel counts the coach's squads only.
+      setPlayers(rosterRows.filter((player) => !player.isUnassigned));
+      setSummary(rosterSummary);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nu s-a putut încărca panoul antrenorului.');
     } finally {
@@ -336,18 +340,21 @@ export default function CoachDashboardScreen() {
   const thisWeekMatches = thisWeekEvents.filter((event) => event.type === 'match').length;
 
   const teamIds = new Set(scopedEvents.map((event) => event.teamId).filter((id): id is number => id != null));
-  const visibleTeamsCount = teamIds.size || teams.length;
-  // Same scope as /coach/teams: the teams of the coach's sessions, else all.
+  // The teams the coach manages (server: the same rule as Program/Prezență);
+  // it used to fall back to every team of the club.
+  const managedTeamIds = useMemo(() => coachManagedTeamIds(teams, session?.id), [teams, session?.id]);
+  const visibleTeamsCount = summary?.teamCount ?? managedTeamIds.size;
+  // Standings: the coach's teams, plus a team of a single session they were
+  // assigned to — never the whole club.
   const teamIdKey = [...teamIds].sort((a, b) => a - b).join(',');
   const coachTeams = useMemo(() => {
     const ids = new Set(teamIdKey ? teamIdKey.split(',').map(Number) : []);
-    return ids.size ? teams.filter((team) => ids.has(team.id)) : teams;
-  }, [teams, teamIdKey]);
+    return teams.filter((team) => managedTeamIds.has(team.id) || ids.has(team.id));
+  }, [teams, teamIdKey, managedTeamIds]);
 
-  const ratedPlayers = players.filter((player) => player.attendanceRate != null);
-  const averageAttendance = ratedPlayers.length
-    ? Math.round(ratedPlayers.reduce((sum, player) => sum + (player.attendanceRate ?? 0), 0) / ratedPlayers.length)
-    : null;
+  // One rate everywhere (utils/attendanceRate.ts): last 30 days, pooled.
+  const averageAttendance = summary ? summary.attendance?.rate ?? summary.averageAttendance ?? null : pooledAttendanceRate(players);
+  const playerCount = summary?.athleteCount ?? players.length;
 
   // push, not replace: the browser/phone back button should return to the panel.
   const goToAttendance = () => router.push('/coach/attendance' as any);
@@ -405,10 +412,11 @@ export default function CoachDashboardScreen() {
                 <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 flex-1 min-w-0 ui-stagger">
                   <GlassStat dot="var(--c-brand-fg)" label="Sesiuni" value={upcomingEvents.length} hint="programate" />
                   <GlassStat dot="var(--c-sky-fg)" label="7 zile" value={thisWeekEvents.length} hint="săptămâna asta" />
-                  <GlassStat dot="var(--c-purple)" label="Jucători" value={players.length} hint={`în ${visibleTeamsCount} ${visibleTeamsCount === 1 ? 'echipă' : 'echipe'}`} />
+                  <GlassStat dot="var(--c-purple)" label="Jucători" value={playerCount} hint={`în ${visibleTeamsCount} ${visibleTeamsCount === 1 ? 'echipă' : 'echipe'}`} />
                   <GlassStat
                     dot={averageAttendance == null ? 'var(--c-faint)' : averageAttendance >= 75 ? 'var(--c-success)' : averageAttendance >= 50 ? 'var(--c-warning)' : 'var(--c-danger)'}
                     label="Prezență"
+                    hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()}
                     value={averageAttendance ?? '—'}
                     suffix={averageAttendance == null ? undefined : '%'}
                     bar={averageAttendance ?? undefined}
@@ -447,7 +455,7 @@ export default function CoachDashboardScreen() {
               {/* Fixed rail from xl up, full width below — at 1280px a shared
                   row keeps both lists above the fold. */}
               <View className="w-full xl:w-[380px] shrink-0 gap-4">
-                <SquadHealth players={players} onManage={goToAttendance} />
+                <SquadHealth players={players} average={averageAttendance} onManage={goToAttendance} />
                 <TeamStandingsCard teams={coachTeams} onOpenTeam={(id) => router.push(`/coach/team/${id}` as any)} />
               </View>
             </View>

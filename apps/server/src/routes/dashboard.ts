@@ -16,7 +16,7 @@ import { resolveDashboardClubScope, type DashboardClubScope } from '../lib/dashb
 import { clubBalances } from '../services/clubFinance';
 import { authenticate, requireRoles } from '../middleware/auth';
 import { isPaidStatus } from '../lib/paymentLedger';
-import { isAttendedStatus, isCountedStatus } from '../lib/attendanceRate';
+import { attendancePeriod, attendancePeriodInfo, attendanceRate as rateInPeriod, isAttendedStatus } from '../lib/attendanceRate';
 
 const router = Router();
 
@@ -117,10 +117,12 @@ router.get('/summary', async (req, res) => {
         const scopedPlayers = await getScopedPostgresPlayers(scope.clubScope, scope.teamIds);
         const scopedPlayerIds = scopedPlayers.map((player) => player.id);
 
-        // Only this month and last month of attendance are read below; the
-        // SQL bound (a couple of days early, so timezone edges stay inside)
-        // stops this from loading the club's whole attendance history.
-        const attendanceSince = new Date(startOfPrevMonth.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
+        // Attendance: the shared 30-day period and the 30 days before it
+        // (lib/attendanceRate.ts), the same numbers as Lot and the team page.
+        // The SQL bound keeps the club's whole history out of memory.
+        const currentAttendancePeriod = attendancePeriod(now);
+        const previousAttendancePeriod = attendancePeriod(now, 1);
+        const attendanceSince = new Date(previousAttendancePeriod.from.getTime() - 24 * 60 * 60 * 1000).toISOString();
         const [pgFinancialDocs, pgPaymentRows, pgAttendanceRows] = await Promise.all([
             scope.clubScope.kind === 'all'
                 ? db.select().from(pgFinancialDocuments)
@@ -200,25 +202,12 @@ router.get('/summary', async (req, res) => {
         const pendingPaymentsCount = balances.filter((balance) => balance.state === 'overdue').length;
         const owingPlayersCount = balances.filter((balance) => balance.outstanding > 0).length;
 
-        const countedPgAttendanceRows = pgAttendanceRows.filter((row) => isCountedStatus(row.status));
-        const postgresMonthlyAttendanceRows = countedPgAttendanceRows.filter((row) => {
-            const date = toDate(row.date);
-            return date ? date >= startOfMonth && date <= endOfMonth : false;
-        });
-
-        const presentCount = postgresMonthlyAttendanceRows.filter((row) => isPresentStatus(row.status)).length;
-        const totalAttendanceRecords = postgresMonthlyAttendanceRows.length;
-
-        const attendanceRate = totalAttendanceRecords > 0
-            ? Math.round((presentCount / totalAttendanceRecords) * 100)
-            : null;
-
-        const prevMonthPgAttendanceRows = countedPgAttendanceRows.filter((row) => inRange(toDate(row.date), startOfPrevMonth, endOfPrevMonth));
-        const previousPresentCount = prevMonthPgAttendanceRows.filter((row) => isPresentStatus(row.status)).length;
-        const previousTotalAttendanceRecords = prevMonthPgAttendanceRows.length;
-        const previousAttendanceRate = previousTotalAttendanceRecords > 0
-            ? Math.round((previousPresentCount / previousTotalAttendanceRecords) * 100)
-            : null;
+        const currentAttendance = rateInPeriod(pgAttendanceRows, currentAttendancePeriod);
+        const previousAttendance = rateInPeriod(pgAttendanceRows, previousAttendancePeriod);
+        const presentCount = currentAttendance.attended;
+        const totalAttendanceRecords = currentAttendance.counted;
+        const attendanceRate = currentAttendance.rate;
+        const previousAttendanceRate = previousAttendance.rate;
         const attendanceChangePoints = attendanceRate != null && previousAttendanceRate != null
             ? attendanceRate - previousAttendanceRate
             : null;
@@ -354,6 +343,7 @@ router.get('/summary', async (req, res) => {
             attendanceRate,
             previousAttendanceRate,
             attendanceChangePoints,
+            attendancePeriod: attendancePeriodInfo(currentAttendancePeriod),
             presentCount,
             totalAttendanceRecords,
             expiredVisasCount: expiredVisasItems.length,

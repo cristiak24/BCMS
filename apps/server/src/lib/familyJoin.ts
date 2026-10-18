@@ -64,7 +64,17 @@ function cleanName(value: unknown) {
     return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
 }
 
-export type ChildInput = { firstName: string; lastName: string; birthDate: string };
+/**
+ * `birthDate` is YYYY-MM-DD. `yearOnly`: the form asked for the year alone and
+ * the date is 1 January of it — kept as the birth year, never as a full date.
+ */
+export type ChildInput = { firstName: string; lastName: string; birthDate: string; yearOnly?: true };
+
+/** The full date of birth worth storing on a player (players.birth_date), or null. */
+export function fullBirthDate(child: { birthDate: string | null; yearOnly?: boolean }) {
+    if (child.yearOnly || !child.birthDate) return null;
+    return /^\d{4}-\d{2}-\d{2}$/.test(child.birthDate) ? child.birthDate : null;
+}
 
 export type TeamSignupInput =
     | { kind: 'parent'; phone: string; children: ChildInput[] }
@@ -124,7 +134,7 @@ export function parseParentChildren(body: unknown, now = new Date()): Result<Chi
         const year = /^\d{4}$/.test(text) ? Number(text) : NaN;
         const age = now.getUTCFullYear() - year;
         if (!Number.isInteger(year) || age < 3 || age > 30) return { ok: false, error: `${firstName}: anul nașterii nu pare corect.` };
-        children.push({ firstName, lastName, birthDate: `${year}-01-01` });
+        children.push({ firstName, lastName, birthDate: `${year}-01-01`, yearOnly: true });
     }
     return { ok: true, value: children };
 }
@@ -140,17 +150,20 @@ export function foldName(value: string | null | undefined) {
         .trim();
 }
 
-export type MatchCandidate = { id: number; firstName: string | null; lastName: string | null; birthYear: number | null };
+export type MatchCandidate = { id: number; firstName: string | null; lastName: string | null; birthYear: number | null; birthDate?: string | null };
 
 /**
- * Existing players that are probably this child, best first. A name match in
- * either order counts ("Popescu Matei" = "Matei Popescu"); a different birth
- * year rules a candidate out, a missing one does not.
+ * Existing players with this child's name, best first. A name match in either
+ * order counts ("Popescu Matei" = "Matei Popescu"). A different date of birth
+ * no longer hides a candidate: a same-name child is exactly what the reviewer
+ * has to see, so it is listed with `birthMismatch` (different year, or a
+ * different full date when both are known) and sorted last.
  */
 export function suggestPlayerMatches<T extends MatchCandidate>(child: { firstName: string; lastName: string; birthDate: string | null }, candidates: T[]) {
     const first = foldName(child.firstName);
     const last = foldName(child.lastName);
     const year = child.birthDate ? Number(child.birthDate.slice(0, 4)) : null;
+    const fullDate = child.birthDate && /^\d{4}-\d{2}-\d{2}$/.test(child.birthDate) ? child.birthDate : null;
 
     return candidates
         .map((candidate) => {
@@ -160,11 +173,12 @@ export function suggestPlayerMatches<T extends MatchCandidate>(child: { firstNam
             const partial = !exact && cLast === last && (cFirst.startsWith(first) || first.startsWith(cFirst)) && cFirst.length > 0;
             const yearKnown = candidate.birthYear != null && year != null;
             const sameYear = yearKnown && candidate.birthYear === year;
-            return { candidate, exact, partial, sameYear, yearConflict: yearKnown && !sameYear };
+            const dateConflict = Boolean(fullDate && candidate.birthDate && candidate.birthDate.slice(0, 10) !== fullDate);
+            return { candidate, exact, partial, sameYear, mismatch: (yearKnown && !sameYear) || dateConflict };
         })
-        .filter((m) => (m.exact || m.partial) && !m.yearConflict)
-        .sort((a, b) => Number(b.exact) - Number(a.exact) || Number(b.sameYear) - Number(a.sameYear))
-        .map((m) => ({ ...m.candidate, exact: m.exact, sameBirthYear: m.sameYear }));
+        .filter((m) => m.exact || m.partial)
+        .sort((a, b) => Number(a.mismatch) - Number(b.mismatch) || Number(b.exact) - Number(a.exact) || Number(b.sameYear) - Number(a.sameYear))
+        .map((m) => ({ ...m.candidate, exact: m.exact, sameBirthYear: m.sameYear, birthMismatch: m.mismatch }));
 }
 
 /**
@@ -177,24 +191,22 @@ export function splitKnownChildren(children: ChildInput[], roster: MatchCandidat
     const known: ChildInput[] = [];
     const fresh: ChildInput[] = [];
     for (const child of children) {
-        const onRoster = suggestPlayerMatches(child, roster).some((match) => match.exact);
+        const onRoster = suggestPlayerMatches(child, roster).some((match) => match.exact && !match.birthMismatch);
         (onRoster ? known : fresh).push(child);
     }
     return { known, fresh };
 }
 
 /**
- * What "approve automatically" does with a join request: link the single exact
- * match, otherwise add a new player. A parent claiming a child who already has
- * a linked parent is never automatic — a name and birth year are public, so
- * that link needs a person to look at it.
+ * What "Aprobă toți" does with a join request: a child nobody in the club has
+ * the name of becomes a new player; anything with a same-name player waits
+ * for a person (audit R3-7). It used to link the single exact match, which let
+ * a stranger who knew a child's name and birth year claim that child's record
+ * in one click.
  */
 export function chooseAutoTarget(
-    kind: 'parent' | 'player',
-    suggestions: { id: number; exact: boolean; guardians?: number }[],
-): number | 'new' | 'review' {
-    const exact = suggestions.filter((s) => s.exact);
-    if (exact.length !== 1) return 'new';
-    if (kind === 'parent' && (exact[0].guardians ?? 0) > 0) return 'review';
-    return exact[0].id;
+    _kind: 'parent' | 'player',
+    suggestions: { id: number }[],
+): 'new' | 'review' {
+    return suggestions.length > 0 ? 'review' : 'new';
 }

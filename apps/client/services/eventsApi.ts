@@ -1,3 +1,5 @@
+import type { EventGameSummary } from '../utils/matchResult';
+
 import { apiClient, ApiError } from './apiClient';
 
 export interface CalendarEvent {
@@ -15,6 +17,10 @@ export interface CalendarEvent {
     teamName?: string;
     coachName?: string;
     coachNote?: string | null;
+    /** The other side of a match (events.opponent). */
+    opponent?: string | null;
+    /** The club's own scorer on this match, when someone keeps statistics. */
+    game?: EventGameSummary | null;
 }
 
 export interface EventAttendance {

@@ -43,11 +43,14 @@ async function readJsonLike<T>(response: Response) {
 /** Error that carries the HTTP status so callers can branch on it. */
 export class ApiError extends Error {
   readonly status: number;
+  /** The JSON error body, for errors that carry more than a message (e.g. a 409 with choices). */
+  readonly data?: unknown;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, data?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -62,7 +65,7 @@ async function buildError(response: Response) {
 
     const payloadMessage = readMessageFromPayload(payload);
     if (payloadMessage) {
-      return new ApiError(payloadMessage, response.status);
+      return new ApiError(payloadMessage, response.status, payload);
     }
   } catch {
     return new ApiError(fallbackMessage, response.status);

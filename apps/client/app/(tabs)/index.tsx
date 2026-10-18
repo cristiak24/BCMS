@@ -34,6 +34,9 @@ import SectionHeader from '../../components/ui/SectionHeader';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
 import { PlayerEventDetailModal } from '../../components/schedule/player/PlayerEventDetailModal';
 import TeamStandingsCard from '../../components/standings/TeamStandingsCard';
+import { getEventTypeMeta } from '../../components/schedule/scheduleShared';
+import { internalMatchResult, type MatchOutcome } from '../../utils/matchResult';
+import { activityLabel, isOngoing, upcomingActivities } from '../../utils/homeAgenda';
 
 type HubEvent = CalendarEvent & {
   source?: 'internal' | 'frb';
@@ -283,15 +286,7 @@ function getEventCategory(event: HubEvent) {
     return event.categoryName;
   }
 
-  if (event.type === 'match') {
-    return 'Meci';
-  }
-
-  if (event.type === 'camp') {
-    return 'Cantonament';
-  }
-
-  return 'Antrenament';
+  return activityLabel(event.type);
 }
 
 function getMonthKey(value: string) {
@@ -364,7 +359,24 @@ function isUpcoming(event: CalendarEvent) {
 function isFinishedGame(event: CalendarEvent) {
   const status = String(event.status ?? '').toLowerCase();
   const finishedStatuses = new Set(['finished', 'completed', 'graded']);
-  return event.type === 'match' && !isCancelled(event) && (finishedStatuses.has(status) || Boolean(getScoreFromText(event)));
+  return event.type === 'match' && !isCancelled(event)
+    && (internalMatchResult(event) != null || finishedStatuses.has(status) || Boolean(getScoreFromText(event)));
+}
+
+/**
+ * The score shown on a card: the club's own scorer first (our score on the
+ * left, matching `getMatchSides`), else an FRB score read from the text.
+ */
+function getEventScore(event: HubEvent) {
+  const own = internalMatchResult(event);
+  if (own) return { home: String(own.us), away: String(own.them), label: own.label };
+  return getScoreFromText(event);
+}
+
+/** The two lines of a result card, in the same order as `getEventScore`. */
+function getMatchSides(event: HubEvent) {
+  const own = internalMatchResult(event);
+  return own ? { home: own.ourName, away: own.theirName } : splitMatchTitle(event.title);
 }
 
 function getStatusCopy(event: CalendarEvent) {
@@ -411,10 +423,12 @@ function splitMatchTitle(title: string) {
   return parts.length === 2 ? { home: parts[0], away: parts[1] } : { home: title, away: '' };
 }
 
-type MatchOutcome = 'win' | 'loss' | 'draw';
-
 /** Win/loss/draw from the player's own side, resolved against their team names. */
 function getMatchOutcome(event: HubEvent, teamNames: Set<string>): MatchOutcome | null {
+  // The club's own sheet knows which side is ours.
+  const own = internalMatchResult(event);
+  if (own) return own.outcome;
+
   const score = getScoreFromText(event);
   if (!score) {
     return null;
@@ -603,8 +617,8 @@ function NextEventCard({
   icon: keyof typeof MaterialIcons.glyphMap;
   onPress?: () => void;
 }) {
-  const score = event ? getScoreFromText(event) : null;
-  const relative = event ? getRelativeLabel(event.startTime) : null;
+  const score = event ? getEventScore(event) : null;
+  const relative = event ? (isOngoing(event) ? 'În desfășurare' : getRelativeLabel(event.startTime)) : null;
 
   const body = (
     <>
@@ -667,7 +681,7 @@ function EventRow({
   onDetails: () => void;
 }) {
   const isMatch = event.type === 'match';
-  const relative = getRelativeLabel(event.startTime);
+  const relative = isOngoing(event) ? 'În desfășurare' : getRelativeLabel(event.startTime);
 
   return (
     <Pressable
@@ -719,9 +733,9 @@ const OUTCOME_META: Record<MatchOutcome, { label: string; full: string; color: s
 };
 
 function ResultCard({ event, outcome }: { event: HubEvent; outcome: MatchOutcome | null }) {
-  const score = getScoreFromText(event);
+  const score = getEventScore(event);
   const dateBlock = getDateBlock(event.startTime);
-  const teams = splitMatchTitle(event.title);
+  const teams = getMatchSides(event);
   const meta = outcome ? OUTCOME_META[outcome] : null;
   const ownTeam = normalizeTeamName(event.teamName);
   const context = [event.categoryName, event.venueName, event.location]
@@ -1011,14 +1025,13 @@ function PlayerHomeScreen() {
     [events, searchValue]
   );
 
-  // Strictly trainings — the section is titled "Antrenamente viitoare", and
-  // admin/medical entries listed under it would be mislabelled. Everything
-  // else is one tap away in /schedule.
+  // Everything that isn't a match: trainings, camps, medical and admin
+  // entries, each row labelled with its type. Trainings only used to be
+  // listed, so a camp in Program never reached a player's home page (R3-17).
+  const allUpcomingActivities = useMemo(() => upcomingActivities(filteredEvents), [filteredEvents]);
   const allUpcomingTraining = useMemo(
-    () => filteredEvents
-      .filter((event) => event.type === 'training' && isUpcoming(event))
-      .sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b)),
-    [filteredEvents]
+    () => allUpcomingActivities.filter((event) => event.type === 'training'),
+    [allUpcomingActivities]
   );
 
   const allUpcomingGames = useMemo(
@@ -1035,7 +1048,7 @@ function PlayerHomeScreen() {
     [filteredEvents]
   );
 
-  const upcomingTraining = allUpcomingTraining.slice(0, SECTION_LIMIT);
+  const upcomingActivityRows = allUpcomingActivities.slice(0, SECTION_LIMIT);
   const upcomingGames = allUpcomingGames.slice(0, SECTION_LIMIT);
   const gameResults = allGameResults.slice(0, SECTION_LIMIT);
 
@@ -1043,7 +1056,8 @@ function PlayerHomeScreen() {
   const weekAhead = Date.now() + 7 * 86400000;
   const weekTrainingCount = allUpcomingTraining.filter((event) => getEventTimestamp(event) <= weekAhead).length;
   const weekMatchCount = allUpcomingGames.filter((event) => getEventTimestamp(event) <= weekAhead).length;
-  const nextTraining = allUpcomingTraining[0] ?? null;
+  const nextActivity = allUpcomingActivities[0] ?? null;
+  const weekCampCount = allUpcomingActivities.filter((event) => event.type === 'camp' && getEventTimestamp(event) <= weekAhead).length;
   const nextGame = allUpcomingGames[0] ?? null;
   const latestResult = allGameResults[0] ?? null;
 
@@ -1143,6 +1157,7 @@ function PlayerHomeScreen() {
               <View className="flex-row flex-wrap gap-1.5 flex-1 min-w-0">
                 <Chip icon="fitness-center" label={`${weekTrainingCount} ${weekTrainingCount === 1 ? 'antrenament' : 'antrenamente'} în 7 zile`} />
                 {weekMatchCount ? <Chip icon="sports-basketball" label={`${weekMatchCount} ${weekMatchCount === 1 ? 'meci' : 'meciuri'}`} /> : null}
+                {weekCampCount ? <Chip icon="cabin" label={`${weekCampCount} ${weekCampCount === 1 ? 'cantonament' : 'cantonamente'}`} /> : null}
                 {attendanceStreak > 1 ? <Chip icon="bolt" label={`${attendanceStreak} prezențe la rând`} /> : null}
               </View>
             )}
@@ -1156,12 +1171,12 @@ function PlayerHomeScreen() {
             cards stacked filled a whole screen before any list). md+: grid. */}
         <View className="m-scroller ui-stagger">
           <NextEventCard
-            event={nextTraining}
+            event={nextActivity}
             accent={palette.royal}
             accentBg={palette.royalBg}
-            icon="fitness-center"
-            label="Antrenament"
-            onPress={nextTraining ? () => setSelectedEvent(nextTraining) : undefined}
+            icon={nextActivity?.type === 'camp' ? 'cabin' : 'fitness-center'}
+            label={nextActivity ? getEventCategory(nextActivity) : 'Antrenament'}
+            onPress={nextActivity ? () => setSelectedEvent(nextActivity) : undefined}
           />
           <NextEventCard
             event={nextGame}
@@ -1233,21 +1248,21 @@ function PlayerHomeScreen() {
             <View className="min-w-0">
               <SectionHeader
                 eyebrow="Pe teren"
-                title="Antrenamente viitoare"
-                subtitle="Următoarele sesiuni programate ale echipei."
-                actionLabel={seeAllLabel(allUpcomingTraining.length)}
+                title="Activități viitoare"
+                subtitle="Antrenamente, cantonamente și celelalte activități ale echipei."
+                actionLabel={seeAllLabel(allUpcomingActivities.length)}
                 onAction={goToSchedule}
                 isMobile={isMobile}
               />
 
-              {upcomingTraining.length ? (
+              {upcomingActivityRows.length ? (
                 <View className="gap-2.5 ui-stagger">
-                  {upcomingTraining.map((event) => (
+                  {upcomingActivityRows.map((event) => (
                     <EventRow
                       key={event.id}
                       event={event}
-                      accent={palette.royal}
-                      accentBg={palette.royalBg}
+                      accent={event.type === 'training' ? palette.royal : getEventTypeMeta(event.type).onSoft}
+                      accentBg={event.type === 'training' ? palette.royalBg : getEventTypeMeta(event.type).soft}
                       label={getEventCategory(event)}
                       isMobile={isMobile}
                       onDetails={() => setSelectedEvent(event)}
@@ -1255,7 +1270,7 @@ function PlayerHomeScreen() {
                   ))}
                 </View>
               ) : (
-                <EmptyState icon="event-busy" compact title="Niciun antrenament viitor" message="Antrenamentele programate de club apar aici." />
+                <EmptyState icon="event-busy" compact title="Nicio activitate viitoare" message="Antrenamentele, cantonamentele și celelalte activități programate de club apar aici." />
               )}
             </View>
 

@@ -11,7 +11,8 @@ import { ROSTER_COLUMN_FLEX, ROSTER_COLUMN_WIDTHS, ROSTER_TABLE_WIDTH } from './
 interface PlayerRowProps {
   player: Player;
   categoryLabel: string;
-  attendanceRate: number;
+  /** Last 30 days; null = nothing marked in the period. */
+  attendanceRate: number | null;
   paymentLabel: string;
   paymentPaid: boolean;
   isActive: boolean;
@@ -44,7 +45,7 @@ export default function PlayerRow({
     : paymentLabel === 'Restanță'
       ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)' }
       : { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' };
-  const attendanceTone = attendanceRate >= 75 ? 'var(--c-success-fg)' : attendanceRate >= 60 ? 'var(--c-warning-fg)' : 'var(--c-danger-fg)';
+  const attendanceTone = attendanceRate == null ? 'var(--c-faint)' : attendanceRate >= 75 ? 'var(--c-success-fg)' : attendanceRate >= 60 ? 'var(--c-warning-fg)' : 'var(--c-danger-fg)';
   const unassigned = !categoryLabel || /neasignat/i.test(categoryLabel);
 
   // A table row, not a floating card: the list used to be eight separate
@@ -86,9 +87,9 @@ export default function PlayerRow({
         </View>
 
         <View style={styles.attendanceCell}>
-          <Text style={[styles.attendanceText, { color: attendanceTone }] as any}>{attendanceRate}%</Text>
+          <Text style={[styles.attendanceText, { color: attendanceTone }] as any}>{attendanceRate == null ? '—' : `${attendanceRate}%`}</Text>
           <View style={styles.barWrap}>
-            <AttendanceBar value={attendanceRate} />
+            <AttendanceBar value={attendanceRate ?? 0} />
           </View>
         </View>
 

@@ -10,6 +10,7 @@ import { sendRouteError } from '../lib/httpErrors';
 import { getOrCompute, invalidate } from '../lib/microCache';
 import { deleteClerkUser } from '../lib/clerkAuth';
 import { publicUser } from '../lib/publicUser';
+import { coachedTeams, handoverRequired, parseHandover, reassignCoachedTeams, validateSuccessor } from '../lib/coachHandover';
 
 const router = Router();
 
@@ -345,10 +346,24 @@ router.post('/accounts/:id/deactivate', rateLimit({ bucket: 'club-admin:mutate',
             return res.status(403).json({ error: 'Admin accounts cannot be deactivated from this screen.' });
         }
 
-        const updated = await db.update(users).set({
-            status: 'disabled',
-            updatedAt: new Date().toISOString(),
-        }).where(eq(users.id, id)).returning();
+        // A coach who still leads teams: say who takes them first (lib/coachHandover.ts).
+        const handover = parseHandover(req.body);
+        if ('error' in handover) return res.status(400).json({ error: handover.error });
+        const ledTeams = await coachedTeams(id);
+        if (ledTeams.length && !handover.decided) {
+            return res.status(409).json(await handoverRequired({ id, name: targetUser.name, clubId: actor.clubId }, ledTeams));
+        }
+        const reassignTo = handover.decided ? handover.reassignTo : null;
+        const successorError = ledTeams.length ? await validateSuccessor(reassignTo, actor.clubId, id) : null;
+        if (successorError) return res.status(400).json({ error: successorError });
+
+        const updated = await db.transaction(async (tx) => {
+            if (ledTeams.length) await reassignCoachedTeams(tx, id, reassignTo);
+            return tx.update(users).set({
+                status: 'disabled',
+                updatedAt: new Date().toISOString(),
+            }).where(eq(users.id, id)).returning();
+        });
 
         await writeAuditLog({
             action: 'club_admin.user_deactivated',
@@ -358,11 +373,15 @@ router.post('/accounts/:id/deactivate', rateLimit({ bucket: 'club-admin:mutate',
             actorUid: req.firebaseUser?.uid ?? null,
             actorRole: req.user?.role ?? null,
             clubId: actor.clubId,
-            metadata: { email: targetUser.email, role: targetUser.role },
+            metadata: {
+                email: targetUser.email,
+                role: targetUser.role,
+                ...(ledTeams.length ? { teams: ledTeams.map((t) => t.id), teamsReassignedTo: reassignTo } : {}),
+            },
         });
 
         invalidate(accountsCacheKey(actor.clubId!));
-        res.json({ success: true, user: publicUser(updated[0]) });
+        res.json({ success: true, user: publicUser(updated[0]), reassignedTeams: ledTeams.length });
     } catch (error) {
         console.error('Club admin deactivate account error:', error);
         res.status(500).json({ error: 'Could not update this account.' });

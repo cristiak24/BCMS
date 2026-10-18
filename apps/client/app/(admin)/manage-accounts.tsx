@@ -17,6 +17,8 @@ import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../components/HeaderCo
 import { formatRelativeDate } from '../../components/myclub/teamDisplay';
 import { clubAdminApi, type ClubAdminAccount, type ClubAdminAccountRole } from '../../services/clubAdminApi';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import CoachHandoverDialog from '../../components/accounts/CoachHandoverDialog';
+import { readHandoverRequest, type HandoverRequest } from '../../utils/coachHandover';
 
 const FILTERS = ['all', 'coach', 'player', 'parent', 'invite', 'inactive'] as const;
 
@@ -119,6 +121,9 @@ export default function ManageAccountsScreen() {
     const [sortDesc, setSortDesc] = useState(true);
     const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
     const [bulkBusy, setBulkBusy] = useState(false);
+    // A coach who still leads teams: who takes them, before deactivating.
+    const [handover, setHandover] = useState<{ account: ClubAdminAccount; request: HandoverRequest } | null>(null);
+    const [handoverBusy, setHandoverBusy] = useState(false);
     const [page, setPage] = useState(1);
     const [menuFor, setMenuFor] = useState<ClubAdminAccount | null>(null);
 
@@ -286,11 +291,33 @@ export default function ManageAccountsScreen() {
             showToast({ variant: 'success', message: isInvite ? `Invitația pentru ${account.email} a fost anulată.` : `Contul lui ${account.name} a fost dezactivat.` });
         } catch (error) {
             setAccounts(previous); // rollback
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Nu am putut actualiza contul.' });
+            const request = readHandoverRequest(error);
+            if (request) setHandover({ account, request });
+            else showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Nu am putut actualiza contul.' });
         } finally {
             setBusyId(null);
         }
     }, [accounts, showToast]);
+
+    const confirmHandover = useCallback(async (teamsReassignTo: number | null) => {
+        if (!handover) return;
+        const { account, request } = handover;
+        setHandoverBusy(true);
+        try {
+            await clubAdminApi.deactivateAccount(account.id, { teamsReassignTo });
+            setAccounts((current) => current.map((item) => (item.id === account.id ? { ...item, status: 'inactive' } : item)));
+            const successor = request.candidates.find((c) => c.id === teamsReassignTo)?.name;
+            showToast({
+                variant: 'success',
+                message: `Contul lui ${account.name} a fost dezactivat. ${successor ? `${request.teams.length === 1 ? 'Echipa a trecut' : 'Echipele au trecut'} la ${successor}.` : `${request.teams.length === 1 ? 'Echipa a rămas' : 'Echipele au rămas'} fără antrenor.`}`,
+            });
+            setHandover(null);
+        } catch (error) {
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Nu am putut dezactiva contul.' });
+        } finally {
+            setHandoverBusy(false);
+        }
+    }, [handover, showToast]);
 
     // Optimistic reactivate: flip back to active, roll back on failure.
     const performReactivate = useCallback(async (account: ClubAdminAccount) => {
@@ -736,6 +763,13 @@ export default function ManageAccountsScreen() {
                 onClose={() => setMenuFor(null)}
             />
 
+            <CoachHandoverDialog
+                request={handover?.request ?? null}
+                personName={handover?.account.name ?? ''}
+                loading={handoverBusy}
+                onConfirm={(teamsReassignTo) => void confirmHandover(teamsReassignTo)}
+                onCancel={() => setHandover(null)}
+            />
             <ConfirmDialog
                 visible={pending != null}
                 title={confirmCopy?.title ?? ''}

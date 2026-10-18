@@ -9,7 +9,8 @@ import RosterCheckbox from './RosterCheckbox';
 interface RosterPlayerCardProps {
   player: Player;
   categoryLabel: string;
-  attendanceRate: number;
+  /** Last 30 days; null = nothing marked in the period. */
+  attendanceRate: number | null;
   paymentLabel: string;
   paymentPaid: boolean;
   isActive: boolean;
@@ -41,7 +42,7 @@ export default function RosterPlayerCard({
     : paymentLabel === 'Restanță'
       ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)' }
       : { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' };
-  const attendanceTone = attendanceRate >= 75 ? 'var(--c-success-fg)' : attendanceRate >= 60 ? 'var(--c-warning-fg)' : 'var(--c-danger-fg)';
+  const attendanceTone = attendanceRate == null ? 'var(--c-faint)' : attendanceRate >= 75 ? 'var(--c-success-fg)' : attendanceRate >= 60 ? 'var(--c-warning-fg)' : 'var(--c-danger-fg)';
   const meta = [player.number ? `#${player.number}` : null, player.position, teamLabel].filter(Boolean).join(' · ');
   void categoryLabel;
 
@@ -86,9 +87,9 @@ export default function RosterPlayerCard({
       </View>
 
       <View className="mt-2.5 flex-row items-center gap-3 pl-[30px]">
-        <Text className="t-num text-[12.5px] font-bold w-[38px]" style={{ color: attendanceTone }}>{attendanceRate}%</Text>
+        <Text className="t-num text-[12.5px] font-bold w-[38px]" style={{ color: attendanceTone }}>{attendanceRate == null ? '—' : `${attendanceRate}%`}</Text>
         <View className="flex-1 min-w-0">
-          <AttendanceBar value={attendanceRate} />
+          <AttendanceBar value={attendanceRate ?? 0} />
         </View>
         <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1 shrink-0" style={{ backgroundColor: payTone.bg }}>
           <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: payTone.fg }} />

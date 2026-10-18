@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { toDate, toIso } from '../lib/dateUtils';
 import { db } from '../db';
-import { attendance, events, notifications, players, playersToTeams, teams, users } from '../db/schema';
+import { attendance, events, gameStats, notifications, players, playersToTeams, teams, users } from '../db/schema';
 import { and, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { buildEventQueryPlan, type EventQueryParams } from '../lib/eventQuery';
@@ -31,6 +31,19 @@ type EventDoc = {
     status?: string;
     createdAt?: Date | string | null;
     coachNote?: string | null;
+    opponent?: string | null;
+};
+
+/**
+ * The club's own scorer (routes/games.ts) on a match: enough for a result on
+ * Acasă and the "Fișa meciului" link. null = nobody kept statistics.
+ */
+type EventGameSummary = {
+    status: 'setup' | 'live' | 'finished';
+    scoreUs: number;
+    scoreThem: number;
+    opponentName: string | null;
+    finishedAt: string | null;
 };
 
 type PlayerDoc = { id: number; firstName?: string | null; lastName?: string | null; number?: number | null; };
@@ -40,7 +53,7 @@ type AttendanceDoc = { id: number; eventId?: number | null; playerId: number; te
 
 
 
-function toEventPayload(event: EventDoc, teamName: string | null, coachName: string | null) {
+function toEventPayload(event: EventDoc, teamName: string | null, coachName: string | null, game: EventGameSummary | null) {
     return {
         ...event,
         startTime: toIso(event.startTime) ?? new Date().toISOString(),
@@ -48,6 +61,7 @@ function toEventPayload(event: EventDoc, teamName: string | null, coachName: str
         createdAt: toIso(event.createdAt) ?? null,
         teamName,
         coachName,
+        game,
     };
 }
 
@@ -70,22 +84,45 @@ async function enrichEvents(eventRows: EventDoc[]) {
         eventRows.map((event) => event.coachId).filter((id): id is number => id != null)
     ));
 
-    const [teamRows, coachRows] = await Promise.all([
+    const matchIds = eventRows.filter((event) => event.type === 'match').map((event) => event.id);
+
+    const [teamRows, coachRows, gameRows] = await Promise.all([
         teamIds.length
             ? db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, teamIds))
             : Promise.resolve([] as { id: number; name: string }[]),
         coachIds.length
             ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, coachIds))
             : Promise.resolve([] as { id: number; name: string }[]),
+        // Whoever may read the event may read its score: GET /games/events/:id
+        // lets any club member in, and players/parents only reach their own
+        // team's events here (getEvents / ensureEventReadAccess).
+        matchIds.length
+            ? db.select({
+                eventId: gameStats.eventId,
+                status: gameStats.status,
+                scoreUs: gameStats.scoreUs,
+                scoreThem: gameStats.scoreThem,
+                opponentName: gameStats.opponentName,
+                finishedAt: gameStats.finishedAt,
+            }).from(gameStats).where(inArray(gameStats.eventId, matchIds))
+            : Promise.resolve([]),
     ]);
 
     const teamNameById = new Map(teamRows.map((row) => [row.id, row.name]));
     const coachNameById = new Map(coachRows.map((row) => [row.id, row.name]));
+    const gameByEventId = new Map(gameRows.map((row) => [row.eventId, {
+        status: (row.status === 'finished' || row.status === 'live' ? row.status : 'setup') as EventGameSummary['status'],
+        scoreUs: row.scoreUs,
+        scoreThem: row.scoreThem,
+        opponentName: row.opponentName ?? null,
+        finishedAt: toIso(row.finishedAt),
+    }]));
 
     return eventRows.map((event) => toEventPayload(
         event,
         event.teamId != null ? teamNameById.get(event.teamId) ?? null : null,
         event.coachId != null ? coachNameById.get(event.coachId) ?? null : null,
+        gameByEventId.get(event.id) ?? null,
     ));
 }
 
@@ -411,6 +448,7 @@ export const eventsController = {
                 status: input.status ?? 'scheduled',
                 createdAt: new Date().toISOString(),
                 coachNote: input.coachNote ?? null,
+                opponent: input.opponent ?? null,
             }).returning();
 
             res.json(await enrichEvent(event as EventDoc));

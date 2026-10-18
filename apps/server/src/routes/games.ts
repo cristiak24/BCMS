@@ -160,7 +160,7 @@ router.get('/events/:eventId', async (req: AuthenticatedRequest, res) => {
             ? await db.select().from(gameStatEvents).where(eq(gameStatEvents.gameId, match.game.id)).orderBy(asc(gameStatEvents.seq))
             : [];
         res.json({
-            event: { id: match.event.id, title: match.event.title, startTime: toIso(match.event.startTime), location: match.event.location },
+            event: { id: match.event.id, title: match.event.title, startTime: toIso(match.event.startTime), location: match.event.location, opponent: match.event.opponent ?? null },
             team: { id: match.team.id, name: match.team.name },
             canKeep: match.canKeep,
             canSetup: match.staff,
@@ -272,6 +272,11 @@ router.put('/events/:eventId/setup', rateLimit({ bucket: 'games:setup', limit: 6
         const [saved] = match.game
             ? await db.update(gameStats).set(values).where(eq(gameStats.id, match.game.id)).returning()
             : await db.insert(gameStats).values({ ...values, eventId: match.event.id, teamId: match.team.id, clubId: match.team.clubId!, createdBy: Number(req.user?.id) }).returning();
+        // The opponent typed here fills the match's own field when it is still
+        // empty, so the L12 sheet names the same side (events.opponent).
+        if (opponentName && !match.event.opponent) {
+            await db.update(events).set({ opponent: opponentName }).where(eq(events.id, match.event.id));
+        }
         res.json(serializeGame(saved));
     } catch (error) {
         console.error('[games/setup] error:', error);
@@ -345,8 +350,12 @@ router.post('/events/:eventId/finish', async (req: AuthenticatedRequest, res) =>
             res.status(403).json({ error: 'Nu ții statistica la acest meci.' });
             return;
         }
+        // The final score is what Acasă shows as the result: derive it from
+        // the stored actions once more rather than trusting the last snapshot.
+        const all = (await db.select().from(gameStatEvents).where(eq(gameStatEvents.gameId, match.game.id))).map(serializeEvent);
+        const box = computeBoxScore(all, match.game.starters as number[], match.game.periodSec);
         const [saved] = await db.update(gameStats)
-            .set({ status: 'finished', finishedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+            .set({ status: 'finished', scoreUs: box.us, scoreThem: box.them, finishedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
             .where(eq(gameStats.id, match.game.id)).returning();
         res.json(serializeGame(saved));
     } catch (error) {

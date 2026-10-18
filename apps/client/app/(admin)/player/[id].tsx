@@ -262,6 +262,11 @@ export default function PlayerProfile() {
                     <View className="flex-1"><FormField label="An naștere" value={birthYear} onChangeText={setBirthYear} keyboardType="numeric" placeholder="2010" error={yearError} /></View>
                     <View className="flex-1"><FormField label="Număr tricou" value={number} onChangeText={setNumber} keyboardType="numeric" placeholder="7" error={numberError} /></View>
                   </View>
+                  {player.birthDate && player.birthDate.slice(0, 4) === birthYear ? (
+                    <Text className="t-meta -mt-2" style={{ color: 'var(--c-muted)' }}>
+                      Data nașterii: {player.birthDate.slice(8, 10)}.{player.birthDate.slice(5, 7)}.{player.birthDate.slice(0, 4)} (din cererea de înscriere)
+                    </Text>
+                  ) : null}
                   <View>
                     <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Stare în club</Text>
                     <SelectField

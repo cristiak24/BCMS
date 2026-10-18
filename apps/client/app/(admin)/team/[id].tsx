@@ -19,6 +19,7 @@ import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import BulkAddPlayersDialog from '../../../components/family/BulkAddPlayersDialog';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import PageHero, { GlassStat } from '../../../components/admin/PageHero';
+import { ATTENDANCE_PERIOD_LABEL } from '../../../utils/attendanceRate';
 
 type TabKey = 'roster' | 'events' | 'history' | 'frb';
 type RosterView = 'grid' | 'list';
@@ -200,7 +201,8 @@ export default function TeamDetailsScreen() {
     const frb = isFrbTeam(team);
     const accentColor = frb ? 'var(--c-danger)' : 'var(--c-success)';
     const crestTint = frb ? 'var(--c-danger-bg)' : 'var(--c-success-bg)';
-    const monthlyAtt = stats?.monthlyAttendanceRate ?? null;
+    // The shared 30-day rate (utils/attendanceRate.ts), same as Dashboard and Lot.
+    const monthlyAtt = stats?.attendance?.rate ?? stats?.monthlyAttendanceRate ?? null;
     const arrears = stats?.playersWithArrears ?? 0;
 
     return (
@@ -288,7 +290,8 @@ export default function TeamDetailsScreen() {
                             <GlassStat
                                 value={monthlyAtt != null ? monthlyAtt : '—'}
                                 suffix={monthlyAtt != null ? '%' : undefined}
-                                label="Prezență luna aceasta"
+                                label="Prezență"
+                                hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()}
                                 dot={attendanceColor(monthlyAtt)}
                                 bar={monthlyAtt ?? undefined}
                             />

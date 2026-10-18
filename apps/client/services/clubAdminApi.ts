@@ -75,9 +75,15 @@ export const clubAdminApi = {
         });
     },
 
-    deactivateAccount(id: string | number) {
-        return apiFetch<{ success: boolean; user?: ClubAdminAccount }>(`/club-admin/accounts/${id}/deactivate`, {
+    /**
+     * `teamsReassignTo`: who takes a coach's teams (null = nobody for now).
+     * Without it, deactivating a coach who leads teams answers 409
+     * `coach_has_teams` (see utils/coachHandover.ts).
+     */
+    deactivateAccount(id: string | number, handover?: { teamsReassignTo: number | null }) {
+        return apiFetch<{ success: boolean; user?: ClubAdminAccount; reassignedTeams?: number }>(`/club-admin/accounts/${id}/deactivate`, {
             method: 'POST',
+            ...(handover ? { body: JSON.stringify(handover) } : {}),
         });
     },
 

@@ -85,6 +85,8 @@ export default function AppHeader({
       router.push('/payments');
     } else if (notification.type === 'access_request') {
       router.push(session?.role === 'coach' ? '/coach/requests' : '/admin/manage-access');
+    } else if (notification.type === 'privacy_request') {
+      router.push(session?.role === 'superadmin' ? '/super-admin/privacy' : '/admin/privacy');
     } else if (notification.eventId != null) {
       router.push('/schedule');
     }

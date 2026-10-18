@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
 import { players, teams, playersToTeams, attendance, playerPayments, users, events, playerGuardians } from '../db/schema';
-import { and, desc, eq, inArray, isNull, lte, notExists, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lte, notExists, or, sql } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ensureClubPlayerRecords } from '../lib/clubPlayerRecords';
 import { buildPlayerUpdate } from '../lib/playerUpdate';
@@ -9,7 +9,7 @@ import { toDate, toIso } from '../lib/dateUtils';
 import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
 import { isFailedStatus, isOutstandingStatus, isPaidStatus } from '../lib/paymentLedger';
 import { coachSeesPlayer, teamsManagedByCoach } from '../lib/coachScope';
-import { attendanceSummary, isAttendedStatus, isCountedStatus } from '../lib/attendanceRate';
+import { attendancePeriod, attendancePeriodInfo, attendanceRate as rateInPeriod, attendanceSummary, isAttendedStatus, isCountedStatus } from '../lib/attendanceRate';
 import { clubBalances, playerFees } from '../services/clubFinance';
 import { listPlayerHistory, writeAuditLog } from '../services/auditService';
 import { sendPaymentReminders as sendReminderNotifications } from '../lib/notifications';
@@ -38,6 +38,7 @@ function isPlayerFacingRole(req: AuthenticatedRequest) {
 const SENSITIVE_ROSTER_FIELDS = [
     'email', 'medicalCheckExpiry', 'attendanceRate', 'paymentStatus',
     'phone', 'guardianName', 'guardianPhone', 'guardian2Name', 'guardian2Phone',
+    'birthDate', 'attendanceAttended', 'attendanceCounted',
 ] as const;
 
 function toSafeRosterRow<T extends Record<string, unknown>>(row: T): T {
@@ -358,15 +359,15 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
         }
     }
 
-    const attendanceByPlayer = new Map<number, { present: number; total: number }>();
+    // Each player's rate over the shared 30-day period (lib/attendanceRate.ts),
+    // the same window as the dashboard and the team page. null = nothing
+    // marked in the period; it used to read 0% and drag the averages down.
+    const period = attendancePeriod();
+    const rowsByPlayer = new Map<number, typeof attendanceRows>();
     for (const row of attendanceRows) {
-        if (!isCountedStatus(row.status)) continue;
-        const curr = attendanceByPlayer.get(row.playerId) || { present: 0, total: 0 };
-        curr.total += 1;
-        if (isAttendancePresent(row.status)) {
-            curr.present += 1;
-        }
-        attendanceByPlayer.set(row.playerId, curr);
+        const list = rowsByPlayer.get(row.playerId) ?? [];
+        list.push(row);
+        rowsByPlayer.set(row.playerId, list);
     }
 
     const latestPaymentByPlayer = new Map<number, typeof paymentRows[0]>();
@@ -401,10 +402,8 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
         const teamNames = playerTeams.map((team) => team.name);
         const clubId = player.email ? clubIdByUserEmail.get(player.email.trim().toLowerCase()) ?? null : null;
 
-        const attendanceStats = attendanceByPlayer.get(player.id);
-        const attendanceRate = attendanceStats && attendanceStats.total > 0
-            ? Math.round((attendanceStats.present / attendanceStats.total) * 100)
-            : 0;
+        const attendanceStats = rateInPeriod(rowsByPlayer.get(player.id) ?? [], period);
+        const attendanceRate = attendanceStats.rate;
 
         const latestPayment = latestPaymentByPlayer.get(player.id);
         const paymentStatus = balanceStatus.get(player.id) ?? latestPayment?.status ?? 'pending';
@@ -415,6 +414,8 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
             lastName,
             category,
             attendanceRate,
+            attendanceAttended: attendanceStats.attended,
+            attendanceCounted: attendanceStats.counted,
             paymentStatus,
             teamName: teamNames[0] || 'Unassigned',
             teamNames,
@@ -450,10 +451,6 @@ async function buildFullPlayerPayload(req: AuthenticatedRequest, player: typeof 
         teamNames: rosterPlayer?.teamNames ?? [],
         category: rosterPlayer?.category ?? 'Unassigned',
     };
-}
-
-function computeAttendanceRateFromRecords(records: (typeof attendance.$inferSelect)[]) {
-    return attendanceSummary(records).rate;
 }
 
 // "Echipa mea" and the club screens now share one definition
@@ -643,50 +640,54 @@ export const playersController = {
                 return res.status(403).json({ error: 'Forbidden' });
             }
 
-            const rosterRows = await buildRosterRows(req);
+            let rosterRows = await buildRosterRows(req);
+            // A coach's summary counts their teams only (P1-10): their roster
+            // also lists the club's unassigned players (so they can add them),
+            // but those are nobody's squad yet.
+            let teamCount: number | null = null;
+            if (req.user?.role === 'coach') {
+                rosterRows = rosterRows.filter((row) => !row.isUnassigned);
+                const clubId = getRequestClubId(req);
+                const clubTeams = clubId == null ? [] : await db.select({ id: teams.id, coachId: teams.coachId }).from(teams).where(eq(teams.clubId, clubId));
+                teamCount = teamsManagedByCoach(clubTeams, req.user?.id).length;
+            }
             const rosterPlayerIds = rosterRows.map(row => row.id);
 
-            const averageAttendance = rosterRows.length > 0
-                ? Math.round((rosterRows.reduce((sum, row) => sum + (row.attendanceRate || 0), 0) / rosterRows.length) * 10) / 10
-                : 0;
+            // One rate, one period (lib/attendanceRate.ts): the last 30 days,
+            // pooled over marked sessions — the dashboard's number. It used to
+            // be the average of all-time player rates with no-data players
+            // counted as 0%.
+            const period = attendancePeriod();
+            const previousPeriod = attendancePeriod(new Date(), 1);
+            const attendanceRows = rosterPlayerIds.length
+                ? await db.select().from(attendance).where(and(
+                    inArray(attendance.playerId, rosterPlayerIds),
+                    gte(attendance.date, new Date(previousPeriod.from.getTime() - 24 * 60 * 60 * 1000).toISOString()),
+                ))
+                : [];
+            const current = rateInPeriod(attendanceRows, period);
+            const previous = rateInPeriod(attendanceRows, previousPeriod);
+            const attendanceDelta = current.rate != null && previous.rate != null ? current.rate - previous.rate : null;
+            const attendanceFields = {
+                // `averageAttendance` keeps its name for older clients; it is the same rate.
+                averageAttendance: current.rate,
+                currentPeriodAttendance: current.rate,
+                previousPeriodAttendance: previous.rate,
+                attendanceDelta,
+                attendance: current,
+                attendancePeriod: attendancePeriodInfo(period),
+                teamCount,
+            };
 
             if (!rosterPlayerIds.length) {
                 return res.json({
                     athleteCount: 0,
-                    averageAttendance,
-                    currentPeriodAttendance: null,
-                    previousPeriodAttendance: null,
-                    attendanceDelta: null,
+                    ...attendanceFields,
                     pendingPayments: 0,
                     pendingPlayerIds: [],
                     owingPayments: 0,
                 });
             }
-
-            const attendanceRows = await db.select().from(attendance).where(inArray(attendance.playerId, rosterPlayerIds));
-
-            const now = new Date();
-            const currentStart = new Date(now);
-            currentStart.setDate(currentStart.getDate() - 30);
-            const previousStart = new Date(currentStart);
-            previousStart.setDate(previousStart.getDate() - 30);
-
-            const currentPeriodRecords = attendanceRows.filter(row => {
-                const date = row.date ? new Date(row.date) : null;
-                return date ? date >= currentStart && date <= now : false;
-            });
-
-            const previousPeriodRecords = attendanceRows.filter(row => {
-                const date = row.date ? new Date(row.date) : null;
-                return date ? date >= previousStart && date < currentStart : false;
-            });
-
-            const currentPeriodAttendance = computeAttendanceRateFromRecords(currentPeriodRecords);
-            const previousPeriodAttendance = computeAttendanceRateFromRecords(previousPeriodRecords);
-
-            const attendanceDelta = currentPeriodAttendance !== null && previousPeriodAttendance !== null
-                ? Math.round((currentPeriodAttendance - previousPeriodAttendance) * 10) / 10
-                : null;
 
             // Same answer as the roster's payment column (shared balances).
             // „Restanțe” are players with something past due; owing money that
@@ -696,10 +697,7 @@ export const playersController = {
 
             res.json({
                 athleteCount: rosterRows.length,
-                averageAttendance,
-                currentPeriodAttendance,
-                previousPeriodAttendance,
-                attendanceDelta,
+                ...attendanceFields,
                 pendingPayments: pendingPlayerIds.length,
                 pendingPlayerIds,
                 owingPayments,

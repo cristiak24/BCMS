@@ -46,9 +46,9 @@ export type L12Lineup = {
     updatedAt?: string | null;
 };
 
-export type L12Team = { id: number; name: string; leagueName: string; seasonName: string; gender: 'M' | 'F' | null };
+export type L12Team = { id: number; name: string; leagueName: string; seasonName: string; gender: 'M' | 'F' | null; /** The team's assigned coach — pre-fills "Antrenor principal". */ coachName?: string | null };
 
-export type L12Event = { id: number; title: string; type: string; startTime: string; endTime: string; location: string | null };
+export type L12Event = { id: number; title: string; type: string; startTime: string; endTime: string; location: string | null; /** events.opponent */ opponent?: string | null };
 
 export type L12OverviewMatch = {
     eventId: number;
@@ -84,8 +84,10 @@ export const l12Api = {
     async getForEvent(eventId: number) {
         return (await apiClient.get<{ event: L12Event; team: L12Team; lineup: L12Lineup | null; template: L12Lineup | null }>(`/l12/events/${eventId}`)).data;
     },
-    async saveForEvent(eventId: number, lineup: L12Lineup) {
-        return (await apiClient.put<L12Lineup>(`/l12/events/${eventId}`, lineup)).data;
+    /** `opponent`, when passed, is stored on the match (events.opponent). */
+    async saveForEvent(eventId: number, lineup: L12Lineup, opponent?: string | null) {
+        const body = opponent === undefined ? lineup : { ...lineup, opponent };
+        return (await apiClient.put<L12Lineup & { opponent?: string | null }>(`/l12/events/${eventId}`, body)).data;
     },
     async resetForEvent(eventId: number) {
         await apiClient.delete(`/l12/events/${eventId}`);

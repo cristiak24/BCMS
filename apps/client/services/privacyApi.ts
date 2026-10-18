@@ -30,3 +30,29 @@ export const privacyApi = {
         URL.revokeObjectURL(url);
     },
 };
+
+/** A GDPR request as the club admin / super admin sees it (GET /privacy/requests). */
+export type PrivacyRequestRow = {
+    id: number;
+    type: string;
+    status: 'open' | 'resolved' | string;
+    createdAt: string;
+    /** 30 days after the request (lib/privacyRequests.ts on the server). */
+    dueAt: string | null;
+    daysLeft: number | null;
+    overdue: boolean;
+    closedAt: string | null;
+    resolutionNote: string | null;
+    closedBy: { id: number; name: string | null } | null;
+    requester: { id: number; name: string | null; email: string | null; role: string | null; status: string | null };
+    club: { id: number; name: string | null } | null;
+};
+
+export const privacyRequestsApi = {
+    async list(status: 'open' | 'closed' | 'all' = 'open') {
+        return (await apiClient.get<PrivacyRequestRow[]>(`/privacy/requests?status=${status}`)).data;
+    },
+    async resolve(id: number, note: string) {
+        return (await apiClient.post<{ id: number; status: string; closedAt: string; resolutionNote: string | null }>(`/privacy/requests/${id}/resolve`, { note })).data;
+    },
+};

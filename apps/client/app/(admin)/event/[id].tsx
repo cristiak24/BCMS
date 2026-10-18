@@ -422,8 +422,14 @@ export default function EventDetailScreen() {
                     <MaterialIcons name="leaderboard" size={19} color="var(--c-success-fg)" />
                   </View>
                   <View className="flex-1 min-w-0">
-                    <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-ink)' }}>Statistică live</Text>
-                    <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Scor, puncte și faulturi pe jucător · fișa meciului</Text>
+                    <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-ink)' }}>Fișa meciului</Text>
+                    <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
+                      {event.game?.status === 'finished'
+                        ? `Final ${event.game.scoreUs} - ${event.game.scoreThem} · statistici pe jucător`
+                        : event.game?.status === 'live'
+                          ? `În desfășurare · ${event.game.scoreUs} - ${event.game.scoreThem}`
+                          : 'Statistică live: scor, puncte și faulturi pe jucător'}
+                    </Text>
                   </View>
                   <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
                 </Pressable>

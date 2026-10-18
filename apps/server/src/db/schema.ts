@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, integer, text, timestamp, unique, foreignKey, pgEnum, boolean, jsonb, customType, index, numeric, uniqueIndex } from "drizzle-orm/pg-core"
+import { pgTable, serial, varchar, integer, text, timestamp, date, unique, foreignKey, pgEnum, boolean, jsonb, customType, index, numeric, uniqueIndex } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 // Lei with bani (lib/money.ts). Read back as a JS number.
@@ -76,6 +76,9 @@ export const players = pgTable("players", {
 	lastName: varchar("last_name", { length: 255 }),
 	number: integer(),
 	birthYear: integer("birth_year"),
+	// Full date of birth when someone gave it (a parent's join request); many
+	// records only have the year. Staff-only (SENSITIVE_ROSTER_FIELDS).
+	birthDate: date("birth_date", { mode: 'string' }),
 	medicalCheckExpiry: timestamp("medical_check_expiry", { mode: 'string' }),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	email: varchar({ length: 255 }),
@@ -217,6 +220,9 @@ export const events = pgTable("events", {
 	// Shared note from the coach on this event, visible to every player on it
 	// (post-session feedback, focus points, MVP shoutout).
 	coachNote: text("coach_note"),
+	// The other side of a match (L12 sheet, scorer). FRB fixtures carry both
+	// sides in the title ("A vs B") instead.
+	opponent: varchar({ length: 160 }),
 }, (table) => [
 	foreignKey({
 			columns: [table.teamId],
@@ -724,6 +730,14 @@ export const privacyRequests = pgTable("privacy_requests", {
 	requesterEmail: varchar("requester_email", { length: 255 }),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	closedAt: timestamp("closed_at", { mode: 'string' }),
+	// Who marked the request resolved, and what was done (routes/privacy.ts).
+	closedBy: integer("closed_by"),
+	resolutionNote: text("resolution_note"),
 }, (table) => [
+	foreignKey({
+			columns: [table.closedBy],
+			foreignColumns: [users.id],
+			name: "privacy_requests_closed_by_users_id_fk"
+		}).onDelete('set null'),
 	uniqueIndex("privacy_requests_open_unique").on(table.userId, table.type).where(sql`${table.status} = 'open'`),
 ]);

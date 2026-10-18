@@ -6,6 +6,8 @@ import ConfirmDialog from '../ui/ConfirmDialog';
 import SelectField from '../ui/SelectField';
 import { superAdminApi, type ClubRole } from '../../services/superAdminApi';
 import { CLUB_ROLE_ORDER, roleLabel } from './format';
+import CoachHandoverDialog from '../accounts/CoachHandoverDialog';
+import { readHandoverRequest, type HandoverRequest } from '../../utils/coachHandover';
 
 /**
  * Row actions for an account or a pending invite, shared by Utilizatori and a
@@ -25,7 +27,7 @@ export type ActionTarget = {
   source: 'user' | 'invite';
 };
 
-type Step = 'menu' | 'role' | 'move' | 'deactivate' | 'reactivate' | 'revoke';
+type Step = 'menu' | 'role' | 'move' | 'deactivate' | 'handover' | 'reactivate' | 'revoke';
 
 export default function UserActions({
   target,
@@ -55,11 +57,14 @@ export default function UserActions({
   const [clubId, setClubId] = useState<string>('');
   const [clubs, setClubs] = useState<Array<{ id: number; name: string }> | null>(null);
   const [busy, setBusy] = useState(false);
+  // A coach who still leads teams: who takes them, before deactivating.
+  const [handover, setHandover] = useState<HandoverRequest | null>(null);
 
   useEffect(() => {
     if (!target) return;
     setStep('menu');
     setBusy(false);
+    setHandover(null);
     setRole((CLUB_ROLE_ORDER as string[]).includes(target.role) ? (target.role as ClubRole) : 'coach');
     setClubId(target.clubId == null ? '' : String(target.clubId));
   }, [target]);
@@ -87,6 +92,25 @@ export default function UserActions({
     } catch (error) {
       notify('error', error instanceof Error ? error.message : 'Acțiunea nu a reușit.');
       setBusy(false);
+    }
+  };
+
+  const deactivate = async (teamsReassignTo?: number | null) => {
+    setBusy(true);
+    try {
+      await superAdminApi.updateUser(numericId, { status: 'disabled', ...(teamsReassignTo !== undefined ? { teamsReassignTo } : {}) });
+      notify('success', `Contul lui ${name} a fost dezactivat.`);
+      onClose();
+      onChanged();
+    } catch (error) {
+      setBusy(false);
+      const request = readHandoverRequest(error);
+      if (request && teamsReassignTo === undefined) {
+        setHandover(request);
+        setStep('handover');
+        return;
+      }
+      notify('error', error instanceof Error ? error.message : 'Acțiunea nu a reușit.');
     }
   };
 
@@ -184,7 +208,15 @@ export default function UserActions({
         destructive
         confirmLabel="Dezactivează"
         loading={busy}
-        onConfirm={() => void run(() => superAdminApi.updateUser(numericId, { status: 'disabled' }), `Contul lui ${name} a fost dezactivat.`)}
+        onConfirm={() => void deactivate()}
+        onCancel={cancel}
+      />
+
+      <CoachHandoverDialog
+        request={step === 'handover' ? handover : null}
+        personName={name}
+        loading={busy}
+        onConfirm={(teamsReassignTo) => void deactivate(teamsReassignTo)}
         onCancel={cancel}
       />
 
