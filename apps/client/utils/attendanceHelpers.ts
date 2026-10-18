@@ -10,7 +10,7 @@ export function getWeeksInMonth(year: number, month: number): WeekInfo[] {
   const firstDayOfMonth = new Date(year, month, 1);
   const lastDayOfMonth = new Date(year, month + 1, 0);
 
-  let currentDay = new Date(firstDayOfMonth);
+  const currentDay = new Date(firstDayOfMonth);
   // Rewind to Monday (0 = Sunday, 1 = Monday ... 6 = Saturday)
   const firstDayOfWeek = currentDay.getDay() === 0 ? 6 : currentDay.getDay() - 1;
   currentDay.setDate(currentDay.getDate() - firstDayOfWeek);

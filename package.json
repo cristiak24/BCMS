@@ -9,9 +9,11 @@
     "build:web": "npm run build:web --workspace=apps/client",
     "deploy:firestore": "firebase deploy --only firestore",
     "seed:superadmin": "tsx scripts/seedSuperadmin.ts",
-    "test": "npm run test --workspace=apps/server && npm run test --workspace=apps/client"
+    "test": "npm run test --workspace=apps/server && npm run test --workspace=apps/client",
+    "lint": "npm run lint --workspace=apps/server && npm run lint --workspace=apps/client"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "ajv": "^6.15.0",
     "concurrently": "^8.0.0"
   },
