@@ -381,3 +381,24 @@ test('closing a request needs an admin of the club, even for super-admin-only ac
     assert.equal((await call(ADMIN, 'POST', `/privacy/requests/${orphan.id}/resolve`, {})).status, 404);
     assert.equal((await call(SUPER, 'POST', `/privacy/requests/${orphan.id}/resolve`, { note: 'Rezolvat.' })).status, 200);
 });
+
+test('a team still on a deactivated coach is flagged, and a deactivated coach cannot be given a team', async () => {
+    const [legacy] = await db.insert(users).values({ email: 'vechi@club.ro', name: 'Antrenor Vechi', role: 'coach', status: 'disabled', clubId }).returning();
+    await db.update(teams).set({ coachId: legacy.id }).where(eq(teams.id, u12));
+
+    const list = await call(ADMIN, 'GET', '/teams');
+    assert.equal(list.status, 200, JSON.stringify(list.body));
+    assert.equal(list.body.find((t: { id: number }) => t.id === u12).coachDisabled, true);
+    assert.equal(list.body.find((t: { id: number }) => t.id === u14).coachDisabled, false);
+    assert.equal((await call(ADMIN, 'GET', `/teams/${u12}`)).body.coachDisabled, true);
+
+    const coaches = await call(ADMIN, 'GET', '/teams/coaches');
+    assert.ok(!coaches.body.some((c: { id: number }) => c.id === legacy.id), 'not offered as a coach');
+
+    const refused = await call(ADMIN, 'PATCH', `/teams/${u14}`, { coachId: legacy.id });
+    assert.equal(refused.status, 400);
+    const [{ id: fresh }] = await db.insert(users).values({ email: 'nou@club.ro', name: 'Antrenor Nou', role: 'coach', status: 'active', clubId }).returning();
+    const moved = await call(ADMIN, 'PATCH', `/teams/${u12}`, { coachId: fresh });
+    assert.equal(moved.status, 200, JSON.stringify(moved.body));
+    assert.equal(moved.body.coachDisabled, false);
+});

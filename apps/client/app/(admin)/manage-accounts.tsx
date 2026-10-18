@@ -425,7 +425,18 @@ export default function ManageAccountsScreen() {
             // Roll back and re-sync from the server so partial failures don't leave
             // the list in an inconsistent optimistic state.
             setAccounts(previous);
-            showToast({ variant: 'error', message: `${failed} din ${eligible.length} conturi nu au putut fi actualizate.` });
+            // Coaches who still lead teams are never deactivated in bulk: each
+            // needs someone to take the teams (the single "Dezactivează" asks).
+            const coachesWithTeams = eligible.filter((_, index) => {
+                const result = results[index];
+                return result.status === 'rejected' && readHandoverRequest(result.reason) != null;
+            });
+            showToast({
+                variant: 'error',
+                message: coachesWithTeams.length
+                    ? `${failed} din ${eligible.length} conturi nu au fost actualizate. ${coachesWithTeams.map((a) => a.name).join(', ')} ${coachesWithTeams.length === 1 ? 'antrenează o echipă: dezactivează contul separat' : 'antrenează echipe: dezactivează conturile separat'}, ca să alegi cine preia echipele.`
+                    : `${failed} din ${eligible.length} conturi nu au putut fi actualizate.`,
+            });
             void loadAccounts('refresh');
         } else {
             const skippedSuffix = skipped > 0 ? ` (${skipped} sărite)` : '';

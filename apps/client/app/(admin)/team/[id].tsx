@@ -310,6 +310,26 @@ export default function TeamDetailsScreen() {
                         </View>
                     </PageHero>
 
+                    {team.coachDisabled ? (
+                        <Pressable
+                            onPress={() => setEditOpen(true)}
+                            accessibilityRole="button"
+                            className="ui-press mb-4 rounded-[14px] border px-4 py-3 flex-row items-center gap-3 text-left"
+                            style={{ backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-border)' } as any}
+                        >
+                            <MaterialIcons name="warning-amber" size={18} color="var(--c-warning-fg)" />
+                            <View className="flex-1 min-w-0">
+                                <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-warning-fg)' }}>
+                                    {`Antrenorul echipei${team.coachName ? `, ${team.coachName},` : ''} are contul dezactivat`}
+                                </Text>
+                                <Text className="text-[12.5px] font-medium mt-0.5" style={{ color: 'var(--c-warning-fg)' }}>
+                                    Niciun alt antrenor nu poate prelua echipa până nu alegi unul. Apasă ca să schimbi antrenorul.
+                                </Text>
+                            </View>
+                            <MaterialIcons name="chevron-right" size={20} color="var(--c-warning-fg)" />
+                        </Pressable>
+                    ) : null}
+
                     {/* Tabs */}
                     <View className="flex-row flex-wrap p-1 rounded-[14px] border self-start mb-4 gap-1" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
                         <TabButton active={tab === 'roster'} onPress={() => setTab('roster')} icon={<Users size={14} color={tab === 'roster' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label={`Lot (${players.length})`} />

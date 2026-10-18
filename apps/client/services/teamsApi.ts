@@ -21,6 +21,8 @@ export interface Team {
     level: TeamLevel | null;
     coachId: number | null;
     coachName: string | null;
+    /** The assigned coach's account is deactivated: the team needs another coach. */
+    coachDisabled?: boolean;
     isActive: boolean;
     playerCount: number;
     staleMedicalChecks: number;

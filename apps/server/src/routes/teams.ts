@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import { db } from '../db';
 import { attendance, clubs, events, l12Documents, playerPayments, players, playersToTeams, teams, users, l12Lineups } from '../db/schema';
 import { requireRoles, authenticate, type AuthenticatedRequest } from '../middleware/auth';
@@ -191,11 +191,14 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
                     .where(inArray(playersToTeams.teamId, teamIds))
                 : Promise.resolve([]),
             coachIds.length
-                ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, coachIds))
+                ? db.select({ id: users.id, name: users.name, status: users.status }).from(users).where(inArray(users.id, coachIds))
                 : Promise.resolve([]),
         ]);
 
         const coachMap = new Map(coachRows.map((coach) => [coach.id, coach.name]));
+        // A coach deactivated while still on a team: the team shows a warning
+        // and asks for another coach (WP4B; deactivation now hands teams over).
+        const disabledCoachIds = new Set(coachRows.filter((coach) => coach.status === 'disabled').map((coach) => coach.id));
         const now = Date.now();
         const isMedicalCheckStale = (expiry: string | null) => !expiry || new Date(expiry).getTime() < now;
 
@@ -226,6 +229,7 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
             return {
                 ...mapTeam(team, req),
                 coachName: team.coachId != null ? coachMap.get(team.coachId) ?? null : null,
+                coachDisabled: team.coachId != null && disabledCoachIds.has(team.coachId),
                 playerCount: stats ? stats.playerIds.size : 0,
                 staleMedicalChecks: stats ? stats.staleMedicalChecks.size : 0,
             };
@@ -244,11 +248,12 @@ router.get('/coaches', async (req: AuthenticatedRequest, res) => {
         }
 
         const rows = isSuperadmin(req)
-            ? await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.role, 'coach')).orderBy(asc(users.name))
+            ? await db.select({ id: users.id, name: users.name }).from(users).where(and(eq(users.role, 'coach'), ne(users.status, 'disabled'))).orderBy(asc(users.name))
             : await db
                 .select({ id: users.id, name: users.name })
                 .from(users)
-                .where(and(eq(users.role, 'coach'), eq(users.clubId, getRequestClubId(req) ?? -1)))
+                // A deactivated coach can no longer be given a team.
+                .where(and(eq(users.role, 'coach'), ne(users.status, 'disabled'), eq(users.clubId, getRequestClubId(req) ?? -1)))
                 .orderBy(asc(users.name));
 
         res.json(rows);
@@ -327,7 +332,7 @@ router.post('/', requireTeamManager, async (req: AuthenticatedRequest, res) => {
 
         let coachName: string | null = null;
         if (normalizedCoachId != null) {
-            const coachRows = await db.select({ id: users.id, name: users.name }).from(users).where(and(eq(users.id, normalizedCoachId), eq(users.role, 'coach'), eq(users.clubId, clubId))).limit(1);
+            const coachRows = await db.select({ id: users.id, name: users.name }).from(users).where(and(eq(users.id, normalizedCoachId), eq(users.role, 'coach'), ne(users.status, 'disabled'), eq(users.clubId, clubId))).limit(1);
             if (!coachRows[0]) {
                 res.status(400).json({ error: 'Selected coach was not found.' });
                 return;
@@ -377,7 +382,7 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
         const [teamPlayers, coachRow] = await Promise.all([
             getTeamPlayersById(id),
             access.team.coachId != null
-                ? db.select({ name: users.name }).from(users).where(eq(users.id, access.team.coachId)).limit(1)
+                ? db.select({ name: users.name, status: users.status }).from(users).where(eq(users.id, access.team.coachId)).limit(1)
                 : Promise.resolve([]),
         ]);
         const now = Date.now();
@@ -386,6 +391,7 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
         res.json({
             ...mapTeam(access.team, req),
             coachName: coachRow[0]?.name ?? null,
+            coachDisabled: coachRow[0]?.status === 'disabled',
             playerCount: teamPlayers.length,
             staleMedicalChecks,
         });
@@ -590,6 +596,7 @@ router.patch('/:id', requireTeamManager, async (req: AuthenticatedRequest, res) 
                 const coachRows = await db.select({ id: users.id }).from(users).where(and(
                     eq(users.id, nextCoachId),
                     eq(users.role, 'coach'),
+                    ne(users.status, 'disabled'),
                     ...(access.team.clubId != null ? [eq(users.clubId, access.team.clubId)] : []),
                 )).limit(1);
                 if (!coachRows[0]) {
@@ -604,7 +611,7 @@ router.patch('/:id', requireTeamManager, async (req: AuthenticatedRequest, res) 
         const [teamPlayers, coachRow] = await Promise.all([
             getTeamPlayersById(id),
             updated[0].coachId != null
-                ? db.select({ name: users.name }).from(users).where(eq(users.id, updated[0].coachId)).limit(1)
+                ? db.select({ name: users.name, status: users.status }).from(users).where(eq(users.id, updated[0].coachId)).limit(1)
                 : Promise.resolve([]),
         ]);
         const now = Date.now();
@@ -613,6 +620,7 @@ router.patch('/:id', requireTeamManager, async (req: AuthenticatedRequest, res) 
         res.json({
             ...mapTeam(updated[0]),
             coachName: coachRow[0]?.name ?? null,
+            coachDisabled: coachRow[0]?.status === 'disabled',
             playerCount: teamPlayers.length,
             staleMedicalChecks,
         });
