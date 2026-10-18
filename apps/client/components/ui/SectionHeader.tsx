@@ -42,7 +42,7 @@ export default function SectionHeader({
             {eyebrow}
           </Text>
         ) : null}
-        <Text className="f-display text-[16px] font-bold leading-tight" style={{ color: 'var(--c-ink)' }}>
+        <Text accessibilityRole="header" className="f-display text-[16px] font-bold leading-tight" style={{ color: 'var(--c-ink)' }}>
           {title}
         </Text>
         {subtitle ? (

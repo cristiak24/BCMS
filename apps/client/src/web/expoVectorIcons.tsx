@@ -101,6 +101,8 @@ import {
   Star,
   Printer,
   Bookmark,
+  Building2,
+  UserRoundCog,
   Square,
   SquareCheck,
   Contact,
@@ -315,6 +317,9 @@ const iconMap: Record<string, typeof Circle> = {
   'content-copy': Copy,
   block: Ban,
   'search-off': SearchX,
+  // Sidebar: the club, and the accounts list (not the roster's silhouette).
+  domain: Building2,
+  'manage-accounts': UserRoundCog,
 };
 
 function Icon({ name = 'circle', size = 20, color = 'currentColor', style, className }: IconProps) {

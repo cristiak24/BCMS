@@ -326,8 +326,8 @@ export default function ContactsScreen() {
       <ScrollView className="flex-1" contentContainerClassName="pb-32" showsVerticalScrollIndicator={false}>
         <PageContainer>
           <PageHero
-            eyebrow={isStaffView || !data ? 'Agendă' : 'Contacte'}
-            title={isStaffView || !data ? 'Agenda clubului' : 'Contactele clubului'}
+            eyebrow="Contacte"
+            title="Contactele clubului"
             subtitle={isStaffView || !data
               ? 'Telefoanele jucătorilor, părinților și ale staff-ului — la un tap distanță.'
               : 'Antrenorii și administratorii clubului.'}

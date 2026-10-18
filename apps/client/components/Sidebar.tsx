@@ -10,21 +10,24 @@ export type AdminMenuIconName = keyof typeof MaterialIcons.glyphMap;
 
 export const ADMIN_MENU_ITEMS: { label: string; icon: AdminMenuIconName; href: string; superadminOnly?: boolean }[] = [
     { label: 'Acasă', icon: 'grid-view', href: '/admin/dashboard' },
-    { label: 'Clubul meu', icon: 'shield', href: '/admin/my-club-admin' },
-    { label: 'Acces & invitații', icon: 'verified-user', href: '/admin/manage-access' },
-    { label: 'Conturi', icon: 'groups', href: '/admin/manage-accounts' },
-    { label: 'Lot', icon: 'people', href: '/admin/roster' },
+    // One distinct glyph per entry: three shields (club, access, compliance)
+    // and one silhouette for both Conturi and Lot read as the same item.
+    { label: 'Clubul meu', icon: 'domain', href: '/admin/my-club-admin' },
+    { label: 'Acces & invitații', icon: 'vpn-key', href: '/admin/manage-access' },
+    { label: 'Conturi', icon: 'manage-accounts', href: '/admin/manage-accounts' },
+    { label: 'Lot', icon: 'groups', href: '/admin/roster' },
     { label: 'Program', icon: 'calendar-today', href: '/admin/schedule' },
     { label: 'L12', icon: 'assignment', href: '/admin/l12' },
     { label: 'Documente', icon: 'folder', href: '/admin/documents' },
-    { label: 'Agendă', icon: 'contacts', href: '/admin/contacts' },
-    { label: 'Admin club nou', icon: 'admin-panel-settings', href: '/admin/create-club-admin', superadminOnly: true },
+    // "Contacte", not "Agendă": Program has an "Agendă" view (the event list).
+    { label: 'Contacte', icon: 'contacts', href: '/admin/contacts' },
+    { label: 'Admin club nou', icon: 'person-add', href: '/admin/create-club-admin', superadminOnly: true },
     { label: 'Finanțe', icon: 'payments', href: '/admin/finance' },
     // Compliance and Users were reachable only by typing the URL: with no menu
     // entry the header title also fell back to the first item ("Dashboard").
-    { label: 'Conformitate', icon: 'verified-user', href: '/admin/compliance' },
+    { label: 'Conformitate', icon: 'medical-services', href: '/admin/compliance' },
     { label: 'Jurnal', icon: 'history', href: '/admin/audit-log' },
-    { label: 'Utilizatori', icon: 'people', href: '/admin/users', superadminOnly: true },
+    { label: 'Utilizatori', icon: 'person-search', href: '/admin/users', superadminOnly: true },
 ];
 
 type SidebarProps = {
@@ -65,7 +68,7 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarP
             </View>
 
             {/* Navigation Links */}
-            <View className="flex-1 py-1 px-2.5 gap-1 relative">
+            <View role="navigation" aria-label="Meniu principal" className="flex-1 py-1 px-2.5 gap-1 relative">
                 {items.map((item) => {
                     if (item.superadminOnly && !isSuperadmin(session)) {
                         return null;

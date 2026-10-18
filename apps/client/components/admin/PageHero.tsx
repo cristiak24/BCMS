@@ -56,7 +56,7 @@ export default function PageHero({
                         {leading}
                         <View className="min-w-0 flex-1">
                             <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{eyebrow}</Text>
-                            <Text className="f-display text-[22px] md:text-[26px] font-extrabold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.035em' } as any}>
+                            <Text accessibilityRole="header" aria-level={1} className="f-display text-[22px] md:text-[26px] font-extrabold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.035em' } as any}>
                                 {title}
                             </Text>
                             {subtitle ? <Text className="text-[13px] mt-1" style={{ color: 'var(--c-muted)' }}>{subtitle}</Text> : null}

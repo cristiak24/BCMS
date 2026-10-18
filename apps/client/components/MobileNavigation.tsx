@@ -46,6 +46,8 @@ export function MobileBottomNavigation({
     // Structural surfaces use tokens, matching Sidebar, so the bar players see on
     // every screen tracks light/dark instead of staying white on a dark shell.
     <View
+      role="navigation"
+      aria-label="Navigare principală"
       className="flex lg:hidden flex-row items-center border-t fixed bottom-0 left-0 right-0 w-full z-20 px-2"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', paddingTop: 10, paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))', ...theme.shadow.lift } as any}
     >
@@ -53,7 +55,7 @@ export function MobileBottomNavigation({
         const isActive = item.match === 'dashboard' ? isDashboard : pathname.includes(item.match);
 
         return (
-          <RouterLink key={item.href} to={item.href} className="flex-1 no-underline">
+          <RouterLink key={item.href} to={item.href} aria-current={isActive ? 'page' : undefined} className="flex-1 no-underline">
             <View className="items-center justify-center py-1 px-1">
               <View className="items-center justify-center rounded-[18px] px-2 py-2 min-h-[52px] w-full" style={{ backgroundColor: isActive ? 'var(--c-surface-tint)' : 'transparent' }}>
                 <MaterialIcons name={item.icon} size={20} color={isActive ? theme.colors.royal : theme.colors.faint} />

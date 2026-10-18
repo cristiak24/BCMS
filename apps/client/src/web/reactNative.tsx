@@ -58,6 +58,8 @@ type AnyProps = {
   onValueChange?: (value: any) => void;
   accessibilityLabel?: string;
   accessibilityRole?: string;
+  /** Heading level for accessibilityRole="header" (1 = page title). */
+  'aria-level'?: number;
 };
 type StyleInput = CSSProperties | StyleInput[] | null | false | undefined;
 type RNStyle = CSSProperties & {
@@ -220,6 +222,22 @@ function omitNativeProps(props: AnyProps) {
   };
 }
 
+/**
+ * RN role names that are not ARIA roles. RN's "header" is a heading, but
+ * forwarding it verbatim produced role="header", which assistive tech ignores:
+ * the admin shell had zero headings. A heading also needs a level; callers pass
+ * `aria-level` (1 for the page title), otherwise it is a section heading (2).
+ */
+function ariaRoleProps(role: string | undefined, level: number | undefined) {
+  if (!role) return {};
+  if (role === 'header') return { role: 'heading', 'aria-level': level ?? 2 };
+  if (role === 'image') return { role: 'img' };
+  if (role === 'imagebutton') return { role: 'button' };
+  if (role === 'adjustable') return { role: 'slider' };
+  if (role === 'text' || role === 'none') return {};
+  return { role };
+}
+
 function cx(...values: Array<string | undefined | false>) {
   return values.filter(Boolean).join(' ') || undefined;
 }
@@ -274,10 +292,12 @@ function createBox(tag: keyof React.JSX.IntrinsicElements, defaultClassName?: st
       onLayout,
       role,
       style,
+      'aria-level': ariaLevel,
       ...domProps
     } = rest;
 
     const layoutRef = useLayoutObserver(onLayout);
+    const roleProps = role ? { role, 'aria-level': ariaLevel } : ariaRoleProps(native.accessibilityRole, ariaLevel);
 
     const Element = tag as any;
     return (
@@ -287,7 +307,7 @@ function createBox(tag: keyof React.JSX.IntrinsicElements, defaultClassName?: st
         aria-label={native.accessibilityLabel}
         data-testid={native.testID}
         ref={onLayout ? mergeRefs(ref, layoutRef) : ref}
-        role={role || native.accessibilityRole}
+        {...roleProps}
         style={withPointerEvents(flattenStyle(style), native.pointerEvents)}
         className={cx(defaultClassName, className)}
         onClick={
@@ -314,7 +334,7 @@ export const SafeAreaView = View;
 
 export const Text = React.forwardRef<HTMLElement, AnyProps>(function Text(props, ref) {
   const { rest, native } = omitNativeProps(props);
-  const { children, className, style, ...domProps } = rest;
+  const { children, className, style, 'aria-level': ariaLevel, ...domProps } = rest;
   const flattened = flattenStyle(style);
   // display/orient/overflow live in the zero-specificity `.rn-clamp` rule, not
   // inline: an inline `display` beat every responsive utility, so a clamped
@@ -325,6 +345,7 @@ export const Text = React.forwardRef<HTMLElement, AnyProps>(function Text(props,
   return (
     <span
       {...domProps}
+      {...ariaRoleProps(native.accessibilityRole, ariaLevel)}
       aria-label={native.accessibilityLabel}
       data-testid={native.testID}
       ref={ref}

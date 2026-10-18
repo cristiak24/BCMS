@@ -40,7 +40,7 @@ const COACH_MENU_ITEMS = [
     { href: '/coach/requests' as const, label: 'Cereri', icon: 'how-to-reg' as const, match: 'coach/requests' },
     { href: '/coach/l12' as const, label: 'L12', icon: 'assignment' as const, match: 'coach/l12' },
     { href: '/documents' as const, label: 'Documente', icon: 'folder' as const, match: 'documents' },
-    { href: '/contacts' as const, label: 'Agendă', icon: 'contacts' as const, match: 'contacts' },
+    { href: '/contacts' as const, label: 'Contacte', icon: 'contacts' as const, match: 'contacts' },
     { href: '/account' as const, label: 'Profil', icon: 'person' as const, match: 'account' },
 ];
 
@@ -134,7 +134,7 @@ function PlayerTabsLayoutContent() {
                 </div>
 
                 {/* ── Main Content ────────────────────────────────── */}
-                <div className="flex-1 min-w-0 overflow-auto overflow-x-hidden flex flex-col relative h-full">
+                <main className="flex-1 min-w-0 overflow-auto overflow-x-hidden flex flex-col relative h-full">
                     <div className="flex-1 min-w-0 pb-24 lg:pb-0 relative w-full flex flex-col">
                         {isParent ? <ChildSwitcher /> : null}
                         {!isCoach ? <AssignedGamesBanner /> : null}
@@ -142,7 +142,7 @@ function PlayerTabsLayoutContent() {
                             <Outlet />
                         </Suspense>
                     </div>
-                </div>
+                </main>
 
                 <div className="lg:hidden">
                     <MobileBottomNavigation

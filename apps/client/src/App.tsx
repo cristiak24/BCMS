@@ -1,10 +1,11 @@
 import { Suspense, useEffect } from 'react';
-import { BrowserRouter, matchPath, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, matchPath, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
 import { lazyRoute, preloadRoutes, prefetchRoutes } from './lazyRoute';
 import RouteProgress from '../components/ui/RouteProgress';
+import { LiveRegion } from '../components/ui/LiveRegion';
 import { InstallBanner } from '../components/pwa/InstallApp';
 import { useSession } from '../context/AuthContext';
 import { getHomeRouteForRole, normalizeRole, readAuthSessionSync } from '../utils/authSession';
@@ -13,6 +14,7 @@ import LegalAcceptanceGate from '../components/legal/LegalAcceptanceGate';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import PublicRoute from '../components/auth/PublicRoute';
 import { PLAYER_FEATURE_FLAGS } from '../config/playerFeatureFlags';
+import { titleForPath } from '../utils/routeTitles';
 
 // Entry screens stay in the main chunk: they are what an unauthenticated visitor
 // hits first, so lazy-loading them would only add a round trip.
@@ -286,6 +288,15 @@ function RoutePrefetcher() {
   return null;
 }
 
+/** Keeps the browser tab title in step with the route ("Lot · BCMS"). */
+function RouteTitle() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    document.title = titleForPath(pathname);
+  }, [pathname]);
+  return null;
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -293,6 +304,8 @@ export default function App() {
         <ThemeProvider>
           <AuthProvider>
             <RouteProgress />
+            <RouteTitle />
+            <LiveRegion />
             <RoutePrefetcher />
             <InstallBanner />
             <LegalAcceptanceGate />

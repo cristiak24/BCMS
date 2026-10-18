@@ -23,13 +23,13 @@ const MOBILE_NAV_ITEMS = [
 const ACCOUNTANT_MENU_ITEMS: typeof ADMIN_MENU_ITEMS = [
     { label: 'Finanțe', icon: 'payments', href: '/admin/finance' },
     { label: 'Documente', icon: 'folder', href: '/admin/documents' },
-    { label: 'Agendă', icon: 'contacts', href: '/admin/contacts' },
+    { label: 'Contacte', icon: 'contacts', href: '/admin/contacts' },
 ];
 
 const ACCOUNTANT_MOBILE_NAV_ITEMS = [
     { href: '/admin/finance' as const, label: 'Finanțe', icon: 'payments' as const, match: 'finance' },
     { href: '/admin/documents' as const, label: 'Documente', icon: 'folder' as const, match: 'documents' },
-    { href: '/admin/contacts' as const, label: 'Agendă', icon: 'contacts' as const, match: 'contacts' },
+    { href: '/admin/contacts' as const, label: 'Contacte', icon: 'contacts' as const, match: 'contacts' },
 ];
 
 // Staff (scorekeepers, team managers) can read the schedule, keep live stats
@@ -37,13 +37,13 @@ const ACCOUNTANT_MOBILE_NAV_ITEMS = [
 const STAFF_MENU_ITEMS: typeof ADMIN_MENU_ITEMS = [
     { label: 'Program', icon: 'calendar-today', href: '/admin/schedule' },
     { label: 'Documente', icon: 'folder', href: '/admin/documents' },
-    { label: 'Agendă', icon: 'contacts', href: '/admin/contacts' },
+    { label: 'Contacte', icon: 'contacts', href: '/admin/contacts' },
 ];
 
 const STAFF_MOBILE_NAV_ITEMS = [
     { href: '/admin/schedule' as const, label: 'Program', icon: 'calendar-today' as const, match: 'schedule' },
     { href: '/admin/documents' as const, label: 'Documente', icon: 'folder' as const, match: 'documents' },
-    { href: '/admin/contacts' as const, label: 'Agendă', icon: 'contacts' as const, match: 'contacts' },
+    { href: '/admin/contacts' as const, label: 'Contacte', icon: 'contacts' as const, match: 'contacts' },
 ];
 
 /**
@@ -172,13 +172,13 @@ function AdminLayoutContent() {
                 </div>
 
                 {/* ── Main Content ────────────────────────────────── */}
-                <div className="flex-1 min-w-0 overflow-auto overflow-x-hidden flex flex-col relative h-full">
+                <main className="flex-1 min-w-0 overflow-auto overflow-x-hidden flex flex-col relative h-full">
                     <div className="flex-1 min-w-0 pb-24 lg:pb-0 relative w-full flex flex-col">
                         <Suspense fallback={<ContentLoading />}>
                             <Outlet />
                         </Suspense>
                     </div>
-                </div>
+                </main>
 
                 {/* ── Mobile FAB slot (absolute, above bottom nav) ─ */}
                 <div className="lg:hidden">{mobileFab}</div>

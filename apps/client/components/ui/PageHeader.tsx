@@ -43,6 +43,8 @@ export default function PageHeader({
     >
       <View className={`${keepTitleOnMobile ? '' : 'hidden lg:flex'} flex-1 min-w-0`}>
         <Text
+          accessibilityRole="header"
+          aria-level={1}
           className="text-[24px] md:text-[28px] font-bold leading-tight"
           style={{ color: 'var(--c-ink)', letterSpacing: '-0.7px' } as any}
           numberOfLines={2}

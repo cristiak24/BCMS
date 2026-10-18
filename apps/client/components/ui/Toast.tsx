@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable } from '@/src/web/reactNative';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
+import { announce } from './LiveRegion';
 
 export type ToastVariant = 'success' | 'error' | 'info';
 
@@ -52,6 +53,11 @@ function ToastItem({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: num
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
+        announce(toast.action ? `${toast.message}. ${toast.action.label}.` : toast.message, toast.variant === 'error' ? 'assertive' : 'polite');
+        // Announced once, when the toast appears.
+    }, [toast.id]);
+
+    useEffect(() => {
         const duration = toast.duration ?? 4000;
         if (duration <= 0) return;
         timerRef.current = setTimeout(() => onDismiss(toast.id), duration);
@@ -89,21 +95,17 @@ function ToastItem({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: num
 /**
  * Fixed bottom-center stack of active toasts. Render once near the page root.
  *
- * The region is a live region so screen readers announce results (saved, failed,
- * undo available) that were previously only conveyed visually. `assertive` is
- * reserved for errors — successes should not interrupt what is being read.
+ * Screen readers hear each toast through the app-wide LiveRegion (mounted in
+ * App.tsx, so it exists before the toast does); a region mounted with each
+ * screen's stack was not reliably announced. Errors are assertive, successes
+ * polite so they do not interrupt what is being read.
  */
 export function ToastHost({ toasts, onDismiss }: { toasts: ToastData[]; onDismiss: (id: number) => void }) {
-    const hasError = toasts.some((toast) => toast.variant === 'error');
-
     return (
         <View
             className="fixed left-1/2 bottom-6 z-[100] flex-col gap-2.5 items-center"
             style={{ transform: 'translateX(-50%)' as any }}
             pointerEvents="box-none"
-            accessibilityRole={hasError ? 'alert' : 'status'}
-            aria-live={hasError ? 'assertive' : 'polite'}
-            aria-atomic="false"
         >
             {toasts.map((toast) => (
                 <ToastItem key={toast.id} toast={toast} onDismiss={onDismiss} />

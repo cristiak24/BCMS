@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Pressable, Text, TextInput, View, type TextInputProps } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
+import { announce } from './LiveRegion';
 
 /**
  * Labelled text field at admin density (44px control, 12.5px label), fully
@@ -23,6 +24,12 @@ export function FormField({
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const borderColor = error ? 'var(--c-danger)' : focused ? 'var(--c-brand-border)' : 'var(--c-border)';
+  const messageId = useId();
+
+  // A validation message appearing under the field is read out, not only shown.
+  useEffect(() => {
+    if (error) announce(`${label}: ${error}`);
+  }, [error, label]);
 
   return (
     <View className="min-w-0">
@@ -40,6 +47,8 @@ export function FormField({
         <TextInput
           {...inputProps}
           accessibilityLabel={label}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error || hint ? messageId : undefined}
           secureTextEntry={secureTextEntry && !revealed}
           placeholderTextColor="var(--c-faint)"
           onFocus={(event: any) => {
@@ -65,9 +74,9 @@ export function FormField({
         ) : null}
       </View>
       {error ? (
-        <Text className="text-[12px] font-semibold mt-1.5" style={{ color: 'var(--c-danger-fg)' }} data-field-error>{error}</Text>
+        <Text className="text-[12px] font-semibold mt-1.5" style={{ color: 'var(--c-danger-fg)' }} nativeID={messageId} data-field-error>{error}</Text>
       ) : hint ? (
-        <Text className="text-[12px] font-medium mt-1.5" style={{ color: 'var(--c-faint)' }}>{hint}</Text>
+        <Text className="text-[12px] font-medium mt-1.5" style={{ color: 'var(--c-faint)' }} nativeID={messageId}>{hint}</Text>
       ) : null}
     </View>
   );

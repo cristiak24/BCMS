@@ -121,13 +121,13 @@ function SuperAdminShell() {
           />
         </div>
 
-        <div className="flex-1 min-w-0 overflow-x-hidden flex flex-col relative">
+        <main className="flex-1 min-w-0 overflow-x-hidden flex flex-col relative">
           <div className="flex-1 min-w-0 pb-28 lg:pb-10 relative w-full flex flex-col">
             <Suspense fallback={<ContentLoading />}>
               <Outlet />
             </Suspense>
           </div>
-        </div>
+        </main>
 
         <div className="lg:hidden">{mobileFab}</div>
 
