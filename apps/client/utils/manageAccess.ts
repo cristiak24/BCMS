@@ -1,5 +1,6 @@
 import type { InviteLinkItem } from '../types/manageAccess';
 import { getPublicAppUrl } from '../config/serverUrl';
+import { plural } from './plural';
 
 export const DEFAULT_REFRESH_INTERVAL_MINUTES = 30;
 /** Server clamps the lifetime to 5–1440 minutes. */
@@ -10,11 +11,11 @@ export const PRESET_REFRESH_INTERVALS = [30, 60, 24 * 60];
 export function formatIntervalLabel(minutes: number) {
     if (minutes % (24 * 60) === 0) {
         const days = minutes / (24 * 60);
-        return days === 1 ? '1 zi' : `${days} zile`;
+        return plural(days, 'zi', 'zile');
     }
     if (minutes % 60 === 0) {
         const hours = minutes / 60;
-        return hours === 1 ? '1 oră' : `${hours} ore`;
+        return plural(hours, 'oră', 'ore');
     }
     return `${minutes} min`;
 }

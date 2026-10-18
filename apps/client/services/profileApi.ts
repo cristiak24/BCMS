@@ -6,6 +6,8 @@ export type ProfileRecord = AuthUser & {
   fullName: string;
   clubName: string | null;
   teamName: string | null;
+  /** Every team of the account: a coach's squads, all of a parent's children's teams. */
+  teamNames?: string[];
   createdAt: string | null;
   lastLoginAt: string | null;
 };

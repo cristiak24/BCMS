@@ -23,6 +23,7 @@ import {
   isUpcoming,
 } from '../../components/coach/coachUtils';
 import { AttendanceNoteInput, AttendanceNoteToggle } from '../../components/attendance/AttendanceNoteField';
+import { plural } from '../../utils/plural';
 
 /**
  * "Prezență" — pick a session on the left, mark the squad on the right.
@@ -556,7 +557,7 @@ export default function CoachAttendanceScreen() {
         visible={bulkConfirmOpen}
         icon="check-circle"
         title="Marchează restul prezenți"
-        message={`${unmarkedIds.length} ${unmarkedIds.length === 1 ? 'jucător nemarcat va fi trecut' : 'jucători nemarcați vor fi trecuți'} ca prezenți. Cei deja marcați nu se schimbă.`}
+        message={`${plural(unmarkedIds.length, 'jucător nemarcat va fi trecut', 'jucători nemarcați vor fi trecuți')} ca prezenți. Cei deja marcați nu se schimbă.`}
         confirmLabel="Confirmă"
         cancelLabel="Anulează"
         loading={bulkSaving}

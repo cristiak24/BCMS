@@ -8,6 +8,8 @@ import FilterChips from '../ui/FilterChips';
 import SelectField from '../ui/SelectField';
 import { financeApi, type BalanceFee, type PaymentAllocation, type PlayerBalance } from '../../services/financeApi';
 import { balancesCsvRows, downloadCsv, paymentsCsvRows } from './financeCsv';
+import { plural } from '../../utils/plural';
+import { playerStatusLabel } from '../../utils/playerStatus';
 
 /**
  * Finanțe → Restanțe și solduri. What every player owes, from the same
@@ -63,7 +65,7 @@ function rowMeta(balance: PlayerBalance, currency: string) {
     if (balance.state === 'paid') return balance.credit ? `La zi · avans ${money(balance.credit, currency)}` : 'La zi';
     if (balance.state === 'overdue') {
         const since = shortDate(balance.oldestOverdue);
-        return `${balance.overdueCount} ${balance.overdueCount === 1 ? 'taxă restantă' : 'taxe restante'}${since ? ` · din ${since}` : ''}`;
+        return `${plural(balance.overdueCount, 'taxă restantă', 'taxe restante')}${since ? ` · din ${since}` : ''}`;
     }
     const next = balance.fees.map((fee) => fee.dueDate).filter(Boolean).sort()[0] ?? null;
     return next ? `Scadent ${shortDate(next)}` : 'De plată';
@@ -276,7 +278,7 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                             >
                                 <View className="flex-1 min-w-0">
                                     <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
-                                        {balance.playerName}{balance.status === 'inactive' ? ' (inactiv)' : ''}
+                                        {balance.playerName}{balance.status === 'inactive' ? ` (${playerStatusLabel(balance.status).toLowerCase()})` : ''}
                                     </Text>
                                     <Text className="t-meta mt-0.5" style={{ color: late ? 'var(--c-danger-fg)' : 'var(--c-muted)' }} numberOfLines={1}>
                                         {[balance.teamName, rowMeta(balance, currency)].filter(Boolean).join(' · ')}

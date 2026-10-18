@@ -1,6 +1,7 @@
 import { parseApiDate } from '@/utils/dates';
 import type { ClubRole } from '../../services/superAdminApi';
 import { toCsv } from '../../utils/csv';
+import { plural } from '../../utils/plural';
 
 /** Copy and formatting shared by the super admin screens (Romanian only). */
 
@@ -110,10 +111,10 @@ export function formatRelative(iso: string | null | undefined, never = 'Niciodat
   if (minutes < 2) return 'acum';
   if (minutes < 60) return `acum ${minutes} min`;
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `acum ${hours} ${hours === 1 ? 'oră' : 'ore'}`;
+  if (hours < 24) return `acum ${plural(hours, 'oră', 'ore')}`;
   const days = Math.round(hours / 24);
   if (days === 1) return 'ieri';
-  if (days < 30) return `acum ${days} zile`;
+  if (days < 30) return `acum ${plural(days, 'zi', 'zile')}`;
   return formatDate(iso);
 }
 
@@ -124,13 +125,8 @@ export function daysSince(iso: string | null | undefined) {
   return Number.isNaN(time) ? null : (Date.now() - time) / 86400000;
 }
 
-/** Romanian plural agreement: 1 cont, 2 conturi, 20 de conturi. */
-export function plural(count: number, one: string, many: string) {
-  if (count === 1) return `1 ${one}`;
-  const rest = count % 100;
-  const de = count !== 0 && (rest === 0 || rest >= 20);
-  return `${formatNumber(count)} ${de ? 'de ' : ''}${many}`;
-}
+/** Romanian plural agreement: 1 cont, 2 conturi, 20 de conturi (utils/plural.ts). */
+export { plural };
 
 /** Percentage change, or null when there is no base to compare against. */
 export function deltaPercent(current: number, previous: number) {

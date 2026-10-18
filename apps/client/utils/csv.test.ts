@@ -14,6 +14,7 @@ test('a cell that would run as a formula stays text', () => {
 test('ordinary values and plain numbers are unchanged', () => {
   assert.equal(csvCell('Matei Pop'), 'Matei Pop');
   assert.equal(csvCell(-150), '-150');
+  assert.equal(csvCell(-150, ','), '-150');
   assert.equal(csvCell('-150'), '-150');
   assert.equal(csvCell('+40.5'), '+40.5');
   assert.equal(csvCell(null), '');
@@ -23,4 +24,10 @@ test('ordinary values and plain numbers are unchanged', () => {
 
 test('a whole file keeps the separator and neutralises every cell', () => {
   assert.equal(toCsv([['Nume', 'Suma'], ['=1+1', 150]], ';', '\r\n'), "Nume;Suma\r\n'=1+1;150");
+});
+
+test('the default file is what Excel in Romanian opens in columns', () => {
+  // ";" between cells, CRLF between rows, "," as the decimal mark.
+  assert.equal(toCsv([['Jucător', 'Suma'], ['Pop, Ion', 152.5]]), 'Jucător;Suma\r\nPop, Ion;152,5');
+  assert.equal(csvCell(152.5, ','), '152.5');
 });

@@ -15,6 +15,8 @@ import { formatCoachDate, getEventTimestamp, isUpcoming } from '../../../compone
 import BulkAddPlayersDialog from '../../../components/family/BulkAddPlayersDialog';
 import TeamStandingsCard from '../../../components/standings/TeamStandingsCard';
 import { ATTENDANCE_PERIOD_LABEL, pooledAttendanceRate } from '../../../utils/attendanceRate';
+import { plural, pluralWord } from '../../../utils/plural';
+import { playerStatusLabel } from '../../../utils/playerStatus';
 
 /**
  * A coach's own squad in full — the roster TeamCard on /coach/teams only
@@ -155,7 +157,7 @@ export default function CoachTeamDetailScreen() {
                 </View>
               ) : null}
               <View className="grid grid-cols-3 gap-2 ui-stagger">
-                <GlassStat dot="var(--c-purple)" label="Lot" value={players.length} hint={players.length === 1 ? 'jucător' : 'jucători'} />
+                <GlassStat dot="var(--c-purple)" label="Lot" value={players.length} hint={pluralWord(players.length, 'jucător', 'jucători')} />
                 <GlassStat
                   dot={attendanceRateColor(average)}
                   label="Prezență"
@@ -212,7 +214,7 @@ export default function CoachTeamDetailScreen() {
                       firstName={player.firstName}
                       lastName={player.lastName}
                       badge={getPlayerBadge(player)}
-                      meta={player.position || player.status || 'Jucător'}
+                      meta={player.position || playerStatusLabel(player.status)}
                       rate={player.attendanceRate ?? null}
                       trailing={<AttendanceRate rate={player.attendanceRate} />}
                     />
@@ -242,7 +244,7 @@ export default function CoachTeamDetailScreen() {
           onClose={() => setShowBulk(false)}
           onDone={({ created, skipped }) => {
             setShowBulk(false);
-            setNotice(`${created} ${created === 1 ? 'jucător adăugat' : 'jucători adăugați'}${skipped.length ? `, ${skipped.length} ${skipped.length === 1 ? 'era' : 'erau'} deja în lot` : ''}.`);
+            setNotice(`${plural(created, 'jucător adăugat', 'jucători adăugați')}${skipped.length ? `, ${plural(skipped.length, 'era', 'erau')} deja în lot` : ''}.`);
             void loadData(true);
           }}
         />

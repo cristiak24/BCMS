@@ -4,6 +4,7 @@ import { X, Check, Users, UserCog, Eye, Search } from 'lucide-react';
 import { Team } from '../../../services/teamsApi';
 import { EVENT_TYPE_META, EventType } from '../scheduleShared';
 import { useResponsive } from '../../../hooks/useResponsive';
+import { plural } from '../../../utils/plural';
 
 const EVENT_TYPES: EventType[] = ['training', 'match', 'camp', 'medical', 'admin'];
 
@@ -136,7 +137,7 @@ export function FilterModal({
             <View className="flex-1">
               <Text className="text-[20px] font-bold text-[#0E2041]">Filtre</Text>
               <Text className="text-slate-400 text-[12px] font-medium mt-0.5">
-                {activeCount === 0 ? 'Niciun filtru aplicat' : `${activeCount} ${activeCount === 1 ? 'filtru aplicat' : 'filtre aplicate'}`}
+                {activeCount === 0 ? 'Niciun filtru aplicat' : `${plural(activeCount, 'filtru aplicat', 'filtre aplicate')}`}
               </Text>
             </View>
             <TouchableOpacity

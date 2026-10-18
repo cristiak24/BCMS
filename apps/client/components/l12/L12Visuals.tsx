@@ -3,6 +3,7 @@ import { Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import Button from '../ui/Button';
 import type { L12OverviewMatch } from '../../services/l12Api';
+import { plural } from '../../utils/plural';
 
 /**
  * Presentational pieces of the L12 home: match "tickets", lineup pips, team
@@ -114,7 +115,7 @@ export function LineupStatus({ set, count, align = 'end' }: { set: boolean; coun
       <View className={`gap-1 ${align === 'end' ? 'items-end' : 'items-start'}`}>
         <LineupPips count={count} />
         <Text className="t-meta" style={{ color: 'var(--c-success-fg)' }}>
-          {count} {count === 1 ? 'jucător' : 'jucători'} pe listă
+          {plural(count, 'jucător', 'jucători')} pe listă
         </Text>
       </View>
     );
@@ -258,7 +259,7 @@ export function DayHeading({ label, count }: { label: string; count: number }) {
     <View className="flex-row items-center gap-2.5 px-0.5">
       {today ? <View className="ui-ping w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--c-brand-fg)' }} /> : null}
       <Text className="f-display text-[15px] font-bold" style={{ color: today ? 'var(--c-brand-fg)' : 'var(--c-ink)' }}>{label}</Text>
-      <Text className="t-num t-meta" style={{ color: 'var(--c-faint)' }}>{count} {count === 1 ? 'meci' : 'meciuri'}</Text>
+      <Text className="t-num t-meta" style={{ color: 'var(--c-faint)' }}>{plural(count, 'meci', 'meciuri')}</Text>
       <View className="flex-1 h-px" style={{ backgroundColor: 'var(--c-border-soft)' }} />
     </View>
   );
@@ -318,9 +319,9 @@ export function L12Hero({
   const upcoming = unset + ready;
   const title = unset > 0 ? 'Hai să pregătim loturile' : upcoming > 0 ? 'Totul e pregătit' : 'Niciun meci în program';
   const subtitle = unset > 0
-    ? `${unset} ${unset === 1 ? 'meci așteaptă' : 'meciuri așteaptă'} lista L12. Alege unul și completeaz-o în câteva atingeri.`
+    ? `${plural(unset, 'meci așteaptă', 'meciuri așteaptă')} lista L12. Alege unul și completeaz-o în câteva atingeri.`
     : upcoming > 0
-      ? `Toate cele ${upcoming} ${upcoming === 1 ? 'meci viitor are' : 'meciuri viitoare au'} lista gata. Succes pe teren!`
+      ? `Toate cele ${plural(upcoming, 'meci viitor are', 'meciuri viitoare au')} lista gata. Succes pe teren!`
       : 'Când apar meciuri în Program, lista lor se pregătește de aici.';
 
   return (

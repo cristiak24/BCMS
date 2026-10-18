@@ -17,6 +17,7 @@ import GuardiansPanel from '../../../components/family/GuardiansPanel';
 import { AuditEntries } from '../../../components/audit/AuditLogList';
 import type { AuditLogEntry } from '../../../services/clubAdminApi';
 import { MEDICAL_META, formatDate, medicalStatus } from '../../../components/myclub/teamDisplay';
+import { PLAYER_STATUS_OPTIONS } from '../../../utils/playerStatus';
 
 /**
  * Admin view of one player: identity form, medical visa, payments and family
@@ -271,7 +272,7 @@ export default function PlayerProfile() {
                     <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Stare în club</Text>
                     <SelectField
                       label="Stare în club"
-                      options={[{ key: 'active', label: 'Activ' }, { key: 'inactive', label: 'Inactiv' }]}
+                      options={PLAYER_STATUS_OPTIONS}
                       value={isActive ? 'active' : 'inactive'}
                       onChange={setStatus}
                       className="sm:max-w-[240px]"

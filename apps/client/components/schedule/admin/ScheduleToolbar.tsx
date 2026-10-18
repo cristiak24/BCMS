@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { EVENT_TYPE_META } from '../scheduleShared';
 import type { EventType } from '../scheduleShared';
+import { plural } from '../../../utils/plural';
 
 /*
  * The schedule's control surface, in ONE row.
@@ -333,7 +334,7 @@ export function ScheduleToolbar({
     // Two rows: the period stepper, then filters. The view switcher sits on
     // the page's tab row (Lunar / Prezență / Notare) and the advanced-filter
     // button leads the chip row, so neither needs a row of its own.
-    const countLabel = `${eventCount} ${eventCount === 1 ? 'eveniment' : 'evenimente'}`;
+    const countLabel = `${plural(eventCount, 'eveniment', 'evenimente')}`;
     return (
       <View>
         <View className="flex-row items-center gap-2">
@@ -396,7 +397,7 @@ export function ScheduleToolbar({
       <View className="flex-row items-center gap-3">
         {monthNav}
         <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>
-          {eventCount} {eventCount === 1 ? 'eveniment' : 'evenimente'}
+          {plural(eventCount, 'eveniment', 'evenimente')}
         </Text>
         <View className="ml-auto flex-row items-center gap-2">
           {viewSwitcher}

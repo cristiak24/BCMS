@@ -21,6 +21,7 @@ import { basketballApi, type Match } from '../../services/basketballApi';
 import { teamsApi, type Team as SavedTeam } from '../../services/teamsApi';
 import PrivacyRequestsBanner from '../../components/privacy/PrivacyRequestsBanner';
 import { ATTENDANCE_PERIOD_LABEL } from '../../utils/attendanceRate';
+import { plural } from '../../utils/plural';
 
 /**
  * Admin home: the club at a glance.
@@ -103,7 +104,7 @@ function countdown(iso: string) {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `în ${hours} h`;
   const days = Math.round(hours / 24);
-  return days === 1 ? 'în 1 zi' : `în ${days} zile`;
+  return `în ${plural(days, 'zi', 'zile')}`;
 }
 
 const time = (iso: string) => parseApiDate(iso).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
@@ -376,7 +377,7 @@ function WeekStrip({ events, selected, onSelect }: { events: CalendarEvent[]; se
             onPress={() => onSelect(active ? null : day.key)}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
-            accessibilityLabel={`${day.weekday} ${day.date}: ${day.events.length} ${day.events.length === 1 ? 'eveniment' : 'evenimente'}`}
+            accessibilityLabel={`${day.weekday} ${day.date}: ${plural(day.events.length, 'eveniment', 'evenimente')}`}
             className="ui-press items-center rounded-[10px] border py-2.5 gap-1.5 hover:bg-[var(--c-surface-3)]"
             style={{
               backgroundColor: active ? 'var(--c-brand-surface)' : day.events.length ? 'var(--c-surface-2)' : 'transparent',
@@ -489,11 +490,11 @@ export default function Dashboard() {
   const attention = useMemo<AttentionItem[]>(() => {
     const items: AttentionItem[] = [];
     if (summary?.expiredVisasCount) {
-      items.push({ key: 'visas', icon: 'medical-services', tone: 'danger', title: `${summary.expiredVisasCount} ${summary.expiredVisasCount === 1 ? 'viză medicală expirată' : 'vize medicale expirate'}`, detail: 'Sportivii nu pot juca până la reînnoire', href: '/admin/compliance' });
+      items.push({ key: 'visas', icon: 'medical-services', tone: 'danger', title: `${plural(summary.expiredVisasCount, 'viză medicală expirată', 'vize medicale expirate')}`, detail: 'Sportivii nu pot juca până la reînnoire', href: '/admin/compliance' });
     }
     const soon = summary?.expiringItems?.filter((i) => !i.expired && i.urgent).length ?? 0;
     if (soon > 0) {
-      items.push({ key: 'soon', icon: 'schedule', tone: 'warning', title: `${soon} ${soon === 1 ? 'viză expiră' : 'vize expiră'} în 7 zile`, href: '/admin/compliance' });
+      items.push({ key: 'soon', icon: 'schedule', tone: 'warning', title: `${plural(soon, 'viză expiră', 'vize expiră')} în 7 zile`, href: '/admin/compliance' });
     }
     if (l12) {
       // The overview also returns ~4 months of past matches (for the L12 page's
@@ -506,14 +507,14 @@ export default function Dashboard() {
         return !m.hasLineup && m.status !== 'cancelled' && at >= today.getTime() && at <= weekAhead;
       });
       if (unset.length > 0) {
-        items.push({ key: 'l12', icon: 'assignment', tone: 'warning', title: `${unset.length} ${unset.length === 1 ? 'meci fără L12' : 'meciuri fără L12'} săptămâna asta`, detail: unset.slice(0, 2).map((m) => m.title).join(' · '), href: '/admin/l12' });
+        items.push({ key: 'l12', icon: 'assignment', tone: 'warning', title: `${plural(unset.length, 'meci fără L12', 'meciuri fără L12')} săptămâna asta`, detail: unset.slice(0, 2).map((m) => m.title).join(' · '), href: '/admin/l12' });
       }
     }
     if (summary?.pendingPaymentsCount) {
-      items.push({ key: 'payments', icon: 'payments', tone: 'warning', title: `${summary.pendingPaymentsCount} ${summary.pendingPaymentsCount === 1 ? 'jucător cu restanțe' : 'jucători cu restanțe'}`, href: '/admin/roster' });
+      items.push({ key: 'payments', icon: 'payments', tone: 'warning', title: `${plural(summary.pendingPaymentsCount, 'jucător cu restanțe', 'jucători cu restanțe')}`, href: '/admin/roster' });
     }
     if (pendingRequests > 0) {
-      items.push({ key: 'requests', icon: 'person-add', tone: 'brand', title: `${pendingRequests} ${pendingRequests === 1 ? 'cerere de acces' : 'cereri de acces'} de aprobat`, href: '/admin/manage-access' });
+      items.push({ key: 'requests', icon: 'person-add', tone: 'brand', title: `${plural(pendingRequests, 'cerere de acces', 'cereri de acces')} de aprobat`, href: '/admin/manage-access' });
     }
     return items;
   }, [summary, l12, pendingRequests]);
@@ -538,7 +539,7 @@ export default function Dashboard() {
   const attentionCard = (
     <SectionCard
       title="Necesită atenție"
-      subtitle={loadingSummary ? 'Se verifică…' : attention.length ? `${attention.length} ${attention.length === 1 ? 'lucru de rezolvat' : 'lucruri de rezolvat'}` : 'Totul la zi'}
+      subtitle={loadingSummary ? 'Se verifică…' : attention.length ? `${plural(attention.length, 'lucru de rezolvat', 'lucruri de rezolvat')}` : 'Totul la zi'}
       icon="notifications-active"
       tone={attention.some((a) => a.tone === 'danger') ? 'danger' : attention.length ? 'warning' : 'success'}
     >
@@ -610,8 +611,8 @@ export default function Dashboard() {
                       {session?.clubName ?? 'Clubul tău'}
                     </Text>
                     <View className="flex-row flex-wrap gap-1.5 mt-3">
-                      <HeaderChip icon="event" label={weekEvents ? `${weekEvents.length} ${weekEvents.length === 1 ? 'eveniment' : 'evenimente'} în 7 zile` : 'Se încarcă…'} />
-                      {matchesThisWeek ? <HeaderChip icon="sports-basketball" label={`${matchesThisWeek} ${matchesThisWeek === 1 ? 'meci' : 'meciuri'}`} /> : null}
+                      <HeaderChip icon="event" label={weekEvents ? `${plural(weekEvents.length, 'eveniment', 'evenimente')} în 7 zile` : 'Se încarcă…'} />
+                      {matchesThisWeek ? <HeaderChip icon="sports-basketball" label={`${plural(matchesThisWeek, 'meci', 'meciuri')}`} /> : null}
                       {!loadingSummary ? (
                         attention.length
                           ? <HeaderChip icon="warning-amber" tone="warning" label={`${attention.length} de rezolvat`} />
@@ -639,7 +640,7 @@ export default function Dashboard() {
                     tone="brand"
                     label="Jucători activi"
                     value={summary.activePlayerCount}
-                    hint={`în ${summary.teamCount} ${summary.teamCount === 1 ? 'echipă' : 'echipe'}`}
+                    hint={`în ${plural(summary.teamCount, 'echipă', 'echipe')}`}
                     delta={summary.playerCountChange ? { label: `${summary.playerCountChange > 0 ? '+' : ''}${summary.playerCountChange}`, direction: summary.playerCountChange > 0 ? 'up' : 'down' } : null}
                     onPress={() => go('/admin/roster')}
                   />
@@ -682,7 +683,7 @@ export default function Dashboard() {
                 {canSeeFinance ? (
                   <QuickAction icon="insights" tone="purple" label="Finanțe" detail="Încasări și cheltuieli" onPress={() => go('/admin/finance')} />
                 ) : (
-                  <QuickAction icon="contacts" tone="purple" label="Contacte" detail="Agenda clubului" onPress={() => go('/admin/contacts')} />
+                  <QuickAction icon="contacts" tone="purple" label="Contacte" detail="Telefoanele clubului" onPress={() => go('/admin/contacts')} />
                 )}
               </View>
 
@@ -694,7 +695,7 @@ export default function Dashboard() {
                 <View className="flex-1 min-w-0 gap-5 ui-rise">
                   <SectionCard
                     title="Următoarele 7 zile"
-                    subtitle={weekEvents ? `${weekEvents.length} ${weekEvents.length === 1 ? 'eveniment programat' : 'evenimente programate'}` : undefined}
+                    subtitle={weekEvents ? `${plural(weekEvents.length, 'eveniment programat', 'evenimente programate')}` : undefined}
                     icon="date-range"
                     tone="brand"
                     action={{ label: 'Program', onPress: () => go('/admin/schedule') }}

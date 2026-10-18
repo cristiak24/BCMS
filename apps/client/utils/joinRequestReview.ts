@@ -1,4 +1,5 @@
 import type { FamilyJoinRequest, JoinSuggestion } from '../services/familyRequestsApi';
+import { plural } from './plural';
 
 /**
  * How a club reviews a team-code join request (components/family/
@@ -37,7 +38,7 @@ function playerName(s: JoinSuggestion) {
 export function matchWarnings(request: FamilyJoinRequest, s: JoinSuggestion) {
   const warnings: string[] = [];
   if (request.kind === 'parent' && s.guardians > 0) {
-    warnings.push(`${playerName(s)} are deja ${s.guardians === 1 ? 'un părinte legat' : `${s.guardians} părinți legați`}.`);
+    warnings.push(`${playerName(s)} are deja ${s.guardians === 1 ? 'un părinte legat' : plural(s.guardians, 'părinte legat', 'părinți legați')}.`);
   }
   if (request.kind === 'player' && s.hasAccount) {
     warnings.push(`${playerName(s)} are deja un cont de jucător.`);

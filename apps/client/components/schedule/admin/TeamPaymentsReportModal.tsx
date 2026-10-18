@@ -5,6 +5,7 @@ import { useResponsive } from '../../../hooks/useResponsive';
 import { X, Receipt, TrendingUp, Clock, Plus, Banknote, Check } from 'lucide-react';
 import { financeApi, AdminRecentPayment } from '../../../services/financeApi';
 import { teamsApi, Player } from '../../../services/teamsApi';
+import { plural } from '../../../utils/plural';
 
 interface TeamPaymentsReportModalProps {
   visible: boolean;
@@ -173,7 +174,7 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
                 <Text className="text-[10px] font-black uppercase tracking-widest text-[#0B7A55]">Încasat</Text>
               </View>
               <Text className="text-[18px] font-black text-[#0B7A55]">{loading ? '—' : formatCurrency(collected, currency)}</Text>
-              <Text className="text-[10px] font-bold text-[#0B7A55]/70 mt-0.5">{paid.length} plăți</Text>
+              <Text className="text-[10px] font-bold text-[#0B7A55]/70 mt-0.5">{plural(paid.length, 'plată', 'plăți')}</Text>
             </View>
             <View className="flex-1 rounded-2xl bg-[#FEF3C7] p-4">
               <View className="flex-row items-center gap-1.5 mb-1">

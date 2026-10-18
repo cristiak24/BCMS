@@ -1,7 +1,7 @@
 import type { PlayerBalance } from '../../services/financeApi';
 import { toCsv, type CsvValue } from '../../utils/csv';
 
-/** CSV files for the accountant (Excel-friendly: BOM, comma-separated). */
+/** CSV files for the accountant (Excel-friendly: BOM, semicolon-separated — utils/csv.ts). */
 
 export function downloadCsv(rows: CsvValue[][], filename: string) {
   const content = toCsv(rows);

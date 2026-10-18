@@ -1,4 +1,5 @@
 import type { L12Lineup } from '../services/l12Api';
+import { plural } from './plural';
 
 /**
  * Formular L-12 before it goes to the referee — pure, see l12Export.test.ts.
@@ -29,7 +30,7 @@ export function resolveMatchSides(title: string, teamName: string, opponent: str
 export function exportGaps(lineup: L12Lineup, opts: { awayTeam: string }) {
   const gaps: string[] = [];
   const missingNumbers = lineup.players.filter((player) => !String(player.shirtNumber ?? '').trim()).length;
-  if (missingNumbers) gaps.push(missingNumbers === 1 ? '1 jucător fără număr de echipament' : `${missingNumbers} jucători fără număr de echipament`);
+  if (missingNumbers) gaps.push(`${plural(missingNumbers, 'jucător', 'jucători')} fără număr de echipament`);
   if (lineup.players.length && lineup.captainPlayerId == null) gaps.push('niciun căpitan ales');
   if (!lineup.staff.headCoach?.name?.trim()) gaps.push('fără antrenor principal');
   if (!opts.awayTeam.trim()) gaps.push('adversarul nu e completat');

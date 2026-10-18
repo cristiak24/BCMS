@@ -8,6 +8,7 @@ import { ErrorState } from '../../components/ui/ScreenState';
 import { Panel } from '../../components/super-admin/ui';
 import { CLUB_ROLE_ORDER, monthLabel, roleLabel } from '../../components/super-admin/format';
 import { superAdminApi, type PlatformSettings } from '../../services/superAdminApi';
+import { plural } from '../../utils/plural';
 
 /**
  * What the platform runs with. Values come from the server's environment, so
@@ -70,7 +71,7 @@ export default function SettingsScreen() {
               <Row icon="credit-card" label="Plăți online (Stripe)" value={settings.stripeConfigured ? 'Configurat' : 'Lipsește cheia'} ok={settings.stripeConfigured} />
               <Row icon="send" label="Expeditor emailuri" value={settings.resendFromEmail} />
               <Row icon="link" label="Adresa aplicației" value={settings.appBaseUrl} />
-              <Row icon="schedule" label="Valabilitate invitații" value={`${settings.inviteTtlHours} ore (${Math.round(settings.inviteTtlHours / 24)} zile)`} />
+              <Row icon="schedule" label="Valabilitate invitații" value={`${plural(settings.inviteTtlHours, 'oră', 'ore')} (${plural(Math.round(settings.inviteTtlHours / 24), 'zi', 'zile')})`} />
               <Row icon="insights" label="Activitate înregistrată din" value={settings.activityTrackingSince ? monthLabel(settings.activityTrackingSince) : 'încă nicio activitate'} />
             </View>
           )}

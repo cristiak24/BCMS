@@ -4,6 +4,7 @@ import { View, Text, ActivityIndicator } from '@/src/web/reactNative';
 import Button from '../ui/Button';
 import SelectField from '../ui/SelectField';
 import type { AuditLogEntry, AuditLogFilters, AuditLogPage } from '../../services/clubAdminApi';
+import { plural } from '../../utils/plural';
 
 /**
  * The audit trail, newest first, in Romanian, with a category filter and
@@ -153,7 +154,7 @@ export default function AuditLogList({ load }: { load: (filters: AuditLogFilters
                     options={CATEGORY_OPTIONS}
                     className="w-full sm:w-[240px]"
                 />
-                {data ? <Text className="t-meta sm:ml-auto" style={{ color: 'var(--c-muted)' }}>{data.total} {data.total === 1 ? 'înregistrare' : 'înregistrări'}</Text> : null}
+                {data ? <Text className="t-meta sm:ml-auto" style={{ color: 'var(--c-muted)' }}>{plural(data.total, 'înregistrare', 'înregistrări')}</Text> : null}
             </View>
 
             {loading ? (

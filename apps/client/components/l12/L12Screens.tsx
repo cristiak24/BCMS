@@ -22,6 +22,7 @@ import ActionSheet from '../ui/ActionSheet';
 import { downloadL12Word, printL12, type L12DocumentInput } from './l12Document';
 import { StatusChip, useL12Base } from './L12MatchLink';
 import { DayHeading, KIND_META, L12Hero, MatchTicket, TeamAvatar, TeamTile, isOwnSide, matchKind, type HeroNext, type MatchKind } from './L12Visuals';
+import { plural } from '../../utils/plural';
 
 /**
  * L12 area, shared by admins (/admin/l12…) and coaches (/coach/l12…):
@@ -411,7 +412,7 @@ export function L12HomeScreen() {
             <EmptyState compact icon="groups" title="Nicio echipă" message="Creează o echipă ca să-i setezi L12-ul." />
           ) : (
             <View className="gap-3">
-              <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{teamsSet} din {data.teams.length} echipe au L12 constant setat.</Text>
+              <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{teamsSet} din {plural(data.teams.length, 'echipă', 'echipe')} {teamsSet === 1 ? 'are' : 'au'} L12 constant setat.</Text>
               <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 ui-stagger">
                 {data.teams.map((team) => (
                   <TeamTile
@@ -470,7 +471,7 @@ function checkBeforeExport(lineup: L12Lineup, notify: (message: string, variant:
     notify(problem, 'error');
     return false;
   }
-  if (lineup.players.length < L12_MIN_PLAYERS) notify(`Foaia are ${lineup.players.length} jucători — minimum ${L12_MIN_PLAYERS} pentru joc.`, 'info');
+  if (lineup.players.length < L12_MIN_PLAYERS) notify(`Foaia are ${plural(lineup.players.length, 'jucător', 'jucători')} — minimum ${L12_MIN_PLAYERS} pentru joc.`, 'info');
   return true;
 }
 

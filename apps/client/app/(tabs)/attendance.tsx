@@ -20,6 +20,8 @@ import {
 import { useSession } from '../../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { normalizeRole } from '../../utils/authSession';
+import { isEliteRhythm } from '../../utils/attendanceBadge';
+import { plural } from '../../utils/plural';
 
 /** How many recent marked sessions the history covers. */
 const HISTORY_LIMIT = 60;
@@ -78,9 +80,9 @@ function currentStreak(records: PlayerAttendanceRecord[]) {
   return streak;
 }
 
-function rateTone(rate: number | null) {
+function rateTone(rate: number | null, sessions: number) {
   if (rate == null) return { label: 'Încă nu există date', color: 'var(--c-muted)' };
-  if (rate >= 90) return { label: 'Ritm de elită', color: 'var(--c-success-fg)' };
+  if (isEliteRhythm(rate, sessions)) return { label: 'Ritm de elită', color: 'var(--c-success-fg)' };
   if (rate >= 75) return { label: 'Pe drumul bun', color: 'var(--c-brand-fg)' };
   if (rate >= 50) return { label: 'Poate mai bine', color: 'var(--c-warning-fg)' };
   return { label: 'Necesită atenție', color: 'var(--c-danger-fg)' };
@@ -165,7 +167,8 @@ function PlayerAttendanceScreen() {
   // resetKey includes the filter so switching chips returns to page 1.
   const pager = usePagination(filteredRecords, PAGE_SIZE, `${filter}:${filteredRecords.length}`);
   const streak = useMemo(() => currentStreak(markedRecords), [markedRecords]);
-  const tone = rateTone(summary.rate);
+  const tone = rateTone(summary.rate, summary.total);
+  const isParent = session?.role === 'parent';
 
   const loadData = useCallback(async (showSpinner = false) => {
     if (showSpinner) setRefreshing(true); else setLoading(true);
@@ -199,10 +202,10 @@ function PlayerAttendanceScreen() {
       <PageContainer>
         <PageHero
           eyebrow="Prezență"
-          title="Prezența mea"
+          title={isParent ? 'Prezența copilului' : 'Prezența mea'}
           subtitle={loading || error
-            ? 'Istoricul sesiunilor la care antrenorul ți-a marcat prezența.'
-            : `${tone.label} · ${summary.total ? `${summary.present} din ${summary.total} sesiuni` : 'nicio sesiune marcată încă'}`}
+            ? (isParent ? 'Istoricul sesiunilor la care antrenorul a marcat prezența copilului.' : 'Istoricul sesiunilor la care antrenorul ți-a marcat prezența.')
+            : `${tone.label} · ${summary.total ? `${summary.present} din ${plural(summary.total, 'sesiune', 'sesiuni')}` : 'nicio sesiune marcată încă'}`}
           leading={loading || error ? undefined : (
             <ProgressRing
               value={summary.rate}
@@ -263,7 +266,7 @@ function PlayerAttendanceScreen() {
                 <View>
                   <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Istoric</Text>
                   <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
-                    Ultimele {markedRecords.length} sesiuni marcate
+                    {markedRecords.length === 1 ? 'Ultima sesiune marcată' : `Ultimele ${plural(markedRecords.length, 'sesiune marcată', 'sesiuni marcate')}`}
                   </Text>
                 </View>
                 <View className="flex-row flex-wrap gap-1.5" accessibilityRole="tablist">

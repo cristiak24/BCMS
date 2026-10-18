@@ -17,6 +17,7 @@ import { ToastHost, useToasts } from '../../../components/ui/Toast';
 import { computeComplianceMetrics } from '../../../components/compliance/complianceMetrics';
 import { MEDICAL_META, formatDate, medicalStatus, type MedicalStatus } from '../../../components/myclub/teamDisplay';
 import { teamsApi, type Player } from '../../../services/teamsApi';
+import { plural } from '../../../utils/plural';
 
 /**
  * Medical visas for the whole club: who is expired, who expires this month,
@@ -41,9 +42,9 @@ function teamsOf(player: Player) {
 function expiryHint(iso: string | null, status: MedicalStatus) {
   if (!iso || status === 'missing') return 'Nicio viză înregistrată';
   const days = Math.round((parseApiDate(iso).getTime() - Date.now()) / 86400000);
-  if (days < 0) return `Expirată de ${-days} ${-days === 1 ? 'zi' : 'zile'}`;
+  if (days < 0) return `Expirată de ${plural(-days, 'zi', 'zile')}`;
   if (days === 0) return 'Expiră azi';
-  return `Peste ${days} ${days === 1 ? 'zi' : 'zile'}`;
+  return `Peste ${plural(days, 'zi', 'zile')}`;
 }
 
 function StatusBadge({ status }: { status: MedicalStatus }) {
@@ -175,7 +176,7 @@ export default function ComplianceScreen() {
       if (!iso) return;
       await Promise.all(editing.map((id) => teamsApi.updatePlayer(id, { medicalCheckExpiry: iso })));
       setPlayers((prev) => prev?.map((p) => (editing.includes(p.id) ? { ...p, medicalCheckExpiry: iso } : p)) ?? prev);
-      showToast({ message: editing.length === 1 ? 'Viza a fost actualizată.' : `Vizele a ${editing.length} sportivi au fost actualizate.`, variant: 'success' });
+      showToast({ message: editing.length === 1 ? 'Viza a fost actualizată.' : `Vizele a ${plural(editing.length, 'sportiv', 'sportivi')} au fost actualizate.`, variant: 'success' });
       setSelected((prev) => prev.filter((id) => !editing.includes(id)));
       setEditing(null);
     } catch {
@@ -234,7 +235,7 @@ export default function ComplianceScreen() {
                 {selected.length > 0 ? (
                   <View className="flex-row items-center gap-3 rounded-[12px] px-3.5 py-2.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
                     <Text className="flex-1 text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
-                      {selected.length} {selected.length === 1 ? 'sportiv selectat' : 'sportivi selectați'}
+                      {plural(selected.length, 'sportiv selectat', 'sportivi selectați')}
                     </Text>
                     <Button size="sm" variant="ghost" label="Deselectează" onPress={() => setSelected([])} />
                     <Button size="sm" variant="primary" icon="event-available" label="Actualizează viza" onPress={() => openEditor(selected)} />
@@ -336,7 +337,7 @@ export default function ComplianceScreen() {
         title="Actualizează viza medicală"
         message={editingNames.length === 1
           ? `Noua dată de expirare pentru ${editingNames[0]}.`
-          : `Aceeași dată de expirare pentru ${editingNames.length} sportivi.`}
+          : `Aceeași dată de expirare pentru ${plural(editingNames.length, 'sportiv', 'sportivi')}.`}
         icon="event-available"
         confirmLabel="Salvează"
         loading={saving}

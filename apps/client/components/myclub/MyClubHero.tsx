@@ -4,6 +4,7 @@ import type { Team } from '../../services/teamsApi';
 import Button from '../ui/Button';
 import PageHero, { GlassStat } from '../admin/PageHero';
 import { isFrbTeam } from './teamDisplay';
+import { plural } from '../../utils/plural';
 
 export default function MyClubHero({
     teams,
@@ -30,7 +31,7 @@ export default function MyClubHero({
 
     const subtitle = stats.total === 0
         ? 'Importă echipele din FRB sau creează prima echipă.'
-        : `${stats.total} ${stats.total === 1 ? 'echipă' : 'echipe'} și ${stats.players} ${stats.players === 1 ? 'jucător' : 'jucători'}, toți într-un singur loc.`;
+        : `${plural(stats.total, 'echipă', 'echipe')} și ${plural(stats.players, 'jucător', 'jucători')}, toți într-un singur loc.`;
 
     return (
         <PageHero

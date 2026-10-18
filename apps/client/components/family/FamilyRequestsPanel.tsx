@@ -8,6 +8,7 @@ import ConfirmDialog from '../ui/ConfirmDialog';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { autoApprovableIds, defaultTarget, denyMessage, formatBirth, matchWarnings } from '../../utils/joinRequestReview';
+import { plural } from '../../utils/plural';
 
 /**
  * Team-code signups waiting for a decision, plus the codes to hand out.
@@ -30,7 +31,7 @@ function timeAgo(iso: string) {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `acum ${hours} h`;
   const days = Math.round(hours / 24);
-  return days === 1 ? 'ieri' : `acum ${days} zile`;
+  return days === 1 ? 'ieri' : `acum ${plural(days, 'zi', 'zile')}`;
 }
 
 function RequestCard({
@@ -97,7 +98,7 @@ function RequestCard({
           <Text className="flex-1 text-[12.5px] font-semibold leading-[18px]" style={{ color: 'var(--c-warning-fg)' }}>
             {request.suggestions.length === 1
               ? 'În club există un jucător cu același nume. Leagă-l doar dacă ești sigur că e același copil.'
-              : `În club există ${request.suggestions.length} jucători cu nume asemănător. Leagă doar dacă ești sigur că e același copil.`}
+              : `În club există ${plural(request.suggestions.length, 'jucător', 'jucători')} cu nume asemănător. Leagă doar dacă ești sigur că e același copil.`}
           </Text>
         </View>
       ) : null}
@@ -291,7 +292,7 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNot
       const { results } = await familyRequestsApi.approveAll(ids);
       const ok = results.filter((r) => r.ok).length;
       const left = (requests?.length ?? 0) - ok;
-      onNotify({ variant: ok === results.length ? 'success' : 'error', message: left ? `${ok} aprobate, ${left} rămân pentru verificarea ta.` : `${ok} cereri aprobate.` });
+      onNotify({ variant: ok === results.length ? 'success' : 'error', message: left ? `${ok} aprobate, ${left} rămân pentru verificarea ta.` : `${plural(ok, 'cerere aprobată', 'cereri aprobate')}.` });
       await load();
     } catch (err) {
       onNotify({ variant: 'error', message: err instanceof Error ? err.message : 'Nu am putut aproba cererile.' });
@@ -375,7 +376,7 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNot
           ? `Respingi cererea pentru ${confirm.request.child.firstName} ${confirm.request.child.lastName}?`
           : confirm?.kind === 'rotate'
             ? `Schimbi codul pentru ${confirm.team.name}?`
-            : bulkIds.length === 1 ? 'Aprobi cererea fără potrivire?' : `Aprobi cele ${bulkIds.length} cereri fără potrivire?`}
+            : bulkIds.length === 1 ? 'Aprobi cererea fără potrivire?' : `Aprobi cele ${plural(bulkIds.length, 'cerere', 'cereri')} fără potrivire?`}
         message={confirm?.kind === 'deny'
           ? denyMessage(confirm.request)
           : confirm?.kind === 'rotate'

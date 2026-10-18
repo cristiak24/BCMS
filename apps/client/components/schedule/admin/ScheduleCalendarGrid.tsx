@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, useWindowDimensions } from '@/src/web/reactNative';
 import { CalendarEvent } from '../../../services/eventsApi';
 import { EVENT_TYPE_META, CalendarDayCell, getMonthGridDays, groupEventsByDay, isCancelledEvent } from '../scheduleShared';
+import { plural } from '../../../utils/plural';
 
 const WEEKDAY_LABELS = ['LUN', 'MAR', 'MIE', 'JOI', 'VIN', 'SÂM', 'DUM'];
 
@@ -49,7 +50,7 @@ const CompactCalendarCell = React.memo(({
     <TouchableOpacity
       onPress={onSelectDay}
       disabled={!activeEvents.length}
-      accessibilityLabel={`${dayData.dayNumber}: ${activeEvents.length} ${activeEvents.length === 1 ? 'eveniment' : 'evenimente'}`}
+      accessibilityLabel={`${dayData.dayNumber}: ${plural(activeEvents.length, 'eveniment', 'evenimente')}`}
       className="ui-press items-center justify-start pt-2"
       style={{
         width: '14.28%',

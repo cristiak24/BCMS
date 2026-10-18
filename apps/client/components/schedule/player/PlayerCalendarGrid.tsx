@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, useWindowDimensions } from '@/src/web/rea
 import { CalendarEvent } from '../../../services/eventsApi';
 import { EVENT_TYPE_META, isCancelledEvent } from '../scheduleShared';
 import { Skeleton } from '../../ui/Skeleton';
+import { plural } from '../../../utils/plural';
 
 /*
  * The player month grid.
@@ -61,7 +62,7 @@ const CompactCalendarCell = React.memo(({
   return (
     <TouchableOpacity
       onPress={() => day.dateKey && onSelectDay(day.dateKey)}
-      accessibilityLabel={`${day.dayNumber}: ${activeEvents.length} ${activeEvents.length === 1 ? 'eveniment' : 'evenimente'}`}
+      accessibilityLabel={`${day.dayNumber}: ${plural(activeEvents.length, 'eveniment', 'evenimente')}`}
       accessibilityState={{ selected: day.isSelected }}
       className="ui-press items-center justify-start pt-2"
       style={{

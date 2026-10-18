@@ -1,5 +1,6 @@
 import { parseApiDate } from '@/utils/dates';
 import type { TeamGender, TeamLevel } from '../../services/teamsApi';
+import { plural } from '../../utils/plural';
 
 export const LEVEL_LABELS: Record<TeamLevel, string> = {
     national: 'Național',
@@ -58,8 +59,8 @@ export function formatRelativeDate(iso: string | null | undefined) {
     if (diffMinutes < 1) return 'acum câteva secunde';
     if (diffMinutes < 60) return `acum ${diffMinutes} min`;
     const diffHours = Math.round(diffMinutes / 60);
-    if (diffHours < 24) return `acum ${diffHours} ${diffHours === 1 ? 'oră' : 'ore'}`;
+    if (diffHours < 24) return `acum ${plural(diffHours, 'oră', 'ore')}`;
     const diffDays = Math.round(diffHours / 24);
-    if (diffDays < 7) return `acum ${diffDays} ${diffDays === 1 ? 'zi' : 'zile'}`;
+    if (diffDays < 7) return `acum ${plural(diffDays, 'zi', 'zile')}`;
     return date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' });
 }

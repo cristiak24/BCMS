@@ -146,12 +146,23 @@ export async function notifyEventChange(params: {
         }, '/schedule');
 }
 
-/** A payment the club recorded (desk or online) — a receipt in the app. */
+/** "150 RON", "152,50 RON" — Romanian decimals in a sentence. */
+function formatRon(amount: number) {
+    return `${new Intl.NumberFormat('ro-RO', { maximumFractionDigits: 2 }).format(roundMoney(amount))} RON`;
+}
+
+/**
+ * A payment the club recorded (desk or online) — a receipt in the app. It names
+ * the child: a parent of two or three players could not tell whose fee it was.
+ */
 export async function notifyPaymentRecorded(playerId: number, amount: number, label: string) {
+    const [player] = await db.select({ firstName: players.firstName, name: players.name })
+        .from(players).where(eq(players.id, playerId)).limit(1);
+    const childName = player ? (player.firstName?.trim() || player.name?.trim() || '') : '';
     return notifyPlayers([playerId], () => ({
         type: 'payment_recorded',
-        title: 'Plată înregistrată',
-        message: `Am înregistrat plata de ${Math.round(amount * 100) / 100} RON${label ? ` (${label})` : ''}. Mulțumim!`,
+        title: childName ? `Plată înregistrată · ${childName}` : 'Plată înregistrată',
+        message: `Am înregistrat plata de ${formatRon(amount)}${childName ? ` pentru ${childName}` : ''}${label ? ` (${label})` : ''}. Mulțumim!`,
         playerId,
     }));
 }

@@ -17,6 +17,7 @@ import Pagination, { usePagination } from '../ui/Pagination';
 import { EmptyState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
 import { Skeleton } from '../ui/Skeleton';
+import { plural } from '../../utils/plural';
 
 type GradeStatusFilter = 'pending' | 'graded';
 type GradeTypeFilter = 'all' | CalendarEvent['type'];
@@ -148,9 +149,9 @@ export function GradeTab() {
       results.forEach((r, i) => { if (r.status === 'fulfilled') okIds.add(ids[i]); else failed += 1; });
       if (okIds.size > 0) {
         setEvents((prev) => prev.map((e) => (okIds.has(e.id) ? { ...e, status: 'graded' } : e)));
-        showToast({ variant: 'success', message: `${okIds.size} ${okIds.size === 1 ? 'eveniment notat' : 'evenimente notate'}.` });
+        showToast({ variant: 'success', message: `${plural(okIds.size, 'eveniment notat', 'evenimente notate')}.` });
       }
-      if (failed > 0) showToast({ variant: 'error', message: `${failed} ${failed === 1 ? 'eveniment nu a putut fi notat' : 'evenimente nu au putut fi notate'}.` });
+      if (failed > 0) showToast({ variant: 'error', message: `${plural(failed, 'eveniment nu a putut fi notat', 'evenimente nu au putut fi notate')}.` });
     } finally {
       setBulkBusy(false);
       setSelectedIds(new Set());
@@ -235,7 +236,7 @@ export function GradeTab() {
         {selectable && selectedIds.size > 0 ? (
           <View className="flex-row items-center gap-3 rounded-[12px] px-3.5 py-2.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
             <Text className="flex-1 text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
-              {selectedIds.size} {selectedIds.size === 1 ? 'eveniment selectat' : 'evenimente selectate'}
+              {plural(selectedIds.size, 'eveniment selectat', 'evenimente selectate')}
             </Text>
             <Button size="sm" variant="ghost" label="Renunță" onPress={() => setSelectedIds(new Set())} />
             <Button size="sm" variant="primary" icon="done-all" label="Marchează ca notate" loading={bulkBusy} onPress={() => setConfirmBulk(true)} />
@@ -309,7 +310,7 @@ export function GradeTab() {
       <ConfirmDialog
         visible={confirmBulk}
         title="Marchezi ca notate?"
-        message={`${selectedIds.size} ${selectedIds.size === 1 ? 'eveniment va fi marcat' : 'evenimente vor fi marcate'} ca notate.`}
+        message={`${plural(selectedIds.size, 'eveniment va fi marcat', 'evenimente vor fi marcate')} ca notate.`}
         confirmLabel="Marchează"
         cancelLabel="Renunță"
         loading={bulkBusy}

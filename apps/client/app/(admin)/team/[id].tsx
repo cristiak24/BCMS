@@ -20,6 +20,7 @@ import BulkAddPlayersDialog from '../../../components/family/BulkAddPlayersDialo
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import { ATTENDANCE_PERIOD_LABEL } from '../../../utils/attendanceRate';
+import { plural, pluralWord } from '../../../utils/plural';
 
 type TabKey = 'roster' | 'events' | 'history' | 'frb';
 type RosterView = 'grid' | 'list';
@@ -525,7 +526,7 @@ export default function TeamDetailsScreen() {
                     setShowBulk(false);
                     setShowAdd(false);
                     loadData();
-                    Alert.alert('Lot actualizat', `${created} ${created === 1 ? 'jucător adăugat' : 'jucători adăugați'}${skipped.length ? `, ${skipped.length} deja în lot (${skipped.slice(0, 5).join(', ')}${skipped.length > 5 ? '…' : ''})` : ''}.`);
+                    Alert.alert('Lot actualizat', `${plural(created, 'jucător adăugat', 'jucători adăugați')}${skipped.length ? `, ${skipped.length} deja în lot (${skipped.slice(0, 5).join(', ')}${skipped.length > 5 ? '…' : ''})` : ''}.`);
                 }}
             />
         </View>
@@ -589,7 +590,7 @@ function AttendanceMeter({ stat, showCount }: { stat: TeamPlayerStat | undefined
                 <View className="h-full rounded-full" style={{ width: `${rate ?? 0}%`, backgroundColor: col }} />
             </View>
             {showCount && stat && stat.total > 0 && (
-                <Text className="text-[10px] font-semibold text-[color:var(--c-faint)] mt-1">{stat.present}/{stat.total} sesiuni</Text>
+                <Text className="text-[10px] font-semibold text-[color:var(--c-faint)] mt-1">{stat.present}/{stat.total} {pluralWord(stat.total, 'sesiune', 'sesiuni')}</Text>
             )}
         </View>
     );

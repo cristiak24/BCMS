@@ -35,6 +35,7 @@ import {
   buildICSCalendar,
   triggerFileDownload,
 } from '../../components/schedule/scheduleShared';
+import { plural } from '../../utils/plural';
 
 type EventFilter = 'all' | 'training' | 'match' | 'camp';
 type ScheduleView = 'month' | 'week' | 'agenda';
@@ -148,11 +149,11 @@ function getNextMatchLabel(match: CalendarEvent | null) {
   // Readable, not "5z" / "40h".
   const hours = Math.ceil(diffMs / 3600000);
   if (hours < 24) {
-    return `în ${hours} ${hours === 1 ? 'oră' : 'ore'}`;
+    return `în ${plural(hours, 'oră', 'ore')}`;
   }
 
   const days = Math.ceil(hours / 24);
-  return days === 1 ? 'mâine' : `în ${days} zile`;
+  return days === 1 ? 'mâine' : `în ${plural(days, 'zi', 'zile')}`;
 }
 
 
@@ -562,7 +563,7 @@ export default function ScheduleScreen() {
                     Evenimentele lunii
                   </Text>
                   <Text className="mt-0.5 text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>
-                    {monthEventCount} {monthEventCount === 1 ? 'eveniment' : 'evenimente'} în {formatMonthName(viewDate)} {viewDate.getFullYear()}
+                    {plural(monthEventCount, 'eveniment', 'evenimente')} în {formatMonthName(viewDate)} {viewDate.getFullYear()}
                   </Text>
                 </View>
                 <Pressable onPress={() => setScheduleView('agenda')} accessibilityRole="button">

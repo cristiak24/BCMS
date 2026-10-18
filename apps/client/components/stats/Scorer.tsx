@@ -6,6 +6,7 @@ import type { EventType, GameEvent } from '../../utils/gameStats';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import BoxScoreView from './BoxScoreView';
 import { useScorer } from './useScorer';
+import { plural } from '../../utils/plural';
 
 /**
  * The live scorer. One rule everywhere: tap the player, then what they did —
@@ -190,7 +191,7 @@ export default function Scorer({
             <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{teamName}</Text>
             <Text className="t-num text-[38px] font-bold leading-tight" style={{ color: 'var(--c-ink-strong)' }}>{s.box.us}</Text>
             <Text className="text-[11.5px] font-semibold" style={{ color: fouls.us >= BONUS_AT ? 'var(--c-danger-fg)' : 'var(--c-faint)' }}>
-              {fouls.us} faulturi{fouls.us >= BONUS_AT ? ' · bonus' : ''}
+              {plural(fouls.us, 'fault', 'faulturi')}{fouls.us >= BONUS_AT ? ' · bonus' : ''}
             </Text>
           </View>
           <View className="items-center gap-1 pt-1">
@@ -221,7 +222,7 @@ export default function Scorer({
             <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{opponentName}</Text>
             <Text className="t-num text-[38px] font-bold leading-tight" style={{ color: 'var(--c-ink-strong)' }}>{s.box.them}</Text>
             <Text className="text-[11.5px] font-semibold" style={{ color: fouls.them >= BONUS_AT ? 'var(--c-danger-fg)' : 'var(--c-faint)' }}>
-              {fouls.them} faulturi{fouls.them >= BONUS_AT ? ' · bonus' : ''}
+              {plural(fouls.them, 'fault', 'faulturi')}{fouls.them >= BONUS_AT ? ' · bonus' : ''}
             </Text>
           </View>
         </View>
@@ -229,7 +230,7 @@ export default function Scorer({
           {!s.online ? <MaterialIcons name="cloud-off" size={13} color="var(--c-warning-fg)" /> : s.syncing ? <ActivityIndicator size="small" color="var(--c-faint)" /> : null}
           <Text className="text-[11.5px] font-semibold" style={{ color: s.pendingCount ? 'var(--c-warning-fg)' : 'var(--c-faint)' }}>
             {s.pendingCount
-              ? `${s.pendingCount} ${s.pendingCount === 1 ? 'acțiune salvată' : 'acțiuni salvate'} pe telefon${s.online ? ', se trimit…' : ' — se trimit când revine internetul'}`
+              ? `${plural(s.pendingCount, 'acțiune salvată', 'acțiuni salvate')} pe telefon${s.online ? ', se trimit…' : ' — se trimit când revine internetul'}`
               : 'Totul e salvat'}
           </Text>
         </View>

@@ -31,6 +31,7 @@ import PageHero from '../../components/admin/PageHero';
 import Button from '../../components/ui/Button';
 import TeamMedicalVisaModal from '../../components/schedule/admin/TeamMedicalVisaModal';
 import TeamPaymentsReportModal from '../../components/schedule/admin/TeamPaymentsReportModal';
+import { plural } from '../../utils/plural';
 
 type TopTab = 'Monthly' | 'Attendance' | 'Grade';
 type ScheduleView = 'month' | 'week' | 'agenda';
@@ -170,8 +171,8 @@ export default function ScheduleScreen() {
 
       if (!silent || changed > 0) {
         const parts = [
-          res.syncedCount ? `${res.syncedCount} ${res.syncedCount === 1 ? 'meci nou' : 'meciuri noi'}` : null,
-          res.updatedCount ? `${res.updatedCount} ${res.updatedCount === 1 ? 'actualizat' : 'actualizate'}` : null,
+          res.syncedCount ? `${plural(res.syncedCount, 'meci nou', 'meciuri noi')}` : null,
+          res.updatedCount ? `${plural(res.updatedCount, 'actualizat', 'actualizate')}` : null,
         ].filter(Boolean);
         showToast({
           variant: 'success',
@@ -598,7 +599,7 @@ export default function ScheduleScreen() {
           refetch();
           showToast({
             variant: 'success',
-            message: count > 1 ? `Au fost create ${count} antrenamente.` : 'Evenimentul a fost salvat.',
+            message: count > 1 ? `Au fost create ${plural(count, 'antrenament', 'antrenamente')}.` : 'Evenimentul a fost salvat.',
           });
         }}
         teams={teams}
@@ -645,10 +646,10 @@ export default function ScheduleScreen() {
         onClose={() => setShowMedicalVisa(false)}
         onSuccess={(updated, failed) => {
           if (updated > 0) {
-            showToast({ variant: 'success', message: `Viză medicală actualizată pentru ${updated} ${updated === 1 ? 'jucător' : 'jucători'}.` });
+            showToast({ variant: 'success', message: `Viză medicală actualizată pentru ${plural(updated, 'jucător', 'jucători')}.` });
           }
           if (failed > 0) {
-            showToast({ variant: 'error', message: `${failed} ${failed === 1 ? 'actualizare a eșuat' : 'actualizări au eșuat'}.` });
+            showToast({ variant: 'error', message: `${plural(failed, 'actualizare a eșuat', 'actualizări au eșuat')}.` });
           }
         }}
       />

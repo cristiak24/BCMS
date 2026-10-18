@@ -19,6 +19,7 @@ import { clubAdminApi, type ClubAdminAccount, type ClubAdminAccountRole } from '
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import CoachHandoverDialog from '../../components/accounts/CoachHandoverDialog';
 import { readHandoverRequest, type HandoverRequest } from '../../utils/coachHandover';
+import { plural } from '../../utils/plural';
 
 const FILTERS = ['all', 'coach', 'player', 'parent', 'invite', 'inactive'] as const;
 
@@ -434,13 +435,13 @@ export default function ManageAccountsScreen() {
             showToast({
                 variant: 'error',
                 message: coachesWithTeams.length
-                    ? `${failed} din ${eligible.length} conturi nu au fost actualizate. ${coachesWithTeams.map((a) => a.name).join(', ')} ${coachesWithTeams.length === 1 ? 'antrenează o echipă: dezactivează contul separat' : 'antrenează echipe: dezactivează conturile separat'}, ca să alegi cine preia echipele.`
-                    : `${failed} din ${eligible.length} conturi nu au putut fi actualizate.`,
+                    ? `${failed} din ${plural(eligible.length, 'cont', 'conturi')} nu au fost actualizate. ${coachesWithTeams.map((a) => a.name).join(', ')} ${coachesWithTeams.length === 1 ? 'antrenează o echipă: dezactivează contul separat' : 'antrenează echipe: dezactivează conturile separat'}, ca să alegi cine preia echipele.`
+                    : `${failed} din ${plural(eligible.length, 'cont', 'conturi')} nu au putut fi actualizate.`,
             });
             void loadAccounts('refresh');
         } else {
             const skippedSuffix = skipped > 0 ? ` (${skipped} sărite)` : '';
-            showToast({ variant: 'success', message: `${succeeded === 1 ? '1 cont actualizat' : `${succeeded} conturi actualizate`}${skippedSuffix}.` });
+            showToast({ variant: 'success', message: `${plural(succeeded, 'cont actualizat', 'conturi actualizate')}${skippedSuffix}.` });
         }
 
         setBulkBusy(false);
@@ -514,7 +515,7 @@ export default function ManageAccountsScreen() {
                     ? 'Reactivează'
                     : `Schimbă în ${roleLabel(pending.action).toLowerCase()}`;
             return {
-                title: `${label}: ${n === 1 ? '1 cont' : `${n} conturi`}?`,
+                title: `${label}: ${plural(n, 'cont', 'conturi')}?`,
                 message: pending.action === 'deactivate'
                     ? 'Membrii activi selectați pierd accesul până la reactivare. Restul sunt săriți.'
                     : pending.action === 'reactivate'
@@ -584,7 +585,7 @@ export default function ManageAccountsScreen() {
                     <PageHero
                         eyebrow="Conturi"
                         title="Conturile clubului"
-                        subtitle={loading ? undefined : `${counts.active} active · ${counts.invites} ${counts.invites === 1 ? 'invitație în așteptare' : 'invitații în așteptare'}`}
+                        subtitle={loading ? undefined : `${counts.active} active · ${plural(counts.invites, 'invitație în așteptare', 'invitații în așteptare')}`}
                         actions={(
                             <>
                                 <Button icon="refresh" label="Reîncarcă" iconOnlyOnMobile loading={refreshing} disabled={loading} onPress={() => void loadAccounts('refresh')} className="hidden sm:flex" />
@@ -622,7 +623,7 @@ export default function ManageAccountsScreen() {
                         {selectedAccounts.length > 0 ? (
                             <View className="flex-col sm:flex-row sm:items-center gap-2 rounded-[12px] px-3.5 py-2.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
                                 <Text className="text-[13px] font-semibold sm:mr-auto" style={{ color: 'var(--c-brand-fg)' }}>
-                                    {selectedAccounts.length === 1 ? '1 cont selectat' : `${selectedAccounts.length} conturi selectate`}
+                                    {plural(selectedAccounts.length, 'cont selectat', 'conturi selectate')}
                                 </Text>
                                 <View className="flex-row flex-wrap items-center gap-1.5">
                                     {(['coach', 'player', 'parent'] as ClubAdminAccountRole[]).map((role) => (

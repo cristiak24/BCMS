@@ -391,7 +391,7 @@ export default function ClubDetailScreen() {
             tone="sky"
             label="Conturi"
             value={club.accounts.total}
-            hint={`${formatNumber(club.roles.admin)} admin · ${formatNumber(club.roles.coach)} antrenori · ${formatNumber(club.roles.parent)} părinți`}
+            hint={`${plural(club.roles.admin, 'admin', 'admini')} · ${plural(club.roles.coach, 'antrenor', 'antrenori')} · ${plural(club.roles.parent, 'părinte', 'părinți')}`}
           />
           <StatCard
             icon="sports-basketball"

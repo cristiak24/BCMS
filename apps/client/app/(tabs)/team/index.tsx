@@ -11,6 +11,7 @@ import { teamsApi, MyTeamSummary, Player } from '../../../services/teamsApi';
 import { GENDER_LABELS, LEVEL_LABELS } from '../../../components/myclub/teamDisplay';
 import { useSession } from '../../../context/AuthContext';
 import { attendanceRateColor, eventTypeMeta, formatEventDateTime } from '../../../components/team/playerTeamDisplay';
+import { plural } from '../../../utils/plural';
 
 /**
  * "Echipa mea" — team picker. A player can belong to several squads, so this
@@ -26,12 +27,12 @@ function getMedicalStatus(expiry: string | null | undefined) {
   const days = Math.ceil((new Date(expiry).getTime() - Date.now()) / 86400000);
   if (Number.isNaN(days)) return { label: 'Necompletată', bg: 'var(--c-surface-3)', fg: 'var(--c-muted)', icon: 'help-outline' as const };
   if (days < 0) return { label: 'Expirată', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', icon: 'error-outline' as const };
-  if (days <= 30) return { label: `Expiră în ${days} zile`, bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', icon: 'schedule' as const };
+  if (days <= 30) return { label: `Expiră în ${plural(days, 'zi', 'zile')}`, bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', icon: 'schedule' as const };
   return { label: 'Valabilă', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', icon: 'verified' as const };
 }
 
 /** Own medical/compliance status — sourced from GET /players/me (self only, never a teammate's). */
-function MyStatusCard({ player }: { player: Player }) {
+function MyStatusCard({ player, isParent }: { player: Player; isParent: boolean }) {
   const status = getMedicalStatus(player.medicalCheckExpiry);
   const expiryLabel = player.medicalCheckExpiry
     ? parseApiDate(player.medicalCheckExpiry).toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -43,7 +44,7 @@ function MyStatusCard({ player }: { player: Player }) {
         <MaterialIcons name={status.icon} size={18} color={status.fg} />
       </View>
       <View className="flex-1 min-w-0">
-        <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Statusul meu</Text>
+        <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{isParent ? 'Statusul copilului' : 'Statusul meu'}</Text>
         <Text className="f-display text-[14.5px] font-bold mt-0.5" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.015em' } as any}>Vizită medicală</Text>
         {expiryLabel ? (
           <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }}>Valabilă până la {expiryLabel}</Text>
@@ -75,7 +76,7 @@ function MetaRow({ icon, children }: { icon: string; children: string }) {
   );
 }
 
-function TeamCard({ team, onOpen }: { team: MyTeamSummary; onOpen: () => void }) {
+function TeamCard({ team, onOpen, isParent }: { team: MyTeamSummary; onOpen: () => void; isParent: boolean }) {
   const chips = [
     team.level ? LEVEL_LABELS[team.level] : null,
     team.gender ? GENDER_LABELS[team.gender] : null,
@@ -120,7 +121,7 @@ function TeamCard({ team, onOpen }: { team: MyTeamSummary; onOpen: () => void })
 
       <View className="gap-1.5">
         <MetaRow icon="sports">{team.coachName ? `Antrenor: ${team.coachName}` : 'Antrenor nealocat'}</MetaRow>
-        <MetaRow icon="groups">{`${team.playerCount} ${team.playerCount === 1 ? 'jucător în lot' : 'jucători în lot'}`}</MetaRow>
+        <MetaRow icon="groups">{`${plural(team.playerCount, 'jucător în lot', 'jucători în lot')}`}</MetaRow>
         <MetaRow icon={nextMeta ? nextMeta.icon : 'event-busy'}>
           {next ? `Urmează: ${next.title} · ${formatEventDateTime(next.startTime)}` : 'Niciun eveniment programat'}
         </MetaRow>
@@ -129,7 +130,7 @@ function TeamCard({ team, onOpen }: { team: MyTeamSummary; onOpen: () => void })
       {/* Own attendance for this squad — the only number on the card that is
           about the player rather than the team. */}
       <View className="flex-row items-center justify-between gap-3 pt-3 border-t" style={{ borderColor: 'var(--c-border)' } as any}>
-        <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Prezența mea</Text>
+        <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{isParent ? 'Prezența copilului' : 'Prezența mea'}</Text>
         <View className="flex-row items-baseline gap-1.5">
           <Text className="f-display t-num text-[18px] font-extrabold" style={{ color: attendanceRateColor(team.attendance.rate) }}>
             {team.attendance.rate == null ? '—' : `${team.attendance.rate}%`}
@@ -157,6 +158,7 @@ function TeamListSkeleton() {
 
 export default function TeamScreen() {
   const { session } = useSession();
+  const isParent = session?.role === 'parent';
   const router = useRouter();
   const [teams, setTeams] = useState<MyTeamSummary[]>([]);
   const [myRecord, setMyRecord] = useState<Player | null>(null);
@@ -187,15 +189,15 @@ export default function TeamScreen() {
   }, [loadData]);
 
   const subtitle = teams.length
-    ? `${teams.length} ${teams.length === 1 ? 'echipă' : 'echipe'} · ${session?.clubName || 'Clubul tău'}`
-    : session?.clubName || 'Echipele tale';
+    ? `${plural(teams.length, 'echipă', 'echipe')} · ${session?.clubName || 'Clubul tău'}`
+    : session?.clubName || (isParent ? 'Echipele copilului' : 'Echipele tale');
 
   return (
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
       <PageContainer>
         <PageHero
           eyebrow="Echipa mea"
-          title="Echipele mele"
+          title={isParent ? 'Echipele copilului' : 'Echipele mele'}
           subtitle={subtitle}
           actions={
             <Pressable
@@ -209,7 +211,7 @@ export default function TeamScreen() {
             </Pressable>
           }
         >
-          {!loading && myRecord ? <MyStatusCard player={myRecord} /> : null}
+          {!loading && myRecord ? <MyStatusCard player={myRecord} isParent={isParent} /> : null}
         </PageHero>
 
         <View className="gap-4">
@@ -225,15 +227,17 @@ export default function TeamScreen() {
           ) : teams.length === 0 ? (
             <EmptyState
               icon="groups"
-              title="Nu ești încă alocat unei echipe"
-              message="Când antrenorul te adaugă într-o echipă, aceasta apare aici cu lotul, programul și prezența ta."
+              title={isParent ? 'Copilul nu e încă într-o echipă' : 'Nu ai încă o echipă'}
+              message={isParent
+                ? 'Când antrenorul adaugă copilul într-o echipă, aceasta apare aici cu lotul, programul și prezența.'
+                : 'Când antrenorul te adaugă într-o echipă, aceasta apare aici cu lotul, programul și prezența ta.'}
             />
           ) : (
             // Two columns from lg up: a player is on one or two squads, so a
             // wider grid would leave a mostly empty row.
             <View className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {teams.map((team) => (
-                <TeamCard key={team.id} team={team} onOpen={() => router.push(`/team/${team.id}`)} />
+                <TeamCard key={team.id} team={team} isParent={isParent} onOpen={() => router.push(`/team/${team.id}`)} />
               ))}
             </View>
           )}

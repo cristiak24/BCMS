@@ -19,6 +19,7 @@ import { CoachPlayerRow } from '../../../components/coach/CoachPrimitives';
 import { eventTypeMeta, getPlayerBadge } from '../../../components/coach/coachDisplay';
 import { formatCoachDate, formatCoachTimeRange } from '../../../components/coach/coachUtils';
 import { AttendanceNoteInput, AttendanceNoteToggle } from '../../../components/attendance/AttendanceNoteField';
+import { plural } from '../../../utils/plural';
 
 /**
  * Admin "Notare prezență" for one event.
@@ -446,7 +447,7 @@ export default function AttendanceScreen() {
         visible={bulkConfirmOpen}
         icon="done-all"
         title="Marchează restul prezenți"
-        message={`${counts.unmarked} ${counts.unmarked === 1 ? 'jucător nemarcat va fi trecut' : 'jucători nemarcați vor fi trecuți'} ca prezenți. Cei deja marcați nu se schimbă. Apasă apoi Salvează.`}
+        message={`${plural(counts.unmarked, 'jucător nemarcat va fi trecut', 'jucători nemarcați vor fi trecuți')} ca prezenți. Cei deja marcați nu se schimbă. Apasă apoi Salvează.`}
         confirmLabel="Marchează"
         cancelLabel="Anulează"
         onConfirm={markRemainingPresent}

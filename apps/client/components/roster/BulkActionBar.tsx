@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, Text, View } from '@/src/web/reactNative';
 import { Download, Users2, UserX, X } from 'lucide-react';
 import { dash } from '../dashboard/dashboardTheme';
+import { pluralWord } from '../../utils/plural';
 
 interface BulkActionBarProps {
   selectedCount: number;
@@ -25,7 +26,7 @@ export default function BulkActionBar({ selectedCount, busy, onExportCsv, onReas
           <Text className="text-[12px] font-black text-white">{selectedCount}</Text>
         </View>
         <Text className="text-[13px] font-black" style={{ color: dash.ink }}>
-          {selectedCount === 1 ? 'sportiv selectat' : 'sportivi selectați'}
+          {pluralWord(selectedCount, 'sportiv selectat', 'sportivi selectați')}
         </Text>
       </View>
 

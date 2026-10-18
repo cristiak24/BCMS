@@ -5,6 +5,7 @@ import type { Team } from '../../services/teamsApi';
 import { GENDER_LABELS, LEVEL_LABELS, formatRelativeDate, isFrbTeam } from './teamDisplay';
 import ThemedCheckbox from './ThemedCheckbox';
 import { TeamAvatar } from '../l12/L12Visuals';
+import { plural } from '../../utils/plural';
 
 function Chip({ label, bg, fg, icon }: { label: string; bg: string; fg: string; icon?: React.ReactNode }) {
     return (
@@ -115,7 +116,7 @@ export default function TeamCard({
                 >
                     {stale ? <AlertTriangle size={11} color="var(--c-warning-fg)" /> : <Check size={11} color="var(--c-success-fg)" />}
                     <Text className="text-[11px] font-semibold" style={{ color: stale ? 'var(--c-warning-fg)' : 'var(--c-success-fg)' }}>
-                        {stale ? `${team.staleMedicalChecks} vize expirate` : 'Vize la zi'}
+                        {stale ? plural(team.staleMedicalChecks, 'viză expirată', 'vize expirate') : 'Vize la zi'}
                     </Text>
                 </View>
             </View>

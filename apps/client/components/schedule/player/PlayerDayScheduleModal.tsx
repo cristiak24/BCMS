@@ -4,6 +4,7 @@ import { Calendar as CalendarIcon, X } from 'lucide-react';
 import { CalendarEvent } from '../../../services/eventsApi';
 import { sortByStartTime, RO_LOCALE } from '../scheduleShared';
 import { PlayerScheduleEventCard } from './PlayerScheduleEventCard';
+import { plural } from '../../../utils/plural';
 
 /**
  * Day-agenda sheet opened by tapping a calendar cell — the player equivalent
@@ -49,7 +50,7 @@ export function PlayerDayScheduleModal({
                 {day?.date.toLocaleDateString(RO_LOCALE, { month: 'long', day: 'numeric' })}
               </Text>
               <Text className="font-bold text-[12px] mt-0.5" style={{ color: 'var(--c-faint)' }}>
-                {events.length === 0 ? 'Nimic programat' : `${events.length} ${events.length === 1 ? 'eveniment planificat' : 'evenimente planificate'}`}
+                {events.length === 0 ? 'Nimic programat' : `${plural(events.length, 'eveniment planificat', 'evenimente planificate')}`}
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} accessibilityLabel="Închide" style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>

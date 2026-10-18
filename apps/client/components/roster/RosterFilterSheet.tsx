@@ -2,6 +2,7 @@ import React from 'react';
 import { FlatList, Modal, Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { dash } from '../dashboard/dashboardTheme';
+import { plural } from '../../utils/plural';
 
 export type RosterFilterSheetItem = { id: string; label: string };
 
@@ -57,7 +58,7 @@ export default function RosterFilterSheet({
                   {title}
                 </Text>
                 <Text className="text-[11px] mt-0.5 font-medium" style={{ color: dash.muted }}>
-                  {items.length} {items.length === 1 ? 'opțiune' : 'opțiuni'} disponibile
+                  {plural(items.length, 'opțiune', 'opțiuni')} disponibile
                 </Text>
               </View>
             </View>

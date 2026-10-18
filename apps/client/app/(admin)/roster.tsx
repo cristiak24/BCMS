@@ -33,6 +33,7 @@ import {
   matchesAttendanceFilter,
 } from '../../components/roster/rosterHelpers';
 import { ATTENDANCE_PERIOD_LABEL, formatAttendanceRate, pooledAttendanceRate } from '../../utils/attendanceRate';
+import { plural } from '../../utils/plural';
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 100];
 const DEFAULT_PAGE_SIZE = 12;
@@ -218,7 +219,7 @@ export default function RosterScreen() {
       Alert.alert(
         owing ? 'Mementouri trimise' : 'Nicio plată de amintit',
         owing
-          ? `${result.sent} ${result.sent === 1 ? 'notificare trimisă' : 'notificări trimise'} pentru ${owing} ${owing === 1 ? 'jucător cu restanțe' : 'jucători cu restanțe'} (jucătorilor și părinților lor).${skipped ? ` ${skipped} ${skipped === 1 ? 'cont a primit' : 'conturi au primit'} deja un memento în ultimele 7 zile.` : ''}`
+          ? `${plural(result.sent, 'notificare trimisă', 'notificări trimise')} pentru ${plural(owing, 'jucător cu restanțe', 'jucători cu restanțe')} (jucătorilor și părinților lor).${skipped ? ` ${plural(skipped, 'cont a primit', 'conturi au primit')} deja un memento în ultimele 7 zile.` : ''}`
           : 'Nimeni nu are restanțe. Plățile care nu au ajuns la scadență nu primesc memento.'
       );
       await fetchRosterData();
@@ -406,7 +407,7 @@ export default function RosterScreen() {
 
     Alert.alert(
       'Elimină sportivii selectați',
-      `Elimini ${selectedIds.size} ${selectedIds.size === 1 ? 'sportiv' : 'sportivi'} din lotul activ?`,
+      `Elimini ${plural(selectedIds.size, 'sportiv', 'sportivi')} din lotul activ?`,
       [
         { text: 'Anulează', style: 'cancel' },
         {
@@ -424,7 +425,7 @@ export default function RosterScreen() {
                 const reason = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')?.reason;
                 Alert.alert(
                   'Eliminare parțială',
-                  `${done} din ${results.length} sportivi au fost eliminați. ${failed} nu au putut fi eliminați${reason instanceof Error && reason.message ? `: ${reason.message}` : '.'}`,
+                  `${done} din ${plural(results.length, 'sportiv', 'sportivi')} ${done === 1 ? 'a fost eliminat' : 'au fost eliminați'}. ${failed} nu au putut fi eliminați${reason instanceof Error && reason.message ? `: ${reason.message}` : '.'}`,
                 );
               }
             } finally {
@@ -568,7 +569,7 @@ export default function RosterScreen() {
               Sportivi
             </Text>
             <Text className="mt-0.5 text-[13px]" style={{ color: dash.muted }}>
-              Afișezi {paginatedPlayers.length} din {sortedPlayers.length} sportivi
+              Afișezi {paginatedPlayers.length} din {plural(sortedPlayers.length, 'sportiv', 'sportivi')}
               {sortedPlayers.length !== players.length ? ` (lot total: ${players.length})` : ''}
             </Text>
           </View>

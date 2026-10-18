@@ -17,6 +17,8 @@ import {
   formatEventTime,
   getInitials,
 } from '../../../components/team/playerTeamDisplay';
+import { pluralWord } from '../../../utils/plural';
+import { useSession } from '../../../context/AuthContext';
 
 /**
  * One of the player's own teams: squad, coach, schedule and their own
@@ -135,6 +137,9 @@ export default function PlayerTeamDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const teamId = Number(id);
+  // A parent is looking at their child's squad, not their own.
+  const isParent = useSession().session?.role === 'parent';
+  const ownAttendanceLabel = isParent ? 'Prezența copilului' : 'Prezența mea';
 
   const [team, setTeam] = useState<MyTeamDetail | null>(null);
   const [tab, setTab] = useState<TabKey>('roster');
@@ -179,17 +184,17 @@ export default function PlayerTeamDetailScreen() {
         <Pressable
           onPress={() => router.push('/team')}
           accessibilityRole="button"
-          accessibilityLabel="Înapoi la echipele mele"
+          accessibilityLabel={isParent ? 'Înapoi la echipele copilului' : 'Înapoi la echipele mele'}
           className="flex-row items-center gap-1.5 self-start mb-3 min-h-[44px] lg:h-8 px-2 -ml-2 rounded-[9px]"
         >
           <MaterialIcons name="arrow-back" size={17} color="var(--c-muted)" />
-          <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Echipele mele</Text>
+          <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>{isParent ? 'Echipele copilului' : 'Echipele mele'}</Text>
         </Pressable>
 
         <PageHero
           eyebrow="Echipa mea"
           title={team?.name || 'Echipă'}
-          subtitle={team ? team.leagueName || 'Echipa ta' : 'Se încarcă...'}
+          subtitle={team ? team.leagueName || (isParent ? 'Echipa copilului' : 'Echipa ta') : 'Se încarcă...'}
           actions={
             <Pressable
               onPress={() => loadData(true)}
@@ -236,7 +241,7 @@ export default function PlayerTeamDetailScreen() {
                 <GlassStat
                   value={team.attendance.rate == null ? '—' : team.attendance.rate}
                   suffix={team.attendance.rate == null ? undefined : '%'}
-                  label="Prezența mea"
+                  label={ownAttendanceLabel}
                   dot={attendanceRateColor(team.attendance.rate)}
                   bar={team.attendance.rate == null ? undefined : team.attendance.rate}
                 />
@@ -261,13 +266,14 @@ export default function PlayerTeamDetailScreen() {
             onAction={() => loadData(true)}
           />
         ) : !team ? (
-          <EmptyState icon="groups" title="Echipa nu este disponibilă" message="Întoarce-te la lista echipelor tale." />
+          <EmptyState icon="groups" title="Echipa nu este disponibilă" message={isParent ? 'Întoarce-te la lista echipelor copilului.' : 'Întoarce-te la lista echipelor tale.'} />
         ) : (
           <View className="gap-4">
             {/* Segmented control: scrolls horizontally on a 375px viewport
                 rather than wrapping to a second row. */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5">
-              {TABS.map((item) => {
+              {TABS.map((tabItem) => {
+                const item = tabItem.key === 'attendance' ? { ...tabItem, label: ownAttendanceLabel } : tabItem;
                 const active = tab === item.key;
                 return (
                   <Pressable
@@ -339,7 +345,7 @@ export default function PlayerTeamDetailScreen() {
                   <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Sesiuni recente marcate</Text>
                   <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>
                     {team.attendance.total
-                      ? `${team.attendance.present}/${team.attendance.total} sesiuni marcate în total`
+                      ? `${team.attendance.present}/${team.attendance.total} ${pluralWord(team.attendance.total, 'sesiune marcată', 'sesiuni marcate')} în total`
                       : 'nicio sesiune marcată'}
                   </Text>
                 </View>

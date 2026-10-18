@@ -5,6 +5,7 @@ import type { Player } from '../../services/teamsApi';
 import { L12_MAX_PLAYERS, L12_STAFF_ROLES, type L12Lineup, type L12Player, type L12StaffRole } from '../../services/l12Api';
 import { medicalStatus } from '../myclub/teamDisplay';
 import { TeamAvatar } from './L12Visuals';
+import { plural } from '../../utils/plural';
 
 /**
  * The L-12 sheet editor shared by the match screen and the team's "L12
@@ -447,14 +448,14 @@ export default function L12Editor({
       key: 'numbers',
       ok: count > 0 && missingNumbers === 0 && duplicates === 0,
       severity: 'error',
-      label: count === 0 ? 'Numere de echipament' : duplicates > 0 ? 'Numere dublate' : missingNumbers > 0 ? `${missingNumbers} ${missingNumbers === 1 ? 'număr lipsă' : 'numere lipsă'}` : 'Numere complete',
+      label: count === 0 ? 'Numere de echipament' : duplicates > 0 ? 'Numere dublate' : missingNumbers > 0 ? `${plural(missingNumbers, 'număr lipsă', 'numere lipsă')}` : 'Numere complete',
       detail: count === 0 ? 'Se completează din lot' : duplicates > 0 ? 'Corectează rândurile marcate cu roșu' : undefined,
     },
     {
       key: 'licenses',
       ok: count > 0 && missingLicenses === 0,
       severity: 'warn',
-      label: count === 0 ? 'Licențe' : missingLicenses > 0 ? `${missingLicenses} ${missingLicenses === 1 ? 'licență lipsă' : 'licențe lipsă'}` : 'Licențe complete',
+      label: count === 0 ? 'Licențe' : missingLicenses > 0 ? `${plural(missingLicenses, 'licență lipsă', 'licențe lipsă')}` : 'Licențe complete',
     },
     { key: 'coach', ok: Boolean(headCoach), severity: 'warn', label: headCoach ? 'Antrenor principal' : 'Fără antrenor principal', detail: headCoach || undefined },
     { key: 'visa', ok: visaIssues.length === 0, severity: 'warn', label: visaIssues.length ? `${visaIssues.length} fără viză valabilă` : 'Vize medicale valabile', detail: visaIssues.slice(0, 2).map((r) => r.player.lastName).join(', ') || undefined },
@@ -653,7 +654,7 @@ export default function L12Editor({
                 </View>
                 <View className="flex-1 min-w-0">
                   <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>
-                    {count === 0 ? 'Hai să alegem jucătorii' : `${emptySlots} ${emptySlots === 1 ? 'loc liber' : 'locuri libere'}`}
+                    {count === 0 ? 'Hai să alegem jucătorii' : `${plural(emptySlots, 'loc liber', 'locuri libere')}`}
                   </Text>
                   <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
                     {count === 0 ? 'Apasă pe cei din lot sau lasă „Completează automat” să o facă.' : 'Adaugă din lotul echipei.'}

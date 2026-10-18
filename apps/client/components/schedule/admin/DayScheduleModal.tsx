@@ -3,6 +3,7 @@ import { View, Text, Modal, Pressable, TouchableOpacity, ScrollView } from '@/sr
 import { Calendar as CalendarIcon, X, Plus, MapPin, ChevronRight } from 'lucide-react';
 import { CalendarEvent } from '../../../services/eventsApi';
 import { EVENT_TYPE_META, formatEventTime, formatTimeRange, isCancelledEvent, RO_LOCALE } from '../scheduleShared';
+import { plural } from '../../../utils/plural';
 
 /**
  * Day agenda shown when a calendar cell is tapped. Laid out as a time-ordered
@@ -53,7 +54,7 @@ export function DayScheduleModal({
                   {day?.date.toLocaleDateString(RO_LOCALE, { month: 'long', day: 'numeric' })}
                 </Text>
                 <Text className="text-slate-400 font-bold text-[12px] mt-0.5">
-                  {events.length === 0 ? 'Nimic programat' : `${events.length} ${events.length === 1 ? 'eveniment planificat' : 'evenimente planificate'}`}
+                  {events.length === 0 ? 'Nimic programat' : `${plural(events.length, 'eveniment planificat', 'evenimente planificate')}`}
                 </Text>
               </View>
               <View className="flex-row items-center gap-2">

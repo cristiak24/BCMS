@@ -3,6 +3,7 @@ import { ActivityIndicator, Modal, Pressable, Text, View } from '@/src/web/react
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { familyApi } from '../../services/familyApi';
 import { birthYearRange, ignoredBirthYears, parseRosterLines, type RosterOrder } from '../../utils/rosterParse';
+import { plural } from '../../utils/plural';
 
 /**
  * Paste a roster ("Popescu Matei 2016", one per line — straight from Excel or
@@ -129,7 +130,7 @@ export default function BulkAddPlayersDialog({
           ) : null}
           {ignored > 0 ? (
             <Text className="text-[12px] mt-2" style={{ color: 'var(--c-warning-fg)' }}>
-              {ignored} {ignored === 1 ? 'rând ignorat' : 'rânduri ignorate'} (lipsește numele sau prenumele).
+              {plural(ignored, 'rând ignorat', 'rânduri ignorate')} (lipsește numele sau prenumele).
             </Text>
           ) : null}
           {droppedYears.length ? (
@@ -160,7 +161,7 @@ export default function BulkAddPlayersDialog({
             >
               {saving ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : <MaterialIcons name="group-add" size={16} color="var(--c-on-brand)" />}
               <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-on-brand)' }}>
-                {rows.length ? `Adaugă ${rows.length} ${rows.length === 1 ? 'jucător' : 'jucători'}` : 'Adaugă'}
+                {rows.length ? `Adaugă ${plural(rows.length, 'jucător', 'jucători')}` : 'Adaugă'}
               </Text>
             </Pressable>
           </View>

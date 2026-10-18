@@ -18,6 +18,7 @@ import Button from '../../../components/ui/Button';
 import { useSession } from '../../../context/AuthContext';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { normalizeRole } from '../../../utils/authSession';
+import { plural } from '../../../utils/plural';
 
 /** Roles the server lets change an event (ensureTeamAccess); others only read it. */
 const EDITOR_ROLES = new Set(['admin', 'superadmin', 'manager']);
@@ -442,7 +443,7 @@ export default function EventDetailScreen() {
                       icon="shield"
                       label={team?.leagueName || 'Echipă'}
                       value={team?.name ?? event.teamName ?? 'Echipă'}
-                      sub={playerCount != null ? `${playerCount} ${playerCount === 1 ? 'jucător' : 'jucători'} în lot` : undefined}
+                      sub={playerCount != null ? `${plural(playerCount, 'jucător', 'jucători')} în lot` : undefined}
                     />
                     {event.coachName && event.coachName !== 'FRB' ? (
                       <InfoRow icon="person" label="Antrenor" value={event.coachName} />

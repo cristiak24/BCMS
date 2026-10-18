@@ -6,6 +6,7 @@ import type { CalendarEvent } from '../../../services/eventsApi';
 import { useAddEventForm, type AddEventType } from '../../../hooks/useAddEventForm';
 import { FormField } from '../../ui/FormField';
 import { EVENT_TYPE_META } from '../scheduleShared';
+import { plural } from '../../../utils/plural';
 
 /**
  * "Eveniment nou" — bottom sheet on phones, centred dialog on desktop.
@@ -438,7 +439,7 @@ export function AddEventModal({
                               onPress={() => setRecurringWeeks(weeks)}
                               accessibilityRole="radio"
                               accessibilityState={{ selected }}
-                              accessibilityLabel={`${weeks} săptămâni`}
+                              accessibilityLabel={plural(weeks, 'săptămână', 'săptămâni')}
                               className="flex-1 h-9 rounded-[8px] items-center justify-center"
                               style={{ backgroundColor: selected ? 'var(--c-surface)' : 'transparent', boxShadow: selected ? 'var(--e-xs)' : 'none' } as any}
                             >

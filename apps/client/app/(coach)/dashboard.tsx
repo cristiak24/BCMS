@@ -27,6 +27,7 @@ import {
   getEventTimestamp,
   isUpcoming,
 } from '../../components/coach/coachUtils';
+import { plural } from '../../utils/plural';
 
 /**
  * "Panou antrenor" — a digest, not an archive: a greeting with the very next
@@ -58,7 +59,7 @@ function formatCountdown(value: string, now = Date.now()) {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `în ${hours} h`;
   const days = Math.round(hours / 24);
-  return days === 1 ? 'în 1 zi' : `în ${days} zile`;
+  return `în ${plural(days, 'zi', 'zile')}`;
 }
 
 /** Glass tile inside the hero: what's next and when. */
@@ -144,7 +145,7 @@ function WeekStrip({ events }: { events: CalendarEvent[] }) {
         <View>
           <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Săptămâna ta</Text>
           <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
-            {total === 0 ? 'Nicio sesiune în următoarele 7 zile' : `${total} ${total === 1 ? 'sesiune' : 'sesiuni'} în următoarele 7 zile`}
+            {total === 0 ? 'Nicio sesiune în următoarele 7 zile' : `${plural(total, 'sesiune', 'sesiuni')} în următoarele 7 zile`}
           </Text>
         </View>
         <View className="w-9 h-9 rounded-[10px] items-center justify-center" style={{ backgroundColor: 'var(--c-sky-bg)' }}>
@@ -161,7 +162,7 @@ function WeekStrip({ events }: { events: CalendarEvent[] }) {
               backgroundColor: day.isToday ? 'var(--c-brand-surface)' : day.events.length ? 'var(--c-surface-2)' : 'transparent',
               borderColor: day.isToday ? 'var(--c-brand-surface)' : 'var(--c-border-soft)',
             } as any}
-            accessibilityLabel={`${day.weekday} ${day.date}: ${day.events.length} sesiuni`}
+            accessibilityLabel={`${day.weekday} ${day.date}: ${plural(day.events.length, 'sesiune', 'sesiuni')}`}
           >
             <Text className="text-[11px] font-semibold capitalize" style={{ color: day.isToday ? 'var(--c-on-brand)' : 'var(--c-muted)' }}>
               {day.weekday}
@@ -400,9 +401,9 @@ export default function CoachDashboardScreen() {
               }
             >
               <View className="flex-row flex-wrap gap-1.5">
-                <Chip icon="event" label={`${thisWeekEvents.length} ${thisWeekEvents.length === 1 ? 'sesiune' : 'sesiuni'} săptămâna asta`} />
-                {thisWeekMatches ? <Chip icon="sports-basketball" label={`${thisWeekMatches} ${thisWeekMatches === 1 ? 'meci' : 'meciuri'}`} /> : null}
-                <Chip icon="groups" label={`${visibleTeamsCount} ${visibleTeamsCount === 1 ? 'echipă' : 'echipe'}`} />
+                <Chip icon="event" label={`${plural(thisWeekEvents.length, 'sesiune', 'sesiuni')} săptămâna asta`} />
+                {thisWeekMatches ? <Chip icon="sports-basketball" label={`${plural(thisWeekMatches, 'meci', 'meciuri')}`} /> : null}
+                <Chip icon="groups" label={`${plural(visibleTeamsCount, 'echipă', 'echipe')}`} />
               </View>
 
               {/* Two columns at 375px rather than four: four tiles across a phone
@@ -412,7 +413,7 @@ export default function CoachDashboardScreen() {
                 <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 flex-1 min-w-0 ui-stagger">
                   <GlassStat dot="var(--c-brand-fg)" label="Sesiuni" value={upcomingEvents.length} hint="programate" />
                   <GlassStat dot="var(--c-sky-fg)" label="7 zile" value={thisWeekEvents.length} hint="săptămâna asta" />
-                  <GlassStat dot="var(--c-purple)" label="Jucători" value={playerCount} hint={`în ${visibleTeamsCount} ${visibleTeamsCount === 1 ? 'echipă' : 'echipe'}`} />
+                  <GlassStat dot="var(--c-purple)" label="Jucători" value={playerCount} hint={`în ${plural(visibleTeamsCount, 'echipă', 'echipe')}`} />
                   <GlassStat
                     dot={averageAttendance == null ? 'var(--c-faint)' : averageAttendance >= 75 ? 'var(--c-success)' : averageAttendance >= 50 ? 'var(--c-warning)' : 'var(--c-danger)'}
                     label="Prezență"

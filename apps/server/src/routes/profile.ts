@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
-import { eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { requireRequestUser } from '../lib/requestContext';
 import { authenticate } from '../middleware/auth';
 import { toIso } from '../lib/dateUtils';
 import { db } from '../db';
 import { clubs, playersToTeams, teams, users } from '../db/schema';
 import { apiOrigin, deleteStoredFile, fileKeyFromUrl, saveStoredFile, sniffMime } from '../lib/storedFiles';
-import { requestedChildId, resolveSelfPlayer } from '../lib/selfPlayer';
+import { guardianChildren, requestedChildId, resolveSelfPlayer, teamIdsOfPlayers } from '../lib/selfPlayer';
 import { checkProfileFields } from '../lib/profileInput';
 
 type NotificationPreferences = {
@@ -49,6 +49,29 @@ async function findUserByNumericId(userId: number) {
     return rows[0] ?? null;
 }
 
+/**
+ * Every team the account belongs to, for the profile's "Echipe" row: a coach's
+ * own squads (it read "Neatribuit"), all of a parent's children's teams (not
+ * only the selected child's), a player's memberships.
+ */
+async function profileTeamNames(user: { id: number; role: string; clubId: number | null }, selfPlayerId: number | null) {
+    let rows: Array<{ name: string }>;
+    if (user.role === 'coach') {
+        rows = user.clubId == null ? [] : await db.select({ name: teams.name }).from(teams)
+            .where(and(eq(teams.coachId, user.id), eq(teams.clubId, user.clubId)))
+            .orderBy(asc(teams.name));
+    } else {
+        const playerIds = user.role === 'parent'
+            ? (await guardianChildren(user.id)).map((child) => child.id)
+            : selfPlayerId != null ? [selfPlayerId] : [];
+        const teamIds = await teamIdsOfPlayers(playerIds);
+        rows = teamIds.length
+            ? await db.select({ name: teams.name }).from(teams).where(inArray(teams.id, teamIds)).orderBy(asc(teams.name))
+            : [];
+    }
+    return Array.from(new Set(rows.map((row) => row.name)));
+}
+
 async function resolveProfileRecord(userId: number, childId: number | null = null) {
     const user = await findUserByNumericId(userId);
     if (!user) {
@@ -86,6 +109,8 @@ async function resolveProfileRecord(userId: number, childId: number | null = nul
         }
     }
 
+    const teamNames = await profileTeamNames(user, player?.id ?? null);
+
     const firstName = user.firstName ?? player?.firstName ?? user.name.split(' ')[0] ?? '';
     const lastName = user.lastName ?? player?.lastName ?? user.name.split(' ').slice(1).join(' ') ?? '';
     const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || user.name;
@@ -102,6 +127,7 @@ async function resolveProfileRecord(userId: number, childId: number | null = nul
         clubId,
         clubName,
         teamName,
+        teamNames,
         teamIds: Array.from(teamIds).map(String),
         avatarUrl: user.avatarUrl ?? null,
         phone: user.phone ?? null,

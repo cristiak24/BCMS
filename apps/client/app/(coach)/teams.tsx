@@ -15,6 +15,8 @@ import { attendanceRateColor, getPlayerBadge } from '../../components/coach/coac
 import ProgressRing from '../../components/ui/ProgressRing';
 import { formatCoachDate, getCoachScopedEvents, getEventTimestamp, isUpcoming } from '../../components/coach/coachUtils';
 import { ATTENDANCE_PERIOD_LABEL, pooledAttendanceRate } from '../../utils/attendanceRate';
+import { plural, pluralWord } from '../../utils/plural';
+import { playerStatusLabel } from '../../utils/playerStatus';
 
 /**
  * "Echipe" — the coach's squads, each card carrying the three things a coach
@@ -90,7 +92,7 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
       ) : null}
 
       <View className="flex-row gap-2 sm:gap-2.5">
-        <StatTile icon="groups" tone="purple" label="Lot" value={team.players.length} hint={team.players.length === 1 ? 'jucător' : 'jucători'} />
+        <StatTile icon="groups" tone="purple" label="Lot" value={team.players.length} hint={pluralWord(team.players.length, 'jucător', 'jucători')} />
         <StatTile
           icon="event"
           tone="brand"
@@ -112,7 +114,7 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
                 firstName={player.firstName}
                 lastName={player.lastName}
                 badge={getPlayerBadge(player)}
-                meta={player.position || player.status || 'Jucător'}
+                meta={player.position || playerStatusLabel(player.status)}
                 rate={player.attendanceRate ?? null}
                 trailing={<AttendanceRate rate={player.attendanceRate} />}
               />
@@ -120,7 +122,7 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
           </View>
           {hidden > 0 ? (
             <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
-              +{hidden} {hidden === 1 ? 'alt jucător' : 'alți jucători'} în lot
+              +{plural(hidden, 'alt jucător', 'alți jucători')} în lot
             </Text>
           ) : null}
         </View>
@@ -214,7 +216,7 @@ export default function CoachTeamsScreen() {
   const teamsAverage = pooledAttendanceRate(visibleTeams.flatMap((team) => team.players));
 
   const subtitle = visibleTeams.length
-    ? `${visibleTeams.length} ${visibleTeams.length === 1 ? 'echipă' : 'echipe'} · ${session?.clubName ?? 'Clubul tău'}`
+    ? `${plural(visibleTeams.length, 'echipă', 'echipe')} · ${session?.clubName ?? 'Clubul tău'}`
     : 'Loturile și activitatea lor viitoare.';
 
   return (

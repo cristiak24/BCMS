@@ -16,6 +16,7 @@ import { apiFetch } from '../../../services/apiClient';
 import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import { EmptyState, SkeletonBlock } from '../../../components/dashboard/ScreenStates';
 import { dash } from '../../../components/dashboard/dashboardTheme';
+import { plural } from '../../../utils/plural';
 
 /* ─── Types for Finances tab ────────────────────────────────────── */
 type AccountingStatus = 'pending' | 'approved' | 'rejected';
@@ -517,7 +518,7 @@ export default function FinancialSettingsPage() {
                         <GlassStat
                             dot="var(--c-danger)"
                             label="Restanțe"
-                            hint={summary ? `${summary.playersOverdue} ${summary.playersOverdue === 1 ? 'jucător' : 'jucători'}` : undefined}
+                            hint={summary ? `${plural(summary.playersOverdue, 'jucător', 'jucători')}` : undefined}
                             value={loadingSummary || !summary ? '—' : Math.round(summary.overdue).toLocaleString('ro-RO')}
                             suffix={loadingSummary || !summary ? undefined : 'RON'}
                         />

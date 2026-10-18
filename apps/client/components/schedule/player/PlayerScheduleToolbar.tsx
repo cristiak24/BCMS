@@ -4,6 +4,7 @@ import {
   ChevronLeft, ChevronRight, LayoutGrid, List, CalendarDays, Download, RotateCw, X, Search,
 } from 'lucide-react';
 import { EVENT_TYPE_META } from '../scheduleShared';
+import { plural } from '../../../utils/plural';
 
 /*
  * The player schedule's control surface, in ONE row.
@@ -277,7 +278,7 @@ export function PlayerScheduleToolbar({
           <TouchableOpacity onPress={onToday} accessibilityLabel="Mergi la luna curentă" className="flex-1 items-center justify-center h-10">
             <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{monthTitle}</Text>
             <Text className="text-[11.5px] font-medium" style={{ color: 'var(--c-faint)' }}>
-              {eventCount} {eventCount === 1 ? 'eveniment' : 'evenimente'}
+              {plural(eventCount, 'eveniment', 'evenimente')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -316,7 +317,7 @@ export function PlayerScheduleToolbar({
         {monthNav}
 
         <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>
-          {eventCount} {eventCount === 1 ? 'eveniment' : 'evenimente'}
+          {plural(eventCount, 'eveniment', 'evenimente')}
         </Text>
 
         <View className="w-px h-6" style={{ backgroundColor: 'var(--c-border)' }} />

@@ -19,6 +19,7 @@ import { NoTeamsEmptyState, NoResultsEmptyState } from '../../components/myclub/
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
 import { toCsv } from '../../utils/csv';
+import { plural } from '../../utils/plural';
 
 const VIEW_STORAGE_KEY = 'myclub.view.v1';
 
@@ -203,7 +204,7 @@ export default function MyClubAdmin() {
                 showToast({ variant: 'success', message: successMsg(succeeded.length) });
             }
             if (failed > 0) {
-                showToast({ variant: 'error', message: `${failed} ${failed === 1 ? 'echipă nu a putut fi actualizată' : 'echipe nu au putut fi actualizate'}.` });
+                showToast({ variant: 'error', message: `${plural(failed, 'echipă nu a putut fi actualizată', 'echipe nu au putut fi actualizate')}.` });
             }
         } finally {
             setBulkBusy(false);
@@ -214,17 +215,17 @@ export default function MyClubAdmin() {
     const handleBulkArchive = () => runBulkUpdate(
         Array.from(selectedIds),
         (id) => teamsApi.updateTeam(id, { isActive: false }),
-        (n) => `${n} ${n === 1 ? 'echipă arhivată' : 'echipe arhivate'}.`,
+        (n) => `${plural(n, 'echipă arhivată', 'echipe arhivate')}.`,
     );
     const handleBulkActivate = () => runBulkUpdate(
         Array.from(selectedIds),
         (id) => teamsApi.updateTeam(id, { isActive: true }),
-        (n) => `${n} ${n === 1 ? 'echipă activată' : 'echipe activate'}.`,
+        (n) => `${plural(n, 'echipă activată', 'echipe activate')}.`,
     );
     const handleBulkReassignCoach = (coachId: number) => runBulkUpdate(
         Array.from(selectedIds),
         (id) => teamsApi.updateTeam(id, { coachId }),
-        (n) => `Antrenor schimbat pentru ${n} ${n === 1 ? 'echipă' : 'echipe'}.`,
+        (n) => `Antrenor schimbat pentru ${plural(n, 'echipă', 'echipe')}.`,
     );
 
     const handleBulkSyncFrb = async () => {
@@ -243,7 +244,7 @@ export default function MyClubAdmin() {
             });
             if (updates.length > 0) {
                 setTeams((prev) => prev.map((t) => updates.find((u) => u.id === t.id) ?? t));
-                showToast({ variant: 'success', message: `${updates.length} ${updates.length === 1 ? 'echipă actualizată' : 'echipe actualizate'} din FRB.` });
+                showToast({ variant: 'success', message: `${plural(updates.length, 'echipă actualizată', 'echipe actualizate')} din FRB.` });
             } else {
                 showToast({ variant: 'info', message: 'Toate echipele selectate sunt deja la zi cu FRB.' });
             }
@@ -267,14 +268,15 @@ export default function MyClubAdmin() {
             t.updatedAt,
         ]);
         const csv = toCsv([header, ...rows]);
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        // BOM: Excel reads the file as UTF-8 (diacritics) only with it.
+        const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         link.download = `echipe-${new Date().toISOString().slice(0, 10)}.csv`;
         link.click();
         URL.revokeObjectURL(url);
-        showToast({ variant: 'success', message: `${targets.length} ${targets.length === 1 ? 'echipă exportată' : 'echipe exportate'} în CSV.` });
+        showToast({ variant: 'success', message: `${plural(targets.length, 'echipă exportată', 'echipe exportate')} în CSV.` });
     };
 
     const openWizard = (source?: 'frb') => {
@@ -336,7 +338,7 @@ export default function MyClubAdmin() {
                         />
 
                         <View className="flex-row items-center justify-between gap-3 mb-3">
-                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>{filteredTeams.length} din {teams.length} echipe</Text>
+                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>{filteredTeams.length} din {plural(teams.length, 'echipă', 'echipe')}</Text>
                             {filteredTeams.length > 0 && (
                                 <Pressable onPress={toggleSelectAll} className="flex-row items-center gap-2 px-1 py-1">
                                     <ThemedCheckbox checked={allFilteredSelected} onToggle={toggleSelectAll} ariaLabel={selectAllLabel} size={17} />

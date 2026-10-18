@@ -11,6 +11,7 @@ import ConfirmDialog from '../ui/ConfirmDialog';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
+import { pluralWord } from '../../utils/plural';
 
 /**
  * "Documente" — the club's PDF library, one screen for every role (admin
@@ -325,7 +326,7 @@ export default function DocumentsScreen() {
           >
             {data ? (
               <View className="grid grid-cols-2 gap-2 max-w-[440px] ui-stagger">
-                <GlassStat value={data.documents.length} label={data.documents.length === 1 ? 'document' : 'documente'} dot="var(--c-brand-fg)" />
+                <GlassStat value={data.documents.length} label={pluralWord(data.documents.length, 'document', 'documente')} dot="var(--c-brand-fg)" />
                 {canUpload ? (
                   <GlassStat
                     value={formatBytes(data.usedBytes)}

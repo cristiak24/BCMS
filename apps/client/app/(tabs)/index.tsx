@@ -37,6 +37,8 @@ import TeamStandingsCard from '../../components/standings/TeamStandingsCard';
 import { getEventTypeMeta } from '../../components/schedule/scheduleShared';
 import { internalMatchResult, type MatchOutcome } from '../../utils/matchResult';
 import { activityLabel, isOngoing, upcomingActivities } from '../../utils/homeAgenda';
+import { isEliteRhythm } from '../../utils/attendanceBadge';
+import { plural, pluralWord } from '../../utils/plural';
 
 type HubEvent = CalendarEvent & {
   source?: 'internal' | 'frb';
@@ -494,12 +496,12 @@ function getAttendanceTrend(countedDescending: PlayerAttendanceRecord[], chunkSi
   return Math.round((rate(recent) - rate(previous)) * 100);
 }
 
-function getAttendanceTone(rate: number | null) {
+function getAttendanceTone(rate: number | null, sessions: number) {
   if (rate == null) {
     return { label: 'În așteptare', color: 'var(--c-muted)' };
   }
 
-  if (rate >= 90) {
+  if (isEliteRhythm(rate, sessions)) {
     return { label: 'Ritm de elită', color: palette.green };
   }
 
@@ -560,7 +562,7 @@ function HeroAttendance({
   playerAttendance: PlayerAttendanceSummary | null;
   attendanceRate: number | null;
 }) {
-  const tone = getAttendanceTone(attendanceRate);
+  const tone = getAttendanceTone(attendanceRate, playerAttendance?.total ?? 0);
 
   return (
     <View className="glass flex-row items-center gap-3.5 rounded-[14px] px-4 py-3 lg:w-[320px]" style={{ boxShadow: 'var(--e-md)' } as any}>
@@ -580,7 +582,7 @@ function HeroAttendance({
         <Text className="f-display text-[15px] font-bold mt-0.5" style={{ color: tone.color }}>{tone.label}</Text>
         <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
           {playerAttendance?.total
-            ? `${playerAttendance.present}/${playerAttendance.total} sesiuni recente`
+            ? `${playerAttendance.present}/${playerAttendance.total} ${pluralWord(playerAttendance.total, 'sesiune recentă', 'sesiuni recente')}`
             : 'Nicio prezență marcată încă'}
         </Text>
       </View>
@@ -609,8 +611,11 @@ function NextEventCard({
   label,
   icon,
   onPress,
+  emptyText = 'Nimic programat.',
 }: {
   event: HubEvent | null;
+  /** What the card says with no event: a result card has nothing "scheduled". */
+  emptyText?: string;
   label: string;
   accent: string;
   accentBg: string;
@@ -645,7 +650,7 @@ function NextEventCard({
         </View>
       ) : (
         <View className="flex-1 justify-center mt-3">
-          <Text className="text-[13px] font-medium" style={{ color: 'var(--c-faint)' }}>Nimic programat.</Text>
+          <Text className="text-[13px] font-medium" style={{ color: 'var(--c-faint)' }}>{emptyText}</Text>
         </View>
       )}
     </>
@@ -817,7 +822,10 @@ function PlayerFormStats({
   monthCount,
   lastMonthCount,
   isMobile,
+  title,
 }: {
+  /** "Forma ta" for the player; a parent is looking at their child. */
+  title: string;
   streak: number;
   strip: PlayerAttendanceRecord[];
   trendDelta: number | null;
@@ -841,7 +849,7 @@ function PlayerFormStats({
     <GlassCard className="ui-rise">
       <View className="flex-row items-center justify-between gap-3 mb-4">
         <View>
-          <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Forma ta</Text>
+          <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
           <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Consistență, rezultate și volum de lucru</Text>
         </View>
         <View className="w-9 h-9 rounded-[10px] items-center justify-center" style={{ backgroundColor: 'var(--c-success-bg)' }}>
@@ -852,7 +860,7 @@ function PlayerFormStats({
         <FormColumn icon="event-available" label="Consistență">
           {hasAttendanceData ? (
             <>
-              <View className="flex-row items-end gap-1.5 mb-2.5 ui-stagger" accessibilityLabel={`Ultimele ${strip.length} sesiuni marcate`}>
+              <View className="flex-row items-end gap-1.5 mb-2.5 ui-stagger" accessibilityLabel={strip.length === 1 ? 'Ultima sesiune marcată' : `Ultimele ${plural(strip.length, 'sesiune marcată', 'sesiuni marcate')}`}>
                 {strip.slice().reverse().map((record) => (
                   <View
                     key={record.event.id}
@@ -861,7 +869,7 @@ function PlayerFormStats({
                 ))}
               </View>
               <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>
-                {streak > 0 ? `${streak} sesiuni consecutive prezent` : 'Fără sesiuni consecutive momentan'}
+                {streak > 0 ? `${plural(streak, 'sesiune', 'sesiuni')} la rând cu prezență` : 'Fără sesiuni consecutive momentan'}
               </Text>
               {trendDelta != null ? (
                 <Text className="text-[12px] font-semibold mt-1" style={{ color: trendDelta >= 0 ? 'var(--c-success-fg)' : 'var(--c-danger-fg)' }}>
@@ -1155,10 +1163,10 @@ function PlayerHomeScreen() {
             <HeroAttendance playerAttendance={playerAttendance} attendanceRate={attendanceRate} />
             {loading ? null : (
               <View className="flex-row flex-wrap gap-1.5 flex-1 min-w-0">
-                <Chip icon="fitness-center" label={`${weekTrainingCount} ${weekTrainingCount === 1 ? 'antrenament' : 'antrenamente'} în 7 zile`} />
-                {weekMatchCount ? <Chip icon="sports-basketball" label={`${weekMatchCount} ${weekMatchCount === 1 ? 'meci' : 'meciuri'}`} /> : null}
-                {weekCampCount ? <Chip icon="cabin" label={`${weekCampCount} ${weekCampCount === 1 ? 'cantonament' : 'cantonamente'}`} /> : null}
-                {attendanceStreak > 1 ? <Chip icon="bolt" label={`${attendanceStreak} prezențe la rând`} /> : null}
+                <Chip icon="fitness-center" label={`${plural(weekTrainingCount, 'antrenament', 'antrenamente')} în 7 zile`} />
+                {weekMatchCount ? <Chip icon="sports-basketball" label={`${plural(weekMatchCount, 'meci', 'meciuri')}`} /> : null}
+                {weekCampCount ? <Chip icon="cabin" label={`${plural(weekCampCount, 'cantonament', 'cantonamente')}`} /> : null}
+                {attendanceStreak > 1 ? <Chip icon="bolt" label={`${plural(attendanceStreak, 'prezență', 'prezențe')} la rând`} /> : null}
               </View>
             )}
           </View>
@@ -1192,6 +1200,7 @@ function PlayerHomeScreen() {
             accentBg={palette.greenBg}
             icon="emoji-events"
             label="Ultimul rezultat"
+            emptyText="Niciun rezultat încă."
             onPress={latestResult ? () => setSelectedEvent(latestResult) : undefined}
           />
         </View>
@@ -1240,6 +1249,7 @@ function PlayerHomeScreen() {
               monthCount={sessionMonthCounts.current}
               lastMonthCount={sessionMonthCounts.previous}
               isMobile={isMobile}
+              title={isParent ? 'Forma copilului' : 'Forma ta'}
             />
 
             {/* Trainings and matches side by side from xl: at 1280px+ a single
@@ -1278,7 +1288,7 @@ function PlayerHomeScreen() {
               <SectionHeader
                 eyebrow="Zi de meci"
                 title="Meciuri viitoare"
-                subtitle="Următoarele meciuri ale echipei tale."
+                subtitle={isParent ? 'Următoarele meciuri ale echipei copilului.' : 'Următoarele meciuri ale echipei tale.'}
                 actionLabel={seeAllLabel(allUpcomingGames.length)}
                 onAction={goToSchedule}
                 isMobile={isMobile}
@@ -1299,7 +1309,7 @@ function PlayerHomeScreen() {
                   ))}
                 </View>
               ) : (
-                <EmptyState icon="sports-basketball" compact title="Niciun meci viitor" message="Meciurile programate ale echipei tale apar aici." />
+                <EmptyState icon="sports-basketball" compact title="Niciun meci viitor" message={isParent ? 'Meciurile programate ale echipei copilului apar aici.' : 'Meciurile programate ale echipei tale apar aici.'} />
               )}
             </View>
             </View>
@@ -1308,7 +1318,7 @@ function PlayerHomeScreen() {
               <SectionHeader
                 eyebrow="Tabelă"
                 title="Rezultate meciuri"
-                subtitle="Ultimele meciuri încheiate ale echipei tale."
+                subtitle={isParent ? 'Ultimele meciuri încheiate ale echipei copilului.' : 'Ultimele meciuri încheiate ale echipei tale.'}
                 actionLabel={seeAllLabel(allGameResults.length)}
                 onAction={goToSchedule}
                 isMobile={isMobile}

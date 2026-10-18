@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from '@/src/web/reactNative'
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocation } from 'react-router-dom';
 import { l12Api } from '../../services/l12Api';
+import { plural } from '../../utils/plural';
 
 /** Admin and coach share the L12 screens under their own prefix. */
 export function useL12Base() {
@@ -54,7 +55,7 @@ export function L12MatchLink({ eventId, onOpen }: { eventId: number; onOpen: (pa
       <View className="flex-1 min-w-0">
         <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-ink)' }}>L12 — lista oficială</Text>
         <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
-          {state === 'loading' ? 'Se verifică…' : state === 'set' ? `${count} jucători pe foaie · export PDF / Word` : 'Nesetat — pornește din L12-ul constant'}
+          {state === 'loading' ? 'Se verifică…' : state === 'set' ? `${plural(count, 'jucător', 'jucători')} pe foaie · export PDF / Word` : 'Nesetat — pornește din L12-ul constant'}
         </Text>
       </View>
       {state === 'loading' ? <ActivityIndicator size="small" color="var(--c-faint)" /> : <StatusChip set={state === 'set'} label={state === 'set' ? `${count}/12` : 'Nesetat'} />}

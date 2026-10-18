@@ -355,6 +355,16 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
   }
 
   const roleLabel = ROLE_LABELS[String(profile.role ?? '').toLowerCase()] ?? profile.role;
+  const role = String(profile.role ?? '').toLowerCase();
+  const teamNames = profile.teamNames?.length ? profile.teamNames : profile.teamName ? [profile.teamName] : [];
+  const teamsLabel = role === 'coach'
+    ? (teamNames.length === 1 ? 'Echipa antrenată' : 'Echipe antrenate')
+    : role === 'parent'
+      ? (teamNames.length === 1 ? 'Echipa copilului' : 'Echipele copiilor')
+      : teamNames.length > 1 ? 'Echipe' : 'Echipă';
+  const teamsValue = teamNames.length
+    ? teamNames.join(', ')
+    : role === 'coach' ? 'Nicio echipă alocată' : role === 'parent' ? 'Niciun copil într-o echipă' : 'Neatribuit';
   const statusMeta = STATUS_META[String(profile.status ?? '').toLowerCase()] ?? {
     label: profile.status ?? '—',
     fg: 'var(--c-muted)',
@@ -449,7 +459,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
                 <View className="h-px" style={{ backgroundColor: 'var(--c-border-soft)' }} />
                 <InfoRow icon="apartment" label="Club" value={profile.clubName ?? 'Neatribuit'} />
                 <View className="h-px" style={{ backgroundColor: 'var(--c-border-soft)' }} />
-                <InfoRow icon="groups" label="Echipă" value={profile.teamName ?? 'Neatribuit'} />
+                <InfoRow icon="groups" label={teamsLabel} value={teamsValue} />
                 <View className="h-px" style={{ backgroundColor: 'var(--c-border-soft)' }} />
                 <InfoRow icon="badge" label="Rol" value={roleLabel} />
               </View>

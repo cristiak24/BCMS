@@ -3,6 +3,7 @@ import React from 'react';
 import { View, Text, Modal, Pressable, TouchableOpacity, ScrollView } from '@/src/web/reactNative';
 import { X, Clock, CheckCircle, XCircle, BriefcaseMedical, Clock3, ChevronRight, CalendarDays } from 'lucide-react';
 import { useResponsive } from '../../hooks/useResponsive';
+import { pluralWord } from '../../utils/plural';
 
 interface AttendanceDetailsModalProps {
     visible: boolean;
@@ -69,7 +70,7 @@ export function AttendanceDetailsModal({ visible, onClose, player, date, details
                         <View className="flex-row items-center gap-2 mt-4">
                             <View className="flex-row items-center gap-1.5 bg-white border border-slate-200 rounded-full px-3 py-1.5">
                                 <Text className="text-[11px] font-black text-[#0E2041]">{details.length}</Text>
-                                <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{details.length === 1 ? 'sesiune' : 'sesiuni'}</Text>
+                                <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{pluralWord(details.length, 'sesiune', 'sesiuni')}</Text>
                             </View>
                             <View className="flex-row items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-full px-3 py-1.5">
                                 <CheckCircle size={12} color="var(--c-success)" />
