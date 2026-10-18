@@ -92,26 +92,77 @@ function parseStandingsTable(raw: string): ParsedStanding[] {
 }
 
 // ---------- GET /api/basketball/leagues ----------
+/**
+ * FRB competitions, by the `leagueId` each frbaschet.ro competition page embeds
+ * (read 2026-10-18; the client's components/myclub/frbLeagues.ts is the same
+ * list). Only seniors and U14–U18 boys were listed, so children's teams (U12,
+ * U13, U15, U20, every girls' league) could not be found. Liga a II-a is left
+ * out: its last FRB season is 2012-2013.
+ */
+export const FRB_LEAGUES: ReadonlyArray<{ id: string; name: string; gender: 'M' | 'F' }> = [
+    { id: '25493', name: 'LNBM', gender: 'M' },
+    { id: '25523', name: 'Liga 1 Masculin', gender: 'M' },
+    { id: '8336', name: 'Cupa României Masculin', gender: 'M' },
+    { id: '39679', name: 'Supercupa Masculin', gender: 'M' },
+    { id: '8342', name: 'U20 Masculin', gender: 'M' },
+    { id: '43666', name: 'U19 Masculin', gender: 'M' },
+    { id: '8339', name: 'U18 Masculin', gender: 'M' },
+    { id: '8353', name: 'U17 Masculin', gender: 'M' },
+    { id: '8348', name: 'U16 Masculin', gender: 'M' },
+    { id: '8351', name: 'U15 Masculin', gender: 'M' },
+    { id: '8346', name: 'U14 Masculin', gender: 'M' },
+    { id: '8349', name: 'U13 Masculin', gender: 'M' },
+    { id: '8943', name: 'U12 Masculin', gender: 'M' },
+    { id: '44533', name: 'U12 4x4 Masculin', gender: 'M' },
+    { id: '35627', name: 'CAN U12 Masculin', gender: 'M' },
+    { id: '8963', name: 'CAN U10 Masculin', gender: 'M' },
+    { id: '25503', name: 'LNBF', gender: 'F' },
+    { id: '25533', name: 'Liga 1 Feminin', gender: 'F' },
+    { id: '8337', name: 'Cupa României Feminin', gender: 'F' },
+    { id: '8343', name: 'U20 Feminin', gender: 'F' },
+    { id: '43665', name: 'U19 Feminin', gender: 'F' },
+    { id: '8340', name: 'U18 Feminin', gender: 'F' },
+    { id: '8354', name: 'U17 Feminin', gender: 'F' },
+    { id: '8347', name: 'U16 Feminin', gender: 'F' },
+    { id: '8352', name: 'U15 Feminin', gender: 'F' },
+    { id: '8345', name: 'U14 Feminin', gender: 'F' },
+    { id: '8350', name: 'U13 Feminin', gender: 'F' },
+    { id: '8953', name: 'U12 Feminin', gender: 'F' },
+    { id: '44534', name: 'U12 4x4 Feminin', gender: 'F' },
+    { id: '35629', name: 'CAN U12 Feminin', gender: 'F' },
+    { id: '8973', name: 'CAN U10 Feminin', gender: 'F' },
+];
+
 router.get('/leagues', (_req, res) => {
-    // Returnăm direct — lista este configurație fixă (ID-uri din FRB)
-    res.json([
-        { id: '25493', name: 'LNBM' },
-        { id: '25523', name: 'Liga 1 Masculin' },
-        { id: '25503', name: 'LNBF' },
-        { id: '25533', name: 'Liga 1 Feminin' },
-        { id: '8339', name: 'U18' },
-        { id: '8348', name: 'U16' },
-        { id: '8346', name: 'U14' },
-    ]);
+    res.json(FRB_LEAGUES);
 });
+
+/**
+ * FRB ids are plain numbers. Anything else used to be pasted into the upstream
+ * URL and answered 200 with an empty list; it is a bad request.
+ */
+const FRB_ID = /^\d{1,9}$/;
+
+function requireIds(req: { query: unknown }, res: { status: (code: number) => { json: (body: unknown) => void } }, names: string[], optional: string[] = []) {
+    const query = req.query as Record<string, unknown>;
+    const missing = names.filter((name) => typeof query[name] !== 'string' || !query[name]);
+    if (missing.length) {
+        res.status(400).json({ error: `${missing.join(' and ')} required` });
+        return null;
+    }
+    const invalid = [...names, ...optional].filter((name) => query[name] != null && query[name] !== '' && !(typeof query[name] === 'string' && FRB_ID.test(query[name] as string)));
+    if (invalid.length) {
+        res.status(400).json({ error: `${invalid.join(' and ')} must be numeric FRB ids` });
+        return null;
+    }
+    return query as Record<string, string>;
+}
 
 // ---------- GET /api/basketball/seasons?leagueId= ----------
 router.get('/seasons', basketballProxyRateLimit, async (req, res) => {
-    const { leagueId } = req.query as Record<string, string>;
-    if (!leagueId) {
-        res.status(400).json({ error: 'leagueId required' });
-        return;
-    }
+    const query = requireIds(req, res, ['leagueId']);
+    if (!query) return;
+    const { leagueId } = query;
 
     try {
         const url = `https://widgets.baskethotel.com/widget-service/show?api=${getFrbApiKey()}&request[0][widget]=320&request[0][param][league_id]=${leagueId}`;
@@ -134,11 +185,9 @@ router.get('/seasons', basketballProxyRateLimit, async (req, res) => {
 
 // ---------- GET /api/basketball/teams?leagueId=&seasonId= ----------
 router.get('/teams', basketballProxyRateLimit, async (req, res) => {
-    const { leagueId, seasonId } = req.query as Record<string, string>;
-    if (!leagueId || !seasonId) {
-        res.status(400).json({ error: 'leagueId and seasonId required' });
-        return;
-    }
+    const query = requireIds(req, res, ['leagueId', 'seasonId']);
+    if (!query) return;
+    const { leagueId, seasonId } = query;
 
     try {
         const url = `https://widgets.baskethotel.com/widget-service/show?api=${getFrbApiKey()}&request[0][widget]=201&request[0][param][league_id][0]=${leagueId}&request[0][param][season_id]=${seasonId}&request[0][param][team_link_visible]=1&request[0][param][team_link_type]=3`;
@@ -171,9 +220,12 @@ router.get('/teams', basketballProxyRateLimit, async (req, res) => {
 
 // ---------- GET /api/basketball/matches?teamId=&seasonId=&leagueId=&month= ----------
 router.get('/matches', basketballProxyRateLimit, async (req, res) => {
-    const { teamId, seasonId, month, leagueId } = req.query as Record<string, string>;
-    if (!teamId || !seasonId || !leagueId) {
-        res.status(400).json({ error: 'teamId, seasonId and leagueId required' });
+    const query = requireIds(req, res, ['teamId', 'seasonId', 'leagueId']);
+    if (!query) return;
+    const { teamId, seasonId, leagueId } = query;
+    const month = typeof query.month === 'string' ? query.month : '';
+    if (month && !/^\d{1,2}$/.test(month)) {
+        res.status(400).json({ error: 'month must be 1-12' });
         return;
     }
 
@@ -189,11 +241,9 @@ router.get('/matches', basketballProxyRateLimit, async (req, res) => {
 // "Fișă meci" — the per-game detail (quarters, referees, arena) that the
 // /matches rows now carry a gameId for.
 router.get('/game', basketballProxyRateLimit, async (req, res) => {
-    const { gameId, seasonId } = req.query as Record<string, string>;
-    if (!gameId || !seasonId) {
-        res.status(400).json({ error: 'gameId and seasonId required' });
-        return;
-    }
+    const query = requireIds(req, res, ['gameId', 'seasonId']);
+    if (!query) return;
+    const { gameId, seasonId } = query;
 
     try {
         const detail = await fetchFrbGameDetail({ gameId, seasonId });
@@ -210,11 +260,9 @@ router.get('/game', basketballProxyRateLimit, async (req, res) => {
 
 // ---------- GET /api/basketball/standings?seasonId=&leagueId= ----------
 router.get('/standings', basketballProxyRateLimit, async (req, res) => {
-    const { seasonId, leagueId } = req.query as Record<string, string>;
-    if (!seasonId || !leagueId) {
-        res.status(400).json({ error: 'seasonId and leagueId required' });
-        return;
-    }
+    const query = requireIds(req, res, ['seasonId', 'leagueId']);
+    if (!query) return;
+    const { seasonId, leagueId } = query;
 
     try {
         const baseUrl = `https://widgets.baskethotel.com/widget-service/show?api=${getFrbApiKey()}&lang=ro`;
