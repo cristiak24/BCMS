@@ -11,3 +11,6 @@ scripts/bcms-61b00-firebase-adminsdk-fbsvc-98ff59a97d.json
 
 # Local development database (npm run db:local)
 **/.pglite
+
+# E2E report/captures when E2E_OUTPUT_DIR points inside the repo (CI)
+e2e-results/
