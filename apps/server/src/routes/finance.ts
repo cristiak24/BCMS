@@ -44,7 +44,7 @@ import { applyCheckoutSession, feeIdMetadata, previewManualPayment, recordManual
 
 const router = Router();
 
-// Every finance endpoint requires a verified Firebase ID token. Per-route checks
+// Every finance endpoint requires a verified Clerk session token. Per-route checks
 // below narrow this further (admin/accountant vs. the player's own data). The
 // Stripe webhook is mounted separately in app.ts, before this router, because it
 // authenticates via the Stripe signature instead.

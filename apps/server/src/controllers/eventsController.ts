@@ -217,7 +217,7 @@ async function ensureTeamAccess(req: AuthenticatedRequest, teamId: number, event
     }
 
     const role = req.user?.role;
-    if (role !== 'admin' && role !== 'coach' && role !== 'manager') {
+    if (role !== 'admin' && role !== 'coach') {
         return { status: 403 as const, error: 'You do not have permission to modify events for this team.' };
     }
 
@@ -862,7 +862,7 @@ export const eventsController = {
     async syncFRBMatches(req: AuthenticatedRequest, res: Response) {
         try {
             const role = req.user?.role;
-            if (!isSuperadmin(req) && role !== 'admin' && role !== 'manager') {
+            if (!isSuperadmin(req) && role !== 'admin') {
                 return res.status(403).json({ error: 'Only club administrators can sync FRB matches.' });
             }
 

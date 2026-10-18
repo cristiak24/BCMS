@@ -711,7 +711,7 @@ export const playersController = {
     async sendPaymentReminders(req: AuthenticatedRequest, res: Response) {
         try {
             const role = req.user?.role;
-            if (role !== 'admin' && role !== 'superadmin' && role !== 'accountant' && role !== 'manager') {
+            if (role !== 'admin' && role !== 'superadmin' && role !== 'accountant') {
                 return res.status(403).json({ error: 'Forbidden' });
             }
             const clubId = getRequestClubId(req);
@@ -740,7 +740,7 @@ export const playersController = {
     async removeFromRoster(req: AuthenticatedRequest, res: Response) {
         try {
             const role = req.user?.role;
-            if (role !== 'admin' && role !== 'superadmin' && role !== 'coach' && role !== 'manager') {
+            if (role !== 'admin' && role !== 'superadmin' && role !== 'coach') {
                 return res.status(403).json({ error: 'Forbidden' });
             }
 
@@ -774,7 +774,7 @@ export const playersController = {
     async addPlayerToTeam(req: AuthenticatedRequest, res: Response) {
         try {
             const role = req.user?.role;
-            if (role !== 'admin' && role !== 'superadmin' && role !== 'coach' && role !== 'manager') {
+            if (role !== 'admin' && role !== 'superadmin' && role !== 'coach') {
                 return res.status(403).json({ error: 'Forbidden' });
             }
 
@@ -826,7 +826,7 @@ export const playersController = {
     async updatePlayer(req: AuthenticatedRequest, res: Response) {
         try {
             const role = req.user?.role;
-            if (role !== 'admin' && role !== 'superadmin' && role !== 'coach' && role !== 'manager') {
+            if (role !== 'admin' && role !== 'superadmin' && role !== 'coach') {
                 return res.status(403).json({ error: 'Forbidden' });
             }
 
