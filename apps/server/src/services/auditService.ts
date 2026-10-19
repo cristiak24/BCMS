@@ -58,6 +58,53 @@ export function auditRequest(
   });
 }
 
+/** Saves of one sheet by one person this close together are one sitting. */
+const ATTENDANCE_SITTING_MINUTES = 30;
+
+/**
+ * Attendance saves on every tap, so the journal gets one entry per session
+ * and sitting, not one per player: a save within half an hour of the same
+ * person's last entry for the same event folds into it (latest mark per
+ * player wins). Never throws.
+ */
+export async function auditAttendanceSave(
+  req: AuthenticatedRequest,
+  session: { eventId: number; clubId: number | null; title: string; startTime: string | null },
+  marks: { playerId: number; status: string }[],
+) {
+  try {
+    const actorUserId = req.user?.id == null ? null : Number(req.user.id);
+    const [last] = actorUserId == null ? [] : await db
+      .select({ id: auditLogs.id, metadata: auditLogs.metadata })
+      .from(auditLogs)
+      .where(and(
+        eq(auditLogs.action, 'attendance.saved'),
+        eq(auditLogs.entityType, 'event'),
+        eq(auditLogs.entityId, String(session.eventId)),
+        eq(auditLogs.actorUserId, actorUserId),
+        sql`${auditLogs.createdAt} > now() - make_interval(mins => ${ATTENDANCE_SITTING_MINUTES})`,
+      ))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(1);
+
+    let previous: Record<string, string> = {};
+    if (last?.metadata) {
+      try { previous = (JSON.parse(last.metadata) as { statuses?: Record<string, string> }).statuses ?? {}; } catch { previous = {}; }
+    }
+    const statuses = { ...previous };
+    for (const mark of marks) statuses[String(mark.playerId)] = mark.status;
+    const metadata = { title: session.title, startTime: session.startTime, marked: Object.keys(statuses).length, statuses };
+
+    if (last) {
+      await db.update(auditLogs).set({ metadata: JSON.stringify(metadata) }).where(eq(auditLogs.id, last.id));
+      return;
+    }
+    await auditRequest(req, { action: 'attendance.saved', entityType: 'event', entityId: session.eventId, clubId: session.clubId, metadata });
+  } catch (error) {
+    console.error('[audit] Failed to record attendance.saved:', error);
+  }
+}
+
 export type AuditLogQuery = {
   /** Null = every club (superadmin). */
   clubId: number | null;

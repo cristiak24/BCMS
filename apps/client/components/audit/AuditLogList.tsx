@@ -11,22 +11,32 @@ import { plural } from '../../utils/plural';
  * paging. Shared by the club admin's Jurnal and the superadmin console.
  */
 
-type Category = 'all' | 'club.' | 'finance.' | 'club_admin.' | 'manage_access.' | 'user.' | 'invitation.' | 'auth.' | 'player.' | 'family.';
+type Category =
+    | 'all' | 'event.' | 'attendance.' | 'game.' | 'document.' | 'player.' | 'team.' | 'finance.'
+    | 'club_admin.' | 'user.' | 'manage_access.' | 'invitation.' | 'auth.' | 'family.' | 'family_request.' | 'privacy.' | 'club.';
 
 const CATEGORY_OPTIONS: { key: Category; label: string }[] = [
     { key: 'all', label: 'Toate acțiunile' },
-    { key: 'club.', label: 'Cluburi' },
+    { key: 'event.', label: 'Evenimente' },
+    { key: 'attendance.', label: 'Prezență' },
+    { key: 'game.', label: 'Meciuri' },
+    { key: 'document.', label: 'Documente' },
+    { key: 'player.', label: 'Jucători' },
+    { key: 'team.', label: 'Coduri de echipă' },
     { key: 'finance.', label: 'Finanțe' },
     { key: 'club_admin.', label: 'Conturi' },
     { key: 'user.', label: 'Utilizatori' },
     { key: 'manage_access.', label: 'Acces și cereri' },
     { key: 'invitation.', label: 'Invitații' },
     { key: 'auth.', label: 'Înregistrări' },
-    { key: 'player.', label: 'Jucători' },
     { key: 'family.', label: 'Familii' },
+    { key: 'family_request.', label: 'Înscrieri cu codul echipei' },
+    { key: 'privacy.', label: 'Confidențialitate' },
+    { key: 'club.', label: 'Cluburi' },
 ];
 
 const ACTION_LABELS: Record<string, string> = {
+    'attendance.saved': 'Prezență notată',
     'auth.signup_with_guardian_invite': 'Părinte înregistrat cu invitație personală',
     'auth.signup_with_invite_code': 'Cont creat cu cod de invitație',
     'auth.signup_with_team_code': 'Cerere de înscriere cu codul echipei',
@@ -37,11 +47,21 @@ const ACTION_LABELS: Record<string, string> = {
     'club_admin.user_deleted': 'Cont șters',
     'club_admin.user_reactivated': 'Cont reactivat',
     'club_admin.user_role_updated': 'Rol schimbat',
+    'document.deleted': 'Document șters',
+    'document.uploaded': 'Document încărcat',
+    'event.cancelled': 'Eveniment anulat',
+    'event.created': 'Eveniment creat',
+    'event.deleted': 'Eveniment șters',
+    'event.updated': 'Eveniment modificat',
     'family.guardian_invite_create': 'Invitație pentru părinte',
+    'family_request.approve': 'Înscriere aprobată',
+    'family_request.deny': 'Înscriere respinsă',
     'finance.document.status': 'Status document financiar',
     'finance.payment.manual': 'Plată înregistrată manual',
     'finance.settings.update': 'Taxe modificate',
     'finance.stripe.account_created': 'Cont Stripe al clubului creat',
+    'game.finished': 'Meci încheiat',
+    'game.reopened': 'Meci redeschis',
     'invitation.accepted': 'Invitație acceptată',
     'invitation.created': 'Invitație trimisă',
     'invitation.resent': 'Invitație retrimisă',
@@ -55,7 +75,13 @@ const ACTION_LABELS: Record<string, string> = {
     'player.updated': 'Fișă modificată',
     'player.removed_from_roster': 'Scos din lot',
     'player.added_to_team': 'Adăugat în echipă',
+    'player.removed_from_team': 'Scos din echipă',
+    'privacy.erasure_requested': 'Cerere de ștergere a datelor',
+    'privacy.erasure_resolved': 'Cerere de ștergere rezolvată',
+    'privacy.export': 'Export de date personale',
     'player.contacts_updated': 'Telefoane modificate',
+    'team.join_code_close': 'Înscrieri cu codul echipei oprite',
+    'team.join_code_open': 'Înscrieri cu codul echipei deschise',
     'team.join_code_rotate': 'Cod de echipă regenerat',
     'user.deactivated': 'Cont dezactivat',
     'user.reactivated': 'Cont reactivat',
@@ -75,6 +101,8 @@ const FIELD_LABELS: Record<string, string> = {
     autoAdjust: 'ajustare automată', billingStartMonth: 'restanțe din luna',
     firstName: 'prenume', lastName: 'nume', name: 'nume complet', status: 'status', number: 'număr',
     birthYear: 'an naștere', medicalCheckExpiry: 'viză medicală', avatarUrl: 'poză',
+    title: 'titlu', startTime: 'început', endTime: 'sfârșit', location: 'locație', type: 'tip', coachId: 'antrenor',
+    amount: 'taxă', description: 'descriere', coachNote: 'notă antrenor', opponent: 'adversar', teamId: 'echipă',
     phone: 'telefon', guardianName: 'părinte 1', guardianPhone: 'telefon părinte 1', guardian2Name: 'părinte 2', guardian2Phone: 'telefon părinte 2',
 };
 
@@ -89,6 +117,7 @@ const STATUS_LABELS: Record<string, string> = { pending: 'în așteptare', proce
 const ENTITY_LABELS: Record<string, string> = {
     player_payment: 'plata', financial_settings: 'setări taxe', financial_document: 'documentul', user: 'contul', player: 'jucătorul',
     invitation: 'invitația', club: 'clubul', team: 'echipa', access_request: 'cererea',
+    event: 'evenimentul', club_document: 'documentul', family_join_request: 'cererea de înscriere',
 };
 
 function formatWhen(value: string) {
@@ -102,6 +131,14 @@ function formatWhen(value: string) {
 function detailOf(entry: AuditLogEntry) {
     const meta = (entry.metadata ?? {}) as Record<string, unknown>;
     const parts: string[] = [];
+    if (meta.title) parts.push(`„${shortValue(meta.title)}”`);
+    if (typeof meta.startTime === 'string') {
+        const when = parseApiDate(meta.startTime);
+        if (!Number.isNaN(when.getTime())) parts.push(new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'short', timeZone: 'Europe/Bucharest' }).format(when));
+    }
+    if (typeof meta.marked === 'number') parts.push(plural(meta.marked, 'jucător marcat', 'jucători marcați'));
+    if (meta.scoreUs != null && meta.scoreThem != null) parts.push(`${meta.scoreUs}–${meta.scoreThem}`);
+    if (meta.fileName && !meta.title) parts.push(String(meta.fileName));
     if (meta.previousRole || meta.nextRole) parts.push(`${ROLE_LABELS[String(meta.previousRole)] ?? meta.previousRole ?? '—'} → ${ROLE_LABELS[String(meta.nextRole)] ?? meta.nextRole}`);
     if (meta.previousStatus || meta.nextStatus) parts.push(`${STATUS_LABELS[String(meta.previousStatus)] ?? meta.previousStatus ?? '—'} → ${STATUS_LABELS[String(meta.nextStatus)] ?? meta.nextStatus}`);
     if (meta.amount != null) parts.push(`${meta.amount} ${String(meta.currency ?? 'ron').toUpperCase()}`);

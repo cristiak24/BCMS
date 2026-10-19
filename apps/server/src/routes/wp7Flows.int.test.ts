@@ -10,6 +10,8 @@ import { serve } from '../test/serve';
 import { seasonBounds } from '../lib/seasonStats';
 import eventRoutes from './eventRoutes';
 import gamesRouter from './games';
+import teamsRouter from './teams';
+import clubDocumentsRouter from './clubDocuments';
 
 /**
  * WP7 leftovers from the 2026-10-15 audit, through the real routes. Event
@@ -84,7 +86,7 @@ before(async () => {
     const [parent] = await db.insert(users).values({ email: PARENT, name: 'Ioana Ionescu', role: 'parent', status: 'active', clubId: club.id }).returning();
     await db.insert(playerGuardians).values({ playerId: ana.id, userId: parent.id });
 
-    server = await serve({ '/api/events': eventRoutes, '/api/games': gamesRouter });
+    server = await serve({ '/api/events': eventRoutes, '/api/games': gamesRouter, '/api/teams': teamsRouter, '/api/club-documents': clubDocumentsRouter });
 });
 
 after(async () => {
@@ -162,4 +164,71 @@ test('C4: a parent sees season statistics only for their own child\'s teams', as
     const own = await call(PARENT, 'GET', `/games/season/teams/${u14}`);
     assert.equal(own.status, 200, JSON.stringify(own.body));
     assert.equal(own.body.games, 0);
+});
+
+const logOf = async (action: string) => db.select().from(auditLogs).where(eq(auditLogs.action, action));
+
+test('D: creating, editing, cancelling and deleting an event are in the journal', async () => {
+    const created = await call(ADMIN, 'POST', '/events', {
+        type: 'training', title: 'Antrenament nou', startTime: at(2 * DAY), endTime: at(2 * DAY + 60 * 60 * 1000), teamId: u12,
+    });
+    assert.equal(created.status, 200, JSON.stringify(created.body));
+    const id = created.body.id;
+
+    assert.equal((await call(COACH, 'PUT', `/events/${id}`, { location: 'Sala 2' })).status, 200);
+    // Flagging the sheet as graded alone is not an edit worth a line.
+    assert.equal((await call(ADMIN, 'PUT', `/events/${id}`, { status: 'graded' })).status, 200);
+    assert.equal((await call(ADMIN, 'PUT', `/events/${id}`, { status: 'cancelled' })).status, 200);
+    assert.equal((await call(ADMIN, 'DELETE', `/events/${id}`)).status, 200);
+
+    const rows = (await db.select().from(auditLogs).where(eq(auditLogs.entityId, String(id))))
+        .filter((row) => row.action.startsWith('event.'));
+    assert.deepEqual(rows.map((row) => row.action), ['event.created', 'event.updated', 'event.cancelled', 'event.deleted']);
+    assert.deepEqual(JSON.parse(rows[1].metadata!).fields, ['location']);
+    assert.ok(rows.every((row) => row.clubId === clubId));
+});
+
+test('D: attendance is one journal entry per session sitting, not one per tap', async () => {
+    const before = (await logOf('attendance.saved')).length;
+    const [{ id: session }] = await db.insert(events).values({
+        type: 'training', title: 'Antrenament de ieri', startTime: at(-DAY), endTime: at(-DAY + 90 * 60 * 1000), teamId: u12,
+    }).returning();
+    const [{ id: matei }] = await db.insert(players).values({ firstName: 'Matei', lastName: 'Popescu', name: 'Matei Popescu', teamId: u12 }).returning();
+    for (const [playerId, status] of [[luca, 'present'], [matei, 'absent'], [matei, 'late']] as const) {
+        const res = await call(COACH, 'POST', `/events/${session}/attendance`, { playerAttendances: [{ playerId, status }] });
+        assert.equal(res.status, 200, JSON.stringify(res.body));
+    }
+    const rows = await logOf('attendance.saved');
+    assert.equal(rows.length, before + 1);
+    const meta = JSON.parse(rows[rows.length - 1].metadata!);
+    assert.equal(meta.marked, 2);
+    assert.equal(meta.statuses[String(matei)], 'late');
+
+    // Another person marking the same sheet gets their own line.
+    await call(ADMIN, 'POST', `/events/${session}/attendance`, { playerAttendances: [{ playerId: luca, status: 'medical' }] });
+    assert.equal((await logOf('attendance.saved')).length, before + 2);
+});
+
+test('D: adding a player to a team, removing them, and club documents are in the journal', async () => {
+    const added = await call(ADMIN, 'POST', `/teams/${u12}/players`, { firstName: 'Radu', lastName: 'Ene' });
+    assert.equal(added.status, 200, JSON.stringify(added.body));
+    const bulk = await call(COACH, 'POST', `/teams/${u12}/players/bulk`, { players: [{ firstName: 'Ion', lastName: 'Marin' }, { firstName: 'Radu', lastName: 'Ene' }] });
+    assert.equal(bulk.status, 201, JSON.stringify(bulk.body));
+    assert.deepEqual(bulk.body.skipped, ['Radu Ene']);
+    assert.equal((await call(ADMIN, 'DELETE', `/teams/${u12}/players/${added.body.id}`)).status, 200);
+
+    const addedRows = await logOf('player.added_to_team');
+    assert.equal(addedRows.length, 2, 'one created directly, one from the bulk list (the duplicate was skipped)');
+    const removed = await logOf('player.removed_from_team');
+    assert.deepEqual(removed.map((row) => row.entityId), [String(added.body.id)]);
+
+    const form = new FormData();
+    form.append('file', new Blob([Buffer.from('%PDF-1.4 test')], { type: 'application/pdf' }), 'regulament.pdf');
+    form.append('title', 'Regulament intern');
+    const upload = await fetch(`${server.base}/api/club-documents`, { method: 'POST', headers: { authorization: bearer(`test_${ADMIN}`, ADMIN) }, body: form });
+    assert.equal(upload.status, 201, await upload.clone().text());
+    const doc = await upload.json() as { id: number };
+    assert.equal((await call(ADMIN, 'DELETE', `/club-documents/${doc.id}`)).status, 204);
+    const docRows = (await db.select().from(auditLogs).where(eq(auditLogs.entityType, 'club_document'))).map((row) => row.action);
+    assert.deepEqual(docRows, ['document.uploaded', 'document.deleted']);
 });

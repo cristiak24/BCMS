@@ -9,6 +9,7 @@ import { roundMoney } from '../lib/money';
 import { attendancePeriod, attendancePeriodInfo, attendanceRate as rateInPeriod, attendanceSummary } from '../lib/attendanceRate';
 import { coachManagesTeam } from '../lib/coachScope';
 import { toDate } from '../lib/dateUtils';
+import { auditRequest } from '../services/auditService';
 
 /** Epoch ms of a DB timestamp (UTC text), 0 when missing — never the process zone. */
 const msOf = (value: unknown) => toDate(value)?.getTime() ?? 0;
@@ -703,6 +704,13 @@ router.post('/:id/players', requireTeamManager, async (req: AuthenticatedRequest
             playerId: insertedPlayer.id,
             teamId,
         });
+        await auditRequest(req, {
+            action: 'player.added_to_team',
+            entityType: 'player',
+            entityId: insertedPlayer.id,
+            clubId: access.team.clubId ?? null,
+            metadata: { teamId, teamName: access.team.name, created: true },
+        });
 
         res.json(mapPlayer(insertedPlayer));
     } catch (e) {
@@ -788,6 +796,16 @@ router.post('/:id/players/bulk', async (req: AuthenticatedRequest, res) => {
             })
             : [];
 
+        for (const player of created) {
+            await auditRequest(req, {
+                action: 'player.added_to_team',
+                entityType: 'player',
+                entityId: player.id,
+                clubId: access.team.clubId ?? null,
+                metadata: { teamId, teamName: access.team.name, created: true },
+            });
+        }
+
         res.status(201).json({ created: created.map(mapPlayer), skipped });
     } catch (e) {
         console.error(`[POST /api/teams/${req.params.id}/players/bulk] error:`, e);
@@ -813,6 +831,13 @@ router.delete('/:id/players/:playerId', requireTeamManager, async (req: Authenti
         await db.transaction(async (tx) => {
             await tx.delete(playersToTeams).where(and(eq(playersToTeams.teamId, teamId), eq(playersToTeams.playerId, playerId)));
             await tx.update(players).set({ teamId: null }).where(and(eq(players.id, playerId), eq(players.teamId, teamId)));
+        });
+        await auditRequest(req, {
+            action: 'player.removed_from_team',
+            entityType: 'player',
+            entityId: playerId,
+            clubId: access.team.clubId ?? null,
+            metadata: { teamId, teamName: access.team.name },
         });
 
         res.json({ success: true });

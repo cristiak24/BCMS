@@ -7,6 +7,7 @@ import { db } from '../db';
 import { clubDocuments, users } from '../db/schema';
 import { resolveRequestClubId } from '../lib/tenantScope';
 import { toIso } from '../lib/dateUtils';
+import { auditRequest } from '../services/auditService';
 import {
     CLUB_DOCUMENT_CLUB_QUOTA_BYTES,
     CLUB_DOCUMENT_MAX_BYTES,
@@ -184,6 +185,13 @@ router.post(
                 visibility: normalizeVisibility(req.body?.visibility),
                 uploadedBy: req.user?.id ?? null,
             }).returning(listColumns);
+            await auditRequest(req, {
+                action: 'document.uploaded',
+                entityType: 'club_document',
+                entityId: row.id,
+                clubId,
+                metadata: { title: row.title, fileName, visibility: row.visibility },
+            });
 
             res.status(201).json({
                 ...row,
@@ -258,7 +266,7 @@ router.delete('/:id', async (req: AuthenticatedRequest, res) => {
             res.status(404).json({ error: 'Documentul nu există.' });
             return;
         }
-        const rows = await db.select({ id: clubDocuments.id, uploadedBy: clubDocuments.uploadedBy })
+        const rows = await db.select({ id: clubDocuments.id, uploadedBy: clubDocuments.uploadedBy, title: clubDocuments.title, fileName: clubDocuments.fileName })
             .from(clubDocuments)
             .where(and(eq(clubDocuments.id, id), eq(clubDocuments.clubId, clubId)))
             .limit(1);
@@ -271,6 +279,13 @@ router.delete('/:id', async (req: AuthenticatedRequest, res) => {
             return;
         }
         await db.delete(clubDocuments).where(eq(clubDocuments.id, id));
+        await auditRequest(req, {
+            action: 'document.deleted',
+            entityType: 'club_document',
+            entityId: id,
+            clubId,
+            metadata: { title: rows[0].title, fileName: rows[0].fileName },
+        });
         res.status(204).end();
     } catch (error) {
         console.error('[club-documents:delete] error:', error);

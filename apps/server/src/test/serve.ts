@@ -32,6 +32,8 @@ export async function serve(mounts: Record<string, Router>) {
 
     return {
         call,
+        /** For requests `call` can't make (multipart uploads). */
+        base,
         close: () => new Promise<void>((resolve) => server.close(() => resolve())),
     };
 }

@@ -11,6 +11,7 @@ import { parseAttendancePayload, parseEventInput } from '../lib/eventValidation'
 import { fetchFrbMatches, frbDateToUtc, type ParsedMatch } from '../lib/frbMatches';
 import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
 import { coachManagesEvent, coachManagesTeam } from '../lib/coachScope';
+import { auditAttendanceSave, auditRequest } from '../services/auditService';
 
 
 /** FRB sync: only fixtures from this far back are inserted as new events. */
@@ -452,6 +453,13 @@ export const eventsController = {
                 opponent: input.opponent ?? null,
             }).returning();
 
+            await auditRequest(req, {
+                action: 'event.created',
+                entityType: 'event',
+                entityId: event.id,
+                clubId: access.team.clubId ?? null,
+                metadata: { title: event.title, type: event.type, startTime: toIso(event.startTime), teamName: access.team.name },
+            });
             res.json(await enrichEvent(event as EventDoc));
         } catch (error) {
             console.error('Create event error:', error);
@@ -522,6 +530,20 @@ export const eventsController = {
             }
 
             const [updated] = await db.update(events).set(updates).where(eq(events.id, eventId)).returning();
+            // Fields that actually changed. "graded" alone is the attendance
+            // sheet flagging itself — attendance.saved already records that.
+            const changed = (Object.keys(updates) as (keyof typeof updates)[])
+                .filter((key) => String(updates[key] ?? '') !== String((existingEvent as Record<string, unknown>)[key] ?? ''));
+            const onlyGraded = changed.length === 1 && changed[0] === 'status' && String(updated.status).toLowerCase() === 'graded';
+            if (changed.length && !onlyGraded) {
+                await auditRequest(req, {
+                    action: String(updated.status ?? '').toLowerCase() === 'cancelled' && String(existingEvent.status ?? '').toLowerCase() !== 'cancelled' ? 'event.cancelled' : 'event.updated',
+                    entityType: 'event',
+                    entityId: eventId,
+                    clubId,
+                    metadata: { title: updated.title, startTime: toIso(updated.startTime), fields: changed },
+                });
+            }
             res.json(await enrichEvent(updated as EventDoc));
 
             // Families hear about a cancelled or moved session (best effort —
@@ -558,11 +580,13 @@ export const eventsController = {
                 return res.status(404).json({ error: 'Event not found' });
             }
 
+            let deleteClubId: number | null = null;
             if (existingEvent.teamId != null) {
                 const access = await ensureTeamAccess(req, existingEvent.teamId, existingEvent.coachId ?? null);
                 if (access.status !== 200) {
                     return res.status(access.status).json({ error: access.error });
                 }
+                deleteClubId = access.team.clubId ?? null;
             } else if (!isSuperadmin(req)) {
                 // No team means no club to scope the check to, so only a superadmin
                 // may touch it. Previously this branch was simply skipped.
@@ -577,6 +601,13 @@ export const eventsController = {
                 // them, unlinked — they used to make deleting such an event fail.
                 await tx.update(notifications).set({ eventId: null }).where(eq(notifications.eventId, eventId));
                 await tx.delete(events).where(eq(events.id, eventId));
+            });
+            await auditRequest(req, {
+                action: 'event.deleted',
+                entityType: 'event',
+                entityId: eventId,
+                clubId: deleteClubId,
+                metadata: { title: existingEvent.title, type: existingEvent.type, startTime: toIso(existingEvent.startTime) },
             });
             res.json({ success: true });
 
@@ -823,6 +854,11 @@ export const eventsController = {
                     });
                 }
             });
+            await auditAttendanceSave(
+                req,
+                { eventId, clubId: access.team.clubId ?? null, title: event.title, startTime: toIso(event.startTime) },
+                items.map((item) => ({ playerId: item.playerId, status: item.status })),
+            );
 
             // Notify only for a new/changed non-empty note — a status-only
             // re-save must not spam a duplicate. Notification failures never

@@ -4,7 +4,7 @@ import PageHero from '../../components/admin/PageHero';
 import AuditLogList from '../../components/audit/AuditLogList';
 import { clubAdminApi } from '../../services/clubAdminApi';
 
-/** Jurnal: who changed what in the club (roles, fees, documents, payments). */
+/** Jurnal: who changed what in the club (accounts, events, attendance, matches, documents, rosters, payments). */
 export default function ClubAuditLogScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
@@ -13,7 +13,7 @@ export default function ClubAuditLogScreen() {
           <PageHero
             eyebrow="Jurnal"
             title="Jurnalul clubului"
-            subtitle="Cine a schimbat roluri, taxe, documente și plăți — și când."
+            subtitle="Cine a schimbat conturi, evenimente, prezența, meciuri, documente, loturi și plăți — și când."
             className="mb-4"
           />
           <AuditLogList load={clubAdminApi.listAuditLogs} />
