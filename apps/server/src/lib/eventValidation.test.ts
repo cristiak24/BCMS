@@ -121,3 +121,14 @@ test('event amount: beyond numeric(12,2) is a 400, not a database error', () => 
     assert.ok(parseEventInput({ ...base, amount: 50 }, 'create').ok);
     assert.equal(parseEventInput({ ...base, amount: 99999999999 }, 'create').ok, false);
 });
+
+test('event: a camp of a month is fine, ten years is a typo and is refused (WP7-E1)', () => {
+    const base = { type: 'camp', title: 'Cantonament', teamId: 3, startTime: '2026-07-01T07:00:00Z' };
+    assert.ok(parseEventInput({ ...base, endTime: '2026-07-31T17:00:00Z' }, 'create').ok);
+    const decade = parseEventInput({ ...base, endTime: '2036-07-01T17:00:00Z' }, 'create');
+    assert.equal(decade.ok, false);
+    assert.match((decade as { error: string }).error, /cel mult 31 de zile/);
+    // Editing only the end against the stored start is checked too.
+    const stretched = parseEventInput({ endTime: '2026-09-01T17:00:00Z' }, 'update', { startTime: '2026-07-01T07:00:00Z', endTime: '2026-07-05T17:00:00Z' });
+    assert.equal(stretched.ok, false);
+});

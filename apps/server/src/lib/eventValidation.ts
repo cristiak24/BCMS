@@ -25,6 +25,8 @@ export const MAX_ATTENDANCE_ITEMS = 200;
 export const MAX_NOTE_LENGTH = 2000;
 const MAX_STATUS_LENGTH = 50;
 const MAX_TITLE_LENGTH = 255;
+/** Longest event (a summer camp); see parseEventInput. */
+export const MAX_EVENT_DAYS = 31;
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -194,6 +196,11 @@ export function parseEventInput(
     const endAt = toDate(end);
     if (startAt && endAt && endAt.getTime() < startAt.getTime()) {
         return { ok: false, error: 'endTime must be after startTime.' };
+    }
+    // Camps run over several days; a typo in the year must not create a
+    // ten-year event that fills every calendar day.
+    if (startAt && endAt && endAt.getTime() - startAt.getTime() > MAX_EVENT_DAYS * 24 * 60 * 60 * 1000) {
+        return { ok: false, error: `Un eveniment poate dura cel mult ${MAX_EVENT_DAYS} de zile.` };
     }
 
     if (mode === 'create' || has('teamId')) {

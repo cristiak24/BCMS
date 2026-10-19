@@ -93,8 +93,9 @@ export function ScheduleAgendaList({
   onSyncFRB: () => void;
   onSelectEvent: (event: CalendarEvent) => void;
   onAttendance: (event: CalendarEvent) => void;
-  onDuplicate: (event: CalendarEvent) => void;
-  onToggleCancelled: (event: CalendarEvent) => void;
+  /** Absent for roles that can't change events (the accountant). */
+  onDuplicate?: (event: CalendarEvent) => void;
+  onToggleCancelled?: (event: CalendarEvent) => void;
   onGrade: (event: CalendarEvent) => void;
 }) {
   const now = Date.now();
@@ -135,8 +136,8 @@ export function ScheduleAgendaList({
                 showActions={!isMobile}
                 onPress={() => onSelectEvent(event)}
                 onAttendance={() => onAttendance(event)}
-                onDuplicate={() => onDuplicate(event)}
-                onToggleCancelled={() => onToggleCancelled(event)}
+                onDuplicate={onDuplicate ? () => onDuplicate(event) : undefined}
+                onToggleCancelled={onToggleCancelled ? () => onToggleCancelled(event) : undefined}
               />
             ))}
           </EventGroupCard>
@@ -162,7 +163,7 @@ export function ScheduleAgendaList({
                 showActions={!isMobile}
                 onPress={() => onSelectEvent(event)}
                 onGrade={() => onGrade(event)}
-                onDuplicate={() => onDuplicate(event)}
+                onDuplicate={onDuplicate ? () => onDuplicate(event) : undefined}
               />
             ))}
           </EventGroupCard>

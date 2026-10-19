@@ -22,6 +22,8 @@ import AttendanceMarkButtons from '../../../components/attendance/AttendanceMark
 import AttendanceSaveStatus, { useSaveStatus } from '../../../components/attendance/AttendanceSaveStatus';
 import { attendanceMarkMeta, toAttendanceMark, type AttendanceMark } from '../../../utils/attendanceStatus';
 import { isAttendanceOpen } from '../../../utils/attendanceWindow';
+import { canMarkAttendance } from '../../../utils/eventPermissions';
+import { useSession } from '../../../context/AuthContext';
 import { plural } from '../../../utils/plural';
 
 /**
@@ -73,6 +75,7 @@ export default function AttendanceScreen() {
   const router = useRouter();
   const { searchValue, setSearchPlaceholder, setSearchValue, setHeaderActions, setMobileFab } = useHeader();
   const { toasts, showToast, dismissToast } = useToasts();
+  const { session } = useSession();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -154,7 +157,10 @@ export default function AttendanceScreen() {
   }, [loadData]);
 
   const dirtyNotes = roster.filter(noteDirty).length;
-  const locked = event ? !isAttendanceOpen(event.startTime) : false;
+  const notYet = event ? !isAttendanceOpen(event.startTime) : false;
+  // The accountant opens the same sheet to read it; the server refuses their writes.
+  const readOnly = !canMarkAttendance(session?.role);
+  const locked = notYet || readOnly;
 
   // An unsaved note is easy to lose with one misclick on the sidebar.
   useEffect(() => {
@@ -422,7 +428,9 @@ export default function AttendanceScreen() {
                 <View className="flex-row items-start gap-2.5 rounded-[12px] border px-3.5 py-3" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
                   <MaterialIcons name="lock" size={18} color="var(--c-muted)" style={{ marginTop: 1 }} />
                   <Text className="flex-1 text-[13px] font-medium leading-5" style={{ color: 'var(--c-ink-soft)' }}>
-                    Prezența se poate nota din ziua evenimentului ({formatCoachDate(event.startTime)}). Până atunci vezi doar lotul.
+                    {readOnly
+                      ? 'Poți vedea prezența; o notează antrenorul sau administratorul clubului.'
+                      : `Prezența se poate nota din ziua evenimentului (${formatCoachDate(event.startTime)}). Până atunci vezi doar lotul.`}
                   </Text>
                 </View>
               ) : (

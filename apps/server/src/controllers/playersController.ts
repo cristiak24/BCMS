@@ -586,16 +586,16 @@ export const playersController = {
                 return res.status(403).json({ error: 'Forbidden' });
             }
 
-            const { query } = req.query;
-            if (!query || typeof query !== 'string') {
-                return res.status(400).json({ error: 'Search query is required' });
+            // `query` is what the app sends; `q` is accepted too. One letter
+            // matched half the club and was answered "query is required".
+            const raw = typeof req.query.query === 'string' ? req.query.query : typeof req.query.q === 'string' ? req.query.q : '';
+            const q = raw.trim().toLowerCase().slice(0, 80);
+            if (q.length < 2) {
+                return res.status(400).json({ error: 'Scrie cel puțin 2 caractere.' });
             }
 
             const built = await buildPlayerScope(req);
             if (built.skip) return res.json([]);
-
-            const q = query.trim().toLowerCase().slice(0, 80);
-            if (!q) return res.json([]);
             // Filtered in SQL and scoped to the caller's club. This used to load
             // every player and every user of the platform on each keystroke.
             const pattern = `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
@@ -907,19 +907,19 @@ export const playersController = {
         try {
             const role = req.user?.role;
             if (role !== 'admin' && role !== 'superadmin' && role !== 'coach') {
-                return res.status(403).json({ error: 'Forbidden' });
+                return res.status(403).json({ error: 'Doar adminii și antrenorii pot modifica fișa jucătorului.' });
             }
 
             const playerId = parseInt(req.params.id as string, 10);
-            if (Number.isNaN(playerId)) return res.status(400).json({ error: 'Invalid id' });
+            if (Number.isNaN(playerId)) return res.status(400).json({ error: 'Jucător invalid.' });
 
             const pRows = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
-            if (!pRows[0]) return res.status(404).json({ error: 'Player not found' });
+            if (!pRows[0]) return res.status(404).json({ error: 'Jucătorul nu există.' });
 
             const allowedTeamIds = await getAllowedTeamIds(req);
             if (allowedTeamIds !== null) {
                 const p = pRows[0];
-                if (!await isPlayerAllowedForRequest(req, p)) return res.status(403).json({ error: 'Access denied' });
+                if (!await isPlayerAllowedForRequest(req, p)) return res.status(403).json({ error: 'Nu ai acces la acest jucător.' });
                 if (!await coachMayEditPlayer(req, p.id, p.teamId ?? null)) return res.status(403).json({ error: COACH_SCOPE_ERROR });
             }
 
@@ -975,7 +975,7 @@ export const playersController = {
             res.json(updated);
         } catch (error) {
             console.error('Update player error:', error);
-            res.status(500).json({ error: 'Internal server error' });
+            res.status(500).json({ error: 'Nu am putut salva fișa jucătorului.' });
         }
     },
 

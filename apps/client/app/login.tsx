@@ -1,3 +1,4 @@
+import { PROFILE_MISSING_MESSAGE } from '../utils/profileRetry';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -164,7 +165,7 @@ export default function Login() {
         resendSecondFactor,
         cancelSecondFactor,
     } = useLogin();
-    const { session, initializing } = useSession();
+    const { session, initializing, profileMissing, signOut } = useSession();
     const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
@@ -188,6 +189,15 @@ export default function Login() {
 
                         <AuthCard>
                             <AuthHeading title="Intră în cont" subtitle="Conectare securizată pentru contul tău BCMS." />
+
+                            {profileMissing && !session ? (
+                                <div role="alert" className="mb-4 rounded-[var(--r-md)] border border-[var(--c-border)] bg-[var(--c-warning-bg)] px-4 py-3 text-sm font-semibold leading-5 text-[var(--c-warning-fg)]">
+                                    <p>{PROFILE_MISSING_MESSAGE}</p>
+                                    <button type="button" onClick={() => void signOut()} className="mt-2 font-bold underline underline-offset-2">
+                                        Ieși din cont și intră cu alt email
+                                    </button>
+                                </div>
+                            ) : null}
 
                             {secondFactor ? (
                                 <form

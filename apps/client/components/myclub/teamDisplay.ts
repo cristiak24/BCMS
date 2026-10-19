@@ -22,18 +22,8 @@ export function computeAge(birthYear: number | null | undefined) {
     return new Date().getFullYear() - birthYear;
 }
 
-export type MedicalStatus = 'valid' | 'soon' | 'expired' | 'missing';
-
-export function medicalStatus(expiry: string | null | undefined): MedicalStatus {
-    if (!expiry) return 'missing';
-    const time = new Date(expiry).getTime();
-    if (Number.isNaN(time)) return 'missing';
-    const now = Date.now();
-    if (time < now) return 'expired';
-    const days = (time - now) / 86400000;
-    if (days <= 30) return 'soon';
-    return 'valid';
-}
+export { medicalStatus, type MedicalStatus } from '../../utils/medicalVisa';
+import type { MedicalStatus } from '../../utils/medicalVisa';
 
 export const MEDICAL_META: Record<MedicalStatus, { label: string; bg: string; fg: string }> = {
     valid: { label: 'Viză valabilă', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },

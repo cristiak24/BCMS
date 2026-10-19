@@ -43,7 +43,8 @@ export function ScheduleWeekView({
   searchQuery: string;
   showCancelled: boolean;
   onSelectEvent: (event: CalendarEvent) => void;
-  onQuickAdd: (date: Date) => void;
+  /** Absent for roles that can't create events (the accountant). */
+  onQuickAdd?: (date: Date) => void;
   onCountChange?: (count: number) => void;
   isMobile: boolean;
 }) {
@@ -136,7 +137,7 @@ export function ScheduleWeekView({
                 ) : dayEvents.length === 0 ? (
                   <View className="flex-row items-center justify-between min-h-[40px]">
                     <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>Liber</Text>
-                    {!isPast ? (
+                    {!isPast && onQuickAdd ? (
                       <TouchableOpacity
                         onPress={() => onQuickAdd(day)}
                         accessibilityLabel={`Adaugă eveniment ${day.getDate()}`}
@@ -199,13 +200,15 @@ export function ScheduleWeekView({
                         +{dayEvents.length - WEEK_MAX_VISIBLE} încă
                       </Text>
                     ) : null}
-                    <TouchableOpacity
-                      onPress={() => onQuickAdd(day)}
-                      accessibilityLabel={`Adaugă eveniment ${day.getDate()}`}
-                      className="h-8 rounded-[9px] items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[var(--c-surface-2)]"
-                    >
-                      <Plus size={15} color="var(--c-faint)" />
-                    </TouchableOpacity>
+                    {onQuickAdd ? (
+                      <TouchableOpacity
+                        onPress={() => onQuickAdd(day)}
+                        accessibilityLabel={`Adaugă eveniment ${day.getDate()}`}
+                        className="h-8 rounded-[9px] items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[var(--c-surface-2)]"
+                      >
+                        <Plus size={15} color="var(--c-faint)" />
+                      </TouchableOpacity>
+                    ) : null}
                   </>
                 )}
               </View>

@@ -23,7 +23,8 @@ export function DayScheduleModal({
   isSmallPhone?: boolean;
   onClose: () => void;
   onSelectEvent: (event: CalendarEvent) => void;
-  onQuickAdd: (date: Date) => void;
+  /** Absent for roles that can't create events (the accountant). */
+  onQuickAdd?: (date: Date) => void;
 }) {
   const events = day?.events ?? [];
   const isToday = day ? day.date.toDateString() === new Date().toDateString() : false;
@@ -58,15 +59,17 @@ export function DayScheduleModal({
                 </Text>
               </View>
               <View className="flex-row items-center gap-2">
-                <TouchableOpacity
-                  onPress={() => day && onQuickAdd(day.date)}
-                  className="h-10 rounded-full bg-[#1D3E90] px-4 flex-row items-center gap-1.5"
-                  style={{ boxShadow: '0 8px 18px rgba(29,62,144,0.28)' } as any}
-                  accessibilityLabel="Adaugă eveniment în această zi"
-                >
-                  <Plus color="#fff" size={15} />
-                  <Text className="text-white text-[11px] font-black uppercase tracking-widest">Adaugă</Text>
-                </TouchableOpacity>
+                {onQuickAdd ? (
+                  <TouchableOpacity
+                    onPress={() => day && onQuickAdd(day.date)}
+                    className="h-10 rounded-full bg-[#1D3E90] px-4 flex-row items-center gap-1.5"
+                    style={{ boxShadow: '0 8px 18px rgba(29,62,144,0.28)' } as any}
+                    accessibilityLabel="Adaugă eveniment în această zi"
+                  >
+                    <Plus color="#fff" size={15} />
+                    <Text className="text-white text-[11px] font-black uppercase tracking-widest">Adaugă</Text>
+                  </TouchableOpacity>
+                ) : null}
                 <TouchableOpacity
                   onPress={onClose}
                   className="w-10 h-10 rounded-full bg-[#F4F7FC] border border-[#E3EAF5] items-center justify-center"
@@ -89,12 +92,14 @@ export function DayScheduleModal({
                 <Text className="text-slate-400 font-semibold text-[12.5px] mt-1 text-center">
                   Adaugă un antrenament, meci, cantonament sau eveniment de club.
                 </Text>
-                <TouchableOpacity
-                  onPress={() => day && onQuickAdd(day.date)}
-                  className="mt-5 bg-[#EAF1FB] border border-[#D6E4F7] rounded-full px-5 py-2.5"
-                >
-                  <Text className="text-[#1D3E90] text-[12px] font-black uppercase tracking-widest">+ Adaugă eveniment</Text>
-                </TouchableOpacity>
+                {onQuickAdd ? (
+                  <TouchableOpacity
+                    onPress={() => day && onQuickAdd(day.date)}
+                    className="mt-5 bg-[#EAF1FB] border border-[#D6E4F7] rounded-full px-5 py-2.5"
+                  >
+                    <Text className="text-[#1D3E90] text-[12px] font-black uppercase tracking-widest">+ Adaugă eveniment</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             ) : (
               <View>

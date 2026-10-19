@@ -27,15 +27,18 @@ export default function ThemedCheckbox({
             className="items-center justify-center shrink-0"
             style={{ width: hit, height: hit, margin: -(hit - size) / 2 }}
         >
+            {/* Theme tokens: the fixed navy/white box stayed a white square on
+                the dark theme (WP7-E9). */}
             <View
-                className={`items-center justify-center rounded-[7px] border-2 transition-colors ${
-                    checked
-                        ? 'bg-[#1D3E90] border-[#1D3E90]'
-                        : 'bg-white border-[#CBD5E1] hover:border-[#1D3E90]'
-                }`}
-                style={{ width: size, height: size }}
+                className="items-center justify-center rounded-[7px] border-2 transition-colors"
+                style={{
+                    width: size,
+                    height: size,
+                    backgroundColor: checked ? 'var(--c-brand-surface)' : 'var(--c-surface)',
+                    borderColor: checked ? 'var(--c-brand-surface)' : 'var(--c-border-strong)',
+                } as any}
             >
-                {checked && <Check size={Math.round(size * 0.62)} color="var(--c-surface)" strokeWidth={3.5} />}
+                {checked && <Check size={Math.round(size * 0.62)} color="var(--c-on-brand)" strokeWidth={3.5} />}
             </View>
         </Pressable>
     );

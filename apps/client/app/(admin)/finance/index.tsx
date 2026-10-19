@@ -1,3 +1,4 @@
+import { formatPaymentWhen } from '../../../utils/paymentDate';
 import { parseApiDate } from '@/utils/dates';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, Modal, Platform } from '@/src/web/reactNative';
@@ -100,20 +101,6 @@ function formatCurrency(amount: number, currency = 'ron') {
     } catch {
         return `${amount.toFixed(2)} ${currency.toUpperCase()}`;
     }
-}
-
-function formatPaymentDate(value: string) {
-    const date = parseApiDate(value);
-    if (Number.isNaN(date.getTime())) {
-        return value;
-    }
-
-    return new Intl.DateTimeFormat('ro-RO', {
-        day: '2-digit',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-    }).format(date);
 }
 
 /* ─── Shared visual primitives ──────────────────────────────────── */
@@ -960,7 +947,7 @@ export default function FinancialSettingsPage() {
                                                 <View className="flex-1 min-w-0">
                                                     <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{payment.playerName}</Text>
                                                     <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-                                                        {[formatPaymentDate(payment.date), payment.teamName, payment.provider === 'cash' ? 'numerar' : payment.provider === 'stripe' ? 'card' : null].filter(Boolean).join(' · ')}
+                                                        {[formatPaymentWhen(payment.date, payment.provider), payment.teamName, payment.provider === 'cash' ? 'numerar' : payment.provider === 'stripe' ? 'card' : null].filter(Boolean).join(' · ')}
                                                     </Text>
                                                 </View>
                                                 <View className="items-end shrink-0">

@@ -34,6 +34,11 @@ const VALID_STATUSES = new Set(['active', 'inactive', 'injured', 'suspended']);
 
 const MAX_TEXT_LENGTH = 120;
 
+/** The field as the edit form names it — these messages are shown as-is (WP7-E5). */
+const FIELD_LABELS: Record<(typeof TEXT_FIELDS)[number], string> = {
+    firstName: 'Prenumele', lastName: 'Numele', name: 'Numele complet', email: 'Emailul', status: 'Starea', avatarUrl: 'Poza',
+};
+
 export function buildPlayerUpdate(body: PlayerUpdateInput | null | undefined): PlayerUpdateResult {
     const input = body ?? {};
     const data: PlayerUpdateFields = {};
@@ -50,12 +55,12 @@ export function buildPlayerUpdate(body: PlayerUpdateInput | null | undefined): P
         }
 
         if (typeof value !== 'string') {
-            return { ok: false, error: `${field} must be a string.` };
+            return { ok: false, error: `${FIELD_LABELS[field]} nu e valid.` };
         }
 
         const trimmed = value.trim();
         if (trimmed.length > MAX_TEXT_LENGTH) {
-            return { ok: false, error: `${field} must be at most ${MAX_TEXT_LENGTH} characters.` };
+            return { ok: false, error: `${FIELD_LABELS[field]} poate avea cel mult ${MAX_TEXT_LENGTH} de caractere.` };
         }
 
         if (field === 'email') {
@@ -66,11 +71,11 @@ export function buildPlayerUpdate(body: PlayerUpdateInput | null | undefined): P
     }
 
     if (data.status !== undefined && !VALID_STATUSES.has(data.status)) {
-        return { ok: false, error: 'status is not a valid player status.' };
+        return { ok: false, error: 'Starea aleasă nu există.' };
     }
 
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-        return { ok: false, error: 'email is not a valid address.' };
+        return { ok: false, error: 'Adresa de email nu e validă.' };
     }
 
     if (input.number !== undefined) {
@@ -79,7 +84,7 @@ export function buildPlayerUpdate(body: PlayerUpdateInput | null | undefined): P
         } else {
             const parsed = Number(input.number);
             if (!Number.isInteger(parsed) || parsed < 0 || parsed > 999) {
-                return { ok: false, error: 'number must be an integer between 0 and 999.' };
+                return { ok: false, error: 'Numărul de tricou trebuie să fie un număr întreg între 0 și 999.' };
             }
             data.number = parsed;
         }
@@ -92,7 +97,7 @@ export function buildPlayerUpdate(body: PlayerUpdateInput | null | undefined): P
             const parsed = Number(input.birthYear);
             const currentYear = new Date().getFullYear();
             if (!Number.isInteger(parsed) || parsed < 1900 || parsed > currentYear) {
-                return { ok: false, error: 'birthYear is out of range.' };
+                return { ok: false, error: `Anul nașterii trebuie să fie între 1900 și ${currentYear}.` };
             }
             data.birthYear = parsed;
         }
@@ -104,14 +109,14 @@ export function buildPlayerUpdate(body: PlayerUpdateInput | null | undefined): P
         } else {
             const parsed = new Date(String(input.medicalCheckExpiry));
             if (Number.isNaN(parsed.getTime())) {
-                return { ok: false, error: 'medicalCheckExpiry is not a valid date.' };
+                return { ok: false, error: 'Data vizei medicale nu e validă.' };
             }
             data.medicalCheckExpiry = parsed.toISOString();
         }
     }
 
     if (Object.keys(data).length === 0) {
-        return { ok: false, error: 'No updatable fields were provided.' };
+        return { ok: false, error: 'Nu ai modificat nimic.' };
     }
 
     return { ok: true, data };

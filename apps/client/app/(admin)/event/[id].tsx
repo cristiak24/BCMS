@@ -17,11 +17,10 @@ import { AddEventModal } from '../../../components/schedule/admin/AddEventModal'
 import Button from '../../../components/ui/Button';
 import { useSession } from '../../../context/AuthContext';
 import { useResponsive } from '../../../hooks/useResponsive';
-import { normalizeRole } from '../../../utils/authSession';
+import { canManageEvents, canMarkAttendance } from '../../../utils/eventPermissions';
 import { plural } from '../../../utils/plural';
 
 /** Roles the server lets change an event (ensureTeamAccess); others only read it. */
-const EDITOR_ROLES = new Set(['admin', 'superadmin', 'manager']);
 
 /**
  * Admin event detail.
@@ -135,7 +134,10 @@ export default function EventDetailScreen() {
   const [editing, setEditing] = useState(false);
   const { session } = useSession();
   const { isMobile } = useResponsive();
-  const canEdit = EDITOR_ROLES.has(normalizeRole(session?.role));
+  // Edit, note, mark and delete are the server's admin/coach writes; the
+  // accountant shares this screen read-only (WP7-E6).
+  const canEdit = canManageEvents(session?.role);
+  const canMark = canMarkAttendance(session?.role);
   const [playerCount, setPlayerCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -388,7 +390,8 @@ export default function EventDetailScreen() {
                   value={noteDraft}
                   onChangeText={setNoteDraft}
                   accessibilityLabel="Notă pentru jucători"
-                  placeholder="ex. Ritm foarte bun azi, continuăm cu pick-and-roll."
+                  editable={canEdit}
+                  placeholder={canEdit ? 'ex. Ritm foarte bun azi, continuăm cu pick-and-roll.' : 'Nicio notă.'}
                   placeholderTextColor="var(--c-faint)"
                   multiline
                   maxLength={2000}
@@ -397,7 +400,7 @@ export default function EventDetailScreen() {
                 />
                 {noteError ? <Text className="text-[12px] font-semibold mt-1.5" style={{ color: 'var(--c-danger-fg)' }}>{noteError}</Text> : null}
                 {/* Nothing to save and nothing saved: no "Salvat" on an empty note. */}
-                {noteDirty || (event.coachNote ?? '').trim() ? (
+                {canEdit && (noteDirty || (event.coachNote ?? '').trim()) ? (
                   <View className="flex-row justify-end mt-2.5">
                     <ActionButton
                       icon={noteDirty ? 'save' : 'check'}
@@ -463,7 +466,7 @@ export default function EventDetailScreen() {
                   {event.teamId && !cancelled ? (
                     <ActionButton
                       icon="fact-check"
-                      label={isUpcoming ? 'Lista de prezență' : 'Marchează prezența'}
+                      label={isUpcoming || !canMark ? 'Lista de prezență' : 'Marchează prezența'}
                       tone="brand"
                       onPress={() => router.push(`/admin/attendance/${event.id}` as any)}
                     />
@@ -471,7 +474,9 @@ export default function EventDetailScreen() {
                   {isUpcoming && !cancelled ? (
                     <ActionButton icon="event" label="Adaugă în calendar (.ics)" onPress={exportIcs} />
                   ) : null}
-                  <ActionButton icon="delete" label="Șterge evenimentul" tone="danger" onPress={() => setConfirmDelete(true)} />
+                  {canEdit ? (
+                    <ActionButton icon="delete" label="Șterge evenimentul" tone="danger" onPress={() => setConfirmDelete(true)} />
+                  ) : null}
                 </View>
               </Card>
             </View>

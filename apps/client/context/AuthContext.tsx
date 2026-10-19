@@ -20,6 +20,7 @@ import {
   type UserRole,
 } from '../utils/authSession';
 import { ApiError, apiFetch, setActiveChildId, setSessionTokenGetter, setUnauthorizedHandler } from '../services/apiClient';
+import { loadProfileWithRetry, ProfileMissingError } from '../utils/profileRetry';
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Types
@@ -54,6 +55,8 @@ type AuthContextValue = {
   initializing: boolean;
   reloadSession: () => Promise<AuthUser | null>;
   signOut: () => Promise<void>;
+  /** Signed in to Clerk, but no BCMS profile exists for the account. */
+  profileMissing?: boolean;
 };
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -105,29 +108,12 @@ function isProfileProvisioningError(error: unknown) {
  * The apiClient automatically attaches the current session token.
  */
 async function fetchMeFromBackend(currentUser: NonNullable<CurrentUser>): Promise<AuthUser> {
-  // Retry a bit longer — the profile may be created shortly after sign-in
-  for (let attempt = 0; attempt < 10; attempt++) {
-    try {
-      const data = await apiFetch<MeResponse>('/auth/me');
-      if (data?.success && data.user) {
-        return mapMeToAuthUser(currentUser, data.user);
-      }
-    } catch (err: any) {
-      if (isProfileProvisioningError(err)) {
-        const waitMs = Math.min(300 + attempt * 250, 1500);
-        await new Promise((r) => setTimeout(r, waitMs));
-        continue;
-      }
-      throw err;
-    }
-
-    const waitMs = Math.min(300 + attempt * 250, 1500);
-    await new Promise((r) => setTimeout(r, waitMs));
-  }
-
-  throw new Error(
-    'Your account profile is not ready yet. Please try again in a moment.',
-  );
+  // A profile created at signup can lag a moment: one retry, then a clear
+  // ProfileMissingError instead of ~10 s of spinner (utils/profileRetry.ts).
+  return loadProfileWithRetry(async () => {
+    const data = await apiFetch<MeResponse>('/auth/me');
+    return data?.success && data.user ? mapMeToAuthUser(currentUser, data.user) : null;
+  }, isProfileProvisioningError);
 }
 
 /** The Clerk session exists client-side but can no longer mint a valid token. */
@@ -157,6 +143,7 @@ function AuthBridge({ children }: PropsWithChildren) {
     return persisted;
   });
   const [initializing, setInitializing] = useState(() => session == null);
+  const [profileMissing, setProfileMissing] = useState(false);
   const sessionRef = useRef(session);
   sessionRef.current = session;
   const authRequestId = useRef(0);
@@ -227,6 +214,8 @@ function AuthBridge({ children }: PropsWithChildren) {
             nextSession = await fetchMeFromBackend(currentUser);
             break;
           } catch (error) {
+            // No profile is an answer, not a hiccup — don't retry it again.
+            if (error instanceof ProfileMissingError) throw error;
             if (error instanceof ApiError && error.status === 401) {
               // Clerk still lists a session but the backend rejects its token (it
               // was revoked/expired server-side, or the user was deleted). Retry
@@ -250,6 +239,7 @@ function AuthBridge({ children }: PropsWithChildren) {
         setCachedAuthSession(nextSession);
         await saveAuthSession(nextSession);
         if (mounted && requestId === authRequestId.current) {
+          setProfileMissing(false);
           // Keep the optimistic object when nothing changed, so revalidation
           // doesn't re-render every session consumer for no reason.
           setSession((previous) => (
@@ -268,6 +258,16 @@ function AuthBridge({ children }: PropsWithChildren) {
           setCachedAuthSession(null);
           await clearAuthSession();
           if (mounted && requestId === authRequestId.current) {
+            setSession(null);
+          }
+          return;
+        }
+
+        if (error instanceof ProfileMissingError) {
+          setCachedAuthSession(null);
+          await clearAuthSession();
+          if (mounted && requestId === authRequestId.current) {
+            setProfileMissing(true);
             setSession(null);
           }
           return;
@@ -320,6 +320,7 @@ function AuthBridge({ children }: PropsWithChildren) {
     }
 
     const nextSession = await fetchMeFromBackend(liveUser);
+    setProfileMissing(false);
     setCachedAuthSession(nextSession);
     setSession(nextSession);
     await saveAuthSession(nextSession);
@@ -328,6 +329,7 @@ function AuthBridge({ children }: PropsWithChildren) {
 
   const signOut = useCallback(async () => {
     await clerk.signOut();
+    setProfileMissing(false);
     // A parent's child selection must not leak into the next account on this device.
     setActiveChildId(null);
     setCachedAuthSession(null);
@@ -346,8 +348,8 @@ function AuthBridge({ children }: PropsWithChildren) {
   }, [signOut]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user: currentUser, session, initializing, reloadSession, signOut }),
-    [currentUser, initializing, session, reloadSession, signOut],
+    () => ({ user: currentUser, session, initializing, reloadSession, signOut, profileMissing }),
+    [currentUser, initializing, session, reloadSession, signOut, profileMissing],
   );
 
   return (

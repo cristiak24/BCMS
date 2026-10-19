@@ -196,15 +196,17 @@ export default function AppHeader({
                   <View className="absolute top-2 right-2 w-2 h-2 rounded-full border-2" style={{ backgroundColor: 'var(--c-sky)', borderColor: 'var(--c-surface)' } as any} />
                 ) : null}
               </Pressable>
+              {/* Same weight as the bell beside it, with a brand tint: the solid
+                  near-black square was the heaviest thing in the light header. */}
               {onOpenMenu ? (
                 <Pressable
                   onPress={onOpenMenu}
-                  className="w-10 h-10 items-center justify-center rounded-[12px]"
-                  style={{ backgroundColor: 'var(--c-brand-surface-deep)' } as any}
+                  className="ui-press w-10 h-10 items-center justify-center rounded-[12px] border"
+                  style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'color-mix(in srgb, var(--c-brand-fg) 22%, transparent)' } as any}
                   accessibilityRole="button"
                   accessibilityLabel="Deschide meniul"
                 >
-                  <MaterialIcons name="menu" size={22} color="#FFFFFF" />
+                  <MaterialIcons name="menu" size={22} color="var(--c-brand-fg)" />
                 </Pressable>
               ) : null}
             </View>

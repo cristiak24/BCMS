@@ -27,7 +27,7 @@ test('rejects a body that carries only non-whitelisted fields', () => {
 
     assert.equal(result.ok, false);
     assert.ok(!result.ok);
-    assert.match(result.error, /No updatable fields/);
+    assert.match(result.error, /Nu ai modificat nimic/);
 });
 
 test('trims text fields', () => {
@@ -41,14 +41,14 @@ test('rejects non-string values for text fields', () => {
     const result = buildPlayerUpdate({ firstName: { $ne: null } });
 
     assert.ok(!result.ok);
-    assert.match(result.error, /firstName must be a string/);
+    assert.match(result.error, /Prenumele nu e valid/);
 });
 
 test('rejects over-long text fields', () => {
     const result = buildPlayerUpdate({ name: 'a'.repeat(121) });
 
     assert.ok(!result.ok);
-    assert.match(result.error, /at most 120 characters/);
+    assert.match(result.error, /cel mult 120 de caractere/);
 });
 
 test('validates player status against the allowed set', () => {
@@ -57,7 +57,7 @@ test('validates player status against the allowed set', () => {
 
     const invalid = buildPlayerUpdate({ status: 'superadmin' });
     assert.ok(!invalid.ok);
-    assert.match(invalid.error, /not a valid player status/);
+    assert.match(invalid.error, /Starea aleasă nu există/);
 });
 
 test('validates email format', () => {
@@ -65,7 +65,7 @@ test('validates email format', () => {
 
     const invalid = buildPlayerUpdate({ email: 'not-an-email' });
     assert.ok(!invalid.ok);
-    assert.match(invalid.error, /not a valid address/);
+    assert.match(invalid.error, /email nu e validă/);
 });
 
 test('null or an empty email clears the address instead of failing the save', () => {
@@ -113,10 +113,25 @@ test('normalises medicalCheckExpiry to ISO and allows clearing it', () => {
 
     const invalid = buildPlayerUpdate({ medicalCheckExpiry: 'not-a-date' });
     assert.ok(!invalid.ok);
-    assert.match(invalid.error, /not a valid date/);
+    assert.match(invalid.error, /vizei medicale nu e validă/);
 });
 
 test('handles null and undefined bodies without throwing', () => {
     assert.ok(!buildPlayerUpdate(null).ok);
     assert.ok(!buildPlayerUpdate(undefined).ok);
+});
+
+test('every validation message is the Romanian sentence the edit form shows (WP7-E5)', () => {
+    const messages = [
+        buildPlayerUpdate({ number: 1000 }),
+        buildPlayerUpdate({ birthYear: 1800 }),
+        buildPlayerUpdate({ email: 'nu-e-email' }),
+        buildPlayerUpdate({ firstName: 42 as unknown as string }),
+    ].map((result) => (result as { ok: false; error: string }).error);
+    assert.deepEqual(messages, [
+        'Numărul de tricou trebuie să fie un număr întreg între 0 și 999.',
+        `Anul nașterii trebuie să fie între 1900 și ${new Date().getFullYear()}.`,
+        'Adresa de email nu e validă.',
+        'Prenumele nu e valid.',
+    ]);
 });

@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, Pressable, useWindowDimensions } from '@/src/web/reactNative';
 import { useRouter, useLocalSearchParams } from '@/src/web/expoRouter';
 import { useSession } from '../../context/AuthContext';
+import { canManageEvents } from '../../utils/eventPermissions';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
 import {
@@ -107,10 +108,19 @@ export default function ScheduleScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const { session } = useSession();
+  // The accountant reads the calendar; creating, duplicating and cancelling
+  // are admin writes the server refuses them (WP7-E6).
+  const canManage = canManageEvents(session?.role);
+
   useEffect(() => {
     // Tabs and "Adaugă eveniment" live in the page header now; in the top
     // bar they squeezed the search field down to "Caută evenim…".
     setHeaderActions(null);
+    if (!canManage) {
+      setMobileFab(null);
+      return;
+    }
 
     // Extended FAB ("+ Eveniment"): fixed to the viewport above the bottom
     // nav. It was `position: absolute` inside the page flow and carried a
@@ -141,7 +151,7 @@ export default function ScheduleScreen() {
         <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' } as any}>Eveniment</Text>
       </Pressable>
     );
-  }, [activeTab, setHeaderActions, setMobileFab]);
+  }, [activeTab, canManage, setHeaderActions, setMobileFab]);
   // ─────────────────────────────────────────────────────────────────
 
   // Day to pre-fill when the form is opened from a calendar day ("+" on the
@@ -213,7 +223,6 @@ export default function ScheduleScreen() {
   // Keep FRB fixtures current without anyone pressing "Sync": once per
   // FRB_SYNC_INTERVAL per device, when the schedule opens.
   // Only roles the server lets sync; accountants/staff would just get a 403.
-  const { session } = useSession();
   const canSyncFrb = ['admin', 'superadmin', 'manager'].includes(String(session?.role ?? ''));
   useEffect(() => {
     if (!canSyncFrb) return;
@@ -427,7 +436,7 @@ export default function ScheduleScreen() {
             searchQuery={searchValue}
             showCancelled={showCancelled}
             onSelectEvent={navigateToEvent}
-            onQuickAdd={handleQuickAdd}
+            onQuickAdd={canManage ? handleQuickAdd : undefined}
             isMobile={isMobile}
           />
         ) : scheduleView === 'agenda' ? (
@@ -440,8 +449,8 @@ export default function ScheduleScreen() {
             onSyncFRB={handleSyncFRB}
             onSelectEvent={navigateToEvent}
             onAttendance={navigateToGrade}
-            onDuplicate={(event) => setConfirmDuplicate(event)}
-            onToggleCancelled={requestToggleCancelled}
+            onDuplicate={canManage ? (event) => setConfirmDuplicate(event) : undefined}
+            onToggleCancelled={canManage ? requestToggleCancelled : undefined}
             onGrade={navigateToGrade}
           />
         ) : (
@@ -536,7 +545,7 @@ export default function ScheduleScreen() {
             title="Calendarul clubului"
             subtitle="Antrenamente, meciuri și evenimente, într-un singur loc."
             className="mb-0"
-            actions={<Button icon="add" label="Adaugă eveniment" variant="primary" onPress={() => { setAddEventDate(null); setShowAddModal(true); }} />}
+            actions={canManage ? <Button icon="add" label="Adaugă eveniment" variant="primary" onPress={() => { setAddEventDate(null); setShowAddModal(true); }} /> : undefined}
           >
             {topTabs}
           </PageHero>
@@ -590,7 +599,7 @@ export default function ScheduleScreen() {
         isSmallPhone={isSmallPhone}
         onClose={() => setSelectedDay(null)}
         onSelectEvent={(event) => { setSelectedDay(null); navigateToEvent(event); }}
-        onQuickAdd={handleQuickAdd}
+        onQuickAdd={canManage ? handleQuickAdd : undefined}
       />
 
       <FilterModal

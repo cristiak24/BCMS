@@ -12,6 +12,7 @@ import eventRoutes from './eventRoutes';
 import gamesRouter from './games';
 import teamsRouter from './teams';
 import clubDocumentsRouter from './clubDocuments';
+import playerRoutes from './playerRoutes';
 
 /**
  * WP7 leftovers from the 2026-10-15 audit, through the real routes. Event
@@ -86,7 +87,7 @@ before(async () => {
     const [parent] = await db.insert(users).values({ email: PARENT, name: 'Ioana Ionescu', role: 'parent', status: 'active', clubId: club.id }).returning();
     await db.insert(playerGuardians).values({ playerId: ana.id, userId: parent.id });
 
-    server = await serve({ '/api/events': eventRoutes, '/api/games': gamesRouter, '/api/teams': teamsRouter, '/api/club-documents': clubDocumentsRouter });
+    server = await serve({ '/api/events': eventRoutes, '/api/games': gamesRouter, '/api/teams': teamsRouter, '/api/club-documents': clubDocumentsRouter, '/api/players': playerRoutes });
 });
 
 after(async () => {
@@ -231,4 +232,15 @@ test('D: adding a player to a team, removing them, and club documents are in the
     assert.equal((await call(ADMIN, 'DELETE', `/club-documents/${doc.id}`)).status, 204);
     const docRows = (await db.select().from(auditLogs).where(eq(auditLogs.entityType, 'club_document'))).map((row) => row.action);
     assert.deepEqual(docRows, ['document.uploaded', 'document.deleted']);
+});
+
+test('E2: player search asks for two letters, in Romanian, whatever the parameter is called', async () => {
+    for (const path of ['/players/search?q=a', '/players/search?query=a', '/players/search']) {
+        const res = await call(ADMIN, 'GET', path);
+        assert.equal(res.status, 400, path);
+        assert.equal(res.body.error, 'Scrie cel puțin 2 caractere.');
+    }
+    const found = await call(ADMIN, 'GET', '/players/search?q=lu');
+    assert.equal(found.status, 200, JSON.stringify(found.body));
+    assert.ok(found.body.some((p: { id: number }) => p.id === luca));
 });
