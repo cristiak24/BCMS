@@ -5,8 +5,9 @@ import { ATTENDANCE_MARKS, toAttendanceMark, type AttendanceMark } from '../../u
 /**
  * The four marks as one segmented control, shared by the coach "Prezență"
  * screen and the admin sheet. The filled segment is the row's only status
- * indicator. On a phone the four share the row in quarters, so the icons
- * drop out below `sm` — four icon+label pills did not fit in 375px.
+ * indicator. Icons only where there is room: not in a phone's quarters
+ * (below `sm`), nor beside the player's name in the md–2xl row, where four
+ * icon pills squeezed the name to "Luca …".
  */
 export default function AttendanceMarkButtons({
   value,
@@ -49,7 +50,7 @@ export default function AttendanceMarkButtons({
             {busy && selected ? (
               <ActivityIndicator size="small" color={option.fg} />
             ) : (
-              <View className="hidden sm:flex">
+              <View className="hidden sm:flex md:hidden 2xl:flex">
                 <MaterialIcons name={option.icon} size={16} color={selected ? option.fg : 'var(--c-muted)'} />
               </View>
             )}

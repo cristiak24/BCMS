@@ -22,7 +22,7 @@ import { Navigate } from 'react-router-dom';
 import { normalizeRole } from '../../utils/authSession';
 import { isEliteRhythm } from '../../utils/attendanceBadge';
 import { plural } from '../../utils/plural';
-import { toAttendanceMark } from '../../utils/attendanceStatus';
+import { attendanceMarkMeta, toAttendanceMark } from '../../utils/attendanceStatus';
 
 /** How many recent marked sessions the history covers. */
 const HISTORY_LIMIT = 60;
@@ -93,8 +93,10 @@ function AttendanceRow({ record }: { record: PlayerAttendanceRecord }) {
   const key = statusKey(record.status);
   // A late arrival is filed under "Prezent" (it counts as attended) but the
   // badge says what the coach marked.
-  const late = toAttendanceMark(record.status) === 'late';
-  const meta = key ? (late ? { ...STATUS_META.present, label: 'Întârziat', icon: 'access-time' } : STATUS_META[key]) : null;
+  const lateMeta = toAttendanceMark(record.status) === 'late' ? attendanceMarkMeta('late') : null;
+  const meta = key
+    ? (lateMeta ? { label: lateMeta.label, fg: lateMeta.fg, bg: lateMeta.bg, bar: lateMeta.solid, icon: lateMeta.icon } : STATUS_META[key])
+    : null;
   const type = eventTypeMeta(record.event.type);
   const note = record.attendance?.note?.trim();
 
@@ -246,7 +248,7 @@ function PlayerAttendanceScreen() {
         >
           {loading || error ? null : (
             <View className="grid grid-cols-3 gap-2 ui-stagger">
-              <GlassStat dot="var(--c-success)" label="Prezent" value={counts.present} hint={counts.late ? `din care ${plural(counts.late, 'întârziere', 'întârzieri')}` : 'sesiuni'} />
+              <GlassStat dot="var(--c-success)" label="Prezent" value={counts.present} hint={counts.late ? plural(counts.late, 'întârziere', 'întârzieri') : 'sesiuni'} />
               <GlassStat dot="var(--c-danger)" label="Absent" value={counts.absent} hint="sesiuni" />
               <GlassStat dot="var(--c-warning)" label="Motivat" value={counts.excused} hint="sesiuni" />
             </View>

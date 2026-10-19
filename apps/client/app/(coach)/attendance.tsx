@@ -134,7 +134,7 @@ function AttendanceRow({
         className="absolute left-0 top-0 bottom-0 w-[3px]"
         style={{ backgroundColor: attendanceMarkMeta(player.status)?.solid ?? 'var(--c-border-strong)', transition: 'background-color 0.2s ease' } as any}
       />
-      <View className="flex-row items-center gap-2 flex-1 min-w-0">
+      <View className="flex-row items-center gap-2 flex-1 min-w-0 md:min-w-[170px]">
         <View className="flex-1 min-w-0">
           <CoachPlayerRow
             bare

@@ -18,7 +18,7 @@ const COLUMNS: { key: SeasonSortKey; label: string; full: string }[] = [
   { key: 'pts', label: 'Pct/m', full: 'Puncte pe meci' },
   { key: 'reb', label: 'Rec/m', full: 'Recuperări pe meci' },
   { key: 'ast', label: 'Pase/m', full: 'Pase decisive pe meci' },
-  { key: 'ptsTotal', label: 'Total pct', full: 'Total puncte' },
+  { key: 'ptsTotal', label: 'Total', full: 'Total puncte' },
 ];
 
 function cell(row: TeamSeasonRow, key: SeasonSortKey) {
@@ -46,7 +46,11 @@ export default function TeamSeasonTable({ teamId, title = 'Statistici de sezon' 
   }, [teamId]);
 
   const rows = useMemo(() => (data ? sortSeasonRows(data.players, sortKey) : []), [data, sortKey]);
-  const columns = compact ? COLUMNS.slice(0, 2) : COLUMNS;
+  // Rebounds/assists exist only on full-mode sheets: no empty "—" columns.
+  const anyFull = (data?.players ?? []).some((row) => row.fullGames > 0);
+  const available = COLUMNS.filter((column) => anyFull || (column.key !== 'reb' && column.key !== 'ast'));
+  const columns = compact ? available.slice(0, 2) : available;
+  const colWidth = compact ? 'w-[52px]' : 'w-[72px]';
 
   return (
     <View className="rounded-[16px] border p-4 md:p-5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
@@ -83,7 +87,7 @@ export default function TeamSeasonTable({ teamId, title = 'Statistici de sezon' 
                   accessibilityRole="button"
                   accessibilityLabel={`Sortează după ${column.full.toLowerCase()}`}
                   accessibilityState={{ selected: active }}
-                  className="ui-press w-[64px] flex-row items-center justify-end gap-0.5"
+                  className={`ui-press ${colWidth} flex-row items-center justify-end gap-0.5`}
                 >
                   <Text className="text-[11.5px] font-bold uppercase tracking-[0.04em]" style={{ color: active ? 'var(--c-brand-fg)' : 'var(--c-faint)' }} numberOfLines={1}>
                     {column.label}
@@ -107,7 +111,7 @@ export default function TeamSeasonTable({ teamId, title = 'Statistici de sezon' 
                 {columns.map((column) => (
                   <Text
                     key={column.key}
-                    className="t-num w-[64px] text-right text-[13.5px]"
+                    className={`t-num ${colWidth} text-right text-[13.5px]`}
                     style={{ color: sortKey === column.key ? 'var(--c-ink-strong)' : 'var(--c-ink-soft)', fontWeight: sortKey === column.key ? 700 : 500 } as any}
                   >
                     {cell(row, column.key)}
@@ -131,7 +135,7 @@ export default function TeamSeasonTable({ teamId, title = 'Statistici de sezon' 
                 ) : content}
                 {open ? (
                   <View className="flex-row flex-wrap gap-x-4 gap-y-1 px-2 pb-3 pl-10">
-                    {COLUMNS.slice(2).map((column) => (
+                    {available.slice(2).map((column) => (
                       <Text key={column.key} className="t-meta" style={{ color: 'var(--c-muted)' }}>
                         {column.full}: <Text className="t-num font-semibold" style={{ color: 'var(--c-ink)' }}>{cell(row, column.key)}</Text>
                       </Text>
@@ -142,7 +146,7 @@ export default function TeamSeasonTable({ teamId, title = 'Statistici de sezon' 
             );
           })}
 
-          {data.players.some((row) => row.fullGames < row.games) ? (
+          {anyFull && data.players.some((row) => row.fullGames < row.games) ? (
             <Text className="t-meta mt-3" style={{ color: 'var(--c-muted)' }}>
               Recuperările și pasele vin doar din meciurile ținute în modul complet; „—” = niciun astfel de meci.
             </Text>

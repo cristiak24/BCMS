@@ -19,7 +19,7 @@ type StatView = 'avg' | 'total';
 function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <View className="rounded-[12px] px-3 py-2.5 min-w-0" style={{ backgroundColor: 'var(--c-surface-2)' }}>
-      <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }} numberOfLines={1}>{label}</Text>
+      <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }} numberOfLines={2}>{label}</Text>
       <Text className="t-num text-[20px] font-bold mt-0.5" style={{ color: 'var(--c-ink-strong)' }}>{value}</Text>
       {hint ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{hint}</Text> : null}
     </View>
@@ -49,7 +49,7 @@ export default function SeasonStatsCard({ playerId }: { playerId: number }) {
   }, [playerId]);
 
   const avg = mode === 'avg';
-  const pick = (average: number | null, total: number, available = true) => (!available ? '—' : avg ? formatStat(average) : formatStat(total));
+  const pick = (average: number | null, total: number) => (avg ? formatStat(average) : formatStat(total));
   const full = (data?.fullGames ?? 0) > 0;
 
   return (
@@ -88,18 +88,25 @@ export default function SeasonStatsCard({ playerId }: { playerId: number }) {
         </Text>
       ) : (
         <View className="gap-3">
+          {/* Only what the sheets recorded: a simple-mode season has points
+              and fouls, not eight tiles of "—". */}
           <View className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <Tile label={avg ? 'Puncte / meci' : 'Puncte'} value={pick(data.averages.pts, data.totals.pts)} />
-            <Tile label={avg ? 'Recuperări / meci' : 'Recuperări'} value={pick(data.averages.reb, data.totals.reb, full)} />
-            <Tile label={avg ? 'Pase decisive / meci' : 'Pase decisive'} value={pick(data.averages.ast, data.totals.ast, full)} />
-            <Tile label={avg ? 'Faulturi / meci' : 'Faulturi'} value={pick(data.averages.pf, data.totals.pf)} />
-            <Tile label={avg ? 'Furturi / meci' : 'Furturi'} value={pick(data.averages.stl, data.totals.stl, full)} />
-            <Tile label={avg ? 'Capace / meci' : 'Capace'} value={pick(data.averages.blk, data.totals.blk, full)} />
-            <Tile label={avg ? 'Mingi pierdute / meci' : 'Mingi pierdute'} value={pick(data.averages.tov, data.totals.tov, full)} />
-            <Tile
-              label={avg ? 'Minute / meci' : 'Minute'}
-              value={data.timedGames ? (avg ? formatStat(data.averages.minutes) : formatStat(Math.round(data.totals.secondsPlayed / 60))) : '—'}
-            />
+            {[
+              { label: 'Puncte', value: pick(data.averages.pts, data.totals.pts), show: true },
+              { label: 'Recuperări', value: pick(data.averages.reb, data.totals.reb), show: full },
+              { label: 'Pase decisive', value: pick(data.averages.ast, data.totals.ast), show: full },
+              { label: 'Faulturi', value: pick(data.averages.pf, data.totals.pf), show: true },
+              { label: 'Furturi', value: pick(data.averages.stl, data.totals.stl), show: full },
+              { label: 'Capace', value: pick(data.averages.blk, data.totals.blk), show: full },
+              { label: 'Mingi pierdute', value: pick(data.averages.tov, data.totals.tov), show: full },
+              {
+                label: 'Minute',
+                value: avg ? formatStat(data.averages.minutes) : formatStat(Math.round(data.totals.secondsPlayed / 60)),
+                show: data.timedGames > 0,
+              },
+            ].filter((tile) => tile.show).map((tile) => (
+              <Tile key={tile.label} label={tile.label} value={tile.value} hint={avg ? 'pe meci' : 'total'} />
+            ))}
           </View>
 
           {full ? (
@@ -114,7 +121,7 @@ export default function SeasonStatsCard({ playerId }: { playerId: number }) {
             <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
               {full
                 ? `Recuperările, pasele și procentele vin din ${plural(data.fullGames, 'meciul ținut', 'meciurile ținute')} în modul complet.`
-                : 'Recuperările, pasele și procentele apar din meciurile ținute în modul complet.'}
+                : 'Recuperările, pasele, furturile și procentele apar după meciurile ținute în modul complet.'}
             </Text>
           ) : null}
 

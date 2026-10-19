@@ -398,7 +398,7 @@ export default function AttendanceScreen() {
             </View>
             {roster.length > 0 ? (
               <View className="grid grid-cols-3 gap-2 max-w-[520px] ui-stagger">
-                <GlassStat value={counts.present + counts.late} label="Prezenți" dot="var(--c-success)" hint={counts.late ? `din care ${plural(counts.late, 'întârziat', 'întârziați')}` : undefined} />
+                <GlassStat value={counts.present + counts.late} label="Prezenți" dot="var(--c-success)" hint={counts.late ? plural(counts.late, 'întârziat', 'întârziați') : undefined} />
                 <GlassStat value={counts.absent} label="Absenți" dot="var(--c-danger)" />
                 <GlassStat value={counts.medical} label="Motivați" dot="var(--c-warning)" />
               </View>
