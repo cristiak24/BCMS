@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import type { Game } from '../../services/gamesApi';
@@ -60,6 +60,17 @@ function mmss(ms: number) {
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
+/** "#7 Popescu"; without a shirt number, the full name (it read "# Test"). */
+function playerTag(p: { number?: string | null; firstName?: string; lastName?: string } | null | undefined) {
+  if (!p) return '';
+  const number = String(p.number ?? '').trim();
+  return number ? `#${number} ${p.lastName ?? ''}`.trim() : `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
+}
+
+function initials(p: { firstName?: string; lastName?: string } | null | undefined) {
+  return `${p?.firstName?.[0] ?? ''}${p?.lastName?.[0] ?? ''}`.toUpperCase() || '?';
+}
+
 function periodName(p: number) {
   return p > 4 ? `Prelungirea ${p - 4}` : `Sfertul ${p}`;
 }
@@ -104,6 +115,17 @@ export default function Scorer({
   const [subMode, setSubMode] = useState(false);
   const [showBox, setShowBox] = useState(false);
   const [confirm, setConfirm] = useState<'period' | 'finish' | null>(null);
+  // An action for a fouled-out player (5 fouls) waits for an explicit yes.
+  // The action pad for the chosen player. In "Complet" it is four rows and
+  // "Fault" (last) sat under the phone's bottom bar: bring the whole pad into
+  // view, clear of the bar (scroll-margin), each time a player is picked.
+  const actionsRef = useRef<HTMLElement | null>(null);
+  const selectedKey = selected?.side === 'us' ? selected.playerId : null;
+  useEffect(() => {
+    if (selectedKey == null) return;
+    actionsRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [selectedKey]);
+  const [fouledOutAction, setFouledOutAction] = useState<{ kind: 'action'; type: EventType } | { kind: 'sub'; playerId: number } | null>(null);
   const [finishing, setFinishing] = useState(false);
 
   const opponentName = game.opponentName || 'Adversar';
@@ -121,8 +143,14 @@ export default function Scorer({
     return () => { void lock?.release().catch(() => undefined); };
   }, []);
 
-  const record = (type: EventType) => {
+  const fouledOut = (playerId: number) => (s.box.players[playerId]?.pf ?? 0) >= MAX_FOULS;
+
+  const record = (type: EventType, confirmed = false) => {
     if (!selected) return;
+    if (selected.side === 'us' && !confirmed && fouledOut(selected.playerId)) {
+      setFouledOutAction({ kind: 'action', type });
+      return;
+    }
     if (selected.side === 'us') s.add({ type, side: 'us', playerId: selected.playerId });
     else s.add({ type, side: 'them', oppNumber: selected.number });
     try { navigator.vibrate?.(12); } catch { /* not supported */ }
@@ -143,8 +171,12 @@ export default function Scorer({
     setSelected((cur) => (cur?.side === 'us' && cur.playerId === playerId ? null : { side: 'us', playerId }));
   };
 
-  const tapBench = (playerId: number) => {
+  const tapBench = (playerId: number, confirmed = false) => {
     if (subOut == null) return;
+    if (!confirmed && fouledOut(playerId)) {
+      setFouledOutAction({ kind: 'sub', playerId });
+      return;
+    }
     s.add({ type: 'sub', side: 'us', playerId, otherPlayerId: subOut });
     setSubOut(null);
     setSubMode(false);
@@ -152,11 +184,11 @@ export default function Scorer({
 
   const describe = (e: GameEvent) => {
     const who = e.side === 'us'
-      ? e.playerId != null ? `#${rosterById.get(e.playerId)?.number ?? ''} ${rosterById.get(e.playerId)?.lastName ?? ''}`.trim() : teamName
+      ? e.playerId != null ? playerTag(rosterById.get(e.playerId)) : teamName
       : e.oppNumber ? `${opponentName} #${e.oppNumber}` : opponentName;
     if (e.type === 'sub') {
       const out = e.otherPlayerId != null ? rosterById.get(e.otherPlayerId) : null;
-      return `Schimbare: intră ${who}, iese #${out?.number ?? ''} ${out?.lastName ?? ''}`.trim();
+      return `Schimbare: intră ${who}, iese ${playerTag(out)}`.trim();
     }
     if (e.type === 'period_start' || e.type === 'period_end') return `${TYPE_LABEL[e.type]} ${e.period}`;
     return `${who} ${TYPE_LABEL[e.type] ?? e.type}`;
@@ -269,7 +301,7 @@ export default function Scorer({
         <Text className="text-[12.5px] font-semibold px-0.5" style={{ color: subMode ? 'var(--c-brand-fg)' : 'var(--c-muted)' }}>
           {subMode
             ? subOut == null ? 'Schimbare: apasă cine iese' : 'Acum apasă cine intră (de pe bancă)'
-            : selectedPlayer ? `Ce a făcut #${selectedPlayer.number} ${selectedPlayer.lastName}?` : '1. Apasă jucătorul · 2. Apasă ce a făcut'}
+            : selectedPlayer ? `Ce a făcut ${playerTag(selectedPlayer)}?` : '1. Apasă jucătorul · 2. Apasă ce a făcut'}
         </Text>
         <View className="grid grid-cols-5 gap-1.5">
           {s.box.onCourt.map((id) => {
@@ -278,14 +310,15 @@ export default function Scorer({
             const active = (selected?.side === 'us' && selected.playerId === id) || subOut === id;
             const out = (line?.pf ?? 0) >= MAX_FOULS;
             return (
-              <Pressable key={id} onPress={() => tapOnCourt(id)} accessibilityRole="button" accessibilityState={{ selected: active }} accessibilityLabel={`#${p?.number} ${p?.lastName}, ${line?.pts ?? 0} puncte, ${line?.pf ?? 0} faulturi`}
+              <Pressable key={id} onPress={() => tapOnCourt(id)} accessibilityRole="button" accessibilityState={{ selected: active }} accessibilityLabel={`${playerTag(p)}, ${plural(line?.pts ?? 0, 'punct', 'puncte')}, ${plural(line?.pf ?? 0, 'fault', 'faulturi')}${out ? ', eliminat' : ''}`}
                 className="ui-press rounded-[12px] border px-1 py-2 items-center gap-0.5"
                 style={{
                   borderColor: active ? 'var(--c-brand-fg)' : out ? 'var(--c-danger)' : 'var(--c-border)',
                   backgroundColor: active ? 'var(--c-surface-tint)' : out ? 'var(--c-danger-bg)' : 'var(--c-surface)',
                   boxShadow: active ? 'inset 0 0 0 1px var(--c-brand-fg)' : 'none',
                 } as any}>
-                <Text className="t-num text-[19px] font-bold" style={{ color: active ? 'var(--c-brand-fg)' : 'var(--c-ink-strong)' }}>{p?.number ? `#${p.number}` : '—'}</Text>
+                {/* No shirt number: initials, not a big "—". */}
+                <Text className="t-num text-[19px] font-bold" style={{ color: active ? 'var(--c-brand-fg)' : p?.number ? 'var(--c-ink-strong)' : 'var(--c-muted)' }}>{p?.number ? `#${p.number}` : initials(p)}</Text>
                 <Text className="text-[11px] font-semibold" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{p?.lastName ?? ''}</Text>
                 <Text className="t-num text-[13px] font-bold" style={{ color: 'var(--c-ink)' }}>{line?.pts ?? 0}p</Text>
                 <View className="flex-row gap-0.5">
@@ -301,11 +334,11 @@ export default function Scorer({
         {subMode && subOut != null ? (
           <View className="flex-row flex-wrap gap-1.5">
             {bench.map((p) => (
-              <Pressable key={p.playerId} onPress={() => tapBench(p.playerId)} accessibilityRole="button" accessibilityLabel={`Intră #${p.number} ${p.lastName}`}
+              <Pressable key={p.playerId} onPress={() => tapBench(p.playerId)} accessibilityRole="button" accessibilityLabel={`Intră ${playerTag(p)}`}
                 className="ui-press h-11 px-3 rounded-[11px] border flex-row items-center gap-1.5"
                 style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)', opacity: (s.box.players[p.playerId]?.pf ?? 0) >= MAX_FOULS ? 0.45 : 1 } as any}>
-                <Text className="t-num text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>#{p.number}</Text>
-                <Text className="text-[13px]" style={{ color: 'var(--c-ink-soft)' }}>{p.lastName}</Text>
+                {p.number ? <Text className="t-num text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>#{p.number}</Text> : null}
+                <Text className="text-[13px]" style={{ color: 'var(--c-ink-soft)' }}>{p.number ? p.lastName : `${p.firstName} ${p.lastName}`}</Text>
               </Pressable>
             ))}
             {bench.length === 0 ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Nu ai jucători pe bancă.</Text> : null}
@@ -315,10 +348,10 @@ export default function Scorer({
 
       {/* Actions for the selected player */}
       {selected?.side === 'us' ? (
-        <View className="gap-1.5">
+        <View ref={actionsRef as any} className="gap-1.5" style={{ scrollMarginBottom: 104, scrollMarginTop: 72 } as any}>
           {selectedFouledOut ? (
             <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>
-              Are 5 faulturi — trebuie să iasă. Folosește „Schimbare”.
+              Are 5 faulturi — eliminat. Folosește „Schimbare”; o acțiune pentru el cere confirmare.
             </Text>
           ) : null}
           <View className={`grid ${game.mode === 'full' ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5`}>
@@ -374,6 +407,24 @@ export default function Scorer({
       {showBox ? (
         <BoxScoreView box={s.box} mode={game.mode} roster={game.roster} opponentRoster={game.opponentRoster} teamName={teamName} opponentName={opponentName} />
       ) : null}
+
+      <ConfirmDialog
+        visible={fouledOutAction != null}
+        icon="warning"
+        title={fouledOutAction?.kind === 'sub' ? 'Intră un jucător eliminat?' : 'Jucătorul e eliminat'}
+        message={fouledOutAction?.kind === 'sub'
+          ? `${playerTag(rosterById.get(fouledOutAction.playerId))} are 5 faulturi și nu mai poate juca. Îl treci totuși pe teren?`
+          : `${playerTag(selectedPlayer)} are 5 faulturi și nu mai poate juca. Înregistrezi totuși „${TYPE_LABEL[fouledOutAction?.type ?? 'p2'] ?? ''}”?`}
+        confirmLabel={fouledOutAction?.kind === 'sub' ? 'Da, intră' : 'Da, înregistrează'}
+        cancelLabel="Anulează"
+        onConfirm={() => {
+          const pending = fouledOutAction;
+          setFouledOutAction(null);
+          if (pending?.kind === 'action') record(pending.type, true);
+          else if (pending?.kind === 'sub') tapBench(pending.playerId, true);
+        }}
+        onCancel={() => setFouledOutAction(null)}
+      />
 
       <ConfirmDialog
         visible={confirm != null}

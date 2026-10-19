@@ -78,8 +78,12 @@ export type BoxScore = {
  * each later period starts with whoever was on court when the previous ended.
  * Minutes need a clock: with `periodSec` set, time on court is summed from
  * period starts/ends and the clock stamps of substitutions.
+ *
+ * `nowClockSec`: during a running period, the clock now (seconds left). Players
+ * on court are then credited up to it, so MIN is live instead of 0:00 until the
+ * next substitution or the end of the period. Omit it for the stored snapshot.
  */
-export function computeBoxScore(events: GameEvent[], starters: number[], periodSec: number | null): BoxScore {
+export function computeBoxScore(events: GameEvent[], starters: number[], periodSec: number | null, nowClockSec: number | null = null): BoxScore {
     const live = events.filter((e) => !e.deleted).sort((a, b) => a.seq - b.seq);
     const box: BoxScore = { us: 0, them: 0, byPeriod: [], teamFouls: {}, players: {}, opponents: {}, onCourt: [...starters] };
     const line = (id: number) => (box.players[id] ??= emptyLine());
@@ -147,6 +151,11 @@ export function computeBoxScore(events: GameEvent[], starters: number[], periodS
             const tf = (box.teamFouls[e.period] ??= { us: 0, them: 0 });
             tf[e.side] += 1;
         }
+    }
+
+    // A period still running: time on court so far, up to the clock now.
+    if (timed && periodOpen && nowClockSec != null) {
+        box.onCourt.forEach((id) => credit(id, since.get(id) ?? periodSec!, nowClockSec));
     }
 
     box.byPeriod.sort((a, b) => a.period - b.period);

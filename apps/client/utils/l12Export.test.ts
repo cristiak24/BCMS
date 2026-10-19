@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 
-import { exportGaps, resolveMatchSides, withTeamCoach } from './l12Export';
+import { defaultU22, exportGaps, resolveMatchSides, withTeamCoach } from './l12Export';
 import type { L12Lineup, L12Player } from '../services/l12Api';
 
 const player = (playerId: number, shirtNumber: string): L12Player => ({ playerId, shirtNumber, license: '', u22: false, citizenship: 'ROU', naturalized: false });
@@ -37,4 +37,14 @@ test("the team's coach fills an empty head-coach line, and only that", () => {
   const blank = sheet({ staff: { headCoach: { name: ' ', license: 'L-1' } } });
   assert.deepEqual(withTeamCoach(blank, 'Ion Ionescu').staff.headCoach, { name: 'Ion Ionescu', license: 'L-1' });
   assert.equal(withTeamCoach(sheet({ staff: {} }), null).staff.headCoach, undefined);
+});
+
+test('U22/U23 is not ticked for children; only for 19–22', () => {
+  assert.equal(defaultU22(11), false);
+  assert.equal(defaultU22(17), false);
+  assert.equal(defaultU22(18), false);
+  assert.equal(defaultU22(19), true);
+  assert.equal(defaultU22(22), true);
+  assert.equal(defaultU22(23), false);
+  assert.equal(defaultU22(null), false);
 });

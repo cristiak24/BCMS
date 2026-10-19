@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
+import { useLocation } from 'react-router-dom';
 import { gamesApi } from '../../services/gamesApi';
 
 /**
@@ -11,17 +12,20 @@ import { gamesApi } from '../../services/gamesApi';
  */
 export default function AssignedGamesBanner() {
   const router = useRouter();
+  const { pathname } = useLocation();
   const [games, setGames] = useState<{ eventId: number; title: string; startTime: string; status: string }[]>([]);
 
   useEffect(() => {
     gamesApi.assigned().then(setGames).catch(() => setGames([]));
   }, []);
 
-  if (!games.length) return null;
+  // Not on the scorer of that very match: it said "ții statistica" above the scorer itself.
+  const shown = games.filter((g) => pathname !== `/stats/${g.eventId}`);
+  if (!shown.length) return null;
 
   return (
     <View className="w-full px-3 sm:px-4 lg:px-6 xl:px-8 pt-3 gap-2">
-      {games.map((g) => (
+      {shown.map((g) => (
         <Pressable
           key={g.eventId}
           onPress={() => router.push(`/stats/${g.eventId}` as any)}

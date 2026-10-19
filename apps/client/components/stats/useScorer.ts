@@ -195,7 +195,13 @@ export function useScorer(eventId: number, game: Game, serverEvents: GameEvent[]
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodMs, timed, game.periodSec]);
 
-  const box = useMemo(() => computeBoxScore(state.events, game.starters, game.periodSec), [state.events, game.starters, game.periodSec]);
+  // The clock now, to the second: MIN is live during a period (it read 0:00
+  // until the next substitution). The display tick re-renders while it runs.
+  const nowClockSec = timed ? Math.ceil(remainingMs(state.clock) / 1000) : null;
+  const box = useMemo(
+    () => computeBoxScore(state.events, game.starters, game.periodSec, nowClockSec),
+    [state.events, game.starters, game.periodSec, nowClockSec],
+  );
 
   // Opening the scorer opens period 1 (once — the ref survives StrictMode's double effect).
   const opened = useRef(false);

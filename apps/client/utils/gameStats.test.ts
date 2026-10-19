@@ -46,3 +46,22 @@ test('minutes from clock stamps across a substitution and two periods', () => {
     assert.equal(box.players[3].secondsPlayed, 840);
     assert.deepEqual(box.onCourt.sort(), [1, 3]);
 });
+
+test('during a running period, MIN counts up to the clock now (not 0:00 until a sub)', () => {
+    seq = 0;
+    const events = [
+        ev({ type: 'period_start', clockSec: 600 }),
+        ev({ type: 'sub', playerId: 3, otherPlayerId: 2, clockSec: 450 }),
+    ];
+    // 7:00 left: player 1 has played 3:00, player 2 left at 7:30, player 3 came on then.
+    const live = computeBoxScore(events, [1, 2], 600, 420);
+    assert.equal(live.players[1].secondsPlayed, 180);
+    assert.equal(live.players[2].secondsPlayed, 150);
+    assert.equal(live.players[3].secondsPlayed, 30);
+    // Without a clock now (the stored snapshot), the open stretch is not counted yet.
+    const stored = computeBoxScore(events, [1, 2], 600);
+    assert.equal(stored.players[1].secondsPlayed, 0);
+    // After the period ends, the clock now changes nothing.
+    const ended = computeBoxScore([...events, ev({ type: 'period_end', clockSec: 0 })], [1, 2], 600, 0);
+    assert.equal(ended.players[1].secondsPlayed, 600);
+});

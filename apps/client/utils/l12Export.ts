@@ -43,3 +43,12 @@ export function withTeamCoach(lineup: L12Lineup, coachName: string | null | unde
   if (!name || lineup.staff.headCoach?.name?.trim()) return lineup;
   return { ...lineup, staff: { ...lineup.staff, headCoach: { name, license: lineup.staff.headCoach?.license ?? '' } } };
 }
+
+/**
+ * The "Juc. U22/U23" box is about young players on senior teams. It was ticked
+ * for every child (age <= 22), so a U12 sheet came out all crosses. Ticked by
+ * default only for ages 19–22 (turning, this season); always editable.
+ */
+export function defaultU22(ageThisSeason: number | null | undefined) {
+  return ageThisSeason != null && ageThisSeason >= 19 && ageThisSeason <= 22;
+}

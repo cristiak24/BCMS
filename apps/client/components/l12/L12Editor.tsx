@@ -6,6 +6,7 @@ import { L12_MAX_PLAYERS, L12_STAFF_ROLES, type L12Lineup, type L12Player, type 
 import { medicalStatus } from '../myclub/teamDisplay';
 import { TeamAvatar } from './L12Visuals';
 import { plural } from '../../utils/plural';
+import { defaultU22 } from '../../utils/l12Export';
 
 /**
  * The L-12 sheet editor shared by the match screen and the team's "L12
@@ -24,8 +25,6 @@ export const EMPTY_LINEUP: L12Lineup = { competition: null, gender: null, player
 /** Basketball needs five on court; FRB sheets carry up to twelve. */
 export const L12_MIN_PLAYERS = 5;
 
-/** "U22/23" on the form: players turning 22 or younger this season. */
-const U22_MAX_AGE = 22;
 
 export function sortLineupPlayers(players: L12Player[]) {
   return [...players].sort((a, b) => {
@@ -238,9 +237,12 @@ function SheetRow({
 }) {
   const name = `${player.lastName ?? ''} ${player.firstName ?? ''}`.trim() || 'Jucător';
   const slot = (
-    // Row number on the paper form: rows run 4–15.
-    <View className={`${COL.slot} h-8 rounded-[8px] items-center justify-center shrink-0`} style={{ backgroundColor: 'var(--c-surface-3)' }} accessibilityLabel={`Rândul ${index + 4} din tabelă`}>
-      <Text className="t-num text-[12px] font-bold" style={{ color: 'var(--c-muted)' }}>{index + 4}</Text>
+    // Row number on the paper form (rows run 4–15). It looked exactly like the
+    // shirt number next to it; now it is a small, faint "rând" marker with no
+    // box, while the shirt number stays a bold input.
+    <View className={`${COL.slot} h-8 items-center justify-center shrink-0`} accessibilityLabel={`Rândul ${index + 4} din formular`}>
+      <Text className="text-[8.5px] font-semibold uppercase tracking-[0.06em] leading-none" style={{ color: 'var(--c-faint)' }}>rând</Text>
+      <Text className="t-num text-[11px] font-medium leading-tight" style={{ color: 'var(--c-faint)' }}>{index + 4}</Text>
     </View>
   );
   const nameBlock = (
@@ -374,7 +376,7 @@ export default function L12Editor({
       // A clash with a number already on the sheet is left blank to be filled, not duplicated.
       shirtNumber: number && !taken.has(number) ? number : '',
       license: prior?.license ?? '',
-      u22: prior ? prior.u22 : age != null && age <= U22_MAX_AGE,
+      u22: prior ? prior.u22 : defaultU22(age),
       citizenship: prior?.citizenship || 'ROU',
       naturalized: prior?.naturalized ?? false,
     };
@@ -622,8 +624,8 @@ export default function L12Editor({
           {count > 0 ? (
             <>
               <View className="hidden md:flex flex-row items-center gap-2.5 px-4 py-2" style={{ backgroundColor: 'var(--c-surface-2)', borderTopWidth: 1, borderTopColor: 'var(--c-border)' } as any}>
-                <Text className={`t-eyebrow ${COL.slot} text-center`} style={{ color: 'var(--c-faint)' }}>#</Text>
-                <Text className={`t-eyebrow ${COL.number} text-center`} style={{ color: 'var(--c-faint)' }}>Nr.</Text>
+                <Text className={`t-eyebrow ${COL.slot} text-center`} style={{ color: 'var(--c-faint)' }}>Rd.</Text>
+                <Text className={`t-eyebrow ${COL.number} text-center`} style={{ color: 'var(--c-faint)' }}>Tricou</Text>
                 <Text className="t-eyebrow flex-[1.4] min-w-[140px]" style={{ color: 'var(--c-faint)' }}>Jucător</Text>
                 <Text className={`t-eyebrow ${COL.license}`} style={{ color: 'var(--c-faint)' }}>Licență</Text>
                 <Text className={`t-eyebrow ${COL.citizenship} text-center`} style={{ color: 'var(--c-faint)' }}>Cetăț.</Text>
