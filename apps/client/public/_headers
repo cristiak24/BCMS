@@ -22,7 +22,8 @@
 # production Clerk domain and every origin must be confirmed in the browser
 # console on bcms.ro before it is enforced. The sha256 is the inline theme
 # script in index.html — recompute it whenever that script changes
-# (utils/securityHeaders.test.ts fails if it no longer matches).
+# (utils/securityHeaders.test.ts fails if it no longer matches). Violations
+# go to the API's /api/csp-report and show in the Render logs as "[csp]".
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
@@ -30,4 +31,4 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
   Strict-Transport-Security: max-age=31536000
   Content-Security-Policy: frame-ancestors 'none'; base-uri 'self'; object-src 'none'
-  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'sha256-WwNHXpktGWcTjl+xAcQ8Fq7Lm0rr/CXFZHQIMA24glM=' https://*.clerk.accounts.dev https://clerk.bcms.ro https://challenges.cloudflare.com; connect-src 'self' https://bcms-qflv.onrender.com https://*.clerk.accounts.dev https://clerk.bcms.ro https://clerk-telemetry.com; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self' https://challenges.cloudflare.com; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'sha256-WwNHXpktGWcTjl+xAcQ8Fq7Lm0rr/CXFZHQIMA24glM=' https://*.clerk.accounts.dev https://clerk.bcms.ro https://challenges.cloudflare.com; connect-src 'self' https://bcms-qflv.onrender.com https://*.clerk.accounts.dev https://clerk.bcms.ro https://clerk-telemetry.com; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self' https://challenges.cloudflare.com; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'; report-uri https://bcms-qflv.onrender.com/api/csp-report

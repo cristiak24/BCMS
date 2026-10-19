@@ -1,4 +1,5 @@
 import { createElement, lazy, useSyncExternalStore, type ComponentType } from 'react';
+import { createStaleChunkGuard } from '../utils/staleChunk';
 
 /**
  * Route-level code splitting that survives deploys and gives instant feedback.
@@ -26,7 +27,6 @@ import { createElement, lazy, useSyncExternalStore, type ComponentType } from 'r
 type Factory<T> = () => Promise<{ default: T }>;
 
 const RELOAD_KEY = 'bcms.chunk-reload-at';
-const RELOAD_COOLDOWN_MS = 30_000;
 
 let pending = 0;
 const listeners = new Set<() => void>();
@@ -49,19 +49,17 @@ function isChunkLoadError(error: unknown) {
   return /dynamically imported module|Importing a module script failed|error loading dynamically imported|Failed to fetch|MIME type|ChunkLoadError|Unable to preload CSS/i.test(message);
 }
 
-/** Reload once to pick up the current deploy. Returns false if we just did. */
-export function reloadForStaleChunk() {
-  try {
-    const last = Number(sessionStorage.getItem(RELOAD_KEY) || 0);
-    if (Date.now() - last < RELOAD_COOLDOWN_MS) return false;
-    sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
-  } catch {
-    // Storage unavailable: still reload — a loop is unlikely without a real
-    // server-side breakage, and a stuck screen is worse.
-  }
-  window.location.reload();
-  return true;
-}
+/**
+ * Reload once to pick up the current deploy (utils/staleChunk.ts). True when
+ * the failure is handled — including every later report while that reload
+ * is under way; false if this page already came from such a reload.
+ */
+export const reloadForStaleChunk = createStaleChunkGuard({
+  now: () => Date.now(),
+  read: () => Number(sessionStorage.getItem(RELOAD_KEY) || 0),
+  write: (value) => sessionStorage.setItem(RELOAD_KEY, String(value)),
+  reload: () => window.location.reload(),
+});
 
 const loaded = new WeakMap<Factory<unknown>, Promise<unknown>>();
 /** Modules whose import already settled, so they can render synchronously. */
@@ -72,6 +70,15 @@ function load<T>(factory: Factory<T>): Promise<{ default: T }> {
   if (cached) return cached as Promise<{ default: T }>;
 
   const promise = factory().then((module) => {
+    if (!module) {
+      // A stale chunk, already handled: our `vite:preloadError` listener
+      // cancelled the event to reload the page, and Vite's preload helper
+      // then resolves the import with undefined instead of throwing. Reading
+      // `.default` here flashed the error screen until the reload landed
+      // (E2E-1). Stay pending — the page is going away.
+      loaded.delete(factory as Factory<unknown>);
+      return new Promise<{ default: T }>(() => {});
+    }
     resolved.set(factory as Factory<unknown>, module.default);
     return module;
   }, (error) => {
@@ -140,6 +147,8 @@ export function useRouteLoading() {
 if (typeof window !== 'undefined') {
   // Vite fires this when a <link rel=modulepreload>/CSS preload for a chunk
   // fails — the same stale-deploy situation, caught before the import.
+  // Cancelling the event makes the failed import resolve with undefined,
+  // which load() above holds pending until the reload replaces the page.
   window.addEventListener('vite:preloadError', (event) => {
     if (reloadForStaleChunk()) event.preventDefault();
   });

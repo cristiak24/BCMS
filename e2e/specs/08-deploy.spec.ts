@@ -1,18 +1,21 @@
 /**
  * Deploy (audit runda 5, src/lazyRoute.ts): a phone keeps the old app open
  * after a deploy; the next screen it opens asks for a chunk name that no
- * longer exists, and Cloudflare (like support/client/serve.ts) answers with
- * index.html. The app must notice, reload once onto the new build, and show
- * the screen.
+ * longer exists, and Cloudflare (like support/client/serve.ts) answers a
+ * real 404 (the /assets/* Worker, WP7-G2). The app must notice, reload once
+ * onto the new build, and show the screen.
  */
 import type { Page } from '@playwright/test';
 import { test, expect, signIn } from '../support/fixtures';
 import { E2E } from '../support/env';
 
-test('a missing chunk is answered with index.html (SPA fallback, as in production)', async ({ request }) => {
-  const response = await request.get(`${E2E.webUrl}/assets/does-not-exist-123.js`);
-  expect(response.status()).toBe(200);
-  expect(response.headers()['content-type']).toContain('text/html');
+test('a missing chunk is a real 404, while app paths keep the SPA fallback (as in production)', async ({ request }) => {
+  const asset = await request.get(`${E2E.webUrl}/assets/does-not-exist-123.js`);
+  expect(asset.status()).toBe(404);
+  expect(asset.headers()['content-type']).not.toContain('text/html');
+  const route = await request.get(`${E2E.webUrl}/admin/does-not-exist`);
+  expect(route.status()).toBe(200);
+  expect(route.headers()['content-type']).toContain('text/html');
 });
 
 /**
@@ -22,11 +25,11 @@ test('a missing chunk is answered with index.html (SPA fallback, as in productio
 async function openScreenAfterDeploy(page: Page) {
   await signIn(page, 'admin');
   await page.goto('/admin/dashboard');
-  await expect(page.getByText(/Bună (dimineața|ziua|seara), Andrei/)).toBeVisible();
+  await expect(page.getByText(/(Bună (dimineața|ziua|seara)|Noapte bună), Andrei/)).toBeVisible();
   await page.waitForLoadState('networkidle');
 
   // "Deploy": every chunk this tab has not loaded yet now has an old name,
-  // which the server answers with index.html.
+  // which the server answers with a 404.
   const loaded = new Set(await page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name)));
   let stale = true;
   const staleRequests: string[] = [];
@@ -52,28 +55,30 @@ async function openScreenAfterDeploy(page: Page) {
 }
 
 /** The browser logs the HTML-instead-of-JS module failure; that is the scenario itself. */
-const MODULE_LOAD_NOISE = /MIME type|dynamically imported module|Failed to load module script/i;
-/** Bug E2E-1 (below): what the error screen logs before the reload. */
-const E2E_1 = /reading 'default'/;
-
-test('a stale chunk reloads the app once and the screen shows', async ({ page, consoleErrors }) => {
-  await openScreenAfterDeploy(page);
-  consoleErrors.splice(0, consoleErrors.length, ...consoleErrors.filter((e) => !MODULE_LOAD_NOISE.test(e) && !E2E_1.test(e)));
-});
+const MODULE_LOAD_NOISE = /MIME type|dynamically imported module|Failed to load module script|Failed to load resource.*404/i;
 
 /**
- * Bug E2E-1 (found by this suite, not fixed — WP6B does not touch app code):
- * src/lazyRoute.ts cancels `vite:preloadError` (event.preventDefault()) when it
- * starts the reload. Vite's preload helper then swallows the error and the
- * dynamic import RESOLVES with `undefined`, so React.lazy throws
- * "Cannot read properties of undefined (reading 'default')" and the
- * ErrorBoundary screen flashes (and logs) until the reload replaces the page.
- * Depends on whether a dependency chunk or the route chunk fails first, so it
- * shows on some runs only. Fix idea: in the preloadError handler, reload
- * without preventDefault(), or make lazyRoute treat an undefined module as a
- * stale chunk.
+ * Was bug E2E-1: src/lazyRoute.ts cancels `vite:preloadError` when it starts
+ * the reload. Vite then either resolves the failed import with `undefined`
+ * or reports the route import a second time inside the reload cooldown —
+ * both flashed the ErrorBoundary screen ("Ceva nu a funcționat") until the
+ * reload landed, on some runs only (which chunk fails first). Now load()
+ * holds an undefined module pending and utils/staleChunk.ts treats every
+ * report after the first as the same reload (unit-tested there, since the
+ * order can't be forced here). Checked on every DOM change: the error screen
+ * never appears, and nothing but the expected module-load noise is logged.
  */
-test.fixme('E2E-1: a stale chunk never flashes the error screen', async ({ page, consoleErrors }) => {
+test('a stale chunk reloads the app once, without ever flashing the error screen', async ({ page, consoleErrors }) => {
+  const flashes: string[] = [];
+  await page.exposeFunction('__e2eErrorScreen', (text: string) => { flashes.push(text); });
+  await page.addInitScript(() => {
+    const report = (window as unknown as { __e2eErrorScreen: (text: string) => void }).__e2eErrorScreen;
+    new MutationObserver(() => {
+      if (document.body?.innerText.includes('Ceva nu a funcționat')) report(location.pathname);
+    }).observe(document, { childList: true, subtree: true, characterData: true });
+  });
+
   await openScreenAfterDeploy(page);
+  expect(flashes, 'the error screen showed during the stale-chunk reload').toEqual([]);
   consoleErrors.splice(0, consoleErrors.length, ...consoleErrors.filter((e) => !MODULE_LOAD_NOISE.test(e)));
 });

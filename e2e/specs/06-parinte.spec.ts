@@ -58,5 +58,7 @@ test('the delegated parent opens the match with the other child selected', async
   await expect(page).toHaveURL(new RegExp(`/stats/${events.delegatedMatch}$`));
   await expect(page.getByText('Amical U12 (delegat)').first()).toBeVisible();
   await expect(page.getByText('Nu am putut deschide meciul')).toHaveCount(0);
+  // Four days ahead: the scorer asks before it starts (WP7-C1).
+  await page.getByRole('button', { name: 'Pornește oricum' }).click();
   await expect(page.getByText('CS Oaspeți').first()).toBeVisible();
 });

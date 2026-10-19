@@ -1,10 +1,11 @@
 /**
  * Builds the client with the E2E Vite config (production mode: hashed chunks,
  * no StrictMode double fetches) into a temporary folder and serves it the way
- * Cloudflare does in production (wrangler.toml
- * `not_found_handling = "single-page-application"`): an existing file is
- * served as is, ANY missing path — /assets/*.js included — gets index.html
- * with status 200. That fallback is what the stale-chunk test relies on.
+ * Cloudflare does in production (apps/client/wrangler.toml): an existing file
+ * is served as is, a missing app path gets index.html with status 200 (SPA
+ * fallback), and a missing /assets/* file a real 404 — the Worker in front of
+ * /assets/* (apps/client/worker/index.ts, WP7-G2). The stale-chunk test runs
+ * against that.
  *
  *   tsx e2e/support/client/serve.ts   (started by e2e/playwright.config.ts)
  */
@@ -63,7 +64,13 @@ function serve() {
       fs.createReadStream(file).pipe(res);
       return;
     }
-    // SPA fallback, exactly like production — also for a missing /assets/*.js.
+    // Like the production Worker: an old build's chunk is a real 404.
+    if (pathname.startsWith('/assets/')) {
+      res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+      res.end('Not found');
+      return;
+    }
+    // SPA fallback, exactly like production.
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     res.end(indexHtml);
   });

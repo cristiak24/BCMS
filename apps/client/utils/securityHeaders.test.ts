@@ -30,3 +30,10 @@ test('the report-only policy allows the inline theme script by its hash', () => 
   const hash = createHash('sha256').update(inline).digest('base64');
   assert.ok((siteHeader('Content-Security-Policy-Report-Only') ?? '').includes(`'sha256-${hash}'`));
 });
+
+test('report-only violations are sent to the API, so they can be read before enforcing (WP7-G3)', () => {
+  const policy = siteHeader('Content-Security-Policy-Report-Only') ?? '';
+  assert.match(policy, /report-uri https:\/\/bcms-qflv\.onrender\.com\/api\/csp-report/);
+  // The enforced policy stays the minimal one until the report-only one is clean.
+  assert.doesNotMatch(siteHeader('Content-Security-Policy') ?? '', /default-src/);
+});

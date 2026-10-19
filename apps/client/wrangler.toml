@@ -1,6 +1,11 @@
 name = "bcms"
 compatibility_date = "2025-01-01"
+# Runs only for /assets/* (run_worker_first): a missing hashed chunk answers a
+# real 404 instead of the SPA fallback's index.html (worker/index.ts).
+main = "./worker/index.ts"
 
 [assets]
 directory = "./dist"
+binding = "ASSETS"
 not_found_handling = "single-page-application"
+run_worker_first = ["/assets/*"]

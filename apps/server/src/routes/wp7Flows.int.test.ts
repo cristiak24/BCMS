@@ -15,6 +15,8 @@ import clubDocumentsRouter from './clubDocuments';
 import playerRoutes from './playerRoutes';
 import financeRouter from './finance';
 import clubAdminRouter from './clubAdmin';
+import { cspReportRoute } from './cspReport';
+import { Router } from 'express';
 
 /**
  * WP7 leftovers from the 2026-10-15 audit, through the real routes. Event
@@ -89,7 +91,9 @@ before(async () => {
     const [parent] = await db.insert(users).values({ email: PARENT, name: 'Ioana Ionescu', role: 'parent', status: 'active', clubId: club.id }).returning();
     await db.insert(playerGuardians).values({ playerId: ana.id, userId: parent.id });
 
-    server = await serve({ '/api/events': eventRoutes, '/api/games': gamesRouter, '/api/teams': teamsRouter, '/api/club-documents': clubDocumentsRouter, '/api/players': playerRoutes, '/api/finance': financeRouter, '/api/club-admin': clubAdminRouter });
+    const csp = Router();
+    csp.post('/', ...cspReportRoute);
+    server = await serve({ '/api/csp-report': csp, '/api/events': eventRoutes, '/api/games': gamesRouter, '/api/teams': teamsRouter, '/api/club-documents': clubDocumentsRouter, '/api/players': playerRoutes, '/api/finance': financeRouter, '/api/club-admin': clubAdminRouter });
 });
 
 after(async () => {
@@ -288,4 +292,13 @@ test('F3: when the email cannot be sent the invitation stays pending and the adm
     assert.notEqual(resent.body.invitation.inviteUrl, res.body.invitation.inviteUrl, 'a fresh link');
     const [after] = await db.select().from(invites).where(eq(invites.id, row.id));
     assert.equal(after.status, 'pending');
+});
+
+test('G3: CSP violation reports are accepted in the browser\'s own format', async () => {
+    const res = await fetch(`${server.base}/api/csp-report`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/csp-report' },
+        body: JSON.stringify({ 'csp-report': { 'document-uri': 'https://bcms.ro/', 'effective-directive': 'connect-src', 'blocked-uri': 'https://x.example/' } }),
+    });
+    assert.equal(res.status, 204);
 });

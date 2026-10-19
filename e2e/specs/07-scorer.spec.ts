@@ -22,7 +22,10 @@ async function opponent(page: Page, action: '+1' | '+2' | '+3' | 'Fault') {
   await page.getByRole('button', { name: `CS Oaspeți ${action}`, exact: true }).click();
 }
 
-const synced = (page: Page) => expect(page.getByText(/salvat(e)? pe telefon/)).toHaveCount(0, { timeout: 15_000 });
+// Nothing left on the phone: neither typed actions ("1 acțiune salvată" /
+// "3 acțiuni salvate pe telefon") nor the automatic quarter markers
+// ("Se sincronizează…"). The singular never matched `salvat(e)?`.
+const synced = (page: Page) => expect(page.getByText(/salvat[eă]? pe telefon|Se sincronizează/)).toHaveCount(0, { timeout: 15_000 });
 
 test('a simple match from setup to final, with an offline stretch', async ({ page, context, consoleErrors }) => {
   const { events } = seedIds();
@@ -37,6 +40,9 @@ test('a simple match from setup to final, with an offline stretch', async ({ pag
   }
   await page.getByLabel('Numele echipei adverse').fill('CS Oaspeți');
   await page.getByRole('button', { name: 'Începe meciul' }).click();
+  // The seeded match is two days ahead: the scorer asks first (WP7-C1).
+  await expect(page.getByText('Meciul e programat mai târziu')).toBeVisible();
+  await page.getByRole('button', { name: 'Pornește oricum' }).click();
   await expect(page.getByText('Sfertul 1')).toBeVisible();
 
   // Quarter 1: us 2 + 3 + 1 = 6 (a +2 undone), them 2; one foul each.
