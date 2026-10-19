@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable } from '@/src/web/reactNative';
+import { Pressable, View } from '@/src/web/reactNative';
 import { Check } from 'lucide-react';
 
 export default function ThemedCheckbox({
@@ -13,21 +13,30 @@ export default function ThemedCheckbox({
     ariaLabel?: string;
     size?: number;
 }) {
+    // 32px touch target around the drawn box; layout unchanged (negative margin).
+    const hit = Math.max(size, 32);
     return (
         <Pressable
             onPress={(event: any) => {
                 event?.stopPropagation?.();
                 onToggle();
             }}
+            accessibilityRole="checkbox"
             accessibilityLabel={ariaLabel}
-            className={`items-center justify-center rounded-[7px] border-2 transition-colors ${
-                checked
-                    ? 'bg-[#1D3E90] border-[#1D3E90]'
-                    : 'bg-white border-[#CBD5E1] hover:border-[#1D3E90]'
-            }`}
-            style={{ width: size, height: size }}
+            aria-checked={checked}
+            className="items-center justify-center shrink-0"
+            style={{ width: hit, height: hit, margin: -(hit - size) / 2 }}
         >
-            {checked && <Check size={Math.round(size * 0.62)} color="var(--c-surface)" strokeWidth={3.5} />}
+            <View
+                className={`items-center justify-center rounded-[7px] border-2 transition-colors ${
+                    checked
+                        ? 'bg-[#1D3E90] border-[#1D3E90]'
+                        : 'bg-white border-[#CBD5E1] hover:border-[#1D3E90]'
+                }`}
+                style={{ width: size, height: size }}
+            >
+                {checked && <Check size={Math.round(size * 0.62)} color="var(--c-surface)" strokeWidth={3.5} />}
+            </View>
         </Pressable>
     );
 }

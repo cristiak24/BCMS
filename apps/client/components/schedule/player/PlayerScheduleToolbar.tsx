@@ -150,8 +150,8 @@ export function PlayerScheduleToolbar({
             key={key}
             onPress={() => onViewChange(key)}
             accessibilityLabel={label}
-            className={`flex-row items-center gap-1.5 h-[28px] rounded-[8px] justify-center ${
-              isMobile ? 'w-9' : 'px-2.5'
+            className={`flex-row items-center gap-1.5 rounded-[8px] justify-center ${
+              isMobile ? 'h-8 w-9' : 'h-[28px] px-2.5'
             }`}
             style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
           >
