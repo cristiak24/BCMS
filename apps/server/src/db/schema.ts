@@ -124,6 +124,7 @@ export const teams = pgTable("teams", {
 	level: teamLevel(),
 	coachId: integer("coach_id"),
 	isActive: boolean("is_active").default(true).notNull(),
+	joinCodeEnabled: boolean("join_code_enabled").default(true).notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [

@@ -237,6 +237,25 @@ test('a team code needs the role and the children filled in, and refuses a worki
     assert.equal((await signup('ABC123', { joinAs: 'player', birthDate: '2010-05-05' }, { existing: { id: adminId, status: 'active' } })).status, 409);
 });
 
+test('a team code switched off says so, creates nothing, and works again once reopened', async () => {
+    const accountsBefore = (await db.select().from(users)).length;
+    await db.update(teams).set({ joinCodeEnabled: false }).where(eq(teams.id, teamId));
+    try {
+        const looked = await resolveInvite('ABC123');
+        assert.equal(looked.ok, false);
+        assert.match(looked.ok ? '' : looked.error, /oprite/);
+
+        const out = await signup('ABC123', { joinAs: 'parent', children: [ana] }, { email: 'closed.parent@mail.ro' });
+        assert.equal(out.status, 400);
+        assert.match(String(out.body.error), /oprite/);
+        assert.equal((await db.select().from(users)).length, accountsBefore);
+    } finally {
+        await db.update(teams).set({ joinCodeEnabled: true }).where(eq(teams.id, teamId));
+    }
+    assert.equal((await resolveInvite('ABC123')).ok, true);
+    assert.equal((await signup('ABC123', { joinAs: 'parent', children: [ana] }, { email: 'reopened.parent@mail.ro' })).status, 201);
+});
+
 test('a guardian invite lets the parent in active and cannot be used twice', async () => {
     const playerId = await seedChild('Ilinca');
     const { token } = await createGuardianInvite({ clubId, playerId, createdBy: adminId });

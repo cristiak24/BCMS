@@ -22,6 +22,7 @@ export const INVITE_ERRORS = {
     team: 'Codul echipei nu este valid. Cere-l antrenorului.',
     code: 'Codul de invitație nu este valid, a expirat sau a atins numărul maxim de utilizări.',
     teamGone: 'Echipa din acest cod nu mai există. Cere un cod nou administratorului clubului.',
+    teamClosed: 'Înscrierile cu acest cod sunt oprite momentan. Cere-i antrenorului sau clubului să le redeschidă.',
 } as const;
 
 type Guardian = NonNullable<Awaited<ReturnType<typeof findUsableGuardianInvite>>>;
@@ -47,7 +48,9 @@ export async function resolveInvite(raw: string): Promise<InviteLookup> {
 
     if (looksLikeTeamCode(raw)) {
         const hit = await findTeamByJoinCode(raw);
-        return hit ? { ok: true, invite: { kind: 'team', hit } } : { ok: false, error: INVITE_ERRORS.team };
+        if (!hit) return { ok: false, error: INVITE_ERRORS.team };
+        if (!hit.team.joinCodeEnabled) return { ok: false, error: INVITE_ERRORS.teamClosed };
+        return { ok: true, invite: { kind: 'team', hit } };
     }
 
     if (looksLikeInviteCode(raw)) {
