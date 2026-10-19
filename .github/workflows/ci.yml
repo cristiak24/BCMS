@@ -1,0 +1,102 @@
+name: CI
+
+# The quality gates of every change (AUDIT-FIX-PROMPT.md, rule 4) plus lint
+# and the end-to-end suite. No real secrets anywhere: the tests run on
+# in-memory PGlite, the build needs no keys, and the E2E suite replaces Clerk
+# with a fake that lives only in e2e/.
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Render runs the API in UTC; so do the server tests.
+  TZ: UTC
+
+jobs:
+  server:
+    name: Server · tsc + teste
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: tsc
+        working-directory: apps/server
+        run: npx tsc --noEmit
+      - name: Teste (node:test, PGlite în memorie)
+        working-directory: apps/server
+        run: npm test
+        env:
+          # Only so a module that checks for it at import time loads; never used.
+          CLERK_SECRET_KEY: sk_test_ci_placeholder
+
+  client:
+    name: Client · tsc + teste + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: tsc
+        working-directory: apps/client
+        run: npx tsc --noEmit -p .
+      - name: Teste (utils)
+        working-directory: apps/client
+        run: npm test
+      - name: Build web
+        working-directory: apps/client
+        run: npm run build:web
+
+  lint:
+    name: Lint (doar erorile opresc build-ul)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Chromium pentru Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Teste E2E
+        run: npm run test:e2e
+        env:
+          E2E_OUTPUT_DIR: e2e-results
+      - name: Raport și capturi
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: e2e-results
+          retention-days: 14
+          if-no-files-found: ignore

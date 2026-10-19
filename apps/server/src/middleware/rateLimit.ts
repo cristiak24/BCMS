@@ -8,9 +8,11 @@ import type { AuthenticatedRequest } from './auth';
  * Keyed per authenticated user (falling back to client IP) + a caller-supplied
  * bucket name, so limits are isolated per sensitive action. Zero dependencies.
  *
- * Note: on serverless (Firebase Functions) counters live per warm instance, so
- * this is a guard against accidental hammering / simple abuse, not a hard global
- * quota. It must be layered on top of real authorization, never instead of it.
+ * Note: counters live in the memory of the one API process (Render), so they
+ * reset on every deploy, restart or free-tier spin-down and are not shared
+ * across instances. This is a guard against accidental hammering / simple
+ * abuse, not a hard global quota. It must be layered on top of real
+ * authorization, never instead of it.
  */
 
 type WindowState = {

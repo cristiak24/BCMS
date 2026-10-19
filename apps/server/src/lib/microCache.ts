@@ -3,9 +3,10 @@
  *
  * Purpose: coalesce short bursts of identical, read-heavy work (e.g. the club
  * admin accounts listing that runs invitation sync + several queries on every
- * request). Values are stored per-process, so on serverless (Firebase
- * Functions) this is best-effort per instance — good enough to smooth out a
- * user hammering "Refresh", and safe because we invalidate on every mutation.
+ * request). Values are stored per-process (the API runs as one Node process on
+ * Render; a deploy or restart empties it), so this is best-effort — good enough
+ * to smooth out a user hammering "Refresh", and safe because we invalidate on
+ * every mutation.
  *
  * Zero dependencies by design.
  */

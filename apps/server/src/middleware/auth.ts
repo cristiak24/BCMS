@@ -1,13 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyBearerToken } from '../lib/clerkAuth';
+import { verifyBearerToken, type ClerkAuthUser } from '../lib/clerkAuth';
 import { findOrLinkUser } from '../lib/identityLink';
 import { recordActivity } from '../lib/activityTracker';
+import type { users } from '../db/schema';
+
+/** A `users` row as Drizzle selects it. */
+export type User = typeof users.$inferSelect;
 
 export interface AuthenticatedRequest extends Request {
-    user?: any; // You can type this properly based on your User model
-    // Despite the name (kept to avoid touching every call site), this now holds
-    // the Clerk identity: { uid: <clerk user id>, email }.
-    firebaseUser?: any;
+    /** The caller's row; absent when the verified identity has no profile yet. */
+    user?: User;
+    // Despite the name (kept to avoid touching every call site), this holds
+    // the verified Clerk identity: { uid: <clerk user id>, email }.
+    firebaseUser?: ClerkAuthUser;
 }
 
 export const authenticate = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {

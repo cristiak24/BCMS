@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { and, eq, inArray } from 'drizzle-orm';
-import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
+import { authenticate, type AuthenticatedRequest, type User } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
 import { db } from '../db';
 import { familyJoinRequests, playerGuardians, players, playersToTeams, teams, users } from '../db/schema';
@@ -29,7 +29,7 @@ router.use(authenticate);
 
 const limiter = rateLimit({ bucket: 'family:mutate', limit: 30, windowMs: 60_000 });
 
-function requireParent(req: AuthenticatedRequest) {
+function requireParent(req: AuthenticatedRequest): req is AuthenticatedRequest & { user: User } {
     return req.user?.role === 'parent' && req.user?.status === 'active';
 }
 
@@ -143,8 +143,10 @@ router.post('/invites/accept', limiter, async (req: AuthenticatedRequest, res) =
 
 /** The player, if the caller is a club admin or coaches one of the player's teams. */
 async function managedPlayer(req: AuthenticatedRequest, playerId: number) {
-    const role = req.user?.role;
-    const clubId = req.user?.clubId == null ? null : Number(req.user.clubId);
+    const user = req.user;
+    if (!user) return null;
+    const role = user.role;
+    const clubId = user.clubId == null ? null : Number(user.clubId);
     if (clubId == null || !Number.isInteger(playerId) || (role !== 'admin' && role !== 'coach')) return null;
 
     const teamIds = await teamIdsOfPlayers([playerId]);
@@ -152,9 +154,9 @@ async function managedPlayer(req: AuthenticatedRequest, playerId: number) {
     const teamRows = await db.select({ id: teams.id, coachId: teams.coachId }).from(teams)
         .where(and(inArray(teams.id, teamIds), eq(teams.clubId, clubId)));
     if (!teamRows.length) return null;
-    if (role === 'coach' && !teamRows.some((t) => t.coachId === Number(req.user.id))) return null;
+    if (role === 'coach' && !teamRows.some((t) => t.coachId === Number(user.id))) return null;
     const [player] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
-    return player ? { player, clubId } : null;
+    return player ? { player, clubId, userId: user.id } : null;
 }
 
 router.get('/players/:id/guardians', async (req: AuthenticatedRequest, res) => {
@@ -181,7 +183,7 @@ router.post('/players/:id/invites', limiter, async (req: AuthenticatedRequest, r
             res.status(404).json({ error: 'Jucătorul nu există.' });
             return;
         }
-        const invite = await createGuardianInvite({ clubId: managed.clubId, playerId: managed.player.id, createdBy: Number(req.user.id) });
+        const invite = await createGuardianInvite({ clubId: managed.clubId, playerId: managed.player.id, createdBy: Number(managed.userId) });
         await writeAuditLog({
             action: 'family.guardian_invite_create',
             entityType: 'player',

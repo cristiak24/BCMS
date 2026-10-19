@@ -53,7 +53,7 @@ export function createServerApp() {
             callback(null, false);
         },
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        // Identity is proven by the Firebase ID token in `Authorization` only.
+        // Identity is proven by the Clerk session token in `Authorization` only.
         // The old `X-User-*` headers are no longer read by the server and are
         // deliberately not allowed through CORS either.
         // X-BCMS-Child: a parent's selected child (lib/selfPlayer.ts) — a selection

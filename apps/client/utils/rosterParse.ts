@@ -28,7 +28,7 @@ function parseLines(text: string, order: RosterOrder): ParsedLine[] {
   return text
     .split(/\r?\n/)
     .map((line) => line
-      .replace(/^\s*\d+\s*[.)\-]\s*/, '') // "1. ", "2) ", "3 - "
+      .replace(/^\s*\d+\s*[.)-]\s*/, '') // "1. ", "2) ", "3 - "
       .replace(/[\t;,]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim())

@@ -151,9 +151,11 @@ router.get('/invites/validate', inviteValidateLimiter as any, async (req: any, r
 // POST /api/auth/complete-invite-signup
 router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidLimiter, async (req: AuthenticatedRequest, res: any) => {
     try {
+        // authenticate() sets the verified identity before it calls next().
+        const identity = req.firebaseUser!;
         const outcome = await completeInviteSignup({
             body: req.body,
-            identity: { uid: req.firebaseUser.uid, email: req.firebaseUser.email || '' },
+            identity: { uid: identity.uid, email: identity.email || '' },
             existingUser: req.user ? { id: req.user.id, status: req.user.status } : null,
             ip: req.ip ?? null,
             userAgent: req.get('user-agent') ?? null,
