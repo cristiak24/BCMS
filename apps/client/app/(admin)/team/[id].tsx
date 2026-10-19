@@ -15,6 +15,7 @@ import TeamMedicalVisaModal from '../../../components/schedule/admin/TeamMedical
 import TeamPaymentsReportModal from '../../../components/schedule/admin/TeamPaymentsReportModal';
 import TeamFrbPanel from '../../../components/myclub/team-detail/TeamFrbPanel';
 import TeamEventsPanel from '../../../components/myclub/team-detail/TeamEventsPanel';
+import TeamAddPlayersPanel from '../../../components/myclub/team-detail/TeamAddPlayersPanel';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import BulkAddPlayersDialog from '../../../components/family/BulkAddPlayersDialog';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -58,14 +59,14 @@ export default function TeamDetailsScreen() {
     // and blocks the whole tab).
     const [playerPendingRemoval, setPlayerPendingRemoval] = useState<Player | null>(null);
 
-    const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<Player[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
-    const [isAdding, setIsAdding] = useState<number | null>(null);
+    // Bumped on every roster change so the add panel refetches who is still available.
+    const [rosterVersion, setRosterVersion] = useState(0);
 
-    const loadData = useCallback(async () => {
+    // `silent` refreshes in place (after a bulk import) instead of swapping the
+    // whole page for a spinner, so the add panel stays open where it was.
+    const loadData = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
         try {
-            setLoading(true);
+            if (!silent) setLoading(true);
             const [tData, pData, cData, sData] = await Promise.all([
                 teamsApi.getTeamById(teamId),
                 teamsApi.getTeamPlayers(teamId),
@@ -76,6 +77,7 @@ export default function TeamDetailsScreen() {
             setPlayers(pData);
             setCoaches(cData);
             setStats(sData);
+            setRosterVersion((v) => v + 1);
         } catch (error) {
             console.error('Error loading team details', error);
             Alert.alert('Eroare', 'Eroare la încărcarea detaliilor echipei.');
@@ -93,38 +95,12 @@ export default function TeamDetailsScreen() {
         if (s) setStats(s);
     }, [teamId]);
 
-    useEffect(() => {
-        const timer = setTimeout(async () => {
-            if (searchQuery.trim().length >= 2) {
-                try {
-                    setIsSearching(true);
-                    const results = await teamsApi.searchPlayers(searchQuery.trim());
-                    setSearchResults(results.filter((rp) => !players.some((p) => p.id === rp.id)));
-                } catch (e) {
-                    console.error('Error searching players', e);
-                } finally {
-                    setIsSearching(false);
-                }
-            } else {
-                setSearchResults([]);
-            }
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [searchQuery, players]);
-
+    // Errors propagate to TeamAddPlayersPanel, which shows them inline.
     const handleAddExistingPlayer = async (player: Player) => {
-        try {
-            setIsAdding(player.id);
-            await teamsApi.addPlayerToTeam(player.id, teamId);
-            setPlayers((prev) => [...prev, player]);
-            setSearchQuery('');
-            setSearchResults([]);
-            void refreshStats();
-        } catch {
-            Alert.alert('Eroare', 'Nu am putut adăuga jucătorul în echipă.');
-        } finally {
-            setIsAdding(null);
-        }
+        await teamsApi.addPlayerToTeam(player.id, teamId);
+        setPlayers((prev) => [...prev, player]);
+        setRosterVersion((v) => v + 1);
+        void refreshStats();
     };
 
     const handleRemovePlayer = (player: Player) => setPlayerPendingRemoval(player);
@@ -137,6 +113,7 @@ export default function TeamDetailsScreen() {
             setRemovingId(player.id);
             await teamsApi.removePlayerFromTeam(teamId, player.id);
             setPlayers((prev) => prev.filter((p) => p.id !== player.id));
+            setRosterVersion((v) => v + 1);
             void refreshStats();
             setPlayerPendingRemoval(null);
         } catch (e) {
@@ -396,49 +373,12 @@ export default function TeamDetailsScreen() {
 
                             {/* Add panel */}
                             {showAdd && (
-                                <View className="rounded-[16px] bg-[var(--c-surface-2)] border border-[var(--c-border)] p-4 mb-4">
-                                    <Pressable
-                                        onPress={() => setShowBulk(true)}
-                                        accessibilityRole="button"
-                                        className="ui-press flex-row items-center gap-2 h-10 px-3 mb-3 rounded-[12px] border self-start"
-                                        style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
-                                    >
-                                        <MaterialIcons name="group-add" size={16} color="var(--c-brand-fg)" />
-                                        <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Lipește o listă de jucători noi</Text>
-                                    </Pressable>
-                                    <View className="relative mb-2">
-                                        <View className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"><Search size={15} color="var(--c-faint)" /></View>
-                                        <TextInput
-                                            value={searchQuery}
-                                            onChangeText={setSearchQuery}
-                                            placeholder="Caută jucători existenți după nume"
-                                            placeholderTextColor="var(--c-faint)"
-                                            className="w-full h-10 rounded-[12px] border border-[var(--c-border)] bg-[var(--c-surface)] pl-9 pr-9 text-[13px] font-semibold text-[color:var(--c-ink-strong)]"
-                                        />
-                                        {isSearching && <View className="absolute right-3 top-2.5"><ActivityIndicator size="small" color="var(--c-brand-fg)" /></View>}
-                                    </View>
-                                    {searchResults.length > 0 && (
-                                        <View className="gap-1.5 max-h-[260px] overflow-y-auto">
-                                            {searchResults.map((rp) => (
-                                                <View key={rp.id} className="flex-row items-center justify-between px-3.5 py-2.5 rounded-[12px] bg-[var(--c-surface)] border border-[var(--c-border)]">
-                                                    <View className="flex-row items-center gap-2.5 min-w-0">
-                                                        <View className="w-8 h-8 rounded-full bg-[var(--c-surface-tint)] items-center justify-center flex-none"><Text className="text-[11px] font-black text-[color:var(--c-brand-fg)]">{rp.firstName.charAt(0)}{rp.lastName.charAt(0)}</Text></View>
-                                                        <Text className="text-[13px] font-bold text-[color:var(--c-ink-strong)] truncate" numberOfLines={1}>{rp.firstName} {rp.lastName}</Text>
-                                                    </View>
-                                                    <Pressable onPress={() => handleAddExistingPlayer(rp)} disabled={isAdding !== null} className="h-8 px-3 rounded-[10px] bg-[var(--c-brand-surface)] items-center justify-center flex-row gap-1">
-                                                        {isAdding === rp.id ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : <Text className="text-[color:var(--c-on-brand)] text-[12.5px] font-semibold">Adaugă</Text>}
-                                                    </Pressable>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    )}
-                                    {searchQuery.length >= 2 && !isSearching && searchResults.length === 0 && (
-                                        <Text className="text-center text-[color:var(--c-faint)] text-[12px] py-3 font-bold">Niciun jucător disponibil găsit.</Text>
-                                    )}
-                                    {searchQuery.length < 2 && (
-                                        <Text className="text-center text-[color:var(--c-faint)] text-[12px] py-1 font-semibold">Scrie cel puțin 2 caractere pentru a căuta.</Text>
-                                    )}
-                                </View>
+                                <TeamAddPlayersPanel
+                                    teamId={teamId}
+                                    rosterVersion={rosterVersion}
+                                    onAdd={handleAddExistingPlayer}
+                                    onOpenBulk={() => setShowBulk(true)}
+                                />
                             )}
 
                             {/* Roster grid */}
@@ -541,8 +481,7 @@ export default function TeamDetailsScreen() {
                 onClose={() => setShowBulk(false)}
                 onDone={({ created, skipped }) => {
                     setShowBulk(false);
-                    setShowAdd(false);
-                    loadData();
+                    void loadData({ silent: true });
                     Alert.alert('Lot actualizat', `${plural(created, 'jucător adăugat', 'jucători adăugați')}${skipped.length ? `, ${skipped.length} deja în lot (${skipped.slice(0, 5).join(', ')}${skipped.length > 5 ? '…' : ''})` : ''}.`);
                 }}
             />

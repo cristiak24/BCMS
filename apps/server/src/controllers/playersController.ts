@@ -623,18 +623,69 @@ export const playersController = {
             }
 
             const built = await buildPlayerScope(req);
-            if (built.skip) return res.json({ items: [], hasMore: false });
+            if (built.skip) return res.json({ items: [], hasMore: false, total: 0 });
 
             const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1), 50);
             const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0);
 
-            const rows = await db.select().from(players)
-                .where(built.scope ?? sql`true`)
-                .orderBy(desc(players.createdAt), desc(players.id))
-                .limit(limit + 1)
-                .offset(offset);
+            // Optional narrowing for the team page's add panel: a name filter,
+            // only players on no team at all, and never the target team's own
+            // members (so paging counts match what the admin can still add).
+            const conditions = built.scope ? [built.scope] : [];
+            const q = typeof req.query.query === 'string' ? req.query.query.trim().toLowerCase().slice(0, 80) : '';
+            if (q) {
+                const pattern = `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+                conditions.push(sql`lower(concat_ws(' ', ${players.firstName}, ${players.lastName}, ${players.name})) like ${pattern}`);
+            }
+            if (req.query.unassigned === '1' || req.query.unassigned === 'true') {
+                conditions.push(sql`${players.teamId} is null and not exists (select 1 from ${playersToTeams} where ${playersToTeams.playerId} = ${players.id})`);
+            }
+            const excludeTeamId = Number(req.query.excludeTeamId);
+            if (Number.isInteger(excludeTeamId) && excludeTeamId > 0) {
+                conditions.push(sql`${players.teamId} is distinct from ${excludeTeamId} and not exists (select 1 from ${playersToTeams} where ${playersToTeams.playerId} = ${players.id} and ${playersToTeams.teamId} = ${excludeTeamId})`);
+            }
+            const where = conditions.length ? and(...conditions) : sql`true`;
 
-            res.json({ items: rows.slice(0, limit), hasMore: rows.length > limit });
+            const [rows, [{ total }]] = await Promise.all([
+                db.select().from(players)
+                    .where(where)
+                    .orderBy(q ? players.lastName : desc(players.createdAt), q ? players.firstName : desc(players.id))
+                    .limit(limit + 1)
+                    .offset(offset),
+                db.select({ total: sql<number>`count(*)::int` }).from(players).where(where),
+            ]);
+
+            // Current team names, so "all players" can show where each one
+            // already plays (a player may be on several teams).
+            const items = rows.slice(0, limit);
+            const ids = items.map((row) => row.id);
+            const teamRows = ids.length
+                ? await db.select({ playerId: playersToTeams.playerId, name: teams.name })
+                    .from(playersToTeams)
+                    .innerJoin(teams, eq(teams.id, playersToTeams.teamId))
+                    .where(inArray(playersToTeams.playerId, ids))
+                : [];
+            const primaryTeamIds = [...new Set(items.map((row) => row.teamId).filter((id): id is number => id != null))];
+            const primaryTeams = primaryTeamIds.length
+                ? await db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, primaryTeamIds))
+                : [];
+            const primaryName = new Map(primaryTeams.map((team) => [team.id, team.name]));
+            const namesByPlayer = new Map<number, Set<string>>();
+            for (const row of teamRows) {
+                if (!namesByPlayer.has(row.playerId)) namesByPlayer.set(row.playerId, new Set());
+                namesByPlayer.get(row.playerId)!.add(row.name);
+            }
+
+            res.json({
+                items: items.map((row) => {
+                    const names = namesByPlayer.get(row.id) ?? new Set<string>();
+                    const primary = row.teamId != null ? primaryName.get(row.teamId) : undefined;
+                    if (primary) names.add(primary);
+                    return { ...row, teamNames: [...names] };
+                }),
+                hasMore: rows.length > limit,
+                total,
+            });
         } catch (error) {
             console.error('Browse players error:', error);
             res.status(500).json({ error: 'Internal server error' });

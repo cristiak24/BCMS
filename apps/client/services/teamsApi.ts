@@ -299,6 +299,28 @@ export const teamsApi = {
         return data;
     },
 
+    // The same roster-visible players as searchPlayers, but paged and without
+    // typing anything first — newest players show up on page one. The team
+    // page's add panel narrows it to players not yet on that team.
+    async browsePlayers(params: {
+        limit?: number;
+        offset?: number;
+        query?: string;
+        unassigned?: boolean;
+        excludeTeamId?: number;
+    } = {}): Promise<{ items: Player[]; hasMore: boolean; total: number }> {
+        const { data } = await apiClient.get<{ items: Player[]; hasMore: boolean; total: number }>('/players/browse', {
+            params: {
+                limit: params.limit,
+                offset: params.offset,
+                query: params.query || undefined,
+                unassigned: params.unassigned ? '1' : undefined,
+                excludeTeamId: params.excludeTeamId,
+            },
+        });
+        return data;
+    },
+
     async getRoster(): Promise<Player[]> {
         const { data } = await apiClient.get<Player[]>('/players/roster');
         return data;
