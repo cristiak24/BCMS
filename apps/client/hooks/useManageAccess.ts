@@ -87,10 +87,11 @@ export function useManageAccess() {
         }
     }, []);
 
-    // Teams only matter for parent links, so another role always means no team.
+    // Teams only matter for parent and player links, so a coach/accountant
+    // selection always means no team.
     const setSelectedRole = useCallback((role: InviteRole) => {
         setSelectedRoleState(role);
-        if (role !== 'parent') setSelectedTeamId(null);
+        if (role !== 'parent' && role !== 'player') setSelectedTeamId(null);
     }, []);
 
     const loadInviteLink = useCallback(async (role: InviteRole, teamId: number | null) => {
@@ -148,7 +149,7 @@ export function useManageAccess() {
         try {
             // generate returns the freshly created active link, so a follow-up
             // getActiveInviteLink call would just repeat the same fetch.
-            const nextLink = await manageAccessApi.generateInviteLink(role, interval, role === 'parent' ? selectedTeamId : null);
+            const nextLink = await manageAccessApi.generateInviteLink(role, interval, role === 'parent' || role === 'player' ? selectedTeamId : null);
             setInviteLink(nextLink);
             setRefreshIntervalMinutes(nextLink.refreshIntervalMinutes);
             return true;

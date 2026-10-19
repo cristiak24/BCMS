@@ -610,6 +610,9 @@ export const accessRequests = pgTable("access_requests", {
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	reviewedAt: timestamp("reviewed_at", { mode: 'string' }),
 	reviewedBy: integer("reviewed_by"),
+	// Optional: a player-role request whose link carried a team lands in this
+	// team's roster the moment it is approved (same idea as inviteLinks.teamId).
+	teamId: integer("team_id"),
 }, (table) => [
 	// One waiting request per person, club and role: reopening a link or a retried signup must not stack a second one.
 	uniqueIndex("access_requests_pending_unique").on(table.userId, table.clubId, table.requestedRole).where(sql`${table.status} = 'pending'`),

@@ -259,14 +259,17 @@ async function signUpWithEmailInvitation(ctx: Ctx) {
 }
 
 // Manage-access link (64 hex): everyone waits for an admin; a parent's
-// children wait with the team when the link is tied to one.
+// children, or a player themselves, wait with the team when the link is tied
+// to one (so approval can land them on that team's roster in one step).
 async function signUpWithAccessLink(ctx: Ctx, { link }: Of<'access-link'>) {
     if (ctx.isActive) return fail(409, ACTIVE_ACCOUNT_ERROR);
     const parsedKids = parentChildren(ctx, link.role);
     if (!parsedKids.ok) return fail(400, parsedKids.error);
 
     const kids = parsedKids.value;
-    const linkTeam = kids && link.teamId != null ? await findClubTeam(link.clubId, link.teamId) : null;
+    const wantsTeam = (kids || link.role === 'player') && link.teamId != null;
+    const linkTeam = wantsTeam ? await findClubTeam(link.clubId, link.teamId as number) : null;
+    if (wantsTeam && !linkTeam) return fail(400, INVITE_ERRORS.teamGone);
 
     const { user, queuedForTeam, requestCreated } = await registerWithAccessLink({
         existingUserId: ctx.existingUserId,
@@ -292,7 +295,17 @@ async function signUpWithAccessLink(ctx: Ctx, { link }: Of<'access-link'>) {
             children: kids.map((child) => `${child.firstName} ${child.lastName}`),
         });
     } else if (requestCreated) {
-        void notifyReviewers({ clubId: link.clubId, requesterId: user.id, requesterName: ctx.name, role: link.role });
+        // Access requests are approved by club admins only (the coach's
+        // Cereri page lists family join requests, not access requests), so
+        // the team only names where the player will land, without paging
+        // its coach.
+        void notifyReviewers({
+            clubId: link.clubId,
+            requesterId: user.id,
+            requesterName: ctx.name,
+            role: link.role,
+            teamName: linkTeam?.name ?? null,
+        });
     }
     return created({ userId: user.id, clubId: link.clubId, role: link.role, status: 'pending' });
 }

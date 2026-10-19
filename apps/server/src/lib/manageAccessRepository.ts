@@ -1,9 +1,10 @@
 import { toIso } from './dateUtils';
 import { db } from '../db';
-import { users, clubs, teams, accessRequests, inviteLinks } from '../db/schema';
-import { eq, and, desc, isNull, sql } from 'drizzle-orm';
+import { users, clubs, teams, accessRequests, inviteLinks, players, playersToTeams } from '../db/schema';
+import { eq, and, asc, desc, isNull, sql } from 'drizzle-orm';
 import type { AccessRequestRecord, InviteRole } from '../types/manageAccess';
 import { decryptInviteToken, encryptInviteToken } from './manageAccessTokens';
+import { splitDisplayName } from './password';
 
 type InviteLinkRow = {
     id: number;
@@ -125,6 +126,57 @@ export async function approveAccessRequest(id: number, clubId: number, reviewedB
         .returning();
 
     return updated[0] ?? null;
+}
+
+/**
+ * A player-role access request whose link carried a team: approval lands
+ * them on that team's roster right away, same as a parent's children do.
+ * Claims an existing row first (already linked to this account, or an
+ * unclaimed one an admin pre-created with the same email) instead of
+ * creating a duplicate player.
+ */
+export async function placeApprovedPlayerOnTeam(request: { userId: number; userName: string | null; userEmail: string | null; teamId: number }) {
+    // No unique constraint on (playerId, teamId) — check first, same as every
+    // other membership insert in the app, so a repeat approval (e.g. a second
+    // team) never doubles up the player on a team they're already on.
+    const addToTeam = async (playerId: number) => {
+        const already = await db.select({ id: playersToTeams.id }).from(playersToTeams)
+            .where(and(eq(playersToTeams.playerId, playerId), eq(playersToTeams.teamId, request.teamId)))
+            .limit(1);
+        if (!already.length) await db.insert(playersToTeams).values({ playerId, teamId: request.teamId });
+    };
+
+    const [linked] = await db.select().from(players).where(eq(players.userId, request.userId)).limit(1);
+    if (linked) {
+        if (linked.teamId == null) await db.update(players).set({ teamId: request.teamId }).where(eq(players.id, linked.id));
+        await addToTeam(linked.id);
+        return;
+    }
+
+    const email = (request.userEmail ?? '').trim().toLowerCase();
+    const [unclaimed] = email
+        ? await db.select().from(players)
+            .where(and(sql`lower(trim(${players.email})) = ${email}`, isNull(players.userId)))
+            .orderBy(asc(players.id))
+            .limit(1)
+        : [];
+    if (unclaimed) {
+        await db.update(players).set({ userId: request.userId, teamId: unclaimed.teamId ?? request.teamId }).where(eq(players.id, unclaimed.id));
+        await addToTeam(unclaimed.id);
+        return;
+    }
+
+    const { firstName, lastName } = splitDisplayName(request.userName);
+    const [created] = await db.insert(players).values({
+        name: request.userName,
+        firstName,
+        lastName,
+        status: 'active',
+        teamId: request.teamId,
+        email: request.userEmail,
+        userId: request.userId,
+    }).returning({ id: players.id });
+    await db.insert(playersToTeams).values({ playerId: created.id, teamId: request.teamId });
 }
 
 export async function denyAccessRequest(id: number, clubId: number, reviewedBy: number | null) {

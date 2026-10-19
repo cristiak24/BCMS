@@ -10,6 +10,7 @@ import {
     getActiveInviteLinkForClubRole,
     getClubById,
     listClubAccessRequests,
+    placeApprovedPlayerOnTeam,
     updateUserAccess,
 } from './manageAccessRepository';
 import { generateInviteToken, hashInviteToken, isInviteExpired, normalizeRefreshIntervalMinutes } from './manageAccessTokens';
@@ -57,6 +58,9 @@ export async function approveManageAccessRequest(user: AppUserContext, requestId
         role: request.requestedRole as InviteRole,
         status: 'active',
     });
+    if (request.requestedRole === 'player' && request.teamId != null) {
+        await placeApprovedPlayerOnTeam({ userId: request.userId, userName: request.userName, userEmail: request.userEmail, teamId: request.teamId });
+    }
     void notifyRequester({ userId: request.userId, decision: 'approved', subject: `contul de ${roleLabel(request.requestedRole)}` });
 
     return {

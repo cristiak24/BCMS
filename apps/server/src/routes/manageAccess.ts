@@ -31,6 +31,11 @@ function readInviteRole(value: unknown): InviteRole | null {
     return value === 'player' || value === 'parent' || value === 'coach' ? value : null;
 }
 
+// A parent's children, or a player themselves, can wait for approval on a
+// specific team; a coach or accountant request has no team to land on.
+const TEAM_SCOPED_ROLES: InviteRole[] = ['parent', 'player'];
+const TEAM_ROLE_ERROR = 'Echipa se poate alege doar pentru invitațiile părinților sau ale jucătorilor.';
+
 router.get('/requests', async (req, res) => {
     const user = await requireClubAdmin(req, res);
 
@@ -137,8 +142,8 @@ router.get('/invite-links/active', async (req, res) => {
     }
 
     const teamId = readTeamId(req.query.teamId);
-    if (teamId === null || (teamId !== undefined && role !== 'parent')) {
-        res.status(400).json({ error: teamId === null ? 'Echipa nu este validă.' : 'Echipa se poate alege doar pentru invitațiile părinților.' });
+    if (teamId === null || (teamId !== undefined && !TEAM_SCOPED_ROLES.includes(role))) {
+        res.status(400).json({ error: teamId === null ? 'Echipa nu este validă.' : TEAM_ROLE_ERROR });
         return;
     }
 
@@ -175,8 +180,8 @@ router.post('/invite-links/generate', inviteLimiter, async (req: AuthenticatedRe
     }
 
     const teamId = readTeamId(req.body?.teamId);
-    if (teamId === null || (teamId !== undefined && role !== 'parent')) {
-        res.status(400).json({ error: teamId === null ? 'Echipa nu este validă.' : 'Echipa se poate alege doar pentru invitațiile părinților.' });
+    if (teamId === null || (teamId !== undefined && !TEAM_SCOPED_ROLES.includes(role))) {
+        res.status(400).json({ error: teamId === null ? 'Echipa nu este validă.' : TEAM_ROLE_ERROR });
         return;
     }
 
