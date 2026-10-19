@@ -7,10 +7,10 @@ import StatusBadge from './StatusBadge';
 import { getTeamLabel } from './rosterHelpers';
 import RosterCheckbox from './RosterCheckbox';
 import { ROSTER_COLUMN_FLEX, ROSTER_COLUMN_WIDTHS, ROSTER_TABLE_WIDTH } from './rosterTableLayout';
+import { formatDate, MEDICAL_META, medicalStatus } from '../myclub/teamDisplay';
 
 interface PlayerRowProps {
   player: Player;
-  categoryLabel: string;
   /** Last 30 days; null = nothing marked in the period. */
   attendanceRate: number | null;
   paymentLabel: string;
@@ -25,7 +25,6 @@ interface PlayerRowProps {
 
 export default function PlayerRow({
   player,
-  categoryLabel,
   attendanceRate,
   paymentLabel,
   paymentPaid,
@@ -46,7 +45,8 @@ export default function PlayerRow({
       ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)' }
       : { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' };
   const attendanceTone = attendanceRate == null ? 'var(--c-faint)' : attendanceRate >= 75 ? 'var(--c-success-fg)' : attendanceRate >= 60 ? 'var(--c-warning-fg)' : 'var(--c-danger-fg)';
-  const unassigned = !categoryLabel || /neasignat/i.test(categoryLabel);
+  const medical = medicalStatus(player.medicalCheckExpiry);
+  const medicalMeta = MEDICAL_META[medical];
 
   // A table row, not a floating card: the list used to be eight separate
   // 22px-radius cards with "ROL" / "SĂPTĂMÂNAL" captions over every value.
@@ -78,12 +78,16 @@ export default function PlayerRow({
           </View>
         </View>
 
-        <View style={styles.positionCell}>
-          <Text style={styles.position} numberOfLines={1}>{player.position || '—'}</Text>
-        </View>
-
-        <View style={styles.categoryCell}>
-          {unassigned ? <Text style={styles.muted}>—</Text> : <StatusBadge label={categoryLabel} tone="blue" />}
+        <View style={styles.medicalCell}>
+          <View style={[styles.paymentPill, { backgroundColor: medicalMeta.bg }] as any}>
+            <View style={[styles.dot, { backgroundColor: medicalMeta.fg }] as any} />
+            <Text style={[styles.paymentText, { color: medicalMeta.fg }] as any} numberOfLines={1}>{medicalMeta.label}</Text>
+          </View>
+          {medical !== 'missing' ? (
+            <Text style={styles.medicalDate} numberOfLines={1}>
+              {medical === 'expired' ? 'din' : 'până la'} {formatDate(player.medicalCheckExpiry)}
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.attendanceCell}>
@@ -184,26 +188,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'var(--c-faint)',
   },
-  positionCell: {
-    minWidth: ROSTER_COLUMN_WIDTHS.position,
-    flexGrow: ROSTER_COLUMN_FLEX.position,
-    flexBasis: 0,
-    flexShrink: 0,
-    paddingRight: 12,
-    justifyContent: 'center',
-  },
-  position: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'var(--c-ink-soft)',
-  },
-  categoryCell: {
-    minWidth: ROSTER_COLUMN_WIDTHS.category,
-    flexGrow: ROSTER_COLUMN_FLEX.category,
+  medicalCell: {
+    minWidth: ROSTER_COLUMN_WIDTHS.medical,
+    flexGrow: ROSTER_COLUMN_FLEX.medical,
     flexBasis: 0,
     flexShrink: 0,
     paddingRight: 22,
     justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  medicalDate: {
+    marginTop: 4,
+    fontSize: 11.5,
+    color: 'var(--c-muted)',
+    fontWeight: '500',
   },
   attendanceCell: {
     minWidth: ROSTER_COLUMN_WIDTHS.attendance,

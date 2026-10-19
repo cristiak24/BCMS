@@ -101,7 +101,7 @@ export default function BoxScoreView({
 }) {
   const ours = roster
     .filter((p) => box.players[p.playerId])
-    .map((p) => ({ key: String(p.playerId), number: p.number, name: `${p.lastName} ${p.firstName}`.trim(), line: box.players[p.playerId] }))
+    .map((p) => ({ key: String(p.playerId), number: p.number, name: `${p.firstName} ${p.lastName}`.trim(), line: box.players[p.playerId] }))
     .sort((a, b) => b.line.pts - a.line.pts || Number(a.number || 99) - Number(b.number || 99));
   const theirs = opponentRoster
     .filter((o) => box.opponents[o.number])

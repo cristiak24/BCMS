@@ -215,16 +215,24 @@ export default function TeamDetailsScreen() {
                         the back button sits on its own line and the actions
                         become a horizontal scroll strip (was overflowing and
                         truncating labels to "Progr", "Preze", …). */}
-                    <View className="flex-col lg:flex-row lg:items-center lg:justify-between gap-2.5 mb-4">
-                        <Pressable onPress={() => router.push('/admin/my-club-admin' as any)} className="flex-row items-center gap-2 h-9 pl-2 pr-3.5 rounded-[10px] self-start border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
+                    {/* Phones: back (icon only) and the actions share one row, so the
+                        header no longer fills the first screen before the roster. */}
+                    <View className="flex-row items-center lg:justify-between gap-2 lg:gap-2.5 mb-3 lg:mb-4">
+                        <Pressable
+                            onPress={() => router.push('/admin/my-club-admin' as any)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Înapoi la Clubul meu"
+                            className="flex-row items-center gap-2 h-9 w-9 lg:w-auto justify-center lg:justify-start lg:pl-2 lg:pr-3.5 rounded-[10px] shrink-0 border"
+                            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+                        >
                             <ArrowLeft size={16} color="var(--c-ink)" />
-                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink)' }}>Clubul meu</Text>
+                            <Text className="hidden lg:flex text-[12px] font-semibold" style={{ color: 'var(--c-ink)' }}>Clubul meu</Text>
                         </Pressable>
                         <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={false}
-                            className="-mx-4 lg:mx-0 lg:flex-none"
-                            contentContainerStyle={{ paddingHorizontal: 16, gap: 8, flexGrow: 0 }}
+                            className="flex-1 -mr-4 lg:mr-0 lg:flex-none"
+                            contentContainerStyle={{ paddingRight: 16, gap: 8, flexGrow: 0 }}
                         >
                             <Pressable onPress={() => router.push(`/admin/schedule?teamId=${team.id}` as any)} className="flex-row items-center gap-1.5 h-9 px-3 rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
                                 <Calendar size={14} color="var(--c-brand-fg)" />
@@ -254,17 +262,17 @@ export default function TeamDetailsScreen() {
                         title={team.name}
                         subtitle={team.leagueName ? `${team.leagueName} • ${team.seasonName}` : undefined}
                         leading={
-                            <View className="w-14 h-14 md:w-16 md:h-16 rounded-[16px] items-center justify-center flex-none" style={{ backgroundColor: crestTint }}>
-                                <Shield size={28} color={accentColor} fill={accentColor} />
+                            <View className="w-11 h-11 md:w-16 md:h-16 rounded-[14px] md:rounded-[16px] items-center justify-center flex-none" style={{ backgroundColor: crestTint }}>
+                                <Shield size={24} color={accentColor} fill={accentColor} />
                             </View>
                         }
                         actions={
-                            <View className="flex-row items-center gap-2.5 rounded-[12px] border px-3 py-2" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
-                                <View>
+                            <View className="flex-row items-center gap-2.5 rounded-[12px] border pl-3 pr-1.5 py-1.5 md:pr-3 md:py-2" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
+                                <View className="flex-row md:flex-col items-baseline md:items-start gap-2 md:gap-0">
                                     <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Cod invitație</Text>
-                                    <Text className="f-display t-num text-[18px] font-extrabold tracking-[2px] leading-tight" style={{ color: 'var(--c-brand-fg)' }}>{team.inviteCode}</Text>
+                                    <Text className="f-display t-num text-[16px] md:text-[18px] font-extrabold tracking-[2px] leading-tight" style={{ color: 'var(--c-brand-fg)' }}>{team.inviteCode}</Text>
                                 </View>
-                                <Pressable onPress={handleCopyInvite} className="ui-press w-9 h-9 rounded-[10px] items-center justify-center border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any} accessibilityLabel="Copiază codul">
+                                <Pressable onPress={handleCopyInvite} className="ui-press w-8 h-8 md:w-9 md:h-9 rounded-[10px] items-center justify-center border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any} accessibilityLabel="Copiază codul">
                                     {copied ? <Check size={16} color="var(--c-success-fg)" /> : <Copy size={15} color="var(--c-brand-fg)" />}
                                 </Pressable>
                             </View>
@@ -282,16 +290,21 @@ export default function TeamDetailsScreen() {
                             {team.level && (
                                 <View className="px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--c-surface-3)' }}><Text className="text-[11px] font-semibold" style={{ color: 'var(--c-muted)' }}>{LEVEL_LABELS[team.level]}</Text></View>
                             )}
+                            {/* Phones: the average age is a chip here, not a fifth tile alone on its row. */}
+                            {avgAge ? (
+                                <View className="lg:hidden px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--c-surface-3)' }}><Text className="text-[11px] font-semibold" style={{ color: 'var(--c-muted)' }}>Vârstă medie {avgAge} ani</Text></View>
+                            ) : null}
                             {!team.isActive && (
                                 <View className="px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--c-surface-3)' }}><Text className="text-[11px] font-semibold" style={{ color: 'var(--c-muted)' }}>Inactivă</Text></View>
                             )}
                         </View>
-                        <View className="grid grid-cols-2 lg:grid-cols-5 gap-2 ui-stagger">
-                            <GlassStat value={players.length} label="Jucători în lot" dot="var(--c-brand-fg)" />
+                        <View className="grid grid-cols-4 lg:grid-cols-5 gap-1.5 lg:gap-2 ui-stagger">
+                            <GlassStat value={players.length} label="Jucători în lot" shortLabel="în lot" dot="var(--c-brand-fg)" />
                             <GlassStat
                                 value={monthlyAtt != null ? monthlyAtt : '—'}
                                 suffix={monthlyAtt != null ? '%' : undefined}
                                 label="Prezență"
+                                shortLabel="prezență"
                                 hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()}
                                 dot={attendanceColor(monthlyAtt)}
                                 bar={monthlyAtt ?? undefined}
@@ -299,15 +312,19 @@ export default function TeamDetailsScreen() {
                             <GlassStat
                                 value={medicalIssues > 0 ? medicalIssues : 'La zi'}
                                 label={medicalIssues > 0 ? 'vize de rezolvat' : 'vize medicale'}
+                                shortLabel="vize"
                                 dot={medicalIssues > 0 ? 'var(--c-warning)' : 'var(--c-success)'}
                             />
                             <GlassStat
                                 value={arrears}
                                 label={arrears > 0 ? 'jucători cu restanțe' : 'plăți restante'}
+                                shortLabel="restanțe"
                                 dot={arrears > 0 ? 'var(--c-danger)' : 'var(--c-success)'}
                                 danger={arrears > 0}
                             />
-                            <GlassStat value={avgAge ?? '—'} suffix={avgAge ? 'ani' : undefined} label="Vârstă medie" dot="var(--c-purple)" />
+                            <View className="hidden lg:flex">
+                                <GlassStat value={avgAge ?? '—'} suffix={avgAge ? 'ani' : undefined} label="Vârstă medie" dot="var(--c-purple)" />
+                            </View>
                         </View>
                     </PageHero>
 

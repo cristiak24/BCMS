@@ -114,7 +114,7 @@ function PlayerCard({
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<PlayerContactUpdate>(player);
   const set = (key: keyof PlayerContactUpdate) => (value: string) => setDraft((d) => ({ ...d, [key]: value }));
-  const name = `${player.lastName} ${player.firstName}`.trim();
+  const name = `${player.firstName} ${player.lastName}`.trim();
   const ownPhone = player.phone || player.accountPhone;
   const accounts = player.guardianAccounts ?? [];
   const hasAny = Boolean(ownPhone || player.guardianPhone || player.guardian2Phone || accounts.length);
@@ -213,7 +213,7 @@ function PlayerCard({
       ) : readOnly ? (
         <Text className="text-[13px]" style={{ color: 'var(--c-faint)' }}>Niciun număr de telefon încă.</Text>
       ) : (
-        <Pressable onPress={() => { setDraft(player); setEditing(true); }} accessibilityRole="button" className="ui-press flex-row items-center gap-1.5 self-start">
+        <Pressable onPress={() => { setDraft(player); setEditing(true); }} accessibilityRole="button" className="ui-press flex-row items-center gap-1.5 self-start min-h-[32px]">
           <MaterialIcons name="add" size={15} color="var(--c-brand-fg)" />
           <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Adaugă numere de telefon</Text>
         </Pressable>

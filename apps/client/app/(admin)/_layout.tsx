@@ -7,6 +7,7 @@ import { normalizeRole, isSuperadmin } from '../../utils/authSession';
 import { useSession } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import AppHeader from '../../components/AppHeader';
+import { InstallBanner } from '../../components/pwa/InstallApp';
 import { MobileBottomNavigation, MobileNavigationSheet } from '../../components/MobileNavigation';
 
 const MOBILE_NAV_ITEMS = [
@@ -173,7 +174,10 @@ function AdminLayoutContent() {
 
                 {/* ── Main Content ────────────────────────────────── */}
                 <main className="flex-1 min-w-0 overflow-auto overflow-x-hidden flex flex-col relative h-full">
-                    <div className="flex-1 min-w-0 pb-24 lg:pb-0 relative w-full flex flex-col">
+                    {/* With a floating "+" button the last row needs to clear it too,
+                        not only the bottom bar (it sat under "+ Eveniment"). */}
+                    <div className={`flex-1 min-w-0 ${mobileFab ? 'pb-40' : 'pb-24'} lg:pb-0 relative w-full flex flex-col`}>
+                        <InstallBanner placement="inline" />
                         <Suspense fallback={<ContentLoading />}>
                             <Outlet />
                         </Suspense>

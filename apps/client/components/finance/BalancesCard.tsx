@@ -38,7 +38,9 @@ function exportMonths() {
         const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
         const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         const label = new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric' }).format(date);
-        return { key, label: `Plăți ${label}` };
+        // "Octombrie 2026": the button next to it already says "Export plăți"
+        // (the "Plăți octombrie …" label was cut off on phones).
+        return { key, label: label.charAt(0).toUpperCase() + label.slice(1) };
     });
 }
 
@@ -218,11 +220,18 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                         Calculat la fel ca pe pagina de plăți a fiecărui jucător.
                     </Text>
                 </View>
-                <View className="flex-row items-center gap-2 flex-wrap">
-                    <Button size="sm" icon="file-download" label="Export solduri" disabled={loading || !balances.length} onPress={() => downloadCsv(balancesCsvRows(filtered), 'solduri-jucatori.csv')} />
-                    <SelectField<string> label="Luna exportului de plăți" value={exportMonth} onChange={setExportMonth} options={monthOptions} className="w-[190px]" />
-                    <Button size="sm" icon="file-download" label="Export plăți" loading={exporting} onPress={() => void exportPayments()} />
-                    <Button size="sm" icon="refresh" label="Reîncarcă" iconOnlyOnMobile onPress={() => void load()} disabled={loading} />
+                {/* Two groups that each stay on one line: balances (export, reload)
+                    and payments (month + export). At 375px the four controls used
+                    to break over three rows. */}
+                <View className="flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+                    <View className="flex-row items-center gap-2">
+                        <Button size="sm" icon="file-download" label="Export solduri" disabled={loading || !balances.length} onPress={() => downloadCsv(balancesCsvRows(filtered), 'solduri-jucatori.csv')} />
+                        <Button size="sm" icon="refresh" label="Reîncarcă" iconOnlyOnMobile onPress={() => void load()} disabled={loading} />
+                    </View>
+                    <View className="flex-row items-center gap-2">
+                        <SelectField<string> label="Luna exportului de plăți" value={exportMonth} onChange={setExportMonth} options={monthOptions} className="flex-1 min-w-0 sm:flex-none sm:w-[170px]" />
+                        <Button size="sm" icon="file-download" label="Export plăți" loading={exporting} onPress={() => void exportPayments()} />
+                    </View>
                 </View>
             </View>
 

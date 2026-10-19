@@ -387,6 +387,7 @@ export default function EventDetailScreen() {
                 <TextInput
                   value={noteDraft}
                   onChangeText={setNoteDraft}
+                  accessibilityLabel="Notă pentru jucători"
                   placeholder="ex. Ritm foarte bun azi, continuăm cu pick-and-roll."
                   placeholderTextColor="var(--c-faint)"
                   multiline
@@ -395,16 +396,19 @@ export default function EventDetailScreen() {
                   style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)', color: 'var(--c-ink)' } as any}
                 />
                 {noteError ? <Text className="text-[12px] font-semibold mt-1.5" style={{ color: 'var(--c-danger-fg)' }}>{noteError}</Text> : null}
-                <View className="flex-row justify-end mt-2.5">
-                  <ActionButton
-                    icon={noteDirty ? 'save' : 'check'}
-                    label={noteDirty ? 'Salvează nota' : 'Salvat'}
-                    onPress={saveNote}
-                    tone={noteDirty ? 'brand' : 'neutral'}
-                    disabled={!noteDirty}
-                    loading={savingNote}
-                  />
-                </View>
+                {/* Nothing to save and nothing saved: no "Salvat" on an empty note. */}
+                {noteDirty || (event.coachNote ?? '').trim() ? (
+                  <View className="flex-row justify-end mt-2.5">
+                    <ActionButton
+                      icon={noteDirty ? 'save' : 'check'}
+                      label={noteDirty ? (noteDraft.trim() ? 'Salvează nota' : 'Șterge nota') : 'Salvat'}
+                      onPress={saveNote}
+                      tone={noteDirty ? 'brand' : 'neutral'}
+                      disabled={!noteDirty}
+                      loading={savingNote}
+                    />
+                  </View>
+                ) : null}
               </Card>
             </View>
 

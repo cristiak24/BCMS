@@ -63,8 +63,9 @@ export default function RosterTableHeader({
       <View style={styles.playerCell}>
         <SortableLabel label="Sportiv" column="name" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </View>
-      <Text style={[styles.label, styles.positionCell]}>Poziție</Text>
-      <Text style={[styles.label, styles.categoryCell]}>Categorie</Text>
+      {/* Viza medicală instead of "Poziție" (never filled in anywhere) and
+          "Categorie" (it repeated the team shown under the name). */}
+      <Text style={[styles.label, styles.medicalCell]}>Viză medicală</Text>
       <View style={styles.attendanceCell}>
         <SortableLabel label="Prezență" column="attendance" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </View>
@@ -110,16 +111,9 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     paddingRight: 12,
   },
-  positionCell: {
-    minWidth: ROSTER_COLUMN_WIDTHS.position,
-    flexGrow: ROSTER_COLUMN_FLEX.position,
-    flexBasis: 0,
-    flexShrink: 0,
-    paddingRight: 12,
-  },
-  categoryCell: {
-    minWidth: ROSTER_COLUMN_WIDTHS.category,
-    flexGrow: ROSTER_COLUMN_FLEX.category,
+  medicalCell: {
+    minWidth: ROSTER_COLUMN_WIDTHS.medical,
+    flexGrow: ROSTER_COLUMN_FLEX.medical,
     flexBasis: 0,
     flexShrink: 0,
     paddingRight: 22,

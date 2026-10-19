@@ -6,6 +6,7 @@ import { HeaderProvider, useHeader } from '../../components/HeaderContext';
 import { useSession } from '../../context/AuthContext';
 import { normalizeRole } from '../../utils/authSession';
 import AppHeader from '../../components/AppHeader';
+import { InstallBanner } from '../../components/pwa/InstallApp';
 import { MobileBottomNavigation, MobileNavigationSheet } from '../../components/MobileNavigation';
 import { PLAYER_FEATURE_FLAGS } from '../../config/playerFeatureFlags';
 import ChildSwitcher from '../../components/family/ChildSwitcher';
@@ -138,6 +139,7 @@ function PlayerTabsLayoutContent() {
                     <div className="flex-1 min-w-0 pb-24 lg:pb-0 relative w-full flex flex-col">
                         {isParent ? <ChildSwitcher /> : null}
                         {!isCoach ? <AssignedGamesBanner /> : null}
+                        <InstallBanner placement="inline" />
                         <Suspense fallback={<ContentLoading />}>
                             <Outlet />
                         </Suspense>

@@ -3,7 +3,7 @@ import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, useWindowDimensions } from '@/src/web/reactNative';
 import { CalendarEvent } from '../../../services/eventsApi';
 import { EVENT_TYPE_META, CalendarDayCell, getMonthGridDays, groupEventsByDay, isCancelledEvent } from '../scheduleShared';
-import { plural } from '../../../utils/plural';
+import { CalendarEventPill, calendarDayLabel } from '../CalendarEventPill';
 
 const WEEKDAY_LABELS = ['LUN', 'MAR', 'MIE', 'JOI', 'VIN', 'SÂM', 'DUM'];
 
@@ -50,7 +50,7 @@ const CompactCalendarCell = React.memo(({
     <TouchableOpacity
       onPress={onSelectDay}
       disabled={!activeEvents.length}
-      accessibilityLabel={`${dayData.dayNumber}: ${plural(activeEvents.length, 'eveniment', 'evenimente')}`}
+      accessibilityLabel={calendarDayLabel(dayData.date, dayData.dayNumber ?? 0, activeEvents.length)}
       className="ui-press items-center justify-start pt-2"
       style={{
         width: '14.28%',
@@ -131,7 +131,12 @@ const CalendarCell = React.memo(({
       )}
 
       {/* Day number badge — also opens the day schedule */}
-      <TouchableOpacity onPress={onSelectDay} activeOpacity={0.7} className="flex-row items-center justify-between mb-1">
+      <TouchableOpacity
+        onPress={onSelectDay}
+        activeOpacity={0.7}
+        accessibilityLabel={calendarDayLabel(dayData.date, dayData.dayNumber, activeEvents.length)}
+        className="flex-row items-center justify-between mb-1"
+      >
         <View
           className={`w-6 h-6 rounded-full items-center justify-center ${dayData.isToday ? 'bg-[#1D3E90]' : ''}`}
           style={dayData.isToday ? { boxShadow: '0 2px 6px rgba(29,62,144,0.35)' } as any : undefined}
@@ -154,35 +159,9 @@ const CalendarCell = React.memo(({
 
       {/* Events list */}
       <View className="gap-[3px]">
-        {visibleEvents.map((event) => {
-          const meta = EVENT_TYPE_META[event.type];
-          const isMatch = event.type === 'match';
-          return (
-            <TouchableOpacity
-              key={event.id}
-              onPress={() => onSelectEvent(event)}
-              activeOpacity={0.75}
-              className="hover:opacity-80"
-              style={{
-                borderRadius: 7,
-                paddingHorizontal: 6,
-                paddingVertical: 3,
-                backgroundColor: isMatch ? meta.solid : meta.soft,
-              }}
-            >
-              <Text
-                numberOfLines={1}
-                style={{
-                  fontSize: 10,
-                  fontWeight: '800',
-                  color: isMatch ? meta.onSolid : meta.onSoft,
-                }}
-              >
-                {event.title}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+        {visibleEvents.map((event) => (
+          <CalendarEventPill key={event.id} event={event} dateKey={dayData.dateKey} onPress={() => onSelectEvent(event)} />
+        ))}
         {overflow > 0 && (
           <TouchableOpacity onPress={onSelectDay} activeOpacity={0.7} className="self-start mt-[1px]">
             <View className="bg-slate-100 rounded-full px-2 py-[2px]">

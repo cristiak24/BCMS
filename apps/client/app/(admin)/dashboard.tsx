@@ -185,14 +185,16 @@ function KpiCard({
 
       {/* Spacer pins the footer to the bottom so footers line up across a row. */}
       <View className="flex-1 min-h-2" />
-      <View className="flex-row items-center gap-2 pt-2.5 min-w-0" style={{ borderTopWidth: 1, borderTopColor: 'var(--c-border-soft)' } as any}>
+      <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1 pt-2.5 min-w-0" style={{ borderTopWidth: 1, borderTopColor: 'var(--c-border-soft)' } as any}>
         {delta ? (
           <View className="flex-row items-center gap-0.5 rounded-full px-1.5 py-0.5 shrink-0" style={{ backgroundColor: DELTA_TONE[delta.direction].bg }}>
             <MaterialIcons name={DELTA_TONE[delta.direction].icon} size={11} color={DELTA_TONE[delta.direction].fg} />
             <Text className="t-num text-[11px] font-bold" style={{ color: DELTA_TONE[delta.direction].fg }}>{delta.label}</Text>
           </View>
         ) : null}
-        {hint ? <Text className="t-meta flex-1 min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{hint}</Text> : null}
+        {/* On a phone's half-width card the hint was cut ("Profit −1.134 RON lun…"):
+            it now wraps under the delta chip when the row is too narrow. */}
+        {hint ? <Text className="t-meta flex-1" style={{ color: 'var(--c-muted)', minWidth: 112 } as any} numberOfLines={2}>{hint}</Text> : null}
       </View>
     </Shell>
   );
@@ -511,7 +513,7 @@ export default function Dashboard() {
       }
     }
     if (summary?.pendingPaymentsCount) {
-      items.push({ key: 'payments', icon: 'payments', tone: 'warning', title: `${plural(summary.pendingPaymentsCount, 'jucător cu restanțe', 'jucători cu restanțe')}`, href: '/admin/roster' });
+      items.push({ key: 'payments', icon: 'payments', tone: 'warning', title: `${plural(summary.pendingPaymentsCount, 'jucător cu restanțe', 'jucători cu restanțe')}`, href: '/admin/finance' });
     }
     if (pendingRequests > 0) {
       items.push({ key: 'requests', icon: 'person-add', tone: 'brand', title: `${plural(pendingRequests, 'cerere de acces', 'cereri de acces')} de aprobat`, href: '/admin/manage-access' });
@@ -660,7 +662,7 @@ export default function Dashboard() {
                     label="Încasări"
                     value={money(summary.monthlyIncome)}
                     suffix=" RON"
-                    hint={`Profit ${money(summary.monthlyProfit)} RON luna asta`}
+                    hint={`Profit: ${money(summary.monthlyProfit)} RON`}
                     delta={summary.incomeChangePercent != null ? { label: `${summary.incomeChangePercent > 0 ? '+' : ''}${Math.round(summary.incomeChangePercent)}%`, direction: summary.incomeChangePercent > 0 ? 'up' : summary.incomeChangePercent < 0 ? 'down' : 'flat' } : null}
                     onPress={canSeeFinance ? () => go('/admin/finance') : undefined}
                   />
@@ -669,8 +671,9 @@ export default function Dashboard() {
                     tone={summary.pendingPaymentsCount > 0 ? 'warning' : 'success'}
                     label="Cu restanțe"
                     value={summary.pendingPaymentsCount}
-                    hint={summary.pendingPaymentsCount > 0 ? 'Vezi în Lot' : summary.owingPlayersCount ? `${summary.owingPlayersCount} cu plăți nescadente` : 'Toți sunt la zi'}
-                    onPress={() => go('/admin/roster')}
+                    hint={summary.pendingPaymentsCount > 0 ? (canSeeFinance ? 'Vezi în Finanțe' : 'Vezi în Lot') : summary.owingPlayersCount ? `${summary.owingPlayersCount} cu plăți nescadente` : 'Toți sunt la zi'}
+                    // Arrears are worked in Finanțe (it opens on "Cu restanțe"), not in Lot.
+                    onPress={() => go(canSeeFinance ? '/admin/finance' : '/admin/roster')}
                   />
                 </View>
               ) : null}

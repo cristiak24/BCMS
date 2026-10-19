@@ -766,7 +766,7 @@ router.post('/:id/players/bulk', async (req: AuthenticatedRequest, res) => {
             const hit = known.has(key) ? key : known.has(swapped) ? swapped : null;
             const year = hit ? knownYear.get(hit) : null;
             if (hit && (year == null || row.birthYear == null || year === row.birthYear)) {
-                skipped.push(`${row.lastName} ${row.firstName}`);
+                skipped.push(`${row.firstName} ${row.lastName}`);
                 continue;
             }
             known.add(key);

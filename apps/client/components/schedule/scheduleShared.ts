@@ -1,4 +1,5 @@
 import { parseApiDate } from '@/utils/dates';
+import { groupByEventDays } from '@/utils/eventDays';
 import { Platform } from '@/src/web/reactNative';
 import { CalendarEvent } from '../../services/eventsApi';
 
@@ -150,15 +151,9 @@ export function getMonthGridDays(viewDate: Date, eventsByDay: Map<string, Calend
   });
 }
 
+/** Events by local day; a multi-day event (a camp) is filed under each of its days. */
 export function groupEventsByDay(events: CalendarEvent[]): Map<string, CalendarEvent[]> {
-  const byDay = new Map<string, CalendarEvent[]>();
-  events.forEach((event) => {
-    const date = getEventDate(event.startTime);
-    if (!date) return;
-    const key = toDateKey(date);
-    byDay.set(key, [...(byDay.get(key) ?? []), event]);
-  });
-  return byDay;
+  return groupByEventDays(events);
 }
 
 // ── Formatting (Romanian locale everywhere) ───────────────────────────────

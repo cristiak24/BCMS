@@ -30,6 +30,7 @@ import {
   getEventTimestamp,
   isCancelledEvent,
   getMonthGridDays,
+  groupEventsByDay,
   getEventTypeMeta,
   eventMatchesSearch,
   buildICSCalendar,
@@ -387,21 +388,8 @@ export default function ScheduleScreen() {
     [activeFilter, events, searchValue]
   );
 
-  const eventsByDay = useMemo(() => {
-    const byDay = new Map<string, CalendarEvent[]>();
-
-    filteredEvents.forEach((event) => {
-      const eventDate = getEventDate(event.startTime);
-      if (!eventDate) {
-        return;
-      }
-
-      const dayKey = toDateKey(eventDate);
-      byDay.set(dayKey, [...(byDay.get(dayKey) ?? []), event]);
-    });
-
-    return byDay;
-  }, [filteredEvents]);
+  // A camp sits on every day it covers, not only its first.
+  const eventsByDay = useMemo(() => groupEventsByDay(filteredEvents), [filteredEvents]);
 
   const calendarDays = useMemo(
     () => getCalendarDays(viewDate, eventsByDay, selectedDayKey),
@@ -527,7 +515,7 @@ export default function ScheduleScreen() {
               <View className={`${isMobile ? 'w-full' : 'shrink-0'} gap-3`} style={isMobile ? undefined : { width: width >= 1440 ? 380 : 340 }}>
                 <View className="flex-row items-center justify-between">
                   <Text className="f-display text-[17px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any}>Evenimente viitoare</Text>
-                  <Pressable onPress={() => setScheduleView('agenda')}>
+                  <Pressable onPress={() => setScheduleView('agenda')} accessibilityRole="button" className="h-8 justify-center px-1">
                     <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Vezi tot</Text>
                   </Pressable>
                 </View>
@@ -566,7 +554,7 @@ export default function ScheduleScreen() {
                     {plural(monthEventCount, 'eveniment', 'evenimente')} în {formatMonthName(viewDate)} {viewDate.getFullYear()}
                   </Text>
                 </View>
-                <Pressable onPress={() => setScheduleView('agenda')} accessibilityRole="button">
+                <Pressable onPress={() => setScheduleView('agenda')} accessibilityRole="button" className="h-8 justify-center px-1">
                   <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Vezi toate lunile</Text>
                 </Pressable>
               </View>

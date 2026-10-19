@@ -2,6 +2,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar, { ADMIN_MENU_ITEMS } from '../../components/Sidebar';
 import AppHeader from '../../components/AppHeader';
+import { InstallBanner } from '../../components/pwa/InstallApp';
 import { HeaderProvider, useHeader } from '../../components/HeaderContext';
 import { MobileBottomNavigation, MobileNavigationSheet } from '../../components/MobileNavigation';
 import { ContentLoading } from '../../components/ui/ScreenState';
@@ -123,6 +124,7 @@ function SuperAdminShell() {
 
         <main className="flex-1 min-w-0 overflow-x-hidden flex flex-col relative">
           <div className="flex-1 min-w-0 pb-28 lg:pb-10 relative w-full flex flex-col">
+            <InstallBanner placement="inline" />
             <Suspense fallback={<ContentLoading />}>
               <Outlet />
             </Suspense>

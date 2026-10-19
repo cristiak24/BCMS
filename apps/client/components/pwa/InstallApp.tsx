@@ -160,22 +160,37 @@ const PUBLIC_PATHS = ['/', '/login', '/signup'];
  * One-time nudge on phones (and not inside the installed app). Sits above the
  * bottom navigation; "Nu acum" hides it for 30 days — the profile card stays.
  */
-export function InstallBanner() {
+/**
+ * "Instalează BCMS" on phones. Inside the app it sits in the page flow, above
+ * the content (`placement="inline"`, rendered by each shell): fixed above the
+ * bottom bar it covered the last rows and the "+" button. Public pages keep
+ * the fixed bottom card (the App-level instance). Closing it is for good — the
+ * profile card still offers the install.
+ */
+export function InstallBanner({ placement = 'fixed' }: { placement?: 'fixed' | 'inline' }) {
     const install = useInstallApp();
     const { pathname } = useLocation();
     const [visible, setVisible] = useState(false);
     const [sheetOpen, setSheetOpen] = useState(false);
     const onAppRoute = !PUBLIC_PATHS.includes(pathname) && !pathname.startsWith('/invite');
+    const inline = placement === 'inline';
+    // One banner at a time: the shells own it on app routes, App.tsx elsewhere.
+    const mine = inline ? onAppRoute : !onAppRoute;
 
     useEffect(() => {
-        if (!install.canOffer || install.platform === 'desktop' || wasInstallBannerDismissed()) {
+        if (!mine || !install.canOffer || install.platform === 'desktop' || wasInstallBannerDismissed()) {
             setVisible(false);
             return undefined;
         }
-        // Not in the first seconds of a visit — let the page load first.
+        // In the page flow it shows at once (appearing later would push the
+        // page down under the user's finger); the floating card waits a beat.
+        if (inline) {
+            setVisible(true);
+            return undefined;
+        }
         const timer = window.setTimeout(() => setVisible(true), 4000);
         return () => window.clearTimeout(timer);
-    }, [install.canOffer, install.platform]);
+    }, [mine, inline, install.canOffer, install.platform]);
 
     if (!visible && !sheetOpen) return null;
 
@@ -196,12 +211,16 @@ export function InstallBanner() {
         <>
             {visible ? (
                 <View
-                    className="ui-rise lg:hidden flex-row items-center gap-3 rounded-[16px] border pl-3 pr-2 py-2.5"
-                    style={{
+                    className={`ui-rise lg:hidden flex-row items-center gap-3 rounded-[16px] border pl-3 pr-2 py-2.5 ${inline ? 'mx-4 mt-3' : ''}`}
+                    style={inline ? {
+                        backgroundColor: 'var(--c-surface)',
+                        borderColor: 'var(--c-border)',
+                        boxShadow: 'var(--e-sm)',
+                    } as any : {
                         position: 'fixed',
                         left: 12,
                         right: 12,
-                        bottom: onAppRoute ? 'calc(88px + env(safe-area-inset-bottom, 0px))' : 'calc(16px + env(safe-area-inset-bottom, 0px))',
+                        bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
                         zIndex: 40,
                         backgroundColor: 'var(--c-surface)',
                         borderColor: 'var(--c-border)',

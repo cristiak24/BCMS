@@ -161,10 +161,10 @@ export default function GameSetup({
             const starter = starters.includes(p.playerId);
             return (
               <View key={p.playerId} className="flex-row items-center gap-2.5 rounded-[11px] px-3 py-2" style={{ backgroundColor: playing ? 'var(--c-surface-2)' : 'transparent', opacity: playing ? 1 : 0.6 }}>
-                <Pressable onPress={() => toggleRoster(p.playerId)} accessibilityRole={'checkbox' as any} accessibilityState={{ checked: playing } as any} accessibilityLabel={`${p.lastName} ${p.firstName} joacă`} className="flex-1 min-w-0 flex-row items-center gap-2.5 text-left">
+                <Pressable onPress={() => toggleRoster(p.playerId)} accessibilityRole={'checkbox' as any} accessibilityState={{ checked: playing } as any} accessibilityLabel={`${p.firstName} ${p.lastName} joacă`} className="flex-1 min-w-0 flex-row items-center gap-2.5 text-left">
                   <MaterialIcons name={playing ? 'check-box' : 'check-box-outline-blank'} size={18} color={playing ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
                   <Text className="t-num w-8 text-[13px] font-bold" style={{ color: 'var(--c-muted)' }}>{p.number ? `#${p.number}` : '—'}</Text>
-                  <Text className="flex-1 text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{p.lastName} {p.firstName}</Text>
+                  <Text className="flex-1 text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{p.firstName} {p.lastName}</Text>
                 </Pressable>
                 {playing ? (
                   <Pressable onPress={() => toggleStarter(p.playerId)} accessibilityRole="button" accessibilityState={{ selected: starter }}

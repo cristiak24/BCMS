@@ -95,12 +95,11 @@ export function useInstallApp() {
 }
 
 const DISMISS_KEY = 'bcms.install-dismissed-at';
-const DISMISS_FOR_MS = 30 * 24 * 60 * 60 * 1000;
 
+/** Closed once = closed: it came back after 30 days and covered content again. */
 export function wasInstallBannerDismissed() {
     try {
-        const at = Number(localStorage.getItem(DISMISS_KEY) || 0);
-        return Date.now() - at < DISMISS_FOR_MS;
+        return Boolean(localStorage.getItem(DISMISS_KEY));
     } catch {
         return false;
     }

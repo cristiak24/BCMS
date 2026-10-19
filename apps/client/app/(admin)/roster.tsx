@@ -121,7 +121,7 @@ export default function RosterScreen() {
   }, [fetchRosterData]);
 
   useEffect(() => {
-    setSearchPlaceholder('Caută sportivi, tricou, echipă, poziție sau status de plată...');
+    setSearchPlaceholder('Caută după nume, tricou, echipă sau plată...');
     setSearchValue('');
 
     return () => {
@@ -644,7 +644,7 @@ export default function RosterScreen() {
             ) : (
               <EmptyState
                 title={hasActiveFilters ? 'Niciun sportiv nu corespunde filtrelor curente.' : 'Niciun sportiv găsit.'}
-                message="Încearcă alt nume, număr de tricou, echipă, poziție, status de plată sau interval de prezență."
+                message="Încearcă alt nume, număr de tricou, echipă, status de plată sau interval de prezență."
                 icon="groups"
               />
             )}
@@ -670,7 +670,6 @@ export default function RosterScreen() {
                   <EmptyState title="Niciun sportiv în lot" message="Adaugă primul sportiv pentru a începe gestionarea prezenței și a plăților." icon="groups" />
                 ) : paginatedPlayers.length ? (
                   paginatedPlayers.map((item) => {
-                    const categoryLabel = getCategoryLabel(item);
                     const attendanceRate = typeof item.attendanceRate === 'number' ? getAttendanceRate(item) : null;
                     const paymentStatus = item.paymentStatus || 'pending';
 
@@ -678,7 +677,6 @@ export default function RosterScreen() {
                       <View key={item.id} style={styles.rowSpacer}>
                         <PlayerRow
                           player={item}
-                          categoryLabel={categoryLabel}
                           attendanceRate={attendanceRate}
                           paymentLabel={getPaymentLabel(paymentStatus)}
                           paymentPaid={isPaymentPaid(paymentStatus)}
@@ -695,7 +693,7 @@ export default function RosterScreen() {
                 ) : (
                   <EmptyState
                     title={hasActiveFilters ? 'Niciun sportiv nu corespunde filtrelor curente.' : 'Niciun sportiv găsit.'}
-                    message="Încearcă alt nume, număr de tricou, echipă, poziție, status de plată sau interval de prezență."
+                    message="Încearcă alt nume, număr de tricou, echipă, status de plată sau interval de prezență."
                     icon="groups"
                   />
                 )}

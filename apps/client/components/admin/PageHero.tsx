@@ -75,6 +75,7 @@ export function GlassStat({
     value,
     suffix,
     label,
+    shortLabel,
     hint,
     dot,
     danger,
@@ -83,19 +84,28 @@ export function GlassStat({
     value: string | number;
     suffix?: string;
     label: string;
+    /** Phones: a one-word label for a tight row of tiles; the hint then shows from lg up. */
+    shortLabel?: string;
     hint?: string;
     dot: string;
     danger?: boolean;
     bar?: number;
 }) {
     return (
-        <View className="glass rounded-[12px] px-3 py-2.5 min-w-0" style={{ boxShadow: 'var(--e-sm)' } as any}>
+        <View className={`glass rounded-[12px] ${shortLabel ? 'px-2.5 lg:px-3' : 'px-3'} py-2.5 min-w-0`} style={{ boxShadow: 'var(--e-sm)' } as any}>
             <View className="flex-row items-baseline gap-1">
                 <View className="w-[6px] h-[6px] rounded-full shrink-0 self-center" style={{ backgroundColor: dot }} />
                 <Text className="f-display t-num text-[19px] font-extrabold leading-none" style={{ color: danger ? 'var(--c-danger-fg)' : 'var(--c-ink-strong)' }} numberOfLines={1}>{value}</Text>
                 {suffix ? <Text className="text-[11.5px] font-semibold leading-none" style={{ color: 'var(--c-muted)' }}>{suffix}</Text> : null}
             </View>
-            <Text className="text-[11px] font-medium mt-1.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
+            {shortLabel ? (
+                <>
+                    <Text className="lg:hidden text-[11px] font-medium mt-1.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{shortLabel}</Text>
+                    <Text className="hidden lg:flex text-[11px] font-medium mt-1.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
+                </>
+            ) : (
+                <Text className="text-[11px] font-medium mt-1.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
+            )}
             {bar != null ? (
                 <View className="h-1 rounded-full overflow-hidden mt-1.5" style={{ backgroundColor: 'var(--c-surface-3)' }}>
                     <View className="ui-bar h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, bar))}%`, backgroundColor: dot }} />
@@ -103,7 +113,7 @@ export function GlassStat({
             ) : null}
             {/* With a bar too: an attendance rate names its period under it. */}
             {hint ? (
-                <Text className={`text-[10.5px] ${bar != null ? 'mt-1' : 'mt-0.5'}`} style={{ color: 'var(--c-faint)' }} numberOfLines={1}>{hint}</Text>
+                <Text className={`${shortLabel ? 'hidden lg:flex ' : ''}text-[10.5px] ${bar != null ? 'mt-1' : 'mt-0.5'}`} style={{ color: 'var(--c-faint)' }} numberOfLines={1}>{hint}</Text>
             ) : null}
         </View>
     );

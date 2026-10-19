@@ -44,12 +44,15 @@ const VISIBILITY_OPTIONS: { key: ClubDocumentVisibility; label: string; hint: st
 function UploadPanel({
   file,
   maxFileBytes,
+  duplicateOf,
   onCancel,
   onUploaded,
   onError,
 }: {
   file: File;
   maxFileBytes: number;
+  /** A document already in the club with the same file name and size. */
+  duplicateOf?: ClubDocument | null;
   onCancel: () => void;
   onUploaded: (doc: ClubDocument) => void;
   onError: (message: string) => void;
@@ -87,6 +90,19 @@ function UploadPanel({
           </Text>
         </View>
       </View>
+
+      {duplicateOf ? (
+        <View
+          className="flex-row items-start gap-2.5 rounded-[12px] border px-3 py-2.5"
+          style={{ backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-border)' } as any}
+          accessibilityRole="alert"
+        >
+          <MaterialIcons name="warning-amber" size={17} color="var(--c-warning-fg)" />
+          <Text className="flex-1 min-w-0 text-[13px] font-medium leading-5" style={{ color: 'var(--c-warning-fg)' }}>
+            Fișierul pare deja încărcat, ca „{duplicateOf.title}”{duplicateOf.createdAt ? ` (${formatDate(duplicateOf.createdAt)})` : ''}. Îl poți încărca din nou, dar membrii îl vor vedea de două ori.
+          </Text>
+        </View>
+      ) : null}
 
       <View className="flex-col md:flex-row gap-4">
         <View className="flex-1 min-w-0">
@@ -137,7 +153,7 @@ function UploadPanel({
           style={{ backgroundColor: 'var(--c-brand-surface)', opacity: tooBig || uploading ? 0.6 : 1 } as any}
         >
           {uploading ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : <MaterialIcons name="upload-file" size={16} color="var(--c-on-brand)" />}
-          <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-on-brand)' }}>Încarcă</Text>
+          <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{duplicateOf ? 'Încarcă oricum' : 'Încarcă'}</Text>
         </Pressable>
       </View>
     </View>
@@ -347,6 +363,8 @@ export default function DocumentsScreen() {
               key={`${pending.name}-${pending.lastModified}`}
               file={pending}
               maxFileBytes={data.maxFileBytes}
+              // Same name and size as a document already here: almost surely a second upload.
+              duplicateOf={data.documents.find((doc) => doc.fileName === pending.name && doc.sizeBytes === pending.size) ?? null}
               onCancel={() => setPending(null)}
               onError={(message) => showToast({ variant: 'error', message })}
               onUploaded={(doc) => {
