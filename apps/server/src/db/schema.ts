@@ -35,6 +35,7 @@ export const financialDocuments = pgTable("financial_documents", {
 			foreignColumns: [clubs.id],
 			name: "financial_documents_club_id_clubs_id_fk"
 		}),
+	index("financial_documents_club_id_idx").on(table.clubId),
 ]);
 
 export const users = pgTable("users", {
@@ -64,6 +65,7 @@ export const users = pgTable("users", {
 }, (table) => [
 	unique("users_email_unique").on(table.email),
 	unique("users_firebase_uid_unique").on(table.firebaseUid),
+	index("users_club_id_idx").on(table.clubId),
 ]);
 
 export const players = pgTable("players", {
@@ -95,6 +97,7 @@ export const players = pgTable("players", {
 	userId: integer("user_id"),
 }, (table) => [
 	unique("players_user_id_unique").on(table.userId),
+	index("players_team_id_idx").on(table.teamId),
 	foreignKey({
 			columns: [table.teamId],
 			foreignColumns: [teams.id],
@@ -125,6 +128,7 @@ export const teams = pgTable("teams", {
 	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	unique("teams_invite_code_unique").on(table.inviteCode),
+	index("teams_club_id_idx").on(table.clubId),
 	foreignKey({
 			columns: [table.clubId],
 			foreignColumns: [clubs.id],
@@ -162,6 +166,7 @@ export const playerPayments = pgTable("player_payments", {
 	description: text(),
 }, (table) => [
 	unique("player_payments_stripe_session_id_unique").on(table.stripeSessionId),
+	index("player_payments_player_id_idx").on(table.playerId),
 	foreignKey({
 			columns: [table.playerId],
 			foreignColumns: [players.id],
@@ -174,6 +179,8 @@ export const playersToTeams = pgTable("players_to_teams", {
 	playerId: integer("player_id").notNull(),
 	teamId: integer("team_id").notNull(),
 }, (table) => [
+	index("players_to_teams_team_id_idx").on(table.teamId),
+	index("players_to_teams_player_id_idx").on(table.playerId),
 	foreignKey({
 			columns: [table.playerId],
 			foreignColumns: [players.id],
@@ -224,6 +231,7 @@ export const events = pgTable("events", {
 	// sides in the title ("A vs B") instead.
 	opponent: varchar({ length: 160 }),
 }, (table) => [
+	index("events_team_start_idx").on(table.teamId, table.startTime),
 	foreignKey({
 			columns: [table.teamId],
 			foreignColumns: [teams.id],
@@ -263,6 +271,8 @@ export const attendance = pgTable("attendance", {
 		}),
 	// One row per player per session (migration 0026); saves upsert on it.
 	uniqueIndex("attendance_event_player_unique").on(table.eventId, table.playerId),
+	index("attendance_player_date_idx").on(table.playerId, table.date),
+	index("attendance_team_date_idx").on(table.teamId, table.date),
 ]);
 
 export const notifications = pgTable("notifications", {
@@ -276,6 +286,8 @@ export const notifications = pgTable("notifications", {
 	isRead: boolean("is_read").default(false).notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
+	index("notifications_user_read_idx").on(table.userId, table.isRead),
+	index("notifications_user_created_idx").on(table.userId, table.createdAt),
 	foreignKey({
 			columns: [table.userId],
 			foreignColumns: [users.id],
@@ -689,6 +701,7 @@ export const auditLogs = pgTable("audit_logs", {
 	userAgent: text("user_agent"),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
+	index("audit_logs_club_created_idx").on(table.clubId, table.createdAt),
 	foreignKey({
 		columns: [table.actorUserId],
 		foreignColumns: [users.id],

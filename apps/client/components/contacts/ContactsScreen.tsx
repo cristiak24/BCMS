@@ -6,6 +6,7 @@ import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../HeaderContext';
 import PageContainer from '../ui/PageContainer';
 import PageHero from '../admin/PageHero';
 import SelectField from '../ui/SelectField';
+import Button from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
@@ -21,6 +22,10 @@ import GuardiansPanel from '../family/GuardiansPanel';
  */
 
 const ROLE_LABEL: Record<string, string> = { coach: 'Antrenor', admin: 'Administrator club' };
+
+// Player cards shown at once. All 300 of a club were rendered together
+// (~12,000 elements on a phone); the search still covers everyone.
+const PAGE = 30;
 
 /** Name/team text match, or a digits-only match so "0722 12" finds "0722-123-456". */
 function matchesQuery(query: string, ...values: (string | null | undefined)[]) {
@@ -263,6 +268,7 @@ export default function ContactsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'players' | 'staff'>('players');
   const [teamFilter, setTeamFilter] = useState<string>('all');
+  const [visibleCount, setVisibleCount] = useState(PAGE);
 
   useEffect(() => {
     setSearchPlaceholder('Caută după nume sau telefon…');
@@ -299,6 +305,10 @@ export default function ContactsScreen() {
       (teamFilter === 'all' || p.teamIds.includes(Number(teamFilter)))
       && matchesQuery(query, `${p.firstName} ${p.lastName}`, `${p.lastName} ${p.firstName}`, p.phone, p.accountPhone, p.guardianName, p.guardianPhone, p.guardian2Name, p.guardian2Phone, p.number != null ? `#${p.number}` : null));
   }, [data, teamFilter, query]);
+
+  useEffect(() => {
+    setVisibleCount(PAGE);
+  }, [teamFilter, query]);
 
   const staff = useMemo(
     () => (data?.staff ?? []).filter((s) => matchesQuery(query, s.name, s.phone, ...s.teams.map((t) => t.name))),
@@ -417,7 +427,7 @@ export default function ContactsScreen() {
                     />
                   ) : (
                     <View className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2.5">
-                      {players.map((p) => (
+                      {players.slice(0, visibleCount).map((p) => (
                         <PlayerCard
                           key={p.id}
                           player={p}
@@ -429,6 +439,16 @@ export default function ContactsScreen() {
                       ))}
                     </View>
                   )}
+                  {players.length > visibleCount ? (
+                    <View className="items-center mt-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        label={`Arată încă ${Math.min(PAGE, players.length - visibleCount)} (din ${players.length})`}
+                        onPress={() => setVisibleCount((count) => count + PAGE)}
+                      />
+                    </View>
+                  ) : null}
                 </View>
               ) : staff.length === 0 ? (
                 <EmptyState compact icon="contacts" title="Niciun membru al staff-ului" message={query ? `Nimic pentru „${searchValue.trim()}”.` : 'Antrenorii și adminii clubului apar aici.'} />

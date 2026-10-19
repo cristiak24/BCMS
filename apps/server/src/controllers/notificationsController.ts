@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq } from 'drizzle-orm';
 import { db } from '../db';
 import { notifications } from '../db/schema';
 import { AuthenticatedRequest } from '../middleware/auth';
@@ -33,12 +33,14 @@ export const notificationsController = {
                 return res.status(401).json({ error: 'Unauthorized' });
             }
 
-            const rows = await db
-                .select()
+            // Polled every 45 s by every signed-in screen: count in SQL
+            // (index notifications_user_read_idx), never load the rows.
+            const [{ value }] = await db
+                .select({ value: count() })
                 .from(notifications)
                 .where(and(eq(notifications.userId, req.user.id), eq(notifications.isRead, false)));
 
-            res.json({ count: rows.length });
+            res.json({ count: Number(value) });
         } catch (error) {
             console.error('Get unread notification count error:', error);
             res.status(500).json({ error: 'Internal server error' });

@@ -17,6 +17,9 @@ import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import { EmptyState, SkeletonBlock } from '../../../components/dashboard/ScreenStates';
 import { dash } from '../../../components/dashboard/dashboardTheme';
 import { plural } from '../../../utils/plural';
+import Button from '../../../components/ui/Button';
+
+const DOCUMENTS_PAGE = 20;
 
 /* ─── Types for Finances tab ────────────────────────────────────── */
 type AccountingStatus = 'pending' | 'approved' | 'rejected';
@@ -191,6 +194,9 @@ export default function FinancialSettingsPage() {
     const [uploadModal, setUploadModal] = useState<UploadModalState>(EMPTY_UPLOAD_MODAL);
     const [documentFilter, setDocumentFilter] = useState<'all' | AccountingStatus>('all');
     const [documentSearch, setDocumentSearch] = useState('');
+    // Documents shown at once: a club's whole register (120+, ~40 elements
+    // each) was rendered on every visit; search and filters still cover all.
+    const [visibleDocuments, setVisibleDocuments] = useState(DOCUMENTS_PAGE);
     const [updatingDocId, setUpdatingDocId] = useState<number | null>(null);
     const [summary, setSummary] = useState<FinanceSummary | null>(null);
     const [loadingSummary, setLoadingSummary] = useState(true);
@@ -285,6 +291,10 @@ export default function FinancialSettingsPage() {
             collectedAmount,
         };
     }, [uploads, recentPayments]);
+
+    useEffect(() => {
+        setVisibleDocuments(DOCUMENTS_PAGE);
+    }, [documentFilter, documentSearch]);
 
     const filteredUploads = useMemo(() => {
         const query = documentSearch.trim().toLowerCase();
@@ -821,7 +831,7 @@ export default function FinancialSettingsPage() {
                                     />
                                 ) : (
                                     <View className="gap-3">
-                                        {filteredUploads.map((entry) => {
+                                        {filteredUploads.slice(0, visibleDocuments).map((entry) => {
                                             const meta = STATUS_META[entry.accountingStatus];
                                             const isUpdating = updatingDocId === entry.id;
                                             return (
@@ -904,6 +914,16 @@ export default function FinancialSettingsPage() {
                                                 </View>
                                             );
                                         })}
+                                        {filteredUploads.length > visibleDocuments ? (
+                                            <View className="items-center">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    label={`Arată încă ${Math.min(DOCUMENTS_PAGE, filteredUploads.length - visibleDocuments)} (din ${filteredUploads.length})`}
+                                                    onPress={() => setVisibleDocuments((count) => count + DOCUMENTS_PAGE)}
+                                                />
+                                            </View>
+                                        ) : null}
                                     </View>
                                 )}
                             </ScrollView>

@@ -38,6 +38,7 @@ import { createAllowedOrigins, isOriginAllowed } from '../lib/corsOrigins';
 import { fitsMoneyColumn, roundMoney } from '../lib/money';
 import { sendRouteError } from '../lib/httpErrors';
 import { isValidBillingMonth, type ComputedFee } from '../lib/feeSchedule';
+import { compareBalances, summarizeBalance } from '../lib/balanceSummary';
 import { clubBalances, clubPlayers, collectedInRange, getClubFeeSettings, playerFees } from '../services/clubFinance';
 import { notifyPaymentRecorded } from '../lib/notifications';
 import { applyCheckoutSession, feeIdMetadata, previewManualPayment, recordManualPayment } from '../services/payments';
@@ -1318,7 +1319,9 @@ router.get('/admin/recent-payments', async (req, res) => {
 
 /**
  * What every player owes — the same calculation as the player's own Plăți
- * page. Optional ?teamId= narrows it to one squad.
+ * page. Optional ?teamId= narrows it to one squad. Each row carries the
+ * totals only (lib/balanceSummary.ts); ?include=fees adds every fee, for the
+ * CSV export, and /admin/balances/:playerId gives one player's fees.
  */
 router.get('/admin/balances', async (req, res) => {
     try {
@@ -1329,15 +1332,52 @@ router.get('/admin/balances', async (req, res) => {
         }
         const parsedTeamId = Number(req.query?.teamId);
         const teamId = Number.isFinite(parsedTeamId) && parsedTeamId > 0 ? parsedTeamId : null;
-        const balances = await clubBalances(clubId, { teamId });
+        const withFees = req.query?.include === 'fees';
+        const balances = (await clubBalances(clubId, { teamId })).sort(compareBalances);
         res.json({
             currency: DEFAULT_PAYMENT_CURRENCY,
-            players: balances
-                .sort((a, b) => b.overdue - a.overdue || b.outstanding - a.outstanding || a.playerName.localeCompare(b.playerName))
-                .map(({ fees, ...rest }) => ({ ...rest, fees: fees.map((fee) => ({ ...fee, currency: DEFAULT_PAYMENT_CURRENCY })) })),
+            players: withFees
+                ? balances.map(({ fees, ...rest }) => ({ ...rest, fees: fees.map((fee) => ({ ...fee, currency: DEFAULT_PAYMENT_CURRENCY })) }))
+                : balances.map(summarizeBalance),
         });
     } catch (error) {
         handleRouteError(res, error, '[GET /api/finance/admin/balances]');
+    }
+});
+
+/** One player's fees, fee by fee — the „Încasează” dialog. */
+router.get('/admin/balances/:playerId', async (req, res) => {
+    try {
+        const clubId = await resolveAdminFinanceClubId(req, res);
+        if (clubId === null && res.headersSent) {
+            return;
+        }
+        const playerId = Number(req.params.playerId);
+        if (!Number.isInteger(playerId) || playerId <= 0) {
+            res.status(400).json({ error: 'Jucătorul selectat este invalid.' });
+            return;
+        }
+        const player = await getPlayerByNumericId(playerId);
+        const playerClubId = player ? await getPlayerClubId(player) : null;
+        if (!player || (clubId !== null && playerClubId !== clubId)) {
+            res.status(404).json({ error: 'Jucătorul nu a fost găsit.' });
+            return;
+        }
+        const { fees, totals, credit } = await playerFees({
+            id: player.id,
+            teamId: player.teamId ?? null,
+            createdAt: player.createdAt ?? null,
+            status: player.status ?? null,
+        }, clubId ?? playerClubId);
+        res.json({
+            currency: DEFAULT_PAYMENT_CURRENCY,
+            playerId,
+            ...totals,
+            credit,
+            fees: fees.map((fee) => ({ ...fee, currency: DEFAULT_PAYMENT_CURRENCY })),
+        });
+    } catch (error) {
+        handleRouteError(res, error, '[GET /api/finance/admin/balances/:playerId]');
     }
 });
 

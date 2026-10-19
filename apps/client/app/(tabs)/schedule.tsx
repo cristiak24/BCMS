@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { Clock, MapPin } from 'lucide-react';
@@ -25,6 +25,7 @@ import type { PlayerCalendarDay } from '../../components/schedule/player/PlayerC
 import {
   toDateKey,
   startOfMonth,
+  startOfWeek,
   addMonths,
   getEventDate,
   getEventTimestamp,
@@ -116,6 +117,32 @@ function eventMatchesFilter(event: CalendarEvent, filter: EventFilter) {
   }
 
   return event.type === filter;
+}
+
+/** How far back Program can go: a year, as before. */
+function historyLimit() {
+  const since = new Date();
+  since.setFullYear(since.getFullYear() - 1);
+  return since;
+}
+
+/**
+ * What Program loads first: this month (and this week, which can start in the
+ * previous one) and everything ahead. Older weeks are fetched when the
+ * calendar goes back, the agenda or week view opens, or the month is
+ * exported — a whole year of a club's sessions was ~1 MB on every visit.
+ */
+function initialHistoryStart() {
+  const now = new Date();
+  const monthStart = startOfMonth(now);
+  const weekStart = startOfWeek(now);
+  return weekStart < monthStart ? weekStart : monthStart;
+}
+
+function mergeEvents(current: CalendarEvent[], extra: CalendarEvent[]) {
+  const byId = new Map(current.map((event) => [event.id, event]));
+  extra.forEach((event) => byId.set(event.id, event));
+  return Array.from(byId.values()).sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b));
 }
 
 function parseDateKey(dateKey: string): Date {
@@ -300,6 +327,7 @@ export default function ScheduleScreen() {
   const { session } = useSession();
   const { setSearchPlaceholder, searchValue, setSearchValue } = useHeader();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const eventsRef = useRef<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -326,6 +354,47 @@ export default function ScheduleScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Earliest start loaded so far (null until the first load answers).
+  const loadedFromRef = useRef<Date | null>(null);
+  const clubTeamsRef = useRef<Team[]>([]);
+  const historyRequestRef = useRef<Promise<CalendarEvent[]> | null>(null);
+
+  const toVisibleEvents = useCallback((rows: CalendarEvent[], teamRows: Team[]) => {
+    const teamIds = getSessionTeamIds(session);
+    // A coach's view is scoped by the teams they coach (team.coachId).
+    const roleEvents = isCoach ? getCoachScopedEvents(rows, session, teamRows) : rows;
+    return [...roleEvents]
+      .filter((event) => !isCancelled(event))
+      .filter((event) => isCoach || belongsToSessionTeam(event, teamIds))
+      .sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b));
+  }, [isCoach, session]);
+
+  /**
+   * Make sure everything from `from` (never more than a year back) is loaded;
+   * resolves with the full list. Concurrent calls share one request.
+   */
+  const ensureHistory = useCallback(async (from: Date): Promise<CalendarEvent[]> => {
+    const limit = historyLimit();
+    const target = from < limit ? limit : from;
+    const loadedFrom = loadedFromRef.current;
+    if (!loadedFrom || target >= loadedFrom) return historyRequestRef.current ?? eventsRef.current;
+    if (historyRequestRef.current) {
+      await historyRequestRef.current;
+      return ensureHistory(from);
+    }
+    const request = eventsApi.getEvents({ start: target.toISOString(), end: loadedFrom.toISOString() })
+      .then((rows) => {
+        loadedFromRef.current = target;
+        const merged = mergeEvents(eventsRef.current, toVisibleEvents(rows, clubTeamsRef.current));
+        eventsRef.current = merged;
+        setEvents(merged);
+        return merged;
+      })
+      .finally(() => { historyRequestRef.current = null; });
+    historyRequestRef.current = request;
+    return request;
+  }, [toVisibleEvents]);
+
   const loadData = useCallback(async (showSpinner = false) => {
     if (showSpinner) {
       setRefreshing(true);
@@ -336,22 +405,18 @@ export default function ScheduleScreen() {
     setError(null);
 
     try {
-      // A year back plus everything ahead covers the season the calendar is
-      // browsed in; unbounded, this grew with every season the club recorded.
-      const since = new Date();
-      since.setFullYear(since.getFullYear() - 1);
-      // A coach's view is scoped by the teams they coach (team.coachId).
+      // A refresh keeps the history already on screen; the first load starts
+      // with this month and what is ahead.
+      const start = loadedFromRef.current ?? initialHistoryStart();
       const [allEvents, teamRows] = await Promise.all([
-        eventsApi.getEvents({ start: since.toISOString() }),
+        eventsApi.getEvents({ start: start.toISOString() }),
         isCoach ? teamsApi.getTeams() : Promise.resolve([]),
       ]);
-      const teamIds = getSessionTeamIds(session);
       setClubTeams(teamRows);
-      const roleEvents = isCoach ? getCoachScopedEvents(allEvents, session, teamRows) : allEvents;
-      const visibleEvents = [...roleEvents]
-        .filter((event) => !isCancelled(event))
-        .filter((event) => isCoach || belongsToSessionTeam(event, teamIds))
-        .sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b));
+      clubTeamsRef.current = teamRows;
+      const visibleEvents = toVisibleEvents(allEvents, teamRows);
+      loadedFromRef.current = start;
+      eventsRef.current = visibleEvents;
 
       const landingEvent = findNextUpcomingEvent(visibleEvents);
       const landingDate = landingEvent ? getEventDate(landingEvent.startTime) : null;
@@ -375,11 +440,25 @@ export default function ScheduleScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isCoach, session]);
+  }, [isCoach, toVisibleEvents]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Older weeks, when the screen needs them: a month before what is loaded,
+  // and the whole year for the agenda (it lists past sessions) and the week
+  // view (it can step back freely).
+  useEffect(() => {
+    if (loading) return;
+    const from = scheduleView === 'month' ? viewDate : historyLimit();
+    if (loadedFromRef.current && from < loadedFromRef.current) {
+      ensureHistory(from).catch((err) => {
+        console.error('[schedule] Failed to load older events:', err);
+        setError('Programul nu a putut fi încărcat. Verifică conexiunea și încearcă din nou.');
+      });
+    }
+  }, [ensureHistory, loading, scheduleView, viewDate]);
 
   const filteredEvents = useMemo(
     () => events
@@ -444,9 +523,21 @@ export default function ScheduleScreen() {
 
   const resetKey = `${toDateKey(viewDate).slice(0, 7)}|${activeFilter}|${searchValue}`;
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const filename = `program-${toDateKey(viewDate).slice(0, 7)}.ics`;
-    const ok = triggerFileDownload(filename, buildICSCalendar(filteredEvents), 'text/calendar;charset=utf-8;');
+    let all: CalendarEvent[];
+    try {
+      // The file holds the whole year on record, as it always did.
+      all = await ensureHistory(historyLimit());
+    } catch (err) {
+      console.error('[schedule] Failed to load events for export:', err);
+      setError('Programul nu a putut fi încărcat. Verifică conexiunea și încearcă din nou.');
+      return;
+    }
+    const exported = all
+      .filter((event) => eventMatchesFilter(event, activeFilter))
+      .filter((event) => eventMatchesSearch(event, searchValue));
+    const ok = triggerFileDownload(filename, buildICSCalendar(exported), 'text/calendar;charset=utf-8;');
     if (!ok) {
       setError('Exportul calendarului este disponibil momentan doar pe web.');
     }
@@ -483,7 +574,7 @@ export default function ScheduleScreen() {
             filter={activeFilter}
             onFilterChange={setActiveFilter}
             typeCounts={typeCounts}
-            onExport={handleExport}
+            onExport={() => { void handleExport(); }}
             onRefresh={() => loadData(true)}
             refreshing={refreshing}
             isMobile={isMobile}

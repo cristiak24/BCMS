@@ -10,13 +10,13 @@ import {
     teams as pgTeams,
     users as pgUsers,
 } from '../db/schema';
-import { and, eq, gte, inArray } from 'drizzle-orm';
+import { and, eq, gt, inArray, sql, type SQLWrapper } from 'drizzle-orm';
 import { getRequestUser } from '../lib/requestContext';
 import { resolveDashboardClubScope, type DashboardClubScope } from '../lib/dashboardScope';
 import { clubBalances } from '../services/clubFinance';
 import { authenticate, requireRoles } from '../middleware/auth';
 import { isPaidStatus } from '../lib/paymentLedger';
-import { attendancePeriod, attendancePeriodInfo, attendanceRate as rateInPeriod, isAttendedStatus } from '../lib/attendanceRate';
+import { attendancePeriod, attendancePeriodInfo, attendanceRateFromCounts, type AttendancePeriod } from '../lib/attendanceRate';
 
 const router = Router();
 
@@ -27,11 +27,6 @@ router.use(authenticate, requireRoles(['admin', 'accountant']));
 function normalizeStatus(status?: string | null) {
     return String(status ?? '').trim().toLowerCase();
 }
-
-
-// Shared definition (lib/attendanceRate.ts): late = attended; medical and
-// excused are left out of the rate.
-const isPresentStatus = isAttendedStatus;
 
 // Finanțe uploads both kinds from its "Cheltuieli și facturi" card: a supplier
 // invoice is money going out, like an expense. Counting it as income (anything
@@ -106,6 +101,16 @@ async function getScopedPostgresPlayers(clubScope: DashboardClubScope, teamIds: 
     return Array.from(playersById.values());
 }
 
+/** `sum(amount)` of the rows whose `date` falls in [start, end], as a number (0 when none). */
+function sumBetween(amount: SQLWrapper, date: SQLWrapper, start: Date, end: Date) {
+    return sql<string>`coalesce(sum(${amount}) filter (where ${date} >= ${start.toISOString()} and ${date} <= ${end.toISOString()}), 0)`;
+}
+
+/** Rows dated within (from, to], the bounds of lib/attendanceRate.inAttendancePeriod. */
+function countInPeriod(date: SQLWrapper, period: AttendancePeriod) {
+    return sql<number>`(count(*) filter (where ${date} > ${period.from.toISOString()} and ${date} <= ${period.to.toISOString()}))::int`;
+}
+
 router.get('/summary', async (req, res) => {
     try {
         const now = new Date();
@@ -118,25 +123,48 @@ router.get('/summary', async (req, res) => {
         const scopedPlayerIds = scopedPlayers.map((player) => player.id);
 
         // Attendance: the shared 30-day period and the 30 days before it
-        // (lib/attendanceRate.ts), the same numbers as Lot and the team page.
-        // The SQL bound keeps the club's whole history out of memory.
+        // (lib/attendanceRate.ts), the same numbers as Lot and the team page,
+        // counted per status in SQL instead of loading every row.
         const currentAttendancePeriod = attendancePeriod(now);
         const previousAttendancePeriod = attendancePeriod(now, 1);
-        const attendanceSince = new Date(previousAttendancePeriod.from.getTime() - 24 * 60 * 60 * 1000).toISOString();
-        const [pgFinancialDocs, pgPaymentRows, pgAttendanceRows] = await Promise.all([
+        const attendanceSince = previousAttendancePeriod.from.toISOString();
+        // Summed in SQL, per status (and type): the club's whole payment and
+        // document history used to be loaded here only to add it up. The
+        // rules (what counts as paid, as an expense) stay the JS ones below,
+        // applied to these few grouped rows.
+        const paymentDate = sql`coalesce(${pgPlayerPayments.date}, ${pgPlayerPayments.createdAt})`;
+        const documentSums = db
+            .select({
+                type: pgFinancialDocuments.type,
+                status: pgFinancialDocuments.status,
+                total: sql<string>`coalesce(sum(${pgFinancialDocuments.amount}), 0)`,
+                month: sumBetween(pgFinancialDocuments.amount, pgFinancialDocuments.date, startOfMonth, endOfMonth),
+                previous: sumBetween(pgFinancialDocuments.amount, pgFinancialDocuments.date, startOfPrevMonth, endOfPrevMonth),
+            })
+            .from(pgFinancialDocuments);
+        const [pgDocumentSums, pgPaymentSums, pgAttendanceCounts] = await Promise.all([
             scope.clubScope.kind === 'all'
-                ? db.select().from(pgFinancialDocuments)
+                ? documentSums.groupBy(pgFinancialDocuments.type, pgFinancialDocuments.status)
                 : scope.clubId != null
-                    ? db.select().from(pgFinancialDocuments).where(eq(pgFinancialDocuments.clubId, scope.clubId))
+                    ? documentSums.where(eq(pgFinancialDocuments.clubId, scope.clubId)).groupBy(pgFinancialDocuments.type, pgFinancialDocuments.status)
                     : [],
             scopedPlayerIds.length
-                ? db.select().from(pgPlayerPayments).where(inArray(pgPlayerPayments.playerId, scopedPlayerIds))
+                ? db.select({
+                    status: pgPlayerPayments.status,
+                    total: sql<string>`coalesce(sum(${pgPlayerPayments.amount}), 0)`,
+                    month: sumBetween(pgPlayerPayments.amount, paymentDate, startOfMonth, endOfMonth),
+                    previous: sumBetween(pgPlayerPayments.amount, paymentDate, startOfPrevMonth, endOfPrevMonth),
+                }).from(pgPlayerPayments).where(inArray(pgPlayerPayments.playerId, scopedPlayerIds)).groupBy(pgPlayerPayments.status)
                 : [],
             scopedPlayerIds.length
-                ? db.select().from(pgAttendance).where(and(
+                ? db.select({
+                    status: pgAttendance.status,
+                    current: countInPeriod(pgAttendance.date, currentAttendancePeriod),
+                    previous: countInPeriod(pgAttendance.date, previousAttendancePeriod),
+                }).from(pgAttendance).where(and(
                     inArray(pgAttendance.playerId, scopedPlayerIds),
-                    gte(pgAttendance.date, attendanceSince),
-                ))
+                    gt(pgAttendance.date, attendanceSince),
+                )).groupBy(pgAttendance.status)
                 : [],
         ]);
 
@@ -145,34 +173,24 @@ router.get('/summary', async (req, res) => {
         const teamCount = scope.teamIds?.length ?? (await db.select({ id: pgTeams.id }).from(pgTeams)).length;
 
         const inRange = (date: Date | null, start: Date, end: Date) => (date ? date >= start && date <= end : false);
+        const total = <T,>(rows: T[], keep: (row: T) => boolean, pick: (row: T) => unknown) => rows
+            .filter(keep)
+            .reduce((sum, row) => sum + amountOf(pick(row)), 0);
 
-        const processedPgDocs = pgFinancialDocs.filter((doc) => normalizeStatus(doc.status) === 'processed');
-        const pgIncomeDocs = processedPgDocs.filter((doc) => !isExpenseType(doc.type));
-        const pgExpenseDocs = processedPgDocs.filter((doc) => isExpenseType(doc.type));
+        const isIncomeDoc = (doc: { type: string; status: string | null }) => normalizeStatus(doc.status) === 'processed' && !isExpenseType(doc.type);
+        const isExpenseDoc = (doc: { type: string; status: string | null }) => normalizeStatus(doc.status) === 'processed' && isExpenseType(doc.type);
 
-        const postgresDocumentIncome = pgIncomeDocs.reduce((sum, doc) => sum + amountOf(doc.amount), 0);
-        const postgresDocumentExpense = pgExpenseDocs.reduce((sum, doc) => sum + amountOf(doc.amount), 0);
-        const postgresMonthlyDocumentIncome = pgIncomeDocs
-            .filter((doc) => inRange(toDate(doc.date), startOfMonth, endOfMonth))
-            .reduce((sum, doc) => sum + amountOf(doc.amount), 0);
-        const postgresMonthlyDocumentExpense = pgExpenseDocs
-            .filter((doc) => inRange(toDate(doc.date), startOfMonth, endOfMonth))
-            .reduce((sum, doc) => sum + amountOf(doc.amount), 0);
-        const postgresPrevMonthDocumentIncome = pgIncomeDocs
-            .filter((doc) => inRange(toDate(doc.date), startOfPrevMonth, endOfPrevMonth))
-            .reduce((sum, doc) => sum + amountOf(doc.amount), 0);
-        const postgresPrevMonthDocumentExpense = pgExpenseDocs
-            .filter((doc) => inRange(toDate(doc.date), startOfPrevMonth, endOfPrevMonth))
-            .reduce((sum, doc) => sum + amountOf(doc.amount), 0);
+        const postgresDocumentIncome = total(pgDocumentSums, isIncomeDoc, (doc) => doc.total);
+        const postgresDocumentExpense = total(pgDocumentSums, isExpenseDoc, (doc) => doc.total);
+        const postgresMonthlyDocumentIncome = total(pgDocumentSums, isIncomeDoc, (doc) => doc.month);
+        const postgresMonthlyDocumentExpense = total(pgDocumentSums, isExpenseDoc, (doc) => doc.month);
+        const postgresPrevMonthDocumentIncome = total(pgDocumentSums, isIncomeDoc, (doc) => doc.previous);
+        const postgresPrevMonthDocumentExpense = total(pgDocumentSums, isExpenseDoc, (doc) => doc.previous);
 
-        const paidPgPayments = pgPaymentRows.filter((payment) => isPaidStatus(payment.status));
-        const postgresPaymentIncome = paidPgPayments.reduce((sum, payment) => sum + amountOf(payment.amount), 0);
-        const postgresMonthlyPaymentIncome = paidPgPayments
-            .filter((payment) => inRange(toDate(payment.date ?? payment.createdAt), startOfMonth, endOfMonth))
-            .reduce((sum, payment) => sum + amountOf(payment.amount), 0);
-        const postgresPrevMonthPaymentIncome = paidPgPayments
-            .filter((payment) => inRange(toDate(payment.date ?? payment.createdAt), startOfPrevMonth, endOfPrevMonth))
-            .reduce((sum, payment) => sum + amountOf(payment.amount), 0);
+        const isPaidRow = (row: { status: string }) => isPaidStatus(row.status);
+        const postgresPaymentIncome = total(pgPaymentSums, isPaidRow, (row) => row.total);
+        const postgresMonthlyPaymentIncome = total(pgPaymentSums, isPaidRow, (row) => row.month);
+        const postgresPrevMonthPaymentIncome = total(pgPaymentSums, isPaidRow, (row) => row.previous);
 
         const totalIncome = postgresDocumentIncome + postgresPaymentIncome;
         const totalExpense = postgresDocumentExpense;
@@ -202,8 +220,8 @@ router.get('/summary', async (req, res) => {
         const pendingPaymentsCount = balances.filter((balance) => balance.state === 'overdue').length;
         const owingPlayersCount = balances.filter((balance) => balance.outstanding > 0).length;
 
-        const currentAttendance = rateInPeriod(pgAttendanceRows, currentAttendancePeriod);
-        const previousAttendance = rateInPeriod(pgAttendanceRows, previousAttendancePeriod);
+        const currentAttendance = attendanceRateFromCounts(pgAttendanceCounts.map((row) => ({ status: row.status, count: Number(row.current) })));
+        const previousAttendance = attendanceRateFromCounts(pgAttendanceCounts.map((row) => ({ status: row.status, count: Number(row.previous) })));
         const presentCount = currentAttendance.attended;
         const totalAttendanceRecords = currentAttendance.counted;
         const attendanceRate = currentAttendance.rate;

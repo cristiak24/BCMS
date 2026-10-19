@@ -32,7 +32,7 @@ test('a simple match from setup to final, with an offline stretch', async ({ pag
 
   // Setup: simple mode, the first five as starters, the opponent's name.
   await page.getByRole('button', { name: /^Simplu/ }).click();
-  for (const name of ['Marin Luca', 'Popescu Matei', 'Vasile Andrei', 'Georgescu Mihai', 'Pop Tudor']) {
+  for (const name of ['Luca Marin', 'Matei Popescu', 'Andrei Vasile', 'Mihai Georgescu', 'Tudor Pop']) {
     await page.getByRole('button', { name: `${name} joacă` }).locator('xpath=..').getByRole('button', { name: 'Titular' }).click();
   }
   await page.getByLabel('Numele echipei adverse').fill('CS Oaspeți');
@@ -92,9 +92,9 @@ test('a simple match from setup to final, with an offline stretch', async ({ pag
   await expect(page.getByRole('row').filter({ hasText: 'U12 Masculin' })).toBeVisible();
   expect(await row('U12 Masculin')).toMatch(/U12 Masculin 6 4 10$/);
   expect(await row('CS Oaspeți')).toMatch(/CS Oaspeți 2 3 5$/);
-  expect(await row('Popescu Matei')).toMatch(/Popescu Matei 5 1$/);
-  expect(await row('Marin Luca')).toMatch(/Marin Luca 1 0$/);
-  expect(await row('Vasile Andrei')).toMatch(/Vasile Andrei 0 1$/);
-  expect(await row('Georgescu Mihai')).toMatch(/Georgescu Mihai 2 0$/);
-  expect(await row('Pop Tudor')).toMatch(/Pop Tudor 2 0$/);
+  expect(await row('Matei Popescu')).toMatch(/Matei Popescu 5 1$/);
+  expect(await row('Luca Marin')).toMatch(/Luca Marin 1 0$/);
+  expect(await row('Andrei Vasile')).toMatch(/Andrei Vasile 0 1$/);
+  expect(await row('Mihai Georgescu')).toMatch(/Mihai Georgescu 2 0$/);
+  expect(await row('Tudor Pop')).toMatch(/Tudor Pop 2 0$/);
 });

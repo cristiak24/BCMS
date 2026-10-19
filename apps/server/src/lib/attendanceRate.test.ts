@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { attendanceSummary, isAttendedStatus, isCountedStatus } from './attendanceRate';
+import { attendanceSummary, attendanceSummaryFromCounts, isAttendedStatus, isCountedStatus } from './attendanceRate';
 
 test('late counts as attended; medical and excused stay out of the rate', () => {
     assert.equal(isAttendedStatus('late'), true);
@@ -41,4 +41,27 @@ test('the previous period ends where the current one starts', async () => {
     assert.equal(previous.to.getTime(), current.from.getTime());
     const edge = [{ status: 'present', date: current.from.toISOString() }];
     assert.equal(attendanceRate(edge, current).counted + attendanceRate(edge, previous).counted, 1);
+});
+
+test('counts per status (SQL GROUP BY) give the same summary as the rows they count', () => {
+    const rows = ['present', 'Present ', 'late', 'absent', 'excused', 'medical', 'prezent', 'absent'].map((status) => ({ status }));
+    const buckets = new Map<string, number>();
+    rows.forEach((row) => buckets.set(row.status, (buckets.get(row.status) ?? 0) + 1));
+    assert.deepEqual(
+        attendanceSummaryFromCounts(Array.from(buckets, ([status, count]) => ({ status, count }))),
+        attendanceSummary(rows),
+    );
+    assert.deepEqual(attendanceSummaryFromCounts([]), { attended: 0, counted: 0, rate: null });
+});
+
+test('the period rate from SQL counts equals the rate over the same rows', async () => {
+    const { attendancePeriod, attendanceRate, attendanceRateFromCounts } = await import('./attendanceRate');
+    const period = attendancePeriod(new Date('2026-10-17T12:00:00Z'));
+    const rows = ['present', 'late', 'absent', 'medical', 'present'].map((status) => ({ status, date: '2026-10-10 15:00:00' }));
+    const buckets = new Map<string, number>();
+    rows.forEach((row) => buckets.set(row.status, (buckets.get(row.status) ?? 0) + 1));
+    assert.deepEqual(
+        attendanceRateFromCounts(Array.from(buckets, ([status, count]) => ({ status, count }))),
+        attendanceRate(rows, period),
+    );
 });

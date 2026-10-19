@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Pressable, ScrollView, StyleSheet, Alert } from '@/src/web/reactNative';
 import { useRouter } from '@/src/web/expoRouter';
 import { CreditCard, Download, Plus } from 'lucide-react';
-import { teamsApi, Player, RosterSummary, Team } from '../../services/teamsApi';
+import { teamsApi, Player, RosterPage, RosterPageQuery, RosterSummary, Team } from '../../services/teamsApi';
 import { useResponsive } from '../../hooks/useResponsive';
 import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../components/HeaderContext';
 import { dash } from '../../components/dashboard/dashboardTheme';
@@ -23,16 +23,11 @@ import { downloadRosterCsv } from '../../components/roster/rosterCsv';
 import {
   getAttendanceRate,
   getCategoryLabel,
-  getPaymentBucket,
-  getPaymentBucketRank,
   getPaymentLabel,
-  getTeamLabel,
   isPaymentPaid,
   isPlayerActive,
-  isPlayerUnassigned,
-  matchesAttendanceFilter,
 } from '../../components/roster/rosterHelpers';
-import { ATTENDANCE_PERIOD_LABEL, formatAttendanceRate, pooledAttendanceRate } from '../../utils/attendanceRate';
+import { ATTENDANCE_PERIOD_LABEL, formatAttendanceRate } from '../../utils/attendanceRate';
 import { plural } from '../../utils/plural';
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 100];
@@ -59,10 +54,12 @@ export default function RosterScreen() {
   const { isMobile } = useResponsive();
   const { searchValue, setSearchValue, setSearchPlaceholder, setHeaderActions, setMobileFab } = useHeader();
 
-  const [players, setPlayers] = useState<Player[]>([]);
+  // One page of the roster at a time: the server searches, filters, sorts and
+  // pages (it used to send the whole club, ~160 KB, on every visit).
+  const [rosterPage, setRosterPage] = useState<RosterPage | null>(null);
+  const [pageLoading, setPageLoading] = useState(false);
   const [summary, setSummary] = useState<RosterSummary | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -89,36 +86,78 @@ export default function RosterScreen() {
   const [sortDirection, setSortDirection] = useState<RosterSortDirection>('asc');
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  // Rows the selection was made from, across pages (bulk CSV export).
+  const selectedRows = useRef(new Map<number, Player>());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [showBulkReassignSheet, setShowBulkReassignSheet] = useState(false);
 
-  const fetchRosterData = useCallback(async () => {
+  // The search box is typed into: ask the server once typing pauses.
+  const [debouncedSearch, setDebouncedSearch] = useState(searchValue);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchValue), 250);
+    return () => clearTimeout(timer);
+  }, [searchValue]);
+
+  const rosterQuery = useMemo<RosterPageQuery>(() => ({
+    q: debouncedSearch.trim() || undefined,
+    team: selectedTeam,
+    status: selectedStatus,
+    attendance: selectedAttendance,
+    payment: selectedPayment,
+    sort: sortColumn ?? undefined,
+    dir: sortDirection,
+    page: currentPage,
+    pageSize,
+  }), [currentPage, debouncedSearch, pageSize, selectedAttendance, selectedPayment, selectedStatus, selectedTeam, sortColumn, sortDirection]);
+  const rosterQueryRef = useRef(rosterQuery);
+  rosterQueryRef.current = rosterQuery;
+  const pageRequest = useRef(0);
+
+  const loadPage = useCallback(async (query: RosterPageQuery) => {
+    const request = ++pageRequest.current;
+    setPageLoading(true);
     try {
-      setLoading(true);
+      const data = await teamsApi.getRosterPage(query);
+      if (request !== pageRequest.current) return;
+      setRosterPage(data);
       setError(null);
-
-      const [rosterData, summaryData, allTeams] = await Promise.all([
-        teamsApi.getRoster(),
-        teamsApi.getRosterSummary(),
-        teamsApi.getTeams(),
-      ]);
-
-      setPlayers(rosterData);
-      setSummary(summaryData);
-      setTeams(allTeams);
+      // Past the last page (a filter shrank the list): the server answered the last one.
+      if (data.page !== query.page) setCurrentPage(data.page);
     } catch (fetchError: any) {
-      console.error('Fetch roster page data error:', fetchError);
+      if (request !== pageRequest.current) return;
+      console.error('Fetch roster page error:', fetchError);
       setError(fetchError?.message || 'Nu am putut încărca datele lotului.');
-      setPlayers([]);
-      setSummary(null);
     } finally {
-      setLoading(false);
+      if (request === pageRequest.current) setPageLoading(false);
     }
   }, []);
 
+  const fetchMeta = useCallback(async () => {
+    try {
+      const [summaryData, allTeams] = await Promise.all([teamsApi.getRosterSummary(), teamsApi.getTeams()]);
+      setSummary(summaryData);
+      setTeams(allTeams);
+    } catch (fetchError: any) {
+      console.error('Fetch roster summary error:', fetchError);
+      setError(fetchError?.message || 'Nu am putut încărca datele lotului.');
+      setSummary(null);
+    }
+  }, []);
+
+  /** After a change (add, remove, reminders): the header counts and the page on screen. */
+  const fetchRosterData = useCallback(async () => {
+    await Promise.all([fetchMeta(), loadPage(rosterQueryRef.current)]);
+  }, [fetchMeta, loadPage]);
+
   useEffect(() => {
-    fetchRosterData();
-  }, [fetchRosterData]);
+    fetchMeta();
+  }, [fetchMeta]);
+
+  useEffect(() => {
+    loadPage(rosterQuery);
+  }, [loadPage, rosterQuery]);
+
+  const loading = !rosterPage && !error;
 
   useEffect(() => {
     setSearchPlaceholder('Caută după nume, tricou, echipă sau plată...');
@@ -232,6 +271,8 @@ export default function RosterScreen() {
   };
 
   const toggleSelect = (id: number) => {
+    const row = rosterPage?.items.find((player) => player.id === id);
+    if (row) selectedRows.current.set(id, row);
     setSelectedIds((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
@@ -240,7 +281,10 @@ export default function RosterScreen() {
     });
   };
 
-  const clearSelection = () => setSelectedIds(new Set());
+  const clearSelection = () => {
+    selectedRows.current.clear();
+    setSelectedIds(new Set());
+  };
 
   const handleSort = (column: RosterSortColumn) => {
     if (sortColumn === column) {
@@ -259,67 +303,15 @@ export default function RosterScreen() {
     setSelectedPayment('all');
   };
 
-  const filteredPlayers = useMemo(
-    () =>
-      players.filter((player) => {
-        const fullName = `${player.firstName} ${player.lastName}`.toLowerCase();
-        const number = String(player.number || '').toLowerCase();
-        const position = (player.position || '').toLowerCase();
-        const category = getCategoryLabel(player).toLowerCase();
-        const paymentLabel = getPaymentLabel(player.paymentStatus).toLowerCase();
-        const teamLabel = getTeamLabel(player).toLowerCase();
-        const attendanceRate = getAttendanceRate(player);
-        const query = searchValue.toLowerCase().trim();
-
-        const matchesSearch =
-          !query || [fullName, number, position, category, paymentLabel, teamLabel].some((value) => value.includes(query));
-        const matchesTeam =
-          selectedTeam === 'all' ||
-          (selectedTeam === UNASSIGNED_TEAM_FILTER ? isPlayerUnassigned(player) : getTeamLabel(player) === selectedTeam);
-        const matchesStatus = selectedStatus === 'all' || isPlayerActive(player) === (selectedStatus === 'active');
-        const matchesAttendance = matchesAttendanceFilter(attendanceRate, selectedAttendance);
-        const matchesPayment = selectedPayment === 'all' || getPaymentBucket(player.paymentStatus) === selectedPayment;
-
-        return matchesSearch && matchesTeam && matchesStatus && matchesAttendance && matchesPayment;
-      }),
-    [players, searchValue, selectedAttendance, selectedPayment, selectedStatus, selectedTeam]
-  );
-
-  const sortedPlayers = useMemo(() => {
-    if (!sortColumn) return filteredPlayers;
-
-    const sorted = [...filteredPlayers].sort((a, b) => {
-      let result = 0;
-      if (sortColumn === 'name') {
-        result = `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
-      } else if (sortColumn === 'attendance') {
-        result = getAttendanceRate(a) - getAttendanceRate(b);
-      } else if (sortColumn === 'payment') {
-        result = getPaymentBucketRank(a.paymentStatus) - getPaymentBucketRank(b.paymentStatus);
-      }
-      return sortDirection === 'asc' ? result : -result;
-    });
-
-    return sorted;
-  }, [filteredPlayers, sortColumn, sortDirection]);
-
   useEffect(() => {
     setCurrentPage(1);
   }, [searchValue, selectedTeam, selectedStatus, selectedAttendance, selectedPayment, sortColumn, sortDirection]);
 
-  const teamOptions = useMemo(() => {
-    const uniqueTeams = Array.from(
-      new Set(players.map((player) => getTeamLabel(player)).filter((team) => team !== 'Neasignat'))
-    ).sort((a, b) => a.localeCompare(b));
-
-    const hasUnassignedPlayers = players.some(isPlayerUnassigned);
-
-    return [
-      { label: 'Toate echipele', value: 'all' },
-      ...(hasUnassignedPlayers ? [{ label: 'Neasignați', value: UNASSIGNED_TEAM_FILTER }] : []),
-      ...uniqueTeams.map((team) => ({ label: team, value: team })),
-    ];
-  }, [players]);
+  const teamOptions = useMemo(() => [
+    { label: 'Toate echipele', value: 'all' },
+    ...(rosterPage?.hasUnassigned ? [{ label: 'Neasignați', value: UNASSIGNED_TEAM_FILTER }] : []),
+    ...(rosterPage?.teams ?? []).map((team) => ({ label: team, value: team })),
+  ], [rosterPage?.hasUnassigned, rosterPage?.teams]);
 
   const statusOptions = useMemo(
     () => [
@@ -350,17 +342,10 @@ export default function RosterScreen() {
     []
   );
 
-  const totalPages = Math.max(1, Math.ceil(sortedPlayers.length / pageSize));
-  const paginatedPlayers = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return sortedPlayers.slice(start, start + pageSize);
-  }, [currentPage, pageSize, sortedPlayers]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
+  const paginatedPlayers = rosterPage?.items ?? [];
+  const filteredTotal = rosterPage?.total ?? 0;
+  const rosterTotal = rosterPage?.rosterTotal ?? 0;
+  const totalPages = rosterPage?.totalPages ?? 1;
 
   const allSelectedOnPage = paginatedPlayers.length > 0 && paginatedPlayers.every((player) => selectedIds.has(player.id));
   const someSelectedOnPage = paginatedPlayers.some((player) => selectedIds.has(player.id));
@@ -369,22 +354,35 @@ export default function RosterScreen() {
     setSelectedIds((current) => {
       const next = new Set(current);
       if (allSelectedOnPage) {
-        paginatedPlayers.forEach((player) => next.delete(player.id));
+        paginatedPlayers.forEach((player) => {
+          next.delete(player.id);
+          selectedRows.current.delete(player.id);
+        });
       } else {
-        paginatedPlayers.forEach((player) => next.add(player.id));
+        paginatedPlayers.forEach((player) => {
+          next.add(player.id);
+          selectedRows.current.set(player.id, player);
+        });
       }
       return next;
     });
   };
 
-  const selectedPlayers = useMemo(() => players.filter((player) => selectedIds.has(player.id)), [players, selectedIds]);
-
   const handleBulkExportCsv = () => {
+    const selectedPlayers = Array.from(selectedIds)
+      .map((id) => selectedRows.current.get(id))
+      .filter((player): player is Player => Boolean(player));
     downloadRosterCsv(selectedPlayers, 'lot-selectie.csv');
   };
 
-  const handleExportFilteredCsv = () => {
-    downloadRosterCsv(sortedPlayers, 'lot-jucatori.csv');
+  // Every player matching the filters, in the order on screen — one request, on demand.
+  const handleExportFilteredCsv = async () => {
+    try {
+      const all = await teamsApi.getRosterPage({ ...rosterQueryRef.current, page: 1, pageSize: 'all' });
+      downloadRosterCsv(all.items, 'lot-jucatori.csv');
+    } catch (exportError: any) {
+      Alert.alert('Eroare', exportError?.message || 'Exportul nu a putut fi generat.');
+    }
   };
 
   const handleBulkReassign = async (teamIdRaw: string) => {
@@ -437,21 +435,14 @@ export default function RosterScreen() {
     );
   };
 
-  // Same rate as the dashboard: the last 30 days, pooled (utils/attendanceRate.ts).
-  const fallbackAverageAttendance = useMemo(() => pooledAttendanceRate(players), [players]);
-
   // Restanțe = players with something past due, the same definition as
   // Finanțe and the dashboard; owing a fee that is not due yet is not late.
-  const fallbackPendingPayments = useMemo(
-    () => players.filter((player) => getPaymentBucket(player.paymentStatus) === 'overdue').length,
-    [players]
-  );
-
-  const attendanceValue = summary ? summary.attendance?.rate ?? summary.averageAttendance ?? null : fallbackAverageAttendance;
-  const attendanceAthleteCount = summary?.athleteCount ?? players.length;
-  const pendingPayments = summary?.pendingPayments ?? fallbackPendingPayments;
-  const paidPlayers = players.length - Math.min(players.length, pendingPayments);
-  const rosterReadiness = players.length ? Math.round((paidPlayers / players.length) * 100) : 0;
+  // Both come from the roster summary (the whole roster, not this page).
+  // Attendance is the dashboard's rate: the last 30 days, pooled.
+  const attendanceValue = summary ? summary.attendance?.rate ?? summary.averageAttendance ?? null : null;
+  const pendingPayments = summary?.pendingPayments ?? 0;
+  const paidPlayers = rosterTotal - Math.min(rosterTotal, pendingPayments);
+  const rosterReadiness = rosterTotal ? Math.round((paidPlayers / rosterTotal) * 100) : 0;
 
   const hasActiveFilters =
     Boolean(searchValue.trim()) ||
@@ -521,7 +512,7 @@ export default function RosterScreen() {
     );
   }
 
-  if (error && !players.length) {
+  if (error && !rosterPage) {
     return (
       <View style={styles.listContent}>
         <ErrorState title="Nu am putut încărca lotul" message={error} onRetry={fetchRosterData} />
@@ -557,7 +548,7 @@ export default function RosterScreen() {
         <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
           <GlassStat dot="var(--c-brand-fg)" value={formatAttendanceRate(attendanceValue)} label="Prezență" hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()} />
           <GlassStat dot="var(--c-success)" value={`${rosterReadiness}%`} label="Plăți la zi" bar={rosterReadiness} />
-          <GlassStat dot="var(--c-muted)" value={players.length} label="Sportivi în lot" />
+          <GlassStat dot="var(--c-muted)" value={rosterTotal} label="Sportivi în lot" />
           <GlassStat dot={pendingPayments > 0 ? 'var(--c-danger)' : 'var(--c-success)'} danger={pendingPayments > 0} value={pendingPayments} label="Cu restanțe" />
         </View>
       </PageHero>
@@ -569,12 +560,12 @@ export default function RosterScreen() {
               Sportivi
             </Text>
             <Text className="mt-0.5 text-[13px]" style={{ color: dash.muted }}>
-              Afișezi {paginatedPlayers.length} din {plural(sortedPlayers.length, 'sportiv', 'sportivi')}
-              {sortedPlayers.length !== players.length ? ` (lot total: ${players.length})` : ''}
+              Afișezi {paginatedPlayers.length} din {plural(filteredTotal, 'sportiv', 'sportivi')}
+              {filteredTotal !== rosterTotal ? ` (lot total: ${rosterTotal})` : ''}
             </Text>
           </View>
           <TouchableOpacity
-            onPress={handleExportFilteredCsv}
+            onPress={() => { void handleExportFilteredCsv(); }}
             className="dash-btn-hover flex-row items-center self-start rounded-[10px] border h-9 px-3"
             style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairlineStrong }}
           >
@@ -615,8 +606,8 @@ export default function RosterScreen() {
         />
 
         {isMobile ? (
-          <View className="gap-3">
-            {players.length === 0 ? (
+          <View className="gap-3" style={{ opacity: pageLoading ? 0.6 : 1, transition: 'opacity 120ms' } as any} aria-busy={pageLoading}>
+            {rosterTotal === 0 ? (
               <EmptyState title="Niciun sportiv în lot" message="Adaugă primul sportiv pentru a începe gestionarea prezenței și a plăților." icon="groups" />
             ) : paginatedPlayers.length ? (
               paginatedPlayers.map((item) => {
@@ -654,7 +645,7 @@ export default function RosterScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tableScrollContent}
-            style={styles.tableScroll}
+            style={[styles.tableScroll, { opacity: pageLoading ? 0.6 : 1, transition: 'opacity 120ms' } as any]}
           >
             <View style={styles.tableArea}>
               <RosterTableHeader
@@ -666,7 +657,7 @@ export default function RosterScreen() {
                 onSort={handleSort}
               />
               <View style={styles.rowsWrap}>
-                {players.length === 0 ? (
+                {rosterTotal === 0 ? (
                   <EmptyState title="Niciun sportiv în lot" message="Adaugă primul sportiv pentru a începe gestionarea prezenței și a plăților." icon="groups" />
                 ) : paginatedPlayers.length ? (
                   paginatedPlayers.map((item) => {
@@ -705,7 +696,7 @@ export default function RosterScreen() {
         <RosterPagination
           currentPage={currentPage}
           totalPages={totalPages}
-          totalItems={sortedPlayers.length}
+          totalItems={filteredTotal}
           pageSize={pageSize}
           pageSizeOptions={PAGE_SIZE_OPTIONS}
           onPageSizeChange={setPageSize}
