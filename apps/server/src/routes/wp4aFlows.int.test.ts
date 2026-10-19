@@ -58,7 +58,7 @@ before(async () => {
     await db.insert(playerGuardians).values([{ playerId: matei, userId: parent.id }, { playerId: ana, userId: parent.id }]);
 
     [{ id: session }] = await db.insert(events).values({
-        type: 'training', title: 'Antrenament U12', startTime: '2026-10-20 15:00:00', endTime: '2026-10-20 16:30:00', teamId: u12,
+        type: 'training', title: 'Antrenament U12', startTime: '2026-10-13 15:00:00', endTime: '2026-10-13 16:30:00', teamId: u12,
     }).returning();
     [{ id: match }] = await db.insert(events).values({
         type: 'match', title: 'Meci U12', startTime: '2026-10-25 08:00:00', endTime: '2026-10-25 10:00:00', teamId: u12,

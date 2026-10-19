@@ -8,7 +8,7 @@ import { ToastHost, useToasts } from '../../components/ui/Toast';
 import {
   Calendar as CalendarIcon, Plus, ShieldCheck, Receipt,
 } from 'lucide-react';
-import { eventsApi, CalendarEvent, EventAttendance } from '../../services/eventsApi';
+import { eventsApi, CalendarEvent } from '../../services/eventsApi';
 import { AttendanceTab } from '../../components/schedule/AttendanceTab';
 import { GradeTab } from '../../components/schedule/GradeTab';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../components/HeaderContext';
@@ -25,7 +25,6 @@ import { ScheduleWeekView } from '../../components/schedule/admin/ScheduleWeekVi
 import { ScheduleAgendaList } from '../../components/schedule/admin/ScheduleAgendaList';
 import { AddEventModal } from '../../components/schedule/admin/AddEventModal';
 import { DayScheduleModal } from '../../components/schedule/admin/DayScheduleModal';
-import { EventAttendanceModal } from '../../components/schedule/admin/EventAttendanceModal';
 import { FilterModal } from '../../components/schedule/admin/FilterModal';
 import PageHero from '../../components/admin/PageHero';
 import Button from '../../components/ui/Button';
@@ -78,8 +77,6 @@ export default function ScheduleScreen() {
   const [showMedicalVisa, setShowMedicalVisa] = useState(false);
   const [showPaymentsReport, setShowPaymentsReport] = useState(false);
   const [selectedDay, setSelectedDay] = useState<{ date: Date; events: CalendarEvent[] } | null>(null);
-  const [selectedAttendanceEvent, setSelectedAttendanceEvent] = useState<CalendarEvent | null>(null);
-  const [attendanceList, setAttendanceList] = useState<EventAttendance[]>([]);
 
   // Confirmation dialogs for impactful actions (duplicate / cancel an event).
   const [confirmDuplicate, setConfirmDuplicate] = useState<CalendarEvent | null>(null);
@@ -235,27 +232,6 @@ export default function ScheduleScreen() {
     setAddEventDate(date);
     setSelectedDay(null);
     setShowAddModal(true);
-  };
-
-  const handleOpenAttendance = async (event: CalendarEvent) => {
-    setSelectedAttendanceEvent(event);
-    try {
-      const data = await eventsApi.getEventAttendance(event.id);
-      setAttendanceList(data);
-    } catch {
-      showToast({ variant: 'error', message: 'Nu s-a putut încărca prezența.' });
-      setSelectedAttendanceEvent(null);
-    }
-  };
-
-  const updateAttendance = async (playerId: number, status: string) => {
-    if (!selectedAttendanceEvent) return;
-    try {
-      await eventsApi.updateEventAttendance(selectedAttendanceEvent.id, [{ playerId, status }]);
-      setAttendanceList((prev) => prev.map((p) => (p.playerId === playerId ? { ...p, status } : p)));
-    } catch {
-      showToast({ variant: 'error', message: 'Actualizarea a eșuat.' });
-    }
   };
 
   // Duplicate/cancel go through a confirmation dialog first (impactful, was
@@ -463,7 +439,7 @@ export default function ScheduleScreen() {
             syncing={syncing}
             onSyncFRB={handleSyncFRB}
             onSelectEvent={navigateToEvent}
-            onAttendance={handleOpenAttendance}
+            onAttendance={navigateToGrade}
             onDuplicate={(event) => setConfirmDuplicate(event)}
             onToggleCancelled={requestToggleCancelled}
             onGrade={navigateToGrade}
@@ -615,13 +591,6 @@ export default function ScheduleScreen() {
         onClose={() => setSelectedDay(null)}
         onSelectEvent={(event) => { setSelectedDay(null); navigateToEvent(event); }}
         onQuickAdd={handleQuickAdd}
-      />
-
-      <EventAttendanceModal
-        event={selectedAttendanceEvent}
-        attendanceList={attendanceList}
-        onClose={() => setSelectedAttendanceEvent(null)}
-        onUpdate={updateAttendance}
       />
 
       <FilterModal

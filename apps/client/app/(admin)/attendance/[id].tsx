@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
@@ -14,11 +14,14 @@ import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../../components/ui/ScreenState';
 import { ToastHost, useToasts } from '../../../components/ui/Toast';
-import UnsavedBar from '../../../components/ui/UnsavedBar';
 import { CoachPlayerRow } from '../../../components/coach/CoachPrimitives';
 import { eventTypeMeta, getPlayerBadge } from '../../../components/coach/coachDisplay';
 import { formatCoachDate, formatCoachTimeRange } from '../../../components/coach/coachUtils';
 import { AttendanceNoteInput, AttendanceNoteToggle } from '../../../components/attendance/AttendanceNoteField';
+import AttendanceMarkButtons from '../../../components/attendance/AttendanceMarkButtons';
+import AttendanceSaveStatus, { useSaveStatus } from '../../../components/attendance/AttendanceSaveStatus';
+import { attendanceMarkMeta, toAttendanceMark, type AttendanceMark } from '../../../utils/attendanceStatus';
+import { isAttendanceOpen } from '../../../utils/attendanceWindow';
 import { plural } from '../../../utils/plural';
 
 /**
@@ -30,13 +33,14 @@ import { plural } from '../../../utils/plural';
  * cards, a separate in-card search next to the header search, and a table
  * header that sat over an empty roster.
  *
- * Unlike the coach screen this one edits in a draft and saves once — admins
- * also write a per-player note here, and a note typed letter by letter should
- * not be a request per keystroke. The header search filters the roster.
+ * Same behaviour as the coach screen (audit R3-6): a mark saves the moment it
+ * is tapped and rolls back if the request fails; a note has its own
+ * "Salvează nota" (a note typed letter by letter should not be a request per
+ * keystroke). A session ahead of today is read-only. The header search
+ * filters the roster.
  */
 
-type AttendanceStatus = 'present' | 'absent' | 'medical';
-type StatusFilter = 'all' | 'unmarked' | AttendanceStatus;
+type StatusFilter = 'all' | 'unmarked' | AttendanceMark;
 
 type RosterEntry = {
   id: number;
@@ -44,27 +48,14 @@ type RosterEntry = {
   lastName: string;
   number: number | null;
   position: string | null;
-  status: AttendanceStatus | null;
+  status: AttendanceMark | null;
+  /** Draft note as typed. */
   note: string;
+  /** Note as last saved. */
+  savedNote: string;
 };
 
 const SCHEDULE_PATH = '/admin/schedule';
-
-const STATUS_OPTIONS: { status: AttendanceStatus; label: string; icon: string; fg: string; bg: string; solid: string }[] = [
-  { status: 'present', label: 'Prezent', icon: 'check-circle', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)', solid: 'var(--c-success)' },
-  { status: 'absent', label: 'Absent', icon: 'cancel', fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)', solid: 'var(--c-danger)' },
-  { status: 'medical', label: 'Motivat', icon: 'medical-services', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)', solid: 'var(--c-warning)' },
-];
-
-const OPTION_BY_STATUS = Object.fromEntries(STATUS_OPTIONS.map((option) => [option.status, option])) as Record<AttendanceStatus, (typeof STATUS_OPTIONS)[number]>;
-
-function toStatus(raw: string | null | undefined): AttendanceStatus | null {
-  const value = String(raw ?? '').toLowerCase();
-  if (value === 'present') return 'present';
-  if (value === 'absent') return 'absent';
-  if (value === 'medical' || value === 'excused') return 'medical';
-  return null;
-}
 
 function sortRoster(a: RosterEntry, b: RosterEntry) {
   const aNumber = a.number ?? 999;
@@ -73,8 +64,8 @@ function sortRoster(a: RosterEntry, b: RosterEntry) {
   return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
 }
 
-function isDirty(entry: RosterEntry, saved: RosterEntry | undefined) {
-  return !saved || saved.status !== entry.status || saved.note.trim() !== entry.note.trim();
+function noteDirty(entry: RosterEntry) {
+  return entry.note.trim() !== entry.savedNote.trim();
 }
 
 export default function AttendanceScreen() {
@@ -88,12 +79,14 @@ export default function AttendanceScreen() {
   const [event, setEvent] = useState<CalendarEvent | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
   const [roster, setRoster] = useState<RosterEntry[]>([]);
-  // Last saved state, keyed by player — the draft is diffed against it.
-  const [saved, setSaved] = useState<Map<number, RosterEntry>>(new Map());
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [openNotes, setOpenNotes] = useState<Set<number>>(new Set());
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
+  const saveStatus = useSaveStatus();
+  // Flag the event as graded once per visit; a failure there must not undo a saved mark.
+  const gradedRef = useRef(false);
 
   useEffect(() => {
     setSearchPlaceholder('Caută jucător după nume sau număr…');
@@ -137,17 +130,16 @@ export default function AttendanceScreen() {
               lastName: player.lastName,
               number: player.number,
               position: player.position,
-              status: toStatus(record?.status),
+              status: toAttendanceMark(record?.status),
               note: record?.note ?? '',
+              savedNote: record?.note ?? '',
             };
           })
           .sort(sortRoster);
         setRoster(rows);
-        setSaved(new Map(rows.map((row) => [row.id, row])));
         setOpenNotes(new Set(rows.filter((row) => row.note.trim()).map((row) => row.id)));
       } else {
         setRoster([]);
-        setSaved(new Map());
       }
     } catch (err) {
       console.error('Failed to load attendance screen data', err);
@@ -161,22 +153,79 @@ export default function AttendanceScreen() {
     loadData();
   }, [loadData]);
 
-  const dirtyRows = useMemo(() => roster.filter((row) => isDirty(row, saved.get(row.id))), [roster, saved]);
-  const dirtyCount = dirtyRows.length;
+  const dirtyNotes = roster.filter(noteDirty).length;
+  const locked = event ? !isAttendanceOpen(event.startTime) : false;
 
-  // A half-marked sheet is easy to lose with one misclick on the sidebar.
+  // An unsaved note is easy to lose with one misclick on the sidebar.
   useEffect(() => {
-    if (!dirtyCount) return undefined;
+    if (!dirtyNotes) return undefined;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [dirtyCount]);
+  }, [dirtyNotes]);
 
-  const setStatus = (playerId: number, status: AttendanceStatus) => {
-    setRoster((rows) => rows.map((row) => (row.id === playerId ? { ...row, status: row.status === status ? null : status } : row)));
+  const patchRows = (ids: Set<number>, patch: (row: RosterEntry) => RosterEntry) => {
+    setRoster((rows) => rows.map((row) => (ids.has(row.id) ? patch(row) : row)));
+  };
+
+  const setBusy = (ids: number[], busy: boolean) => {
+    setBusyIds((current) => {
+      const next = new Set(current);
+      ids.forEach((id) => (busy ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  };
+
+  const markGraded = () => {
+    if (!event || gradedRef.current || String(event.status ?? '').toLowerCase() === 'graded') return;
+    gradedRef.current = true;
+    eventsApi.updateEvent(event.id, { status: 'graded' }).then(setEvent).catch(() => { gradedRef.current = false; });
+  };
+
+  /** Saves marks at once; optimistic, rolled back on failure. */
+  const saveMarks = async (marks: { id: number; status: AttendanceMark }[]) => {
+    if (!event || locked || !marks.length) return false;
+    const ids = marks.map((mark) => mark.id);
+    const previous = new Map(roster.filter((row) => ids.includes(row.id)).map((row) => [row.id, row.status]));
+    const next = new Map(marks.map((mark) => [mark.id, mark.status]));
+    patchRows(new Set(ids), (row) => ({ ...row, status: next.get(row.id) ?? row.status }));
+    setBusy(ids, true);
+    try {
+      await saveStatus.track(eventsApi.updateEventAttendance(event.id, marks.map((mark) => ({ playerId: mark.id, status: mark.status }))));
+      markGraded();
+      return true;
+    } catch (err) {
+      patchRows(new Set(ids), (row) => ({ ...row, status: previous.get(row.id) ?? null }));
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Prezența nu s-a salvat. Încearcă din nou.' });
+      return false;
+    } finally {
+      setBusy(ids, false);
+    }
+  };
+
+  const setStatus = (playerId: number, status: AttendanceMark) => {
+    const row = roster.find((entry) => entry.id === playerId);
+    if (!row || row.status === status) return;
+    void saveMarks([{ id: playerId, status }]);
+  };
+
+  const saveNote = async (playerId: number) => {
+    const row = roster.find((entry) => entry.id === playerId);
+    if (!event || locked || !row?.status) return;
+    const note = row.note.trim();
+    setBusy([playerId], true);
+    try {
+      await saveStatus.track(eventsApi.updateEventAttendance(event.id, [{ playerId, status: row.status, note: note || null }]));
+      patchRows(new Set([playerId]), (entry) => ({ ...entry, note, savedNote: note }));
+      showToast({ variant: 'success', message: note ? 'Nota a fost salvată. Familia primește o notificare.' : 'Nota a fost ștearsă.' });
+    } catch (err) {
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Nota nu s-a salvat. Încearcă din nou.' });
+    } finally {
+      setBusy([playerId], false);
+    }
   };
 
   const setNote = (playerId: number, note: string) => {
@@ -192,38 +241,13 @@ export default function AttendanceScreen() {
     });
   };
 
-  const markRemainingPresent = () => {
-    setRoster((rows) => rows.map((row) => (row.status ? row : { ...row, status: 'present' })));
-    setBulkConfirmOpen(false);
-  };
-
-  const discard = () => {
-    setRoster((rows) => rows.map((row) => saved.get(row.id) ?? row));
-  };
-
-  const save = async () => {
-    if (!event || !dirtyCount || saving) return;
-    setSaving(true);
+  const markRemainingPresent = async () => {
+    setBulkSaving(true);
     try {
-      await eventsApi.updateEventAttendance(
-        event.id,
-        dirtyRows.map((row) => ({
-          playerId: row.id,
-          status: row.status ?? 'pending',
-          note: row.note.trim() ? row.note.trim() : null,
-        })),
-      );
-      const next = new Map(saved);
-      dirtyRows.forEach((row) => next.set(row.id, { ...row, note: row.note.trim() }));
-      setSaved(next);
-      // Flag the event as graded; a failure here must not undo a saved sheet.
-      eventsApi.updateEvent(event.id, { status: 'graded' }).then(setEvent).catch(() => undefined);
-      showToast({ variant: 'success', message: 'Prezența și notele au fost salvate.' });
-    } catch (err) {
-      console.error('Submit failed', err);
-      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Salvarea a eșuat. Încearcă din nou.' });
+      await saveMarks(roster.filter((row) => !row.status).map((row) => ({ id: row.id, status: 'present' as const })));
     } finally {
-      setSaving(false);
+      setBulkSaving(false);
+      setBulkConfirmOpen(false);
     }
   };
 
@@ -232,6 +256,7 @@ export default function AttendanceScreen() {
     unmarked: roster.filter((row) => !row.status).length,
     present: roster.filter((row) => row.status === 'present').length,
     absent: roster.filter((row) => row.status === 'absent').length,
+    late: roster.filter((row) => row.status === 'late').length,
     medical: roster.filter((row) => row.status === 'medical').length,
   }), [roster]);
 
@@ -310,7 +335,7 @@ export default function AttendanceScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
-      <ScrollView className="flex-1" contentContainerClassName="pb-32" showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1" contentContainerClassName="pb-16" showsVerticalScrollIndicator={false}>
         <PageContainer>
           <View className="mb-3 self-start">{backButton}</View>
 
@@ -337,10 +362,11 @@ export default function AttendanceScreen() {
                 <MaterialIcons name={meta.icon} size={22} color={meta.fg} />
               </View>
             )}
-            actions={counts.unmarked > 0 ? (
+            actions={counts.unmarked > 0 && !locked ? (
               <Button
                 icon="done-all"
                 label={`Restul prezenți (${counts.unmarked})`}
+                loading={bulkSaving}
                 onPress={() => setBulkConfirmOpen(true)}
               />
             ) : undefined}
@@ -366,7 +392,7 @@ export default function AttendanceScreen() {
             </View>
             {roster.length > 0 ? (
               <View className="grid grid-cols-3 gap-2 max-w-[520px] ui-stagger">
-                <GlassStat value={counts.present} label="Prezenți" dot="var(--c-success)" />
+                <GlassStat value={counts.present + counts.late} label="Prezenți" dot="var(--c-success)" hint={counts.late ? `din care ${plural(counts.late, 'întârziat', 'întârziați')}` : undefined} />
                 <GlassStat value={counts.absent} label="Absenți" dot="var(--c-danger)" />
                 <GlassStat value={counts.medical} label="Motivați" dot="var(--c-warning)" />
               </View>
@@ -384,10 +410,24 @@ export default function AttendanceScreen() {
                   { key: 'all', label: 'Toți', count: counts.all },
                   { key: 'unmarked', label: 'Nemarcați', dot: 'var(--c-border-strong)', count: counts.unmarked },
                   { key: 'present', label: 'Prezenți', dot: 'var(--c-success)', count: counts.present },
+                  { key: 'late', label: 'Întârziați', dot: 'var(--c-brand-fg)', count: counts.late },
                   { key: 'absent', label: 'Absenți', dot: 'var(--c-danger)', count: counts.absent },
                   { key: 'medical', label: 'Motivați', dot: 'var(--c-warning)', count: counts.medical },
                 ]}
               />
+            ) : null}
+
+            {roster.length > 0 ? (
+              locked ? (
+                <View className="flex-row items-start gap-2.5 rounded-[12px] border px-3.5 py-3" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
+                  <MaterialIcons name="lock" size={18} color="var(--c-muted)" style={{ marginTop: 1 }} />
+                  <Text className="flex-1 text-[13px] font-medium leading-5" style={{ color: 'var(--c-ink-soft)' }}>
+                    Prezența se poate nota din ziua evenimentului ({formatCoachDate(event.startTime)}). Până atunci vezi doar lotul.
+                  </Text>
+                </View>
+              ) : (
+                <AttendanceSaveStatus state={saveStatus.state} />
+              )
             ) : null}
 
             {roster.length === 0 ? (
@@ -420,11 +460,13 @@ export default function AttendanceScreen() {
                   <AttendanceRow
                     key={row.id}
                     row={row}
-                    dirty={isDirty(row, saved.get(row.id))}
+                    busy={bulkSaving || busyIds.has(row.id)}
+                    locked={locked}
                     noteOpen={openNotes.has(row.id)}
                     onToggleNote={() => toggleNote(row.id)}
                     onStatus={(status) => setStatus(row.id, status)}
                     onNote={(note) => setNote(row.id, note)}
+                    onSaveNote={() => saveNote(row.id)}
                   />
                 ))}
               </View>
@@ -433,23 +475,14 @@ export default function AttendanceScreen() {
         </PageContainer>
       </ScrollView>
 
-      {/* Save bar — only while there is something to save. */}
-      {dirtyCount > 0 ? (
-        <UnsavedBar
-          label={`Nesalvate: ${dirtyCount}`}
-          saving={saving}
-          onSave={save}
-          onDiscard={discard}
-        />
-      ) : null}
-
       <ConfirmDialog
         visible={bulkConfirmOpen}
         icon="done-all"
         title="Marchează restul prezenți"
-        message={`${plural(counts.unmarked, 'jucător nemarcat va fi trecut', 'jucători nemarcați vor fi trecuți')} ca prezenți. Cei deja marcați nu se schimbă. Apasă apoi Salvează.`}
+        message={`${plural(counts.unmarked, 'jucător nemarcat va fi trecut', 'jucători nemarcați vor fi trecuți')} ca prezenți. Cei deja marcați nu se schimbă.`}
         confirmLabel="Marchează"
         cancelLabel="Anulează"
+        loading={bulkSaving}
         onConfirm={markRemainingPresent}
         onCancel={() => setBulkConfirmOpen(false)}
       />
@@ -463,27 +496,32 @@ export default function AttendanceScreen() {
  * One player. Wide desktop (xl): name | note | status on a single line, so the
  * page's width goes to the note instead of empty space. Tablet/laptop: name and
  * status share a row, the note drops below when opened. Phones: name + note
- * toggle, full-width status thirds, then the note. Tapping the active
- * status again clears it.
+ * toggle, full-width status quarters, then the note.
  */
 function AttendanceRow({
   row,
-  dirty,
+  busy,
+  locked,
   noteOpen,
   onToggleNote,
   onStatus,
   onNote,
+  onSaveNote,
 }: {
   row: RosterEntry;
-  dirty: boolean;
+  busy: boolean;
+  locked: boolean;
   noteOpen: boolean;
   onToggleNote: () => void;
-  onStatus: (status: AttendanceStatus) => void;
+  onStatus: (status: AttendanceMark) => void;
   onNote: (note: string) => void;
+  onSaveNote: () => void;
 }) {
-  const active = row.status ? OPTION_BY_STATUS[row.status] : null;
-  const hasNote = Boolean(row.note.trim());
+  const active = attendanceMarkMeta(row.status);
+  const hasNote = Boolean(row.savedNote.trim());
+  const dirty = noteDirty(row);
   const metaParts = [row.position, row.status ? null : 'Nemarcat'].filter(Boolean);
+  const playerName = `${row.firstName} ${row.lastName}`;
 
   return (
     <View
@@ -506,41 +544,27 @@ function AttendanceRow({
           />
         </View>
         {dirty ? (
-          <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: 'var(--c-warning)' }} accessibilityLabel="Modificat, nesalvat" />
+          <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: 'var(--c-warning)' }} accessibilityLabel="Notă nesalvată" />
         ) : null}
         <AttendanceNoteToggle open={noteOpen} hasNote={hasNote} onPress={onToggleNote} className="xl:hidden" />
       </View>
 
-      <View className={`${noteOpen ? 'flex' : 'hidden'} xl:flex order-last xl:order-none w-full xl:w-auto xl:flex-1 min-w-0`}>
-        <AttendanceNoteInput value={row.note} onChange={onNote} playerName={`${row.firstName} ${row.lastName}`} />
+      <View className={`${noteOpen ? 'flex' : 'hidden'} xl:flex order-last xl:order-none w-full xl:w-auto xl:flex-1 min-w-0 flex-row items-start gap-2`}>
+        <View className="flex-1 min-w-0">
+          <AttendanceNoteInput value={row.note} onChange={onNote} playerName={playerName} editable={!locked} />
+        </View>
+        {dirty ? (
+          <Button
+            size="sm"
+            icon="save"
+            label="Salvează nota"
+            disabled={!row.status || busy || locked}
+            onPress={onSaveNote}
+          />
+        ) : null}
       </View>
 
-      <View className="flex-row gap-1.5 shrink-0" accessibilityRole={'radiogroup' as any} accessibilityLabel={`Prezență ${row.firstName} ${row.lastName}`}>
-        {STATUS_OPTIONS.map((option) => {
-          const selected = row.status === option.status;
-          return (
-            <Pressable
-              key={option.status}
-              onPress={() => onStatus(option.status)}
-              accessibilityRole={'radio' as any}
-              accessibilityState={{ selected, checked: selected } as any}
-              accessibilityLabel={option.label}
-              className="ui-press flex-1 md:flex-none h-10 rounded-[10px] border px-3 flex-row items-center justify-center gap-1.5"
-              style={{
-                borderColor: selected ? option.fg : 'var(--c-border)',
-                backgroundColor: selected ? option.bg : 'var(--c-surface-2)',
-                boxShadow: selected ? `inset 0 0 0 1px ${option.fg}` : 'none',
-                transition: 'background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease',
-              } as any}
-            >
-              <MaterialIcons name={option.icon} size={16} color={selected ? option.fg : 'var(--c-muted)'} />
-              <Text className="text-[12.5px] font-bold" style={{ color: selected ? option.fg : 'var(--c-muted)' }} numberOfLines={1}>
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <AttendanceMarkButtons value={row.status} playerName={playerName} busy={busy} disabled={locked} onMark={onStatus} />
     </View>
   );
 }

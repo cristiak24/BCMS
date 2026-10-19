@@ -15,26 +15,25 @@ import { CoachPlayerRow, SessionRow } from '../../components/coach/CoachPrimitiv
 import ProgressRing from '../../components/ui/ProgressRing';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { attendanceRateColor, attendanceStatusTone, eventTypeMeta, getPlayerBadge, isPresentStatus } from '../../components/coach/coachDisplay';
-import {
-  formatCoachDate,
-  formatCoachTimeRange,
-  getCoachScopedEvents,
-  getEventTimestamp,
-  isUpcoming,
-} from '../../components/coach/coachUtils';
+import { formatCoachDate, formatCoachTimeRange, getCoachScopedEvents } from '../../components/coach/coachUtils';
 import { AttendanceNoteInput, AttendanceNoteToggle } from '../../components/attendance/AttendanceNoteField';
+import AttendanceMarkButtons from '../../components/attendance/AttendanceMarkButtons';
+import AttendanceSaveStatus, { useSaveStatus } from '../../components/attendance/AttendanceSaveStatus';
+import { attendanceMarkMeta, type AttendanceMark } from '../../utils/attendanceStatus';
+import { isAttendanceOpen } from '../../utils/attendanceWindow';
+import { defaultSession, splitSessions } from '../../utils/attendanceSessions';
 import { plural } from '../../utils/plural';
 
 /**
  * "Prezență" — pick a session on the left, mark the squad on the right.
  *
- * The status buttons write through one at a time (PATCH per player) so a coach
- * marking a roster courtside never loses a whole form to one failed request.
+ * Every mark saves the moment it is tapped (one request per player), the same
+ * on the admin sheet (audit R3-6): a coach marking a roster courtside never
+ * loses a whole form to a forgotten "Salvează" or one failed request. A
+ * session ahead of today can't be marked yet (server refuses it too).
  * Each row also carries the per-player feedback note, the same field as the
  * admin's sheet (audit R3-5); a saved note notifies the player's family.
  */
-
-type AttendanceStatus = 'present' | 'absent' | 'medical';
 
 type AttendancePlayer = {
   playerId: number;
@@ -47,19 +46,15 @@ type AttendancePlayer = {
 };
 
 /** Sessions offered in the picker — anything older lives on /schedule. */
-const SESSION_LIMIT = 12;
+const UPCOMING_LIMIT = 4;
+const PAST_LIMIT = 8;
 
 /**
  * On a phone the picker sits ABOVE the roster, so twelve rows pushed the
- * players a full screen down. Show a few and let the coach expand.
+ * players a full screen down. Show a couple of each group and let the coach
+ * expand.
  */
-const MOBILE_SESSION_PREVIEW = 4;
-
-const STATUS_OPTIONS: { status: AttendanceStatus; label: string; icon: string; color: string; bg: string }[] = [
-  { status: 'present', label: 'Prezent', icon: 'check-circle', color: 'var(--c-success-fg)', bg: 'var(--c-success-bg)' },
-  { status: 'absent', label: 'Absent', icon: 'cancel', color: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)' },
-  { status: 'medical', label: 'Motivat', icon: 'medical-services', color: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)' },
-];
+const MOBILE_GROUP_PREVIEW = 2;
 
 function toAttendancePlayer(player: Player): AttendancePlayer {
   return {
@@ -95,26 +90,23 @@ function mergeAttendance(teamPlayers: Player[], attendanceRows: EventAttendance[
 }
 
 /**
- * Marking row. The three options are a segmented control rather than three
- * loose buttons: the selected one is filled, so a coach can see at a glance
- * which players are still unmarked.
- *
- * That filled segment is the *only* status indicator on the row — an earlier
- * pass also carried a "Prezent" pill beside the buttons, which put the same
- * word twice in the same 200px.
+ * Marking row. The four marks are a segmented control (AttendanceMarkButtons):
+ * the selected one is filled, so a coach can see at a glance which players
+ * are still unmarked.
  */
 function AttendanceRow({
   player,
   busy,
+  locked,
   onMark,
   onSaveNote,
 }: {
   player: AttendancePlayer;
   busy: boolean;
-  onMark: (status: AttendanceStatus) => void;
+  locked: boolean;
+  onMark: (status: AttendanceMark) => void;
   onSaveNote: (note: string) => Promise<boolean>;
 }) {
-  const current = String(player.status ?? '').toLowerCase();
   const unmarked = !player.status;
   const [noteOpen, setNoteOpen] = useState(Boolean(player.note));
   const [draft, setDraft] = useState(player.note);
@@ -139,7 +131,7 @@ function AttendanceRow({
           so a coach scrolling a 15-player list sees the gaps at a glance. */}
       <View
         className="absolute left-0 top-0 bottom-0 w-[3px]"
-        style={{ backgroundColor: unmarked ? 'var(--c-border-strong)' : attendanceStatusTone(player.status).fg, transition: 'background-color 0.2s ease' } as any}
+        style={{ backgroundColor: attendanceMarkMeta(player.status)?.solid ?? 'var(--c-border-strong)', transition: 'background-color 0.2s ease' } as any}
       />
       <View className="flex-row items-center gap-2 flex-1 min-w-0">
         <View className="flex-1 min-w-0">
@@ -156,41 +148,13 @@ function AttendanceRow({
         <AttendanceNoteToggle open={noteOpen} hasNote={Boolean(player.note.trim())} onPress={() => setNoteOpen((v) => !v)} />
       </View>
 
-      {/* Full-width thirds on mobile, intrinsic width from md up — three
-          fixed-width pills wrapped to two rows at 375px. */}
-      <View className="flex-row gap-1.5 shrink-0">
-        {STATUS_OPTIONS.map((option) => {
-          const active = current === option.status || (option.status === 'medical' && current === 'excused');
-
-          return (
-            <Pressable
-              key={option.status}
-              disabled={busy}
-              onPress={() => onMark(option.status)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active, disabled: busy }}
-              accessibilityLabel={`${option.label}: ${player.firstName} ${player.lastName}`}
-              className="ui-press flex-1 md:flex-none h-11 rounded-[11px] border px-3 flex-row items-center justify-center gap-1.5"
-              style={{
-                borderColor: active ? option.color : 'var(--c-border)',
-                backgroundColor: active ? option.bg : 'var(--c-surface-2)',
-                boxShadow: active ? `inset 0 0 0 1px ${option.color}` : 'none',
-                opacity: busy ? 0.6 : 1,
-                transition: 'background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease',
-              } as any}
-            >
-              {busy ? (
-                <ActivityIndicator size="small" color={option.color} />
-              ) : (
-                <MaterialIcons name={option.icon} size={16} color={active ? option.color : 'var(--c-muted)'} />
-              )}
-              <Text className="text-[12.5px] font-bold" style={{ color: active ? option.color : 'var(--c-muted)' }} numberOfLines={1}>
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <AttendanceMarkButtons
+        value={player.status}
+        playerName={`${player.firstName} ${player.lastName}`}
+        busy={busy}
+        disabled={locked}
+        onMark={onMark}
+      />
 
       {noteOpen ? (
         <View className="w-full md:basis-full gap-2">
@@ -210,7 +174,7 @@ function AttendanceRow({
               variant={noteDirty ? 'primary' : 'secondary'}
               icon={noteDirty ? 'save' : 'check'}
               label={noteDirty ? 'Salvează nota' : 'Salvat'}
-              disabled={!noteDirty || unmarked || busy}
+              disabled={!noteDirty || unmarked || busy || locked}
               loading={savingNote}
               onPress={saveNote}
             />
@@ -234,6 +198,7 @@ export default function CoachAttendanceScreen() {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const saveStatus = useSaveStatus();
 
   const loadEvents = useCallback(async () => {
     setLoadingEvents(true);
@@ -246,16 +211,9 @@ export default function CoachAttendanceScreen() {
         eventsApi.getEvents({ start: since.toISOString() }),
         teamsApi.getTeams(),
       ]);
-      const scopedEvents = getCoachScopedEvents(eventRows, session, teamRows)
-        .filter((event) => event.type !== 'admin')
-        .sort((a, b) => {
-          const aUpcoming = isUpcoming(a);
-          const bUpcoming = isUpcoming(b);
-          if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1;
-          return Math.abs(getEventTimestamp(a) - Date.now()) - Math.abs(getEventTimestamp(b) - Date.now());
-        });
-      setEvents(scopedEvents);
-      setSelectedEventId((current) => current ?? scopedEvents[0]?.id ?? null);
+      const groups = splitSessions(getCoachScopedEvents(eventRows, session, teamRows).filter((event) => event.type !== 'admin'));
+      setEvents([...groups.upcoming, ...groups.past]);
+      setSelectedEventId((current) => current ?? defaultSession(groups)?.id ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nu s-au putut încărca sesiunile.');
     } finally {
@@ -267,15 +225,23 @@ export default function CoachAttendanceScreen() {
     loadEvents();
   }, [loadEvents]);
 
-  const pickerSessions = useMemo(() => events.slice(0, SESSION_LIMIT), [events]);
+  // `events` is already upcoming (soonest first) then past (latest first).
+  const pickerGroups = useMemo(() => {
+    const groups = splitSessions(events);
+    return { upcoming: groups.upcoming.slice(0, UPCOMING_LIMIT), past: groups.past.slice(0, PAST_LIMIT) };
+  }, [events]);
+  const pickerCount = pickerGroups.upcoming.length + pickerGroups.past.length;
   // Keep the selected session visible even when it sits past the preview cut.
-  const visibleSessions = useMemo(() => {
-    if (!isMobile || showAllSessions) return pickerSessions;
-    const preview = pickerSessions.slice(0, MOBILE_SESSION_PREVIEW);
-    const selected = pickerSessions.find((event) => event.id === selectedEventId);
-    return selected && !preview.includes(selected) ? [...preview.slice(0, MOBILE_SESSION_PREVIEW - 1), selected] : preview;
-  }, [isMobile, pickerSessions, selectedEventId, showAllSessions]);
-  const hiddenSessionCount = pickerSessions.length - visibleSessions.length;
+  const visibleGroups = useMemo(() => {
+    if (!isMobile || showAllSessions) return pickerGroups;
+    const cut = (list: CalendarEvent[]) => {
+      const preview = list.slice(0, MOBILE_GROUP_PREVIEW);
+      const selected = list.find((event) => event.id === selectedEventId);
+      return selected && !preview.includes(selected) ? [...preview.slice(0, MOBILE_GROUP_PREVIEW - 1), selected] : preview;
+    };
+    return { upcoming: cut(pickerGroups.upcoming), past: cut(pickerGroups.past) };
+  }, [isMobile, pickerGroups, selectedEventId, showAllSessions]);
+  const hiddenSessionCount = pickerCount - visibleGroups.upcoming.length - visibleGroups.past.length;
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === selectedEventId) ?? null,
@@ -287,9 +253,12 @@ export default function CoachAttendanceScreen() {
   // quickly used to let a slow response for session A overwrite session B's
   // list — and a save for A could flip the same player's row on B.
   const activeEventIdRef = useRef<number | null>(null);
+  const selectedLocked = selectedEvent ? !isAttendanceOpen(selectedEvent.startTime) : false;
+  const { reset: resetSaveStatus } = saveStatus;
 
   const loadAttendance = useCallback(async () => {
     activeEventIdRef.current = selectedEvent?.id ?? null;
+    resetSaveStatus();
     if (!selectedEvent) {
       setPlayers([]);
       return;
@@ -312,23 +281,26 @@ export default function CoachAttendanceScreen() {
     } finally {
       if (activeEventIdRef.current === eventId) setLoadingAttendance(false);
     }
-  }, [selectedEvent]);
+  }, [selectedEvent, resetSaveStatus]);
 
   useEffect(() => {
     loadAttendance();
   }, [loadAttendance]);
 
-  const markPlayer = async (playerId: number, status: AttendanceStatus) => {
-    if (!selectedEvent) return;
+  /** Optimistic: the segment fills at once and rolls back if the save fails. */
+  const markPlayer = async (playerId: number, status: AttendanceMark) => {
+    if (!selectedEvent || selectedLocked) return;
 
     const eventId = selectedEvent.id;
+    const previous = players.find((player) => player.playerId === playerId)?.status ?? null;
+    const setStatus = (value: string | null) => setPlayers((current) => current.map((player) => player.playerId === playerId ? { ...player, status: value } : player));
     setSavingPlayerId(playerId);
+    setStatus(status);
 
     try {
-      await eventsApi.updateEventAttendance(eventId, [{ playerId, status }]);
-      if (activeEventIdRef.current !== eventId) return;
-      setPlayers((current) => current.map((player) => player.playerId === playerId ? { ...player, status } : player));
+      await saveStatus.track(eventsApi.updateEventAttendance(eventId, [{ playerId, status }]));
     } catch (err) {
+      if (activeEventIdRef.current === eventId) setStatus(previous);
       Alert.alert('Prezență', err instanceof Error ? err.message : 'Nu s-a putut actualiza prezența.');
     } finally {
       setSavingPlayerId(null);
@@ -342,7 +314,7 @@ export default function CoachAttendanceScreen() {
     if (!player?.status) return false;
     const eventId = selectedEvent.id;
     try {
-      await eventsApi.updateEventAttendance(eventId, [{ playerId, status: player.status, note: note || null }]);
+      await saveStatus.track(eventsApi.updateEventAttendance(eventId, [{ playerId, status: player.status, note: note || null }]));
       if (activeEventIdRef.current !== eventId) return true;
       setPlayers((current) => current.map((row) => (row.playerId === playerId ? { ...row, note } : row)));
       return true;
@@ -368,10 +340,10 @@ export default function CoachAttendanceScreen() {
     const eventId = selectedEvent.id;
     setBulkSaving(true);
     try {
-      await eventsApi.updateEventAttendance(
+      await saveStatus.track(eventsApi.updateEventAttendance(
         eventId,
         unmarkedIds.map((playerId) => ({ playerId, status: 'present' })),
-      );
+      ));
       setBulkConfirmOpen(false);
       if (activeEventIdRef.current !== eventId) return;
       const ids = new Set(unmarkedIds);
@@ -418,7 +390,7 @@ export default function CoachAttendanceScreen() {
           }
           actions={
             <>
-              {unmarkedCount > 0 && players.length > 0 ? (
+              {unmarkedCount > 0 && players.length > 0 && !selectedLocked ? (
                 <Button
                   variant="primary"
                   icon="check-circle"
@@ -483,28 +455,36 @@ export default function CoachAttendanceScreen() {
                 </View>
               ) : events.length ? (
                 <View className="gap-2 ui-stagger">
-                  {visibleSessions.map((event) => (
-                    <SessionRow
-                      key={event.id}
-                      compact
-                      event={event}
-                      active={event.id === selectedEventId}
-                      onPress={() => {
-                        setSelectedEventId(event.id);
-                        if (isMobile) setShowAllSessions(false);
-                      }}
-                    />
-                  ))}
+                  {([
+                    { key: 'upcoming', title: 'Urmează', list: visibleGroups.upcoming },
+                    { key: 'past', title: 'Trecute', list: visibleGroups.past },
+                  ] as const).map((group) => group.list.length ? (
+                    <View key={group.key} className="gap-2">
+                      <Text className="t-eyebrow mt-1" style={{ color: 'var(--c-faint)' }} accessibilityRole="header">{group.title}</Text>
+                      {group.list.map((event) => (
+                        <SessionRow
+                          key={event.id}
+                          compact
+                          event={event}
+                          active={event.id === selectedEventId}
+                          onPress={() => {
+                            setSelectedEventId(event.id);
+                            if (isMobile) setShowAllSessions(false);
+                          }}
+                        />
+                      ))}
+                    </View>
+                  ) : null)}
                   {hiddenSessionCount > 0 || (isMobile && showAllSessions) ? (
                     <Pressable
                       onPress={() => setShowAllSessions((value) => !value)}
                       accessibilityRole="button"
-                      accessibilityLabel={showAllSessions ? 'Arată mai puține sesiuni' : `Arată toate sesiunile (${pickerSessions.length})`}
+                      accessibilityLabel={showAllSessions ? 'Arată mai puține sesiuni' : `Arată toate sesiunile (${pickerCount})`}
                       className="ui-press h-10 rounded-[11px] border flex-row items-center justify-center gap-1.5"
                       style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
                     >
                       <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
-                        {showAllSessions ? 'Arată mai puține' : `Arată toate (${pickerSessions.length})`}
+                        {showAllSessions ? 'Arată mai puține' : `Arată toate (${pickerCount})`}
                       </Text>
                       <MaterialIcons name="expand-more" size={16} color="var(--c-brand-fg)" style={{ transform: showAllSessions ? 'rotate(180deg)' : undefined }} />
                     </Pressable>
@@ -529,16 +509,29 @@ export default function CoachAttendanceScreen() {
                 ))}
               </View>
             ) : players.length ? (
-              <View className="gap-2.5 ui-stagger">
-                {players.map((player) => (
-                  <AttendanceRow
-                    key={player.playerId}
-                    player={player}
-                    busy={bulkSaving || savingPlayerId === player.playerId}
-                    onMark={(status) => markPlayer(player.playerId, status)}
-                    onSaveNote={(note) => saveNote(player.playerId, note)}
-                  />
-                ))}
+              <View className="gap-2.5">
+                {selectedLocked && selectedEvent ? (
+                  <View className="flex-row items-start gap-2.5 rounded-[12px] border px-3.5 py-3" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
+                    <MaterialIcons name="lock" size={18} color="var(--c-muted)" style={{ marginTop: 1 }} />
+                    <Text className="flex-1 text-[13px] font-medium leading-5" style={{ color: 'var(--c-ink-soft)' }}>
+                      Prezența se poate nota din ziua evenimentului ({formatCoachDate(selectedEvent.startTime)}). Până atunci vezi doar lotul.
+                    </Text>
+                  </View>
+                ) : (
+                  <AttendanceSaveStatus state={saveStatus.state} />
+                )}
+                <View className="gap-2.5 ui-stagger">
+                  {players.map((player) => (
+                    <AttendanceRow
+                      key={player.playerId}
+                      player={player}
+                      busy={bulkSaving || savingPlayerId === player.playerId}
+                      locked={selectedLocked}
+                      onMark={(status) => markPlayer(player.playerId, status)}
+                      onSaveNote={(note) => saveNote(player.playerId, note)}
+                    />
+                  ))}
+                </View>
               </View>
             ) : (
               <EmptyState

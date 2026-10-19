@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { ATTENDANCE_NOT_OPEN_MESSAGE, isAttendanceOpen } from '../lib/attendanceWindow';
 import { toDate, toIso } from '../lib/dateUtils';
 import { db } from '../db';
 import { attendance, events, gameStats, notifications, players, playersToTeams, teams, users } from '../db/schema';
@@ -766,6 +767,10 @@ export const eventsController = {
             const access = await ensureTeamAccess(req, event.teamId, event.coachId ?? null);
             if (access.status !== 200) {
                 return res.status(access.status).json({ error: access.error });
+            }
+
+            if (!isAttendanceOpen(event.startTime)) {
+                return res.status(409).json({ error: ATTENDANCE_NOT_OPEN_MESSAGE });
             }
 
             const playerIds = items.map((item) => item.playerId);

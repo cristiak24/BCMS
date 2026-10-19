@@ -1,3 +1,5 @@
+import { toAttendanceMark } from './attendanceStatus';
+
 export interface WeekInfo {
   label: string;
   days: Date[];
@@ -84,11 +86,13 @@ export interface AggregateAttendance {
   }[];
 }
 
+// The grid's day cells only tell attended / absent / excused apart, so a late
+// arrival (and the legacy 'prezent' spelling) reads as present — it used to
+// fall through to 'pending' and show the session as never marked.
 export function normalizeAttendanceStatus(status: string | null | undefined): NormalizedAttendanceStatus {
-  if (status === 'present') return 'present';
-  if (status === 'absent') return 'absent';
-  if (status === 'medical' || status === 'excused') return 'medical';
-  return 'pending';
+  const mark = toAttendanceMark(status);
+  if (mark === 'present' || mark === 'late') return 'present';
+  return mark ?? 'pending';
 }
 
 export function computeDailyAttendance(
