@@ -260,10 +260,12 @@ export default function Scorer({
         </View>
         <View className="flex-row items-center justify-center gap-1.5 mt-2">
           {!s.online ? <MaterialIcons name="cloud-off" size={13} color="var(--c-warning-fg)" /> : s.syncing ? <ActivityIndicator size="small" color="var(--c-faint)" /> : null}
-          <Text className="text-[11.5px] font-semibold" style={{ color: s.pendingCount ? 'var(--c-warning-fg)' : 'var(--c-faint)' }}>
-            {s.pendingCount
-              ? `${plural(s.pendingCount, 'acțiune salvată', 'acțiuni salvate')} pe telefon${s.online ? ', se trimit…' : ' — se trimit când revine internetul'}`
-              : 'Totul e salvat'}
+          <Text className="text-[11.5px] font-semibold" style={{ color: s.pendingActions ? 'var(--c-warning-fg)' : 'var(--c-faint)' }}>
+            {s.pendingActions
+              ? `${plural(s.pendingActions, 'acțiune salvată', 'acțiuni salvate')} pe telefon${s.online ? ', se trimit…' : ' — se trimit când revine internetul'}`
+              : s.pendingCount
+                ? (s.online ? 'Se sincronizează…' : 'Fără internet — se sincronizează când revine')
+                : 'Totul e salvat'}
           </Text>
         </View>
         {s.lastError && !s.pendingCount ? <Text className="text-[11.5px] text-center mt-1" style={{ color: 'var(--c-danger-fg)' }}>{s.lastError}</Text> : null}

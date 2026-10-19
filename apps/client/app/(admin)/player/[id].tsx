@@ -14,6 +14,7 @@ import { Skeleton } from '../../../components/ui/Skeleton';
 import { ErrorState } from '../../../components/ui/ScreenState';
 import { ToastHost, useToasts } from '../../../components/ui/Toast';
 import GuardiansPanel from '../../../components/family/GuardiansPanel';
+import SeasonStatsCard from '../../../components/stats/SeasonStatsCard';
 import { AuditEntries } from '../../../components/audit/AuditLogList';
 import type { AuditLogEntry } from '../../../services/clubAdminApi';
 import { MEDICAL_META, formatDate, medicalStatus } from '../../../components/myclub/teamDisplay';
@@ -280,6 +281,8 @@ export default function PlayerProfile() {
                   </View>
                 </View>
               </Card>
+
+              {Number(id) > 0 ? <SeasonStatsCard playerId={Number(id)} /> : null}
 
               {Number(id) > 0 ? (
                 <GuardiansPanel playerId={Number(id)} playerName={`${firstName} ${lastName}`.trim() || 'jucător'} onNotify={showToast} />

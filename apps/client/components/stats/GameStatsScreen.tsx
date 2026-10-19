@@ -6,6 +6,10 @@ import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { gamesApi, type Game, type GamePayload } from '../../services/gamesApi';
 import { computeBoxScore } from '../../utils/gameStats';
 import { useSession } from '../../context/AuthContext';
+import { normalizeRole } from '../../utils/authSession';
+import { startsMoreThanADayAhead } from '../../utils/scorerStatus';
+import Button from '../ui/Button';
+import ConfirmDialog from '../ui/ConfirmDialog';
 import PageContainer from '../ui/PageContainer';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
@@ -17,7 +21,8 @@ import { clearScorerCache } from './useScorer';
 /**
  * /admin/stats/:id, /coach/stats/:id, /stats/:id (a delegated parent).
  * setup (staff) → live scorer (whoever keeps the sheet) → box score.
- * People who may only watch see the box score as it stands.
+ * People who may only watch see the box score as it stands. A club admin can
+ * reopen a finished match to correct it (the server audits it).
  */
 
 function formatWhen(iso: string) {
@@ -33,6 +38,11 @@ export default function GameStatsScreen() {
   const [data, setData] = useState<GamePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingSetup, setEditingSetup] = useState(false);
+  // Opening the scorer more than a day before the match needs a yes first.
+  const [earlyStartOk, setEarlyStartOk] = useState(false);
+  const [confirmReopen, setConfirmReopen] = useState(false);
+  const [reopening, setReopening] = useState(false);
+  const isClubAdmin = ['admin', 'superadmin'].includes(normalizeRole(session?.role));
 
   const load = useCallback(async () => {
     try {
@@ -66,6 +76,22 @@ export default function GameStatsScreen() {
     }
   };
 
+  const reopen = async () => {
+    setReopening(true);
+    try {
+      const game = await gamesApi.reopen(eventId);
+      clearScorerCache(eventId);
+      await load();
+      setData((d) => (d ? { ...d, game } : d));
+      setConfirmReopen(false);
+    } catch (err) {
+      setConfirmReopen(false);
+      setError(err instanceof Error ? err.message : 'Nu am putut redeschide meciul.');
+    } finally {
+      setReopening(false);
+    }
+  };
+
   const header = data ? (
     <View className="mb-4 gap-2">
       <Pressable onPress={() => router.back()} accessibilityRole="button" className="ui-press self-start h-9 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
@@ -96,6 +122,22 @@ export default function GameStatsScreen() {
     ) : (
       <EmptyState icon="sports-basketball" title="Statistica nu a început" message="Antrenorul pregătește meciul. Revino la ora meciului." />
     );
+  } else if (data.game.status === 'setup' && data.canKeep && !earlyStartOk && startsMoreThanADayAhead(data.event.startTime)) {
+    body = (
+      <View className="max-w-[560px] rounded-[16px] border p-5 gap-3" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
+        <View className="flex-row items-center gap-2.5">
+          <MaterialIcons name="event" size={20} color="var(--c-warning-fg)" />
+          <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Meciul e programat mai târziu</Text>
+        </View>
+        <Text className="text-[13.5px] leading-5" style={{ color: 'var(--c-ink-soft)' }}>
+          Meciul începe {formatWhen(data.event.startTime)}. Dacă pornești statistica acum, scorul și acțiunile se înregistrează pentru acest meci. Pornește doar dacă meciul se joacă azi.
+        </Text>
+        <View className="flex-row flex-wrap gap-2">
+          <Button variant="secondary" label="Înapoi" icon="chevron-left" onPress={() => router.back()} />
+          <Button label="Pornește oricum" icon="play-arrow" onPress={() => setEarlyStartOk(true)} />
+        </View>
+      </View>
+    );
   } else if (data.game.status !== 'finished' && data.canKeep) {
     body = (
       <View className="gap-3">
@@ -122,6 +164,10 @@ export default function GameStatsScreen() {
               <MaterialIcons name="refresh" size={14} color="var(--c-brand-fg)" />
               <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Actualizează</Text>
             </Pressable>
+          ) : isClubAdmin ? (
+            <View className="ml-auto">
+              <Button size="sm" variant="secondary" icon="edit" label="Redeschide meciul" onPress={() => setConfirmReopen(true)} />
+            </View>
           ) : null}
         </View>
         <BoxScoreView
@@ -142,6 +188,17 @@ export default function GameStatsScreen() {
         {header}
         {body}
       </PageContainer>
+      <ConfirmDialog
+        visible={confirmReopen}
+        icon="edit"
+        title="Redeschizi meciul?"
+        message="Meciul revine în desfășurare, ca să corectezi acțiunile din foaia de statistică. Scorul se recalculează din acțiuni, iar redeschiderea apare în jurnal. Încheie-l din nou după corectură."
+        confirmLabel="Redeschide"
+        cancelLabel="Anulează"
+        loading={reopening}
+        onConfirm={() => void reopen()}
+        onCancel={() => setConfirmReopen(false)}
+      />
     </ScrollView>
   );
 }

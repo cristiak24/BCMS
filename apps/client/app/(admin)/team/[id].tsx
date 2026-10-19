@@ -4,8 +4,9 @@ import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import {
     ArrowLeft, Users, UserPlus, Copy, Check, Pencil, Calendar, ClipboardCheck,
     Search, X, Trash2, Shield, ListOrdered, History,
-    CalendarClock, LayoutGrid, List, ShieldCheck, Receipt,
+    CalendarClock, LayoutGrid, List, ShieldCheck, Receipt, BarChart3,
 } from 'lucide-react';
+import TeamSeasonTable from '../../../components/stats/TeamSeasonTable';
 import { teamsApi, Team, Player, Coach, TeamStats, TeamPlayerStat } from '../../../services/teamsApi';
 import {
     GENDER_LABELS, LEVEL_LABELS, isFrbTeam, computeAge, medicalStatus, MEDICAL_META,
@@ -23,7 +24,7 @@ import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import { ATTENDANCE_PERIOD_LABEL } from '../../../utils/attendanceRate';
 import { plural, pluralWord } from '../../../utils/plural';
 
-type TabKey = 'roster' | 'events' | 'history' | 'frb';
+type TabKey = 'roster' | 'events' | 'history' | 'stats' | 'frb';
 type RosterView = 'grid' | 'list';
 
 function attendanceColor(rate: number | null) {
@@ -330,6 +331,7 @@ export default function TeamDetailsScreen() {
                         <TabButton active={tab === 'roster'} onPress={() => setTab('roster')} icon={<Users size={14} color={tab === 'roster' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label={`Lot (${players.length})`} />
                         <TabButton active={tab === 'events'} onPress={() => setTab('events')} icon={<CalendarClock size={14} color={tab === 'events' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label="Evenimente" />
                         <TabButton active={tab === 'history'} onPress={() => setTab('history')} icon={<History size={14} color={tab === 'history' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label="Istoric" />
+                        <TabButton active={tab === 'stats'} onPress={() => setTab('stats')} icon={<BarChart3 size={14} color={tab === 'stats' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label="Statistici" />
                         {frb && (
                             <TabButton active={tab === 'frb'} onPress={() => setTab('frb')} icon={<ListOrdered size={14} color={tab === 'frb' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label="Competiție FRB" />
                         )}
@@ -339,6 +341,8 @@ export default function TeamDetailsScreen() {
                         <TeamEventsPanel teamId={team.id} scope="upcoming" />
                     ) : tab === 'history' ? (
                         <TeamEventsPanel teamId={team.id} scope="past" />
+                    ) : tab === 'stats' ? (
+                        <TeamSeasonTable teamId={team.id} />
                     ) : tab === 'frb' && frb ? (
                         <TeamFrbPanel team={team} />
                     ) : (

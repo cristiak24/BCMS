@@ -1,6 +1,7 @@
 import { and, count, desc, eq, like, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db';
 import { auditLogs, users } from '../db/schema';
+import type { AuthenticatedRequest } from '../middleware/auth';
 
 export type AuditLogInput = {
   action: string;
@@ -37,6 +38,24 @@ export async function writeAuditLog(input: AuditLogInput) {
   } catch (error) {
     console.error(`[audit] Failed to record ${input.action}:`, error);
   }
+}
+
+/**
+ * An entry for something the signed-in caller just did: actor and club come
+ * from the verified request. Same never-throws contract as writeAuditLog.
+ */
+export function auditRequest(
+  req: AuthenticatedRequest,
+  input: Omit<AuditLogInput, 'actorUserId' | 'actorUid' | 'actorRole'>,
+) {
+  const clubId = input.clubId !== undefined ? input.clubId : req.user?.clubId == null ? null : Number(req.user.clubId);
+  return writeAuditLog({
+    ...input,
+    clubId,
+    actorUserId: req.user?.id == null ? null : Number(req.user.id),
+    actorUid: req.firebaseUser?.uid ?? null,
+    actorRole: req.user?.role ?? null,
+  });
 }
 
 export type AuditLogQuery = {

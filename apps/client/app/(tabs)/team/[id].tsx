@@ -9,6 +9,7 @@ import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import { teamsApi, MyTeamDetail, MyTeamEvent, MyTeamPastEvent } from '../../../services/teamsApi';
 import { GENDER_LABELS, LEVEL_LABELS } from '../../../components/myclub/teamDisplay';
 import TeamStandingsCard from '../../../components/standings/TeamStandingsCard';
+import TeamSeasonTable from '../../../components/stats/TeamSeasonTable';
 import {
   attendanceRateColor,
   attendanceStatusTone,
@@ -30,12 +31,13 @@ import { useSession } from '../../../context/AuthContext';
  * data belonging to anyone else).
  */
 
-type TabKey = 'roster' | 'events' | 'attendance' | 'standings';
+type TabKey = 'roster' | 'events' | 'attendance' | 'stats' | 'standings';
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: 'roster', label: 'Lot', icon: 'groups' },
   { key: 'events', label: 'Evenimente', icon: 'event' },
   { key: 'attendance', label: 'Prezența mea', icon: 'fact-check' },
+  { key: 'stats', label: 'Statistici', icon: 'sports-basketball' },
   { key: 'standings', label: 'Clasament', icon: 'leaderboard' },
 ];
 
@@ -371,6 +373,8 @@ export default function PlayerTeamDetailScreen() {
                 )}
               </View>
             ) : null}
+
+            {tab === 'stats' ? <TeamSeasonTable teamId={team.id} /> : null}
 
             {tab === 'standings' ? <TeamStandingsCard teamId={team.id} full showWhenEmpty /> : null}
           </View>

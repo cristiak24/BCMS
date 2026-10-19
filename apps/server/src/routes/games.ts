@@ -4,10 +4,12 @@ import { authenticate, type AuthenticatedRequest } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
 import { db } from '../db';
 import { events, gameStatEvents, gameStats, l12Lineups, playerGuardians, players, playersToTeams, teams, users } from '../db/schema';
-import { computeBoxScore, parseEvent, parseOpponentRoster, type GameEvent, type GameMode } from '../lib/gameStats';
-import { toIso } from '../lib/dateUtils';
+import { computeBoxScore, emptyLine, parseEvent, parseOpponentRoster, type GameEvent, type GameMode } from '../lib/gameStats';
+import { toDate, toIso } from '../lib/dateUtils';
+import { seasonBounds, seasonTotals } from '../lib/seasonStats';
 import { resolveSelfPlayerForRequest, teamIdsOfPlayers } from '../lib/selfPlayer';
 import { coachManagesEvent } from '../lib/coachScope';
+import { auditRequest } from '../services/auditService';
 
 /**
  * Live match statistics.
@@ -18,6 +20,9 @@ import { coachManagesEvent } from '../lib/coachScope';
  *   PUT  /api/games/events/:eventId/setup → mode, roster, starters, opponent, scorekeeper
  *   POST /api/games/events/:eventId/events → append/undo events (idempotent by clientId)
  *   POST /api/games/events/:eventId/finish
+ *   POST /api/games/events/:eventId/reopen → club admin only: a finished match back to live
+ *   GET  /api/games/season/players/:playerId → a player's season averages/totals + last matches
+ *   GET  /api/games/season/teams/:teamId    → every player of a team, season totals
  *
  * Keeping stats: club admins and staff, the coach of the match's team, or the
  * person a coach delegated for that match (often a parent). Setup: the same
@@ -141,9 +146,16 @@ function serializeEvent(row: typeof gameStatEvents.$inferSelect): GameEvent {
 
 router.get('/assigned', async (req: AuthenticatedRequest, res) => {
     try {
+        // A signed-in account with no profile row has no id: Number(undefined)
+        // went into the SQL as NaN and answered 500.
+        const userId = Number(req.user?.id);
+        if (!Number.isInteger(userId) || userId <= 0) {
+            res.json([]);
+            return;
+        }
         const rows = await db.select({ game: gameStats, title: events.title, startTime: events.startTime })
             .from(gameStats).innerJoin(events, eq(events.id, gameStats.eventId))
-            .where(and(eq(gameStats.scorekeeperUserId, Number(req.user?.id)), ne(gameStats.status, 'finished')))
+            .where(and(eq(gameStats.scorekeeperUserId, userId), ne(gameStats.status, 'finished')))
             .orderBy(asc(events.startTime));
         res.json(rows.map((r) => ({ eventId: r.game.eventId, title: r.title, startTime: toIso(r.startTime), status: r.game.status })));
     } catch (error) {
@@ -352,16 +364,187 @@ router.post('/events/:eventId/finish', async (req: AuthenticatedRequest, res) =>
         }
         // The final score is what Acasă shows as the result: derive it from
         // the stored actions once more rather than trusting the last snapshot.
-        const all = (await db.select().from(gameStatEvents).where(eq(gameStatEvents.gameId, match.game.id))).map(serializeEvent);
-        const box = computeBoxScore(all, match.game.starters as number[], match.game.periodSec);
+        const box = await recomputeScore(match.game);
         const [saved] = await db.update(gameStats)
             .set({ status: 'finished', scoreUs: box.us, scoreThem: box.them, finishedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
             .where(eq(gameStats.id, match.game.id)).returning();
+        if (match.game.status !== 'finished') {
+            await auditRequest(req, {
+                action: 'game.finished',
+                entityType: 'event',
+                entityId: match.event.id,
+                clubId: match.team.clubId,
+                metadata: { title: match.event.title, teamName: match.team.name, scoreUs: box.us, scoreThem: box.them },
+            });
+        }
         res.json(serializeGame(saved));
     } catch (error) {
         console.error('[games/finish] error:', error);
         res.status(500).json({ error: 'Nu am putut încheia meciul.' });
     }
 });
+
+/**
+ * A wrong action found after "Final" (audit WP7-C2): a club admin reopens the
+ * match, the sheet is corrected through the scorer and finished again. The
+ * score is re-derived from the stored actions, as at finish, and both steps
+ * are audited.
+ */
+router.post('/events/:eventId/reopen', async (req: AuthenticatedRequest, res) => {
+    try {
+        const match = await loadMatch(req, res);
+        if (!match) return;
+        const role = String(req.user?.role ?? '');
+        if (role !== 'admin' && role !== 'superadmin') {
+            res.status(403).json({ error: 'Doar un administrator al clubului poate redeschide meciul.' });
+            return;
+        }
+        if (!match.game || match.game.status !== 'finished') {
+            res.status(409).json({ error: 'Meciul nu e încheiat.' });
+            return;
+        }
+        const box = await recomputeScore(match.game);
+        const [saved] = await db.update(gameStats)
+            .set({ status: 'live', scoreUs: box.us, scoreThem: box.them, finishedAt: null, updatedAt: new Date().toISOString() })
+            .where(eq(gameStats.id, match.game.id)).returning();
+        await auditRequest(req, {
+            action: 'game.reopened',
+            entityType: 'event',
+            entityId: match.event.id,
+            clubId: match.team.clubId,
+            metadata: { title: match.event.title, teamName: match.team.name, scoreUs: match.game.scoreUs, scoreThem: match.game.scoreThem },
+        });
+        res.json(serializeGame(saved));
+    } catch (error) {
+        console.error('[games/reopen] error:', error);
+        res.status(500).json({ error: 'Nu am putut redeschide meciul.' });
+    }
+});
+
+/**
+ * Season statistics read like box scores do: any member of the club, while a
+ * player or parent only sees the teams of their own (selected) child.
+ */
+async function seasonScope(req: AuthenticatedRequest, res: Response, teamIds: number[], clubIdOfTarget: number | null) {
+    const isSuper = req.user?.role === 'superadmin';
+    if (clubIdOfTarget == null || (!isSuper && clubIdOfTarget !== clubIdOf(req))) {
+        res.status(404).json({ error: 'Nu am găsit statisticile.' });
+        return false;
+    }
+    const role = String(req.user?.role ?? '');
+    if (!isSuper && (role === 'player' || role === 'parent')) {
+        const self = await resolveSelfPlayerForRequest(req);
+        const own = new Set(self ? await teamIdsOfPlayers([self.id]) : []);
+        if (!teamIds.some((id) => own.has(id))) {
+            res.status(404).json({ error: 'Nu am găsit statisticile.' });
+            return false;
+        }
+    }
+    return true;
+}
+
+function seasonFrom(req: AuthenticatedRequest) {
+    const year = Number(req.query.season);
+    // ?season=2025 → 2025–26; default: the season today falls in.
+    return Number.isInteger(year) && year >= 2000 && year <= 2100 ? seasonBounds(new Date(Date.UTC(year, 9, 1))) : seasonBounds();
+}
+
+/** The club's finished matches of a season with each one's box score, oldest first. */
+async function finishedGamesOfSeason(clubId: number, bounds: ReturnType<typeof seasonBounds>, teamId?: number) {
+    const rows = await db.select({ game: gameStats, title: events.title, startTime: events.startTime, opponent: events.opponent })
+        .from(gameStats).innerJoin(events, eq(events.id, gameStats.eventId))
+        .where(and(eq(gameStats.clubId, clubId), eq(gameStats.status, 'finished'), ...(teamId != null ? [eq(gameStats.teamId, teamId)] : [])))
+        .orderBy(asc(events.startTime));
+    const inSeason = rows.filter((row) => {
+        const at = toDate(row.startTime)?.getTime();
+        return at != null && at >= bounds.start.getTime() && at < bounds.end.getTime();
+    });
+    if (!inSeason.length) return [];
+    const actions = await db.select().from(gameStatEvents).where(inArray(gameStatEvents.gameId, inSeason.map((row) => row.game.id)));
+    const byGame = new Map<number, GameEvent[]>();
+    for (const action of actions) byGame.set(action.gameId, [...(byGame.get(action.gameId) ?? []), serializeEvent(action)]);
+    return inSeason.map((row) => ({
+        ...row,
+        box: computeBoxScore(byGame.get(row.game.id) ?? [], row.game.starters as number[], row.game.periodSec),
+        rosterIds: new Set((row.game.roster as RosterEntry[]).map((p) => p.playerId)),
+    }));
+}
+
+router.get('/season/players/:playerId', async (req: AuthenticatedRequest, res) => {
+    try {
+        const playerId = Number(req.params.playerId);
+        if (!Number.isInteger(playerId) || playerId <= 0) {
+            res.status(400).json({ error: 'Jucător invalid.' });
+            return;
+        }
+        const teamIds = await teamIdsOfPlayers([playerId]);
+        const clubRows = teamIds.length ? await db.select({ clubId: teams.clubId }).from(teams).where(inArray(teams.id, teamIds)) : [];
+        const own = clubRows.find((row) => row.clubId === clubIdOf(req))?.clubId ?? clubRows[0]?.clubId ?? null;
+        if (!await seasonScope(req, res, teamIds, own)) return;
+
+        const bounds = seasonFrom(req);
+        // Every match the player was on the sheet for — wherever their team is now.
+        const games = (await finishedGamesOfSeason(own!, bounds)).filter((g) => g.rosterIds.has(playerId));
+        const lines = games.map((g) => ({ mode: g.game.mode as GameMode, line: g.box.players[playerId] ?? emptyLine() }));
+        res.json({
+            season: { label: bounds.label, startYear: bounds.startYear },
+            ...seasonTotals(lines),
+            recent: games.map((g, i) => ({ g, line: lines[i].line })).slice(-5).reverse().map(({ g, line }) => ({
+                eventId: g.game.eventId,
+                title: g.title,
+                startTime: toIso(g.startTime),
+                opponentName: g.game.opponentName ?? g.opponent ?? null,
+                mode: g.game.mode,
+                scoreUs: g.game.scoreUs,
+                scoreThem: g.game.scoreThem,
+                pts: line.pts,
+                reb: g.game.mode === 'full' ? line.rebO + line.rebD : null,
+                ast: g.game.mode === 'full' ? line.ast : null,
+                pf: line.pf,
+                minutes: line.secondsPlayed != null ? Math.round(line.secondsPlayed / 60) : null,
+            })),
+        });
+    } catch (error) {
+        console.error('[games/season/player] error:', error);
+        res.status(500).json({ error: 'Nu am putut încărca statisticile sezonului.' });
+    }
+});
+
+router.get('/season/teams/:teamId', async (req: AuthenticatedRequest, res) => {
+    try {
+        const teamId = Number(req.params.teamId);
+        if (!Number.isInteger(teamId) || teamId <= 0) {
+            res.status(400).json({ error: 'Echipă invalidă.' });
+            return;
+        }
+        const [team] = await db.select({ id: teams.id, clubId: teams.clubId }).from(teams).where(eq(teams.id, teamId)).limit(1);
+        if (!team) {
+            res.status(404).json({ error: 'Nu am găsit statisticile.' });
+            return;
+        }
+        if (!await seasonScope(req, res, [teamId], team.clubId)) return;
+
+        const bounds = seasonFrom(req);
+        const games = await finishedGamesOfSeason(team.clubId!, bounds, teamId);
+        // Everyone who played for this team this season, by their latest sheet entry.
+        const people = new Map<number, RosterEntry>();
+        for (const g of games) for (const p of g.game.roster as RosterEntry[]) people.set(p.playerId, p);
+        const rows = Array.from(people.values()).map((p) => {
+            const lines = games.filter((g) => g.rosterIds.has(p.playerId))
+                .map((g) => ({ mode: g.game.mode as GameMode, line: g.box.players[p.playerId] ?? emptyLine() }));
+            return { playerId: p.playerId, firstName: p.firstName, lastName: p.lastName, number: p.number, ...seasonTotals(lines) };
+        });
+        res.json({ season: { label: bounds.label, startYear: bounds.startYear }, games: games.length, players: rows });
+    } catch (error) {
+        console.error('[games/season/team] error:', error);
+        res.status(500).json({ error: 'Nu am putut încărca statisticile sezonului.' });
+    }
+});
+
+/** The score from the stored actions — the source of truth, not the last snapshot. */
+async function recomputeScore(game: typeof gameStats.$inferSelect) {
+    const all = (await db.select().from(gameStatEvents).where(eq(gameStatEvents.gameId, game.id))).map(serializeEvent);
+    return computeBoxScore(all, game.starters as number[], game.periodSec);
+}
 
 export default router;

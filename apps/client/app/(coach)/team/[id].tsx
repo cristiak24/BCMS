@@ -14,6 +14,7 @@ import { attendanceRateColor, getPlayerBadge } from '../../../components/coach/c
 import { formatCoachDate, getEventTimestamp, isUpcoming } from '../../../components/coach/coachUtils';
 import BulkAddPlayersDialog from '../../../components/family/BulkAddPlayersDialog';
 import TeamStandingsCard from '../../../components/standings/TeamStandingsCard';
+import TeamSeasonTable from '../../../components/stats/TeamSeasonTable';
 import { ATTENDANCE_PERIOD_LABEL, pooledAttendanceRate } from '../../../utils/attendanceRate';
 import { plural, pluralWord } from '../../../utils/plural';
 import { playerStatusLabel } from '../../../utils/playerStatus';
@@ -231,6 +232,8 @@ export default function CoachTeamDetailScreen() {
                 upcomingEvents.map((event) => <SessionRow key={event.id} event={event} />)
               )}
             </View>
+
+            {Number.isFinite(teamId) ? <TeamSeasonTable teamId={teamId} /> : null}
 
             <TeamStandingsCard teams={team ? [team] : null} full />
           </View>

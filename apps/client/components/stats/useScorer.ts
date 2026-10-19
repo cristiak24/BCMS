@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { gamesApi, type Game } from '../../services/gamesApi';
 import { computeBoxScore, type EventType, type GameEvent, type Side } from '../../utils/gameStats';
+import { pendingActionCount } from '../../utils/scorerStatus';
 
 /**
  * The scorer's engine. Events are kept on the device first (localStorage) and
@@ -217,6 +218,8 @@ export function useScorer(eventId: number, game: Game, serverEvents: GameEvent[]
     clock: state.clock,
     remaining: remainingMs(state.clock),
     pendingCount: state.pending.length,
+    /** What the user typed and is still unsent — period markers left out. */
+    pendingActions: pendingActionCount(state.events, state.pending),
     syncing,
     online,
     lastError,
