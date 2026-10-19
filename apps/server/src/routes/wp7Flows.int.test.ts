@@ -1,10 +1,10 @@
 import '../test/pgliteEnv';
-import { bearer } from '../test/fakeClerk';
+import { bearer, verifyCount } from '../test/fakeClerk';
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { db } from '../db';
 import { eq } from 'drizzle-orm';
-import { attendance, auditLogs, clubs, events, gameStatEvents, gameStats, playerGuardians, players, teams, users } from '../db/schema';
+import { attendance, auditLogs, clubs, events, gameStatEvents, gameStats, invites, playerGuardians, players, teams, users } from '../db/schema';
 import { closeDb, createSchema } from '../test/pgliteDb';
 import { serve } from '../test/serve';
 import { seasonBounds } from '../lib/seasonStats';
@@ -13,6 +13,8 @@ import gamesRouter from './games';
 import teamsRouter from './teams';
 import clubDocumentsRouter from './clubDocuments';
 import playerRoutes from './playerRoutes';
+import financeRouter from './finance';
+import clubAdminRouter from './clubAdmin';
 
 /**
  * WP7 leftovers from the 2026-10-15 audit, through the real routes. Event
@@ -87,7 +89,7 @@ before(async () => {
     const [parent] = await db.insert(users).values({ email: PARENT, name: 'Ioana Ionescu', role: 'parent', status: 'active', clubId: club.id }).returning();
     await db.insert(playerGuardians).values({ playerId: ana.id, userId: parent.id });
 
-    server = await serve({ '/api/events': eventRoutes, '/api/games': gamesRouter, '/api/teams': teamsRouter, '/api/club-documents': clubDocumentsRouter, '/api/players': playerRoutes });
+    server = await serve({ '/api/events': eventRoutes, '/api/games': gamesRouter, '/api/teams': teamsRouter, '/api/club-documents': clubDocumentsRouter, '/api/players': playerRoutes, '/api/finance': financeRouter, '/api/club-admin': clubAdminRouter });
 });
 
 after(async () => {
@@ -243,4 +245,47 @@ test('E2: player search asks for two letters, in Romanian, whatever the paramete
     const found = await call(ADMIN, 'GET', '/players/search?q=lu');
     assert.equal(found.status, 200, JSON.stringify(found.body));
     assert.ok(found.body.some((p: { id: number }) => p.id === luca));
+});
+
+test('F1: a team without a coach — coaches read its sessions, only the admin changes them', async () => {
+    const [ana] = await db.select().from(players).where(eq(players.teamId, u14));
+    const [{ id: session }] = await db.insert(events).values({
+        type: 'training', title: 'Antrenament U14', startTime: at(-DAY), endTime: at(-DAY + 90 * 60 * 1000), teamId: u14,
+    }).returning();
+
+    const read = await call(COACH, 'GET', `/events/${session}/attendance`);
+    assert.equal(read.status, 200, `coach still reads: ${JSON.stringify(read.body)}`);
+    assert.equal((await call(COACH, 'GET', `/teams/${u14}/players`)).status, 200, 'and sees the squad');
+
+    const mark = await call(COACH, 'POST', `/events/${session}/attendance`, { playerAttendances: [{ playerId: ana.id, status: 'present' }] });
+    assert.equal(mark.status, 403, JSON.stringify(mark.body));
+    assert.equal((await call(COACH, 'PUT', `/events/${session}`, { location: 'Sala 3' })).status, 403);
+    assert.equal((await call(COACH, 'DELETE', `/events/${session}`)).status, 403);
+
+    const admin = await call(ADMIN, 'POST', `/events/${session}/attendance`, { playerAttendances: [{ playerId: ana.id, status: 'present' }] });
+    assert.equal(admin.status, 200, JSON.stringify(admin.body));
+});
+
+test('F2: the payments page verifies the session token once, not twice', async () => {
+    const before = verifyCount();
+    await call(PARENT, 'GET', '/finance/player/summary');
+    assert.equal(verifyCount() - before, 1);
+});
+
+test('F3: when the email cannot be sent the invitation stays pending and the admin gets the link', async () => {
+    // Tests run without RESEND_API_KEY, like a misconfigured deploy.
+    const res = await call(ADMIN, 'POST', '/club-admin/accounts/invitations', { email: 'nou@club.ro', fullName: 'Antrenor nou', role: 'coach' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(res.body.invitation.emailSent, false);
+    assert.match(res.body.invitation.emailError, /Copiază linkul invitației/);
+    assert.match(res.body.invitation.inviteUrl, /invite/);
+    const [row] = await db.select().from(invites).where(eq(invites.id, res.body.invitation.id));
+    assert.equal(row.status, 'pending', 'not revoked: listed, revocable, expiring as usual');
+
+    const resent = await call(ADMIN, 'POST', `/club-admin/accounts/invite-${row.id}/resend`);
+    assert.equal(resent.status, 200, JSON.stringify(resent.body));
+    assert.equal(resent.body.invitation.emailSent, false);
+    assert.notEqual(resent.body.invitation.inviteUrl, res.body.invitation.inviteUrl, 'a fresh link');
+    const [after] = await db.select().from(invites).where(eq(invites.id, row.id));
+    assert.equal(after.status, 'pending');
 });

@@ -61,6 +61,9 @@ export const clubAdminApi = {
                 status: string;
                 expiresAt: string;
                 inviteUrl: string;
+                /** False when the email could not be sent — pass the link on by hand. */
+                emailSent?: boolean;
+                emailError?: string | null;
             };
         }>('/club-admin/accounts/invitations', {
             method: 'POST',
@@ -112,6 +115,9 @@ export const clubAdminApi = {
                 status: string;
                 expiresAt: string;
                 inviteUrl: string;
+                /** False when the email could not be sent — pass the link on by hand. */
+                emailSent?: boolean;
+                emailError?: string | null;
             };
         }>(`/club-admin/accounts/${id}/resend`, {
             method: 'POST',

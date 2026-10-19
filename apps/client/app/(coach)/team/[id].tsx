@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
+import { useSession } from '../../../context/AuthContext';
 import { CalendarEvent, eventsApi } from '../../../services/eventsApi';
 import { teamsApi, type Player, type Team } from '../../../services/teamsApi';
 import PageContainer from '../../../components/ui/PageContainer';
@@ -15,6 +16,7 @@ import { formatCoachDate, getEventTimestamp, isUpcoming } from '../../../compone
 import BulkAddPlayersDialog from '../../../components/family/BulkAddPlayersDialog';
 import TeamStandingsCard from '../../../components/standings/TeamStandingsCard';
 import TeamSeasonTable from '../../../components/stats/TeamSeasonTable';
+import { coachCoachesTeam } from '../../../utils/coachEventScope';
 import { ATTENDANCE_PERIOD_LABEL, pooledAttendanceRate } from '../../../utils/attendanceRate';
 import { plural, pluralWord } from '../../../utils/plural';
 import { playerStatusLabel } from '../../../utils/playerStatus';
@@ -39,6 +41,7 @@ function DetailSkeleton() {
 export default function CoachTeamDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { session } = useSession();
   const teamId = Number(id);
 
   const [team, setTeam] = useState<Team | null>(null);
@@ -194,15 +197,18 @@ export default function CoachTeamDetailScreen() {
             <View className="gap-2.5">
               <View className="flex-row items-center gap-2">
                 <Text className="f-display flex-1 text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Lot complet</Text>
-                <Pressable
-                  onPress={() => setShowBulk(true)}
-                  accessibilityRole="button"
-                  className="ui-press h-9 px-3 rounded-[10px] border flex-row items-center gap-1.5"
-                  style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
-                >
-                  <MaterialIcons name="group-add" size={15} color="var(--c-brand-fg)" />
-                  <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Adaugă din listă</Text>
-                </Pressable>
+                {/* Adding players is the team's own coach's (server: bulk route). */}
+                {coachCoachesTeam(team, session?.id) ? (
+                  <Pressable
+                    onPress={() => setShowBulk(true)}
+                    accessibilityRole="button"
+                    className="ui-press h-9 px-3 rounded-[10px] border flex-row items-center gap-1.5"
+                    style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
+                  >
+                    <MaterialIcons name="group-add" size={15} color="var(--c-brand-fg)" />
+                    <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Adaugă din listă</Text>
+                  </Pressable>
+                ) : null}
               </View>
               {notice ? <Text className="t-meta" style={{ color: 'var(--c-success-fg)' }}>{notice}</Text> : null}
               {sortedPlayers.length === 0 ? (

@@ -163,7 +163,7 @@ export const superAdminApi = {
   },
 
   createInvitation(payload: { email: string; fullName: string; role: InvitableRole; clubId: number }) {
-    return apiFetch<{ success: boolean; invitation: { id: number; email: string; expiresAt: string; inviteUrl: string } }>('/invitations', {
+    return apiFetch<{ success: boolean; invitation: { id: number; email: string; expiresAt: string; inviteUrl: string; emailSent?: boolean } }>('/invitations', {
       method: 'POST',
       body: JSON.stringify(payload),
     });

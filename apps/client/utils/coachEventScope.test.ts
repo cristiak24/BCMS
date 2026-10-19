@@ -4,6 +4,7 @@ import { strict as assert } from 'node:assert';
 import { getCoachScopedEvents } from '../components/coach/coachUtils';
 import type { CalendarEvent } from '../services/eventsApi';
 import type { AuthUser } from './authSession';
+import { coachCanChangeEvent, coachCoachesTeam } from './coachEventScope';
 
 const COACH = 7;
 const OTHER_COACH = 8;
@@ -55,4 +56,13 @@ test('cancelled sessions stay out', () => {
 
 test('without a signed-in coach nothing is shown', () => {
   assert.deepEqual(getCoachScopedEvents([evt(1)], null, teams), []);
+});
+
+test('a coach sees a coach-less team\'s sessions but only changes their own or assigned ones (WP7-F1)', () => {
+  const teams = [{ id: 1, coachId: 7 }, { id: 3, coachId: null }];
+  assert.equal(coachCanChangeEvent({ teamId: 1, coachId: null }, teams, 7), true);
+  assert.equal(coachCanChangeEvent({ teamId: 3, coachId: null }, teams, 7), false);
+  assert.equal(coachCanChangeEvent({ teamId: 3, coachId: 7 }, teams, 7), true, 'assigned to that session');
+  assert.equal(coachCoachesTeam({ id: 3, coachId: null }, 7), false);
+  assert.equal(coachCoachesTeam({ id: 1, coachId: 7 }, '7'), true);
 });

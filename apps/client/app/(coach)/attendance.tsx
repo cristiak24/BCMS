@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { CalendarEvent, EventAttendance, eventsApi } from '../../services/eventsApi';
-import { teamsApi, type Player } from '../../services/teamsApi';
+import { teamsApi, type Player, type Team } from '../../services/teamsApi';
 import { useSession } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import GlassCard from '../../components/ui/GlassCard';
@@ -22,6 +22,7 @@ import AttendanceSaveStatus, { useSaveStatus } from '../../components/attendance
 import { attendanceMarkMeta, type AttendanceMark } from '../../utils/attendanceStatus';
 import { isAttendanceOpen } from '../../utils/attendanceWindow';
 import { defaultSession, splitSessions } from '../../utils/attendanceSessions';
+import { coachCanChangeEvent } from '../../utils/coachEventScope';
 import { plural } from '../../utils/plural';
 
 /**
@@ -190,6 +191,7 @@ export default function CoachAttendanceScreen() {
   const { isMobile } = useResponsive();
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [players, setPlayers] = useState<AttendancePlayer[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
@@ -212,6 +214,7 @@ export default function CoachAttendanceScreen() {
         teamsApi.getTeams(),
       ]);
       const groups = splitSessions(getCoachScopedEvents(eventRows, session, teamRows).filter((event) => event.type !== 'admin'));
+      setTeams(teamRows);
       setEvents([...groups.upcoming, ...groups.past]);
       setSelectedEventId((current) => current ?? defaultSession(groups)?.id ?? null);
     } catch (err) {
@@ -253,7 +256,10 @@ export default function CoachAttendanceScreen() {
   // quickly used to let a slow response for session A overwrite session B's
   // list — and a save for A could flip the same player's row on B.
   const activeEventIdRef = useRef<number | null>(null);
-  const selectedLocked = selectedEvent ? !isAttendanceOpen(selectedEvent.startTime) : false;
+  const selectedNotYet = selectedEvent ? !isAttendanceOpen(selectedEvent.startTime) : false;
+  // A team with no coach is shown, but its sheet is the admin's (WP7-F1).
+  const selectedNotMine = selectedEvent ? !coachCanChangeEvent(selectedEvent, teams, session?.id) : false;
+  const selectedLocked = selectedNotYet || selectedNotMine;
   const { reset: resetSaveStatus } = saveStatus;
 
   const loadAttendance = useCallback(async () => {
@@ -514,7 +520,9 @@ export default function CoachAttendanceScreen() {
                   <View className="flex-row items-start gap-2.5 rounded-[12px] border px-3.5 py-3" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
                     <MaterialIcons name="lock" size={18} color="var(--c-muted)" style={{ marginTop: 1 }} />
                     <Text className="flex-1 text-[13px] font-medium leading-5" style={{ color: 'var(--c-ink-soft)' }}>
-                      Prezența se poate nota din ziua evenimentului ({formatCoachDate(selectedEvent.startTime)}). Până atunci vezi doar lotul.
+                      {selectedNotMine
+                        ? 'Echipa nu are un antrenor alocat, așa că prezența o notează administratorul clubului. Tu vezi lista.'
+                        : `Prezența se poate nota din ziua evenimentului (${formatCoachDate(selectedEvent.startTime)}). Până atunci vezi doar lotul.`}
                     </Text>
                   </View>
                 ) : (

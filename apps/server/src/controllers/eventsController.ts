@@ -10,7 +10,7 @@ import { createFeedbackNotification, notifyEventChange } from '../lib/notificati
 import { parseAttendancePayload, parseEventInput } from '../lib/eventValidation';
 import { fetchFrbMatches, frbDateToUtc, type ParsedMatch } from '../lib/frbMatches';
 import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
-import { coachManagesEvent, coachManagesTeam } from '../lib/coachScope';
+import { coachManagesEvent, coachManagesTeam, coachReadsEvent } from '../lib/coachScope';
 import { auditAttendanceSave, auditRequest } from '../services/auditService';
 
 
@@ -186,7 +186,7 @@ async function ensureEventReadAccess(
         }
     }
 
-    if (options.sheet && req.user?.role === 'coach' && !coachManagesEvent(teamRows[0].coachId, event.coachId, req.user?.id)) {
+    if (options.sheet && req.user?.role === 'coach' && !coachReadsEvent(teamRows[0].coachId, event.coachId, req.user?.id)) {
         return { status: 403 as const, error: 'Poți vedea prezența doar la echipele pe care le antrenezi.' };
     }
 
@@ -668,7 +668,7 @@ export const eventsController = {
                 permittedIds = eventRows
                     .filter((event) => {
                         const team = event.teamId != null ? clubTeams.get(event.teamId) : undefined;
-                        return team != null && (!isCoach || coachManagesEvent(team.coachId, event.coachId, req.user?.id));
+                        return team != null && (!isCoach || coachReadsEvent(team.coachId, event.coachId, req.user?.id));
                     })
                     .map((event) => event.id);
             }

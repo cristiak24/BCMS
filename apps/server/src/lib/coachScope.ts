@@ -1,13 +1,15 @@
 /**
- * What a coach may change — pure, see coachScope.test.ts.
+ * What a coach may change, and what they may read — pure, see
+ * coachScope.test.ts. Admins are unaffected.
  *
- * Club-wide access let any coach edit or delete another squad's sessions,
- * attendance and players. A coach now manages:
- *  - teams they are the assigned coach of;
- *  - teams with no coach assigned yet (so a club that never filled in
- *    coaches keeps working as before);
- *  - any single event they are assigned to, whichever team it belongs to.
- * Admins are unaffected.
+ * WRITE (attendance, events, match sheets, L12, player records): teams they
+ * are the assigned coach of, plus any single event they are assigned to.
+ * A team with no coach yet is the club admin's to change (WP7-F1, club
+ * decision 2026-10-20): it used to give every coach write access.
+ *
+ * READ (sessions, squad lists, contacts): their teams, events assigned to
+ * them, and teams with no coach yet — the WP4A visibility rule, so a club
+ * that never filled in coaches still shows coaches its sessions.
  */
 
 function toId(value: unknown) {
@@ -15,20 +17,37 @@ function toId(value: unknown) {
     return Number.isInteger(id) && id > 0 ? id : null;
 }
 
+/** Write access to a team: its assigned coach only. */
 export function coachManagesTeam(teamCoachId: unknown, userId: unknown) {
     const coach = toId(teamCoachId);
     const user = toId(userId);
-    return coach == null || (user != null && coach === user);
+    return user != null && coach === user;
 }
 
+/** Read access to a team: its coach, or any coach while it has none. */
+export function coachReadsTeam(teamCoachId: unknown, userId: unknown) {
+    return toId(teamCoachId) == null ? toId(userId) != null : coachManagesTeam(teamCoachId, userId);
+}
+
+/** Write access to one event: the team's coach or the coach assigned to the event. */
 export function coachManagesEvent(teamCoachId: unknown, eventCoachId: unknown, userId: unknown) {
     const user = toId(userId);
     return coachManagesTeam(teamCoachId, userId) || (user != null && toId(eventCoachId) === user);
 }
 
-/** Team ids a coach manages, out of the club's teams. */
+/** Read access to one event (and its attendance sheet). */
+export function coachReadsEvent(teamCoachId: unknown, eventCoachId: unknown, userId: unknown) {
+    return coachReadsTeam(teamCoachId, userId) || coachManagesEvent(teamCoachId, eventCoachId, userId);
+}
+
+/** Team ids a coach may change, out of the club's teams. */
 export function teamsManagedByCoach(teams: Array<{ id: number; coachId: number | null }>, userId: unknown) {
     return teams.filter((team) => coachManagesTeam(team.coachId, userId)).map((team) => team.id);
+}
+
+/** Team ids a coach may read, out of the club's teams. */
+export function teamsReadableByCoach(teams: Array<{ id: number; coachId: number | null }>, userId: unknown) {
+    return teams.filter((team) => coachReadsTeam(team.coachId, userId)).map((team) => team.id);
 }
 
 /**

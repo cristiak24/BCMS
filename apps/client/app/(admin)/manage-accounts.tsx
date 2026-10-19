@@ -1,3 +1,4 @@
+import InviteLinkFallbackDialog from '../../components/manage-access/InviteLinkFallbackDialog';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -117,6 +118,7 @@ export default function ManageAccountsScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState<(typeof FILTERS)[number]>('all');
     const [busyId, setBusyId] = useState<string | number | null>(null);
+    const [inviteFallback, setInviteFallback] = useState<{ email: string; inviteUrl: string; emailError?: string | null } | null>(null);
     const [pending, setPending] = useState<PendingAction | null>(null);
     const [sortKey, setSortKey] = useState<SortKey>('created');
     const [sortDesc, setSortDesc] = useState(true);
@@ -363,8 +365,9 @@ export default function ManageAccountsScreen() {
     const performResend = useCallback(async (account: ClubAdminAccount) => {
         setBusyId(account.id);
         try {
-            await clubAdminApi.resendInvitation(account.id);
-            showToast({ variant: 'success', message: `Invitația a fost retrimisă la ${account.email}.` });
+            const { invitation } = await clubAdminApi.resendInvitation(account.id);
+            if (invitation.emailSent === false) setInviteFallback(invitation);
+            else showToast({ variant: 'success', message: `Invitația a fost retrimisă la ${account.email}.` });
         } catch (error) {
             showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Nu am putut retrimite invitația.' });
         } finally {
@@ -794,6 +797,7 @@ export default function ManageAccountsScreen() {
                 onCancel={() => setPending(null)}
             />
 
+            <InviteLinkFallbackDialog invite={inviteFallback} onClose={() => setInviteFallback(null)} />
             <ToastHost toasts={toasts} onDismiss={dismissToast} />
         </View>
     );

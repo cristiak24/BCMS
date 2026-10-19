@@ -8,7 +8,7 @@ import { buildPlayerUpdate } from '../lib/playerUpdate';
 import { toDate, toIso } from '../lib/dateUtils';
 import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
 import { isFailedStatus, isOutstandingStatus, isPaidStatus } from '../lib/paymentLedger';
-import { coachSeesPlayer, teamsManagedByCoach } from '../lib/coachScope';
+import { coachSeesPlayer, teamsManagedByCoach, teamsReadableByCoach } from '../lib/coachScope';
 import { attendancePeriod, attendancePeriodInfo, attendanceRateFromCounts, attendanceSummary, type AttendancePeriod } from '../lib/attendanceRate';
 import { clubBalances, playerFees } from '../services/clubFinance';
 import { listPlayerHistory, writeAuditLog } from '../services/auditService';
@@ -107,13 +107,13 @@ async function coachMayUseTeam(req: AuthenticatedRequest, teamId: number) {
 const COACH_SCOPE_ERROR = 'Poți modifica doar jucătorii echipelor pe care le antrenezi.';
 const COACH_READ_ERROR = 'Poți vedea doar jucătorii echipelor pe care le antrenezi.';
 
-/** For a coach, the club teams they manage (lib/coachScope.ts); null for every other role. */
+/** For a coach, the club teams they may READ (lib/coachScope.ts); null for every other role. */
 async function coachManagedTeamIds(req: AuthenticatedRequest): Promise<number[] | null> {
     if (req.user?.role !== 'coach') return null;
     const clubId = getRequestClubId(req);
     if (clubId == null) return [];
     const clubTeams = await db.select({ id: teams.id, coachId: teams.coachId }).from(teams).where(eq(teams.clubId, clubId));
-    return teamsManagedByCoach(clubTeams, req.user?.id);
+    return teamsReadableByCoach(clubTeams, req.user?.id);
 }
 
 /** SQL twin of coachSeesPlayer: on a managed team, or on no team at all. */
@@ -350,7 +350,7 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
     // A coach's roster: their teams' players and the club's unassigned ones,
     // never another squad's (contacts, medical visas, payments).
     if (req.user?.role === 'coach') {
-        const managed = teamsManagedByCoach(allTeams, req.user?.id);
+        const managed = teamsReadableByCoach(allTeams, req.user?.id);
         const teamsOf = new Map<number, number[]>();
         for (const m of membershipRows) teamsOf.set(m.playerId, [...(teamsOf.get(m.playerId) ?? []), m.teamId]);
         const clubTeamIds = new Set(allTeams.map((t) => t.id));
@@ -722,7 +722,7 @@ export const playersController = {
                 rosterRows = rosterRows.filter((row) => !row.isUnassigned);
                 const clubId = getRequestClubId(req);
                 const clubTeams = clubId == null ? [] : await db.select({ id: teams.id, coachId: teams.coachId }).from(teams).where(eq(teams.clubId, clubId));
-                teamCount = teamsManagedByCoach(clubTeams, req.user?.id).length;
+                teamCount = teamsReadableByCoach(clubTeams, req.user?.id).length;
             }
             const rosterPlayerIds = rosterRows.map(row => row.id);
 

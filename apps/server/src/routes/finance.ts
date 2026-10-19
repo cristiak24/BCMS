@@ -3,7 +3,6 @@ import multer from 'multer';
 import path from 'path';
 import Stripe from 'stripe';
 import { toDate, toIso } from '../lib/dateUtils';
-import { verifyBearerToken } from '../lib/clerkAuth';
 import { requireRequestUser } from '../lib/requestContext';
 import { normalizeRole } from '../lib/requestAuth';
 import { canEditFeeSettings, canUseFinance } from '../lib/financeRoles';
@@ -315,19 +314,18 @@ function getPaymentsReturnUrl(req: Request) {
     );
 }
 
-async function getRequesterEmail(req: Request) {
-    const header = req.header('authorization') || '';
-    const token = header.match(/^Bearer\s+(.+)$/i)?.[1];
-    if (!token) {
-        return null;
-    }
-
-    const decoded = await verifyBearerToken(token);
-    return decoded.email ?? null;
+/**
+ * The caller's email from the identity `authenticate` already verified — the
+ * token used to be verified a second time here, a Clerk round trip per
+ * request (WP7-F2).
+ */
+function getRequesterEmail(req: Request) {
+    const authed = req as AuthenticatedRequest;
+    return authed.firebaseUser?.email ?? authed.user?.email ?? null;
 }
 
 async function getCurrentPlayer(req: Request): Promise<CurrentPlayer> {
-    const email = await getRequesterEmail(req);
+    const email = getRequesterEmail(req);
     if (!email) {
         throw Object.assign(new Error('Trebuie să fii autentificat ca să vezi plățile.'), { statusCode: 401 });
     }

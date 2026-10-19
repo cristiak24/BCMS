@@ -114,6 +114,25 @@ function validityLabel(minutes: number) {
   return hours === 1 ? 'o oră' : `${hours} ore`;
 }
 
+export const INVITE_EMAIL_FAILED_MESSAGE = 'Emailul nu a putut fi trimis. Copiază linkul invitației și trimite-l tu (WhatsApp, SMS).';
+
+/**
+ * Sends the invite email; false when it could not be sent (no RESEND_API_KEY,
+ * provider error). The invitation then stays pending — listed with the
+ * club's invitations, revocable, expiring as usual — and the admin gets the
+ * link to pass on (WP7-F3). It used to be revoked on the spot with only
+ * "RESEND_API_KEY is missing." to show for it.
+ */
+async function trySendInviteEmail(params: { to: string; clubName: string; role: string; url: string; expiresAt: Date }) {
+  try {
+    await sendInviteEmail(params);
+    return true;
+  } catch (error) {
+    console.error('[invitations] invite email failed:', error);
+    return false;
+  }
+}
+
 async function sendInviteEmail(params: { to: string; clubName: string; role: string; url: string; expiresAt: Date }) {
   if (!resend) {
     throw new Error('RESEND_API_KEY is missing.');
@@ -203,18 +222,13 @@ export async function createSuperAdminInvitation(
   const invite = inserted[0];
   const inviteUrl = buildInviteUrl(token);
 
-  try {
-    await sendInviteEmail({
-      to: email,
-      clubName: club.name,
-      role,
-      url: inviteUrl,
-      expiresAt,
-    });
-  } catch (error) {
-    await db.update(invites).set({ status: 'revoked' }).where(eq(invites.id, invite.id));
-    throw error;
-  }
+  const emailSent = await trySendInviteEmail({
+    to: email,
+    clubName: club.name,
+    role,
+    url: inviteUrl,
+    expiresAt,
+  });
 
   await writeAuditLog({
     action: 'invitation.created',
@@ -224,7 +238,7 @@ export async function createSuperAdminInvitation(
     actorUid: actor.firebaseUser?.uid ?? null,
     actorRole: actor.user?.role ?? null,
     clubId: club.id,
-    metadata: { email, fullName, role, clubId: club.id, clubName: club.name },
+    metadata: { email, fullName, role, clubId: club.id, clubName: club.name, emailSent },
     ipAddress: actor.ip ?? null,
     userAgent: actor.userAgent ?? null,
   });
@@ -240,6 +254,8 @@ export async function createSuperAdminInvitation(
     status: 'pending',
     expiresAt: expiresAt.toISOString(),
     inviteUrl,
+    emailSent,
+    emailError: emailSent ? null : INVITE_EMAIL_FAILED_MESSAGE,
   };
 }
 
@@ -278,18 +294,13 @@ export async function resendClubInvitation(
 
   const inviteUrl = buildInviteUrl(token);
 
-  try {
-    await sendInviteEmail({
-      to: invite.email,
-      clubName: club.name,
-      role: invite.role,
-      url: inviteUrl,
-      expiresAt,
-    });
-  } catch (error) {
-    await db.update(invites).set({ status: 'revoked' }).where(eq(invites.id, invite.id));
-    throw error;
-  }
+  const emailSent = await trySendInviteEmail({
+    to: invite.email,
+    clubName: club.name,
+    role: invite.role,
+    url: inviteUrl,
+    expiresAt,
+  });
 
   await writeAuditLog({
     action: 'invitation.resent',
@@ -299,7 +310,7 @@ export async function resendClubInvitation(
     actorUid: actor.firebaseUser?.uid ?? null,
     actorRole: actor.user?.role ?? null,
     clubId: club.id,
-    metadata: { email: invite.email, role: invite.role, clubId: club.id, clubName: club.name },
+    metadata: { email: invite.email, role: invite.role, clubId: club.id, clubName: club.name, emailSent },
     ipAddress: actor.ip ?? null,
     userAgent: actor.userAgent ?? null,
   });
@@ -313,6 +324,8 @@ export async function resendClubInvitation(
     status: 'pending',
     expiresAt: expiresAt.toISOString(),
     inviteUrl,
+    emailSent,
+    emailError: emailSent ? null : INVITE_EMAIL_FAILED_MESSAGE,
   };
 }
 

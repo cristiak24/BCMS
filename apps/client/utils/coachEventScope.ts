@@ -11,6 +11,10 @@
  *  - sessions of teams with no coach assigned yet;
  *  - any single session they are assigned to, whichever team it belongs to.
  * There is no club-wide fallback.
+ *
+ * Seeing is not changing (WP7-F1): a team with no coach is the admin's to
+ * change — `coachCanChangeEvent` / `coachCoachesTeam` mirror the server's
+ * write rule.
  */
 
 type ScopedEvent = { teamId: number | null; coachId: number | null };
@@ -42,4 +46,18 @@ export function filterCoachEvents<T extends ScopedEvent>(events: T[], teams: Sco
   return events.filter((event) =>
     toId(event.coachId) === coach || (event.teamId != null && teamIds.has(Number(event.teamId))),
   );
+}
+
+/** The coach is this team's own coach (write access; a coach-less team is the admin's). */
+export function coachCoachesTeam(team: ScopedTeam | null | undefined, coachId: unknown) {
+  const coach = toId(coachId);
+  return coach != null && team != null && toId(team.coachId) === coach;
+}
+
+/** May the coach change this session (attendance, edits)? Their team's, or assigned to them. */
+export function coachCanChangeEvent(event: ScopedEvent, teams: ScopedTeam[], coachId: unknown) {
+  const coach = toId(coachId);
+  if (coach == null) return false;
+  if (toId(event.coachId) === coach) return true;
+  return coachCoachesTeam(teams.find((team) => team.id === Number(event.teamId)), coach);
 }

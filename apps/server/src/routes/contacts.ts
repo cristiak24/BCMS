@@ -8,7 +8,7 @@ import { playerGuardians, players, playersToTeams, teams, users } from '../db/sc
 import { resolveRequestClubId } from '../lib/tenantScope';
 import { canReadFamilyContacts, isContactStaff, parsePlayerContact } from '../lib/contacts';
 import { guardianChildren, resolveSelfPlayer, teamIdsOfPlayers } from '../lib/selfPlayer';
-import { coachManagesTeam } from '../lib/coachScope';
+import { coachReadsTeam } from '../lib/coachScope';
 
 /**
  * Club contact book.
@@ -61,7 +61,7 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
         // A coach's book holds their own squads' families only (P1-5); the
         // staff numbers below stay club-wide.
         const teamRows = req.user?.role === 'coach'
-            ? clubTeams.filter((team) => coachManagesTeam(team.coachId, req.user?.id))
+            ? clubTeams.filter((team) => coachReadsTeam(team.coachId, req.user?.id))
             : clubTeams;
         const teamIds = teamRows.map((team) => team.id);
 
@@ -165,7 +165,7 @@ router.put(
             // they manage.
             const clubTeams = await db.select({ id: teams.id, coachId: teams.coachId }).from(teams).where(eq(teams.clubId, clubId));
             const clubTeamIds = (req.user?.role === 'coach'
-                ? clubTeams.filter((team) => coachManagesTeam(team.coachId, req.user?.id))
+                ? clubTeams.filter((team) => coachReadsTeam(team.coachId, req.user?.id))
                 : clubTeams).map((t) => t.id);
             if (!clubTeamIds.length) {
                 res.status(404).json({ error: 'Jucătorul nu există.' });

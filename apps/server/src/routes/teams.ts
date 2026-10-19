@@ -7,7 +7,7 @@ import { foldName, generateTeamCode } from '../lib/familyJoin';
 import { clubBalances } from '../services/clubFinance';
 import { roundMoney } from '../lib/money';
 import { attendancePeriod, attendancePeriodInfo, attendanceRate as rateInPeriod, attendanceSummary } from '../lib/attendanceRate';
-import { coachManagesTeam } from '../lib/coachScope';
+import { coachReadsTeam } from '../lib/coachScope';
 import { toDate } from '../lib/dateUtils';
 import { auditRequest } from '../services/auditService';
 
@@ -104,7 +104,7 @@ async function ensureTeamAccess(req: AuthenticatedRequest, teamId: number, optio
         return { status: 403 as const, error: 'You do not have access to this team.' };
     }
 
-    if (options.squadData && req.user?.role === 'coach' && !coachManagesTeam(team.coachId, req.user?.id)) {
+    if (options.squadData && req.user?.role === 'coach' && !coachReadsTeam(team.coachId, req.user?.id)) {
         return { status: 403 as const, error: 'Poți vedea doar jucătorii echipelor pe care le antrenezi.' };
     }
 

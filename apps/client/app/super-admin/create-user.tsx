@@ -24,7 +24,7 @@ const ROLE_HINTS: Record<InvitableRole, string> = {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type Sent = { email: string; inviteUrl: string; expiresAt: string; clubId: number; clubName: string };
+type Sent = { email: string; inviteUrl: string; expiresAt: string; clubId: number; clubName: string; emailSent: boolean };
 
 export default function InviteUserScreen() {
   const router = useRouter();
@@ -71,6 +71,7 @@ export default function InviteUserScreen() {
       setSent({
         email: invitation.email,
         inviteUrl: invitation.inviteUrl,
+        emailSent: invitation.emailSent !== false,
         expiresAt: invitation.expiresAt,
         clubId: Number(clubId),
         clubName: clubs?.find((club) => String(club.id) === clubId)?.name ?? '',
@@ -107,12 +108,13 @@ export default function InviteUserScreen() {
         {sent ? (
           <Panel>
             <View className="items-center text-center gap-2 py-2">
-              <View className="w-12 h-12 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-success-bg)' }}>
-                <MaterialIcons name="mark-email-read" size={24} color="var(--c-success-fg)" />
+              <View className="w-12 h-12 rounded-full items-center justify-center" style={{ backgroundColor: sent.emailSent ? 'var(--c-success-bg)' : 'var(--c-warning-bg)' }}>
+                <MaterialIcons name={sent.emailSent ? 'mark-email-read' : 'link'} size={24} color={sent.emailSent ? 'var(--c-success-fg)' : 'var(--c-warning-fg)'} />
               </View>
-              <Text className="text-[17px] font-bold text-center" style={{ color: 'var(--c-ink)' }}>Invitație trimisă</Text>
+              <Text className="text-[17px] font-bold text-center" style={{ color: 'var(--c-ink)' }}>{sent.emailSent ? 'Invitație trimisă' : 'Invitație creată — emailul nu a plecat'}</Text>
               <Text className="t-meta text-center" style={{ color: 'var(--c-muted)' }}>
                 {sent.email} · {roleLabel(role)} la {sent.clubName}. Linkul expiră pe {formatDate(sent.expiresAt)}.
+                {sent.emailSent ? '' : ' Copiază linkul de mai jos și trimite-l tu.'}
               </Text>
             </View>
             <View className="mt-4 flex-row items-center gap-2 rounded-[11px] border px-3 h-11" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}>

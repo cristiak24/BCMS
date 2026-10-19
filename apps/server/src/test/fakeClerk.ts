@@ -8,7 +8,12 @@ import type { ClerkAuthUser } from '../lib/clerkAuth';
 
 const clerkPath = require.resolve('../lib/clerkAuth');
 
+let verifications = 0;
+/** How many tokens were verified so far — a request should cost exactly one. */
+export const verifyCount = () => verifications;
+
 async function verifyBearerToken(token: string): Promise<ClerkAuthUser> {
+    verifications += 1;
     const [scheme, uid, email] = token.split(':');
     if (scheme !== 'test' || !uid) throw new Error('invalid test token');
     return { uid, email: email || null };

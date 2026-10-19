@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import GlassCard from '../ui/GlassCard';
+import InviteLinkFallbackDialog from './InviteLinkFallbackDialog';
 import { clubAdminApi, type ClubAdminAccountRole } from '../../services/clubAdminApi';
 
 const ROLE_OPTIONS: { label: string; value: ClubAdminAccountRole; description: string; icon: 'sports' | 'person' | 'family-restroom' | 'account-balance' }[] = [
@@ -40,6 +41,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
     const [role, setRole] = useState<ClubAdminAccountRole>('coach');
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ label?: string; email?: string; }>({});
+    const [fallback, setFallback] = useState<{ email: string; inviteUrl: string; emailError?: string | null } | null>(null);
 
     const inputStyle = (hasError: boolean) => ({
         backgroundColor: 'var(--c-surface-2)',
@@ -77,7 +79,11 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                 fullName: normalizedLabel,
                 role,
             });
-            Alert.alert('Invitație trimisă', `${response.invitation.email} va primi invitația de înregistrare în curând.`);
+            if (response.invitation.emailSent === false) {
+                setFallback(response.invitation);
+            } else {
+                Alert.alert('Invitație trimisă', `${response.invitation.email} va primi invitația de înregistrare în curând.`);
+            }
             setLabel('');
             setEmail('');
             setRole('coach');
@@ -91,6 +97,8 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
     };
 
     return (
+        <>
+        <InviteLinkFallbackDialog invite={fallback} onClose={() => setFallback(null)} />
         <GlassCard className="p-0">
             <View className="px-5 md:px-6 py-5 border-b" style={{ borderColor: 'var(--c-border)' } as any}>
                 <View className="flex-row items-start justify-between gap-4">
@@ -213,5 +221,6 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                 </Pressable>
             </View>
         </GlassCard>
+        </>
     );
 }
