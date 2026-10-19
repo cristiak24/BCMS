@@ -29,12 +29,14 @@ export function CalendarEventPill({ event, dateKey, onPress }: { event: Calendar
         opacity: continued ? 0.85 : 1,
       }}
     >
-      <Text numberOfLines={1} style={{ fontSize: 10, fontWeight: '800', color: solid ? meta.onSolid : meta.onSoft }}>
+      {/* One line cut by characters, not words: a line clamp moved the title
+          to the (hidden) second line in narrow cells and left only "21:00 …". */}
+      <Text style={{ fontSize: 10, fontWeight: '800', color: solid ? meta.onSolid : meta.onSoft, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as any}>
         {continued ? (
           `↳ ${event.title}`
         ) : (
           <>
-            <Text className="t-num" style={{ fontWeight: '700', opacity: 0.8 }}>{time}</Text>
+            <Text className="t-num" style={{ fontWeight: '700', opacity: 0.8, whiteSpace: 'nowrap' } as any}>{time}</Text>
             {` ${event.title}`}
           </>
         )}

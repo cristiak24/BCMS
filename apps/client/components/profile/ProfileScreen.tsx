@@ -255,7 +255,9 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
       return '';
     }
 
-    return [profile.clubName, profile.teamName].filter(Boolean).join(' • ');
+    // Every team (a parent's children, a coach's squads), not just one.
+    const teams = profile.teamNames?.length ? profile.teamNames.join(', ') : profile.teamName;
+    return [profile.clubName, teams].filter(Boolean).join(' • ');
   }, [profile]);
 
   const handleRefresh = async () => {

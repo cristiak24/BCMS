@@ -461,7 +461,7 @@ export default function ScheduleScreen() {
         {isMobile ? null : (
           <PageHero
             eyebrow="Program"
-            title={isCoach ? 'Programul echipelor' : 'Programul meu'}
+            title={isCoach ? 'Programul echipelor' : normalizeRole(session?.role) === 'parent' ? 'Programul copilului' : 'Programul meu'}
             subtitle="Antrenamente, meciuri și cantonamente, într-un singur loc."
           >
             <View className="grid grid-cols-3 gap-2.5">
