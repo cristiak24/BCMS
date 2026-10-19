@@ -130,6 +130,7 @@ export default function AppHeader({
                   up — the user taps the field when they want to type. Font is
                   16px so iOS Safari doesn't zoom the page on focus. */}
               <TextInput
+                accessibilityLabel={searchPlaceholder || 'Caută'}
                 placeholder={searchPlaceholder}
                 value={searchValue}
                 onChangeText={onSearchChange}
@@ -242,11 +243,12 @@ export default function AppHeader({
           and the search field gives way first when the viewport is narrow. */}
       <View style={{ flex: 1, maxWidth: 380, minWidth: 160 }}>
         <View
-          className="flex-row items-center rounded-[10px] px-3 py-2 border overflow-hidden"
+          className="flex-row items-center rounded-[10px] px-3 py-2 border overflow-hidden focus-within:ring-2 focus-within:ring-[color:var(--c-brand-border)]"
           style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
         >
           <MaterialIcons name="search" size={18} color={theme.colors.faint} />
           <TextInput
+            accessibilityLabel={searchPlaceholder || 'Caută'}
             placeholder={searchPlaceholder}
             value={searchValue}
             onChangeText={onSearchChange}

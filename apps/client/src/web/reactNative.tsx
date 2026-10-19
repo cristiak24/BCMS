@@ -689,6 +689,8 @@ export function ActivityIndicator({ size = 'small', color = '#2563EB', className
   );
 }
 
+const MODAL_FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"]), [role="button"]';
+
 export function Modal({
   visible,
   children,
@@ -706,6 +708,52 @@ export function Modal({
   statusBarTranslucent?: boolean;
   onShow?: () => void;
 }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Keyboard and screen readers: an open modal is a dialog that holds the
+  // focus. Focus used to stay on the page behind it (Tab walked the hidden
+  // page), and closing it dropped focus on <body>.
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!visible || !node) return undefined;
+    const previous = document.activeElement as HTMLElement | null;
+    if (!node.querySelector('[role="dialog"], [role="alertdialog"]')) {
+      node.setAttribute('role', 'dialog');
+      node.setAttribute('aria-modal', 'true');
+    }
+    // Leaf controls only: the full-screen backdrop is a button that wraps the
+    // whole sheet, and must not be the first (or any) Tab stop.
+    const items = () => Array.from(node.querySelectorAll<HTMLElement>(MODAL_FOCUSABLE))
+      .filter((el) => !el.querySelector(MODAL_FOCUSABLE) && el.getClientRects().length > 0 && !el.hasAttribute('disabled'));
+    const timer = window.setTimeout(() => {
+      if (node.contains(document.activeElement)) return;
+      // A button, not a text field: focusing a field would raise the phone's
+      // keyboard the moment a sheet opens.
+      const first = node.querySelector<HTMLElement>('[autofocus]')
+        ?? items().find((el) => !['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
+      if (first) first.focus({ preventScroll: true });
+      else {
+        node.tabIndex = -1;
+        node.focus({ preventScroll: true });
+      }
+    }, 30);
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const list = items();
+      if (!list.length) return;
+      event.preventDefault();
+      const index = list.indexOf(document.activeElement as HTMLElement);
+      const next = event.shiftKey ? (index <= 0 ? list.length - 1 : index - 1) : (index === list.length - 1 ? 0 : index + 1);
+      list[next].focus();
+    };
+    node.addEventListener('keydown', trap);
+    return () => {
+      window.clearTimeout(timer);
+      node.removeEventListener('keydown', trap);
+      if (previous && document.contains(previous)) previous.focus({ preventScroll: true });
+    };
+  }, [visible]);
+
   useEffect(() => {
     if (!visible || !onRequestClose) return;
     const handleKey = (event: KeyboardEvent) => {
@@ -722,7 +770,7 @@ export function Modal({
   // animationType drives an entrance animation in CSS (.rn-modal[data-animation]):
   // "slide" → the sheet rises from the bottom, "fade" → it fades/rises in. It
   // was accepted and ignored before, so every modal popped in abruptly.
-  return createPortal(<div className="rn-modal" data-animation={animationType}>{children}</div>, document.body);
+  return createPortal(<div ref={containerRef} className="rn-modal" data-animation={animationType}>{children}</div>, document.body);
 }
 
 export function Switch({ value, onValueChange, disabled, className, accessibilityLabel }: AnyProps) {

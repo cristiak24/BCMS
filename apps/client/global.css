@@ -473,6 +473,11 @@
 .native-field:focus {
   border-color: var(--c-brand-border) !important;
 }
+/* Keyboard focus needs more than a border tint (barely visible in dark mode):
+   the same soft ring as FormField. */
+.native-field:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-brand-surface) 22%, transparent);
+}
 .native-field::-webkit-date-and-time-value {
   text-align: left;
   margin: 0;

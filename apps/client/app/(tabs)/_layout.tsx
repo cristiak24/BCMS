@@ -103,6 +103,8 @@ function PlayerTabsLayoutContent() {
 
     return (
         <div className="flex flex-1 min-h-screen bg-[#EAF1F8] lg:flex-row flex-col">
+            {/* Keyboard users skip the menu (12+ stops) straight to the page. */}
+            <a href="#continut" className="skip-link">Sari la conținut</a>
             <Sidebar items={menuItems} />
 
             <div className="flex flex-1 min-w-0 flex-col relative">
@@ -135,7 +137,7 @@ function PlayerTabsLayoutContent() {
                 </div>
 
                 {/* ── Main Content ────────────────────────────────── */}
-                <main className="flex-1 min-w-0 overflow-auto overflow-x-hidden flex flex-col relative h-full">
+                <main id="continut" tabIndex={-1} className="outline-none flex-1 min-w-0 overflow-auto overflow-x-hidden flex flex-col relative h-full">
                     <div className="flex-1 min-w-0 pb-24 lg:pb-0 relative w-full flex flex-col">
                         {isParent ? <ChildSwitcher /> : null}
                         {!isCoach ? <AssignedGamesBanner /> : null}

@@ -90,6 +90,8 @@ function SuperAdminShell() {
 
   return (
     <div className="flex flex-1 min-h-screen lg:flex-row flex-col" style={{ backgroundColor: 'var(--c-bg)' }}>
+        {/* Keyboard users skip the menu (12+ stops) straight to the page. */}
+        <a href="#continut" className="skip-link">Sari la conținut</a>
       <Sidebar items={MENU_ITEMS} subtitle="Administrare platformă" />
 
       <div className="flex flex-1 min-w-0 flex-col relative">
@@ -122,7 +124,7 @@ function SuperAdminShell() {
           />
         </div>
 
-        <main className="flex-1 min-w-0 overflow-x-hidden flex flex-col relative">
+        <main id="continut" tabIndex={-1} className="outline-none flex-1 min-w-0 overflow-x-hidden flex flex-col relative">
           <div className="flex-1 min-w-0 pb-28 lg:pb-10 relative w-full flex flex-col">
             <InstallBanner placement="inline" />
             <Suspense fallback={<ContentLoading />}>
