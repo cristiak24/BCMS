@@ -23,7 +23,7 @@ import {
     teams as pgTeams,
     users as pgUsers,
 } from '../db/schema';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import {
     isFailedStatus,
     isOutstandingStatus,
@@ -868,9 +868,44 @@ function handleRouteError(res: Response, error: unknown, fallback: string) {
     sendRouteError(res, error, { status: Number.isFinite(statusCode) ? statusCode : 500, fallback, log: fallback });
 }
 
+/**
+ * A club's connected Stripe account changed (account.updated, delivered to a
+ * Connect endpoint): cache whether it can take charges now, so a club that
+ * finished onboarding — or got restricted — is reflected without anyone
+ * opening the Finanțe settings (which re-read it). Audited when it flips.
+ */
+async function syncConnectedAccount(account: { id?: string; charges_enabled?: boolean }) {
+    if (!account?.id) return;
+    const chargesEnabled = Boolean(account.charges_enabled);
+    const changed = await db.update(pgClubs)
+        .set({ stripeChargesEnabled: chargesEnabled, updatedAt: new Date().toISOString() })
+        .where(and(eq(pgClubs.stripeAccountId, account.id), ne(pgClubs.stripeChargesEnabled, chargesEnabled)))
+        .returning({ id: pgClubs.id });
+    for (const club of changed) {
+        await recordFinanceAudit({
+            action: 'finance.stripe.account_updated',
+            entityType: 'club',
+            entityId: club.id,
+            clubId: club.id,
+            metadata: { chargesEnabled },
+        });
+    }
+}
+
+/**
+ * The platform endpoint's secret, plus — for account.updated, which Stripe
+ * sends to a separate "connected accounts" endpoint with its own secret —
+ * STRIPE_CONNECT_WEBHOOK_SECRET. Both may point at this URL.
+ */
+function stripeWebhookSecrets() {
+    return [process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET]
+        .map((secret) => secret?.trim())
+        .filter((secret): secret is string => Boolean(secret));
+}
+
 export async function stripeWebhookHandler(req: Request, res: Response) {
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
-    if (!webhookSecret) {
+    const secrets = stripeWebhookSecrets();
+    if (!secrets.length) {
         res.status(500).json({ error: 'Stripe webhook secret is not configured.' });
         return;
     }
@@ -881,11 +916,18 @@ export async function stripeWebhookHandler(req: Request, res: Response) {
         return;
     }
 
-    let event: any;
-    try {
-        event = getStripe().webhooks.constructEvent(req.body, signature, webhookSecret);
-    } catch (error) {
-        const message = error instanceof Error ? error.message : 'Invalid Stripe webhook signature.';
+    let event: any = null;
+    let lastError: unknown = null;
+    for (const secret of secrets) {
+        try {
+            event = getStripe().webhooks.constructEvent(req.body, signature, secret);
+            break;
+        } catch (error) {
+            lastError = error;
+        }
+    }
+    if (!event) {
+        const message = lastError instanceof Error ? lastError.message : 'Invalid Stripe webhook signature.';
         console.error('[POST /api/finance/stripe/webhook] signature error:', message);
         res.status(400).send(`Webhook Error: ${message}`);
         return;
@@ -913,6 +955,10 @@ export async function stripeWebhookHandler(req: Request, res: Response) {
                 if (session.id) {
                     await markCheckoutSessionFailed(session.id, 'expired');
                 }
+                break;
+            }
+            case 'account.updated': {
+                await syncConnectedAccount(event.data.object as { id?: string; charges_enabled?: boolean });
                 break;
             }
             default:

@@ -60,6 +60,7 @@ const ACTION_LABELS: Record<string, string> = {
     'finance.payment.manual': 'Plată înregistrată manual',
     'finance.settings.update': 'Taxe modificate',
     'finance.stripe.account_created': 'Cont Stripe al clubului creat',
+    'finance.stripe.account_updated': 'Contul Stripe al clubului s-a schimbat',
     'game.finished': 'Meci încheiat',
     'game.reopened': 'Meci redeschis',
     'invitation.accepted': 'Invitație acceptată',
@@ -141,6 +142,7 @@ function detailOf(entry: AuditLogEntry) {
     if (meta.fileName && !meta.title) parts.push(String(meta.fileName));
     if (meta.previousRole || meta.nextRole) parts.push(`${ROLE_LABELS[String(meta.previousRole)] ?? meta.previousRole ?? '—'} → ${ROLE_LABELS[String(meta.nextRole)] ?? meta.nextRole}`);
     if (meta.previousStatus || meta.nextStatus) parts.push(`${STATUS_LABELS[String(meta.previousStatus)] ?? meta.previousStatus ?? '—'} → ${STATUS_LABELS[String(meta.nextStatus)] ?? meta.nextStatus}`);
+    if (typeof meta.chargesEnabled === 'boolean') parts.push(meta.chargesEnabled ? 'poate primi plăți cu cardul' : 'nu mai poate primi plăți cu cardul');
     if (meta.amount != null) parts.push(`${meta.amount} ${String(meta.currency ?? 'ron').toUpperCase()}`);
     if (meta.method) parts.push(METHOD_LABELS[String(meta.method)] ?? String(meta.method));
     if (meta.email) parts.push(String(meta.email));
