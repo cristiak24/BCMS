@@ -1,3 +1,4 @@
+import { clearScreenCache } from './screenCache';
 import AsyncStorage from '@/src/web/asyncStorage';
 
 export type UserRole = 'superadmin' | 'admin' | 'coach' | 'player' | 'parent' | 'staff' | 'accountant';
@@ -158,6 +159,8 @@ export function readAuthSessionSync(): AuthUser | null {
 
 export async function clearAuthSession() {
   inMemorySession = null;
+  // The remembered home screens hold the account's personal data.
+  clearScreenCache();
   await AsyncStorage.removeItem(AUTH_SESSION_KEY);
 }
 

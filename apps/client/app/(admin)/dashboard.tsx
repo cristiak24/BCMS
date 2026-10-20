@@ -1,5 +1,6 @@
 import { parseApiDate } from '@/utils/dates';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCachedState } from '../../hooks/useCachedState';
 import { Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
@@ -404,12 +405,14 @@ export default function Dashboard() {
   const router = useRouter();
   const { session } = useSession() as any;
 
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  // Remembered per account (hooks/useCachedState): a revisit or a reopened
+  // app paints last time's figures at once while the requests below refresh them.
+  const [summary, setSummary] = useCachedState<DashboardSummary | null>('admin-home.summary', null);
   const [summaryFailed, setSummaryFailed] = useState(false);
-  const [events, setEvents] = useState<CalendarEvent[] | null>(null);
-  const [l12, setL12] = useState<L12Overview | null>(null);
-  const [pendingRequests, setPendingRequests] = useState(0);
-  const [results, setResults] = useState<RecentResult[] | null>(null);
+  const [events, setEvents, , eventsFallback] = useCachedState<CalendarEvent[] | null>('admin-home.events', null);
+  const [l12, setL12] = useCachedState<L12Overview | null>('admin-home.l12', null);
+  const [pendingRequests, setPendingRequests] = useCachedState('admin-home.requests', 0);
+  const [results, setResults, , resultsFallback] = useCachedState<RecentResult[] | null>('admin-home.results', null);
 
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -437,9 +440,9 @@ export default function Dashboard() {
         });
       setResults(flat.sort((a, b) => parseFrbDate(b) - parseFrbDate(a)).slice(0, 6));
     } catch {
-      setResults([]);
+      resultsFallback([]);
     }
-  }, []);
+  }, [setResults, resultsFallback]);
 
   const loadDashboard = useCallback(() => {
     const start = new Date();
@@ -450,7 +453,7 @@ export default function Dashboard() {
     dashboardApi.getSummary().then(setSummary).catch(() => setSummaryFailed(true));
     eventsApi.getEvents({ start: start.toISOString(), end: end.toISOString() })
       .then((rows) => setEvents(rows.filter((e) => e.status !== 'cancelled')))
-      .catch(() => setEvents([]));
+      .catch(() => eventsFallback([]));
     // Staff/accountant roles get 403 on these — the home just leaves them out.
     l12Api.overview().then(setL12).catch(() => setL12(null));
     Promise.allSettled([manageAccessApi.listRequests(), familyRequestsApi.list()]).then(([access, family]) => {
@@ -459,7 +462,7 @@ export default function Dashboard() {
       setPendingRequests(a + f);
     });
     loadResults();
-  }, [loadResults]);
+  }, [loadResults, setSummary, setEvents, eventsFallback, setL12, setPendingRequests]);
 
   // Refetches on mount AND when the app/tab resumes after a while in the
   // background — otherwise a phone left backgrounded for a day reopens to

@@ -1,5 +1,6 @@
 import { parseApiDate } from '@/utils/dates';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCachedState } from '../../hooks/useCachedState';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
@@ -929,12 +930,17 @@ function PlayerHomeScreen() {
   // HeaderContext) — same as the schedule screen. Home used to render its own
   // search box and its own avatar button, duplicating both of the header's.
   const { setSearchPlaceholder, searchValue, setSearchValue } = useHeader();
-  const [playerAttendance, setPlayerAttendance] = useState<PlayerAttendanceSummary | null>(null);
-  const [attendanceRecords, setAttendanceRecords] = useState<PlayerAttendanceRecord[]>([]);
-  const [events, setEvents] = useState<HubEvent[]>([]);
-  const [playerTeamNames, setPlayerTeamNames] = useState<Set<string>>(new Set());
-  const [standingTeams, setStandingTeams] = useState<Team[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Remembered per account and selected child (hooks/useCachedState): the
+  // home paints last time's figures at once; loadData refreshes them — its
+  // requests run in sequence (base data, FRB fixtures, attendance), so the
+  // wait used to be the longest of the three homes.
+  const [playerAttendance, setPlayerAttendance] = useCachedState<PlayerAttendanceSummary | null>('player-home.attendance', null);
+  const [attendanceRecords, setAttendanceRecords] = useCachedState<PlayerAttendanceRecord[]>('player-home.records', []);
+  const [events, setEvents, eventsFromCache] = useCachedState<HubEvent[]>('player-home.events', []);
+  const [teamNameList, setTeamNameList] = useCachedState<string[]>('player-home.team-names', []);
+  const playerTeamNames = useMemo(() => new Set(teamNameList), [teamNameList]);
+  const [standingTeams, setStandingTeams] = useCachedState<Team[] | null>('player-home.standings', null);
+  const [loading, setLoading] = useState(!eventsFromCache);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attendanceWarning, setAttendanceWarning] = useState<string | null>(null);
@@ -949,10 +955,11 @@ function PlayerHomeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const hasData = useRef(eventsFromCache);
   const loadData = useCallback(async (showSpinner = false) => {
     if (showSpinner) {
       setRefreshing(true);
-    } else {
+    } else if (!hasData.current) {
       setLoading(true);
     }
 
@@ -976,7 +983,7 @@ function PlayerHomeScreen() {
 
       const teamIds = getSessionTeamIds(session);
       const teamNames = getPlayerTeamNames(myRecord, roster);
-      setPlayerTeamNames(teamNames);
+      setTeamNameList(Array.from(teamNames));
 
       const sessionEvents = allEvents
         .filter((event) => belongsToPlayerTeams(event, teamIds, teamNames))
@@ -1006,6 +1013,7 @@ function PlayerHomeScreen() {
       );
 
       setEvents(dedupeHubEvents([...sessionEvents, ...frbEventGroups.flat()]));
+      hasData.current = true;
 
       try {
         const details = await loadPlayerAttendanceDetails(session, sessionEvents, 20);
@@ -1022,7 +1030,7 @@ function PlayerHomeScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [session]);
+  }, [session, setTeamNameList, setStandingTeams, setEvents, setPlayerAttendance, setAttendanceRecords]);
 
   // Refetches on mount AND when the app/tab resumes after a while in the
   // background, instead of leaving a stale or failed load on screen.

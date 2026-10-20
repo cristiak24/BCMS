@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCachedState } from '../../hooks/useCachedState';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
@@ -289,16 +290,19 @@ function HomeSkeleton() {
 export default function CoachDashboardScreen() {
   const router = useRouter();
   const { session } = useSession();
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [summary, setSummary] = useState<RosterSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Remembered per account (hooks/useCachedState): a revisit paints last
+  // time's panel at once; the load below refreshes it in the background.
+  const [events, setEvents, eventsFromCache] = useCachedState<CalendarEvent[]>('coach-home.events', []);
+  const [teams, setTeams] = useCachedState<Team[]>('coach-home.teams', []);
+  const [players, setPlayers] = useCachedState<Player[]>('coach-home.players', []);
+  const [summary, setSummary] = useCachedState<RosterSummary | null>('coach-home.summary', null);
+  const [loading, setLoading] = useState(!eventsFromCache);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const hasData = useRef(eventsFromCache);
   const loadData = useCallback(async (showSpinner = false) => {
-    if (showSpinner) setRefreshing(true); else setLoading(true);
+    if (showSpinner) setRefreshing(true); else if (!hasData.current) setLoading(true);
     setError(null);
 
     try {
@@ -318,13 +322,14 @@ export default function CoachDashboardScreen() {
       // can be added to a team); the panel counts the coach's squads only.
       setPlayers(rosterRows.filter((player) => !player.isUnassigned));
       setSummary(rosterSummary);
+      hasData.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nu s-a putut încărca panoul antrenorului.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [setEvents, setTeams, setPlayers, setSummary]);
 
   // Refetches on mount AND when the app/tab resumes after a while in the
   // background, instead of leaving a stale or failed load on screen.
