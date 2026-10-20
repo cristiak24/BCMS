@@ -33,28 +33,28 @@ export function DayScheduleModal({
     <Modal visible={day !== null} transparent animationType={isMobile ? 'slide' : 'fade'}>
       <Pressable className={`flex-1 bg-black/45 ${isMobile ? 'justify-end' : 'items-center justify-center p-5'}`} onPress={onClose}>
         <View
-          className={`bg-white w-full overflow-hidden ${isMobile ? 'rounded-t-[24px]' : 'rounded-[20px]'}`}
+          className={`bg-[var(--c-surface)] w-full overflow-hidden ${isMobile ? 'rounded-t-[24px]' : 'rounded-[20px]'}`}
           style={{ maxWidth: isMobile ? undefined : 560, maxHeight: isMobile ? '90%' : '86%', boxShadow: '0 24px 60px rgba(11,30,61,0.28)' } as any}
           onStartShouldSetResponder={() => true}
         >
           {/* Header */}
-          <View className={`${isMobile ? 'px-5 pt-4 pb-4' : 'px-6 pt-5 pb-4'} border-b border-[#EEF3F9]`}>
+          <View className={`${isMobile ? 'px-5 pt-4 pb-4' : 'px-6 pt-5 pb-4'} border-b border-[var(--c-border)]`}>
             <View className="flex-row items-start justify-between gap-4">
               <View className="flex-1">
                 <View className="flex-row items-center gap-2">
-                  <Text className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1D3E90]">
+                  <Text className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--c-brand-fg)]">
                     {day?.date.toLocaleDateString(RO_LOCALE, { weekday: 'long' })}
                   </Text>
                   {isToday && (
-                    <View className="bg-[#EAF2FF] rounded-full px-2 py-[2px]">
-                      <Text className="text-[9px] font-black uppercase tracking-widest text-[#1D3E90]">Azi</Text>
+                    <View className="bg-[var(--c-surface-tint)] rounded-full px-2 py-[2px]">
+                      <Text className="text-[9px] font-black uppercase tracking-widest text-[color:var(--c-brand-fg)]">Azi</Text>
                     </View>
                   )}
                 </View>
-                <Text className="text-[#0E2041] text-[21px] font-bold mt-0.5">
+                <Text className="text-[color:var(--c-ink-strong)] text-[21px] font-bold mt-0.5">
                   {day?.date.toLocaleDateString(RO_LOCALE, { month: 'long', day: 'numeric' })}
                 </Text>
-                <Text className="text-slate-400 font-bold text-[12px] mt-0.5">
+                <Text className="text-[color:var(--c-faint)] font-bold text-[12px] mt-0.5">
                   {events.length === 0 ? 'Nimic programat' : `${plural(events.length, 'eveniment planificat', 'evenimente planificate')}`}
                 </Text>
               </View>
@@ -62,17 +62,17 @@ export function DayScheduleModal({
                 {onQuickAdd ? (
                   <TouchableOpacity
                     onPress={() => day && onQuickAdd(day.date)}
-                    className="h-10 rounded-full bg-[#1D3E90] px-4 flex-row items-center gap-1.5"
+                    className="h-10 rounded-full bg-[var(--c-brand-surface)] px-4 flex-row items-center gap-1.5"
                     style={{ boxShadow: '0 8px 18px rgba(29,62,144,0.28)' } as any}
                     accessibilityLabel="Adaugă eveniment în această zi"
                   >
-                    <Plus color="#fff" size={15} />
-                    <Text className="text-white text-[11px] font-black uppercase tracking-widest">Adaugă</Text>
+                    <Plus color="var(--c-on-brand)" size={15} />
+                    <Text className="text-[color:var(--c-on-brand)] text-[11px] font-black uppercase tracking-widest">Adaugă</Text>
                   </TouchableOpacity>
                 ) : null}
                 <TouchableOpacity
                   onPress={onClose}
-                  className="w-10 h-10 rounded-full bg-[#F4F7FC] border border-[#E3EAF5] items-center justify-center"
+                  className="w-10 h-10 rounded-full bg-[var(--c-surface-2)] border border-[var(--c-border)] items-center justify-center"
                   accessibilityLabel="Închide"
                 >
                   <X color="var(--c-ink-soft)" size={18} />
@@ -84,20 +84,20 @@ export function DayScheduleModal({
           {/* Timeline */}
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
             {events.length === 0 ? (
-              <View className="rounded-[22px] border border-dashed border-[#D8E4F2] bg-[#F8FAFD] px-6 py-10 items-center">
-                <View className="w-12 h-12 rounded-full bg-white border border-[#E3EAF5] items-center justify-center">
+              <View className="rounded-[22px] border border-dashed border-[var(--c-border)] bg-[var(--c-surface-2)] px-6 py-10 items-center">
+                <View className="w-12 h-12 rounded-full bg-[var(--c-surface)] border border-[var(--c-border)] items-center justify-center">
                   <CalendarIcon size={22} color="var(--c-faint)" />
                 </View>
-                <Text className="text-[#0E2041] font-black mt-4">Niciun eveniment în această zi</Text>
-                <Text className="text-slate-400 font-semibold text-[12.5px] mt-1 text-center">
+                <Text className="text-[color:var(--c-ink-strong)] font-black mt-4">Niciun eveniment în această zi</Text>
+                <Text className="text-[color:var(--c-faint)] font-semibold text-[12.5px] mt-1 text-center">
                   Adaugă un antrenament, meci, cantonament sau eveniment de club.
                 </Text>
                 {onQuickAdd ? (
                   <TouchableOpacity
                     onPress={() => day && onQuickAdd(day.date)}
-                    className="mt-5 bg-[#EAF1FB] border border-[#D6E4F7] rounded-full px-5 py-2.5"
+                    className="mt-5 bg-[var(--c-surface-tint)] border border-[var(--c-border)] rounded-full px-5 py-2.5"
                   >
-                    <Text className="text-[#1D3E90] text-[12px] font-black uppercase tracking-widest">+ Adaugă eveniment</Text>
+                    <Text className="text-[color:var(--c-brand-fg)] text-[12px] font-black uppercase tracking-widest">+ Adaugă eveniment</Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -112,7 +112,7 @@ export function DayScheduleModal({
                     <View key={event.id} className="flex-row">
                       {/* Time gutter */}
                       <View style={{ width: 52 }} className="items-end pr-3 pt-3">
-                        <Text className={`text-[12px] font-black ${cancelled ? 'text-slate-300' : 'text-[#0E2041]'}`}>
+                        <Text className={`text-[12px] font-black ${cancelled ? 'text-[color:var(--c-faint)]' : 'text-[color:var(--c-ink-strong)]'}`}>
                           {formatEventTime(event.startTime)}
                         </Text>
                       </View>
@@ -128,7 +128,7 @@ export function DayScheduleModal({
                             backgroundColor: cancelled ? 'var(--c-border-strong)' : meta.solid,
                           }}
                         />
-                        {!isLast && <View className="flex-1 w-[2px] bg-[#E8EFF8] mt-1" />}
+                        {!isLast && <View className="flex-1 w-[2px] bg-[var(--c-border)] mt-1" />}
                       </View>
 
                       {/* Row */}
@@ -136,7 +136,7 @@ export function DayScheduleModal({
                         <TouchableOpacity
                           onPress={() => onSelectEvent(event)}
                           activeOpacity={0.85}
-                          className={`rounded-2xl border border-[#E7EEF7] bg-white px-4 py-3 flex-row items-center gap-3 hover:border-[#C9DBF2] ${
+                          className={`rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-3 flex-row items-center gap-3 hover:border-[var(--c-border-strong)] ${
                             cancelled ? 'opacity-60' : ''
                           }`}
                           style={{ borderLeftWidth: 3, borderLeftColor: cancelled ? 'var(--c-border-strong)' : meta.solid }}
@@ -145,7 +145,7 @@ export function DayScheduleModal({
                             <View className="flex-row items-center gap-2">
                               <Text
                                 numberOfLines={1}
-                                className={`text-[14.5px] font-black text-[#0E2041] flex-1 ${cancelled ? 'line-through' : ''}`}
+                                className={`text-[14.5px] font-black text-[color:var(--c-ink-strong)] flex-1 ${cancelled ? 'line-through' : ''}`}
                               >
                                 {event.title}
                               </Text>
@@ -156,18 +156,18 @@ export function DayScheduleModal({
                               </View>
                             </View>
                             <View className={`${isMobile ? 'gap-1 mt-1.5' : 'flex-row items-center gap-3 mt-1.5'}`}>
-                              <Text className="text-[11.5px] font-bold text-slate-500">
+                              <Text className="text-[11.5px] font-bold text-[color:var(--c-muted)]">
                                 {formatTimeRange(event.startTime, event.endTime)}
                               </Text>
                               <View className="flex-row items-center gap-1 flex-1 min-w-0">
                                 <MapPin size={12} color="var(--c-faint)" />
-                                <Text numberOfLines={1} className="text-[11.5px] font-semibold text-slate-400 flex-1">
+                                <Text numberOfLines={1} className="text-[11.5px] font-semibold text-[color:var(--c-faint)] flex-1">
                                   {event.location || 'Sală principală'}
                                 </Text>
                               </View>
                             </View>
                           </View>
-                          <ChevronRight size={16} color="#C3D2E5" />
+                          <ChevronRight size={16} color="var(--c-faint)" />
                         </TouchableOpacity>
                       </View>
                     </View>
