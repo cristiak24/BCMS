@@ -1,4 +1,5 @@
 import { buildApiUrl, buildServerUrl } from '../config/serverUrl';
+import { isNetworkError, NETWORK_ERROR_MESSAGE, retryOnNetworkError } from '../utils/networkRetry';
 
 type ApiResponseType = 'json' | 'text' | 'blob' | 'void';
 type QueryParamValue = string | number | boolean | null | undefined;
@@ -266,19 +267,23 @@ export async function apiFetch<T>(
     });
   };
 
+  // No answer at all (timeout, or the server asleep / mid-deploy): reads are
+  // safe to repeat, so they wait for the server to wake and try again a few
+  // times — once used to be too few, and the browser's raw "Failed to fetch"
+  // reached the login screen. send() mints a fresh token each time (Clerk's
+  // expire after 60s). A write is never repeated: it may have gone through.
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const repeatable = method === 'GET' && !init?.signal;
   let response: Response;
   try {
-    response = await send();
+    response = repeatable
+      ? await retryOnNetworkError(send, { beforeRetry: wakeServer })
+      : await send();
   } catch (error) {
-    // Timeout or network failure, most likely the server fell asleep (e.g. a
-    // tab resumed after a while). Reads are safe to repeat: wake it and try
-    // once more. send() mints a fresh token — Clerk's expire after 60s.
-    const method = (init?.method ?? 'GET').toUpperCase();
-    if (method !== 'GET' || init?.signal) {
-      throw error;
+    if (isNetworkError(error) && !(init?.signal?.aborted)) {
+      throw new ApiError(NETWORK_ERROR_MESSAGE, 0);
     }
-    await wakeServer();
-    response = await send();
+    throw error;
   }
 
   if (!response.ok) {

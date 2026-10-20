@@ -167,6 +167,17 @@ export default function Login() {
     } = useLogin();
     const { session, initializing, profileMissing, signOut } = useSession();
     const [showPassword, setShowPassword] = useState(false);
+    // The API sleeps on the free plan and wakes in up to a minute; say so
+    // instead of leaving a silent spinner (the requests keep retrying).
+    const [slow, setSlow] = useState(false);
+    useEffect(() => {
+        if (!loading) {
+            setSlow(false);
+            return undefined;
+        }
+        const timer = window.setTimeout(() => setSlow(true), 5000);
+        return () => window.clearTimeout(timer);
+    }, [loading]);
 
     useEffect(() => {
         if (!initializing && session) {
@@ -375,6 +386,11 @@ export default function Login() {
                                         </div>
                                     ) : null}
 
+                                    {slow ? (
+                                        <p role="status" className="m-0 rounded-[var(--r-md)] border border-[var(--c-border)] bg-[var(--c-surface-tint)] px-4 py-3 text-sm font-semibold leading-5 text-[var(--c-ink-soft)]">
+                                            Serverul pornește după o pauză — poate dura până la un minut. Nu închide pagina.
+                                        </p>
+                                    ) : null}
                                     <button type="submit" disabled={loading} className={`group mt-1 ${authPrimaryButtonClass}`}>
                                         {loading ? <Loader2 className="animate-spin" size={18} /> : null}
                                         <span>{loading ? 'Se conectează...' : 'Autentificare'}</span>
