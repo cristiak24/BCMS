@@ -1,6 +1,8 @@
 /**
- * Live match statistics — pure rules, shared shape with the client
- * (apps/client/utils/gameStats.ts mirrors computeBoxScore).
+ * Live match statistics — pure rules, and the ONLY copy: the client imports
+ * this file (apps/client/utils/gameStats.ts re-exports it), so the scorer's
+ * on-screen score and the server's stored snapshot can't drift apart. Keep
+ * it free of server imports (no db, no node modules).
  *
  * A game is a list of events ("period 3, 06:51 left, us, player 7, made 2").
  * Score, box score and minutes are always *derived* from the events, so undo is
@@ -16,7 +18,7 @@ export const FULL_ONLY_TYPES = ['m1', 'm2', 'm3', 'reb_o', 'reb_d', 'ast', 'stl'
 export const EVENT_TYPES = [...SIMPLE_TYPES, ...FULL_ONLY_TYPES] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
-const POINTS: Partial<Record<EventType, number>> = { p1: 1, p2: 2, p3: 3 };
+export const POINTS: Partial<Record<EventType, number>> = { p1: 1, p2: 2, p3: 3 };
 /** Event types that need no player at all. */
 const TEAMLESS = new Set<EventType>(['period_start', 'period_end']);
 
