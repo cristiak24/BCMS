@@ -329,6 +329,9 @@ export async function resendClubInvitation(
   };
 }
 
+/** New coach accounts must carry a phone number (audit R3-19, decided 2026-10-20). */
+export const COACH_PHONE_REQUIRED = 'Antrenorii trebuie să-și treacă numărul de telefon: jucătorii și părinții îl folosesc ca să-i contacteze.';
+
 export const INVITATION_ERRORS = {
   notFound: 'Invitația nu există.',
   noEmail: 'Contul tău nu are o adresă de email verificată. Verifică emailul și încearcă din nou.',
@@ -439,6 +442,11 @@ export async function acceptInvitation(params: {
 
   if (invite.status === 'expired' || isInviteExpired(invite)) {
     throw new Error(INVITATION_ERRORS.expired);
+  }
+
+  // A coach's number is how players and parents reach them (audit R3-19).
+  if (invite.role === 'coach' && !String(params.phone ?? '').trim()) {
+    throw new Error(COACH_PHONE_REQUIRED);
   }
 
   const [ownRows, emailRows] = await Promise.all([

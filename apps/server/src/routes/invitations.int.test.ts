@@ -51,7 +51,8 @@ async function inviteRow(id: number) {
     return (await db.select().from(invites).where(eq(invites.id, id)))[0];
 }
 
-const accept = (token: string, auth: string, body: Record<string, unknown> = {}) =>
+// Every signup form sends a phone; a coach invitation requires one.
+const accept = (token: string, auth: string, body: Record<string, unknown> = { phone: '0722 000 111' }) =>
     api.call('POST', `/api/invitations/${encodeURIComponent(token)}/accept`, { auth, body });
 
 test('a foreign account cannot claim an invitation by posting the invited email', async () => {
@@ -80,7 +81,13 @@ test('without a verified email the invitation is refused', async () => {
 test('an invitation works once: a replay is refused, also through signup', async () => {
     const { token, id } = await invitation('coach.new@club.ro', 'coach', clubA);
 
-    const first = await accept(token, bearer('user_coach_new', 'coach.new@club.ro'), { firstName: 'Ion', lastName: 'Pop' });
+    // A coach invitation needs a phone number (R3-19); refusing leaves it usable.
+    const noPhone = await accept(token, bearer('user_coach_new', 'coach.new@club.ro'), { firstName: 'Ion', lastName: 'Pop' });
+    assert.equal(noPhone.status, 400);
+    assert.match(String(noPhone.body.error), /numărul de telefon/);
+    assert.equal((await inviteRow(id)).status, 'pending');
+
+    const first = await accept(token, bearer('user_coach_new', 'coach.new@club.ro'), { firstName: 'Ion', lastName: 'Pop', phone: '0722 000 111' });
     assert.equal(first.status, 201);
     const coach = await user('coach.new@club.ro');
     assert.equal(coach.firebaseUid, 'user_coach_new');
@@ -166,3 +173,4 @@ test('the public token routes are rate limited', async () => {
     }
     assert.equal(last, 429);
 });
+

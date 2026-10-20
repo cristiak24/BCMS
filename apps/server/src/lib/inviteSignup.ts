@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { users } from '../db/schema';
-import { acceptInvitation } from '../services/invitationsService';
+import { acceptInvitation, COACH_PHONE_REQUIRED } from '../services/invitationsService';
 import { writeAuditLog, type AuditLogInput } from '../services/auditService';
 import { notifyReviewers } from './accessNotify';
 import { registerWithAccessLink, registerWithGuardianInvite, registerWithTeamCode } from './accountSignup';
@@ -67,8 +67,8 @@ export async function completeInviteSignup(input: InviteSignupInput): Promise<In
     const { name, inviteToken } = body as { name?: string; inviteToken?: unknown };
     if (!name || !inviteToken) return fail(400, 'Name and invite token are required');
 
-    // Phone is collected on every signup form; optional here only so an
-    // older client build keeps working until it is redeployed.
+    // Phone is collected on every signup form. Required for a coach (checked
+    // per branch below) and a parent registering children; otherwise optional.
     const phoneCheck = normalizePhone(body.phone, 'Telefon');
     if (!phoneCheck.ok) return fail(400, phoneCheck.error);
 
@@ -184,6 +184,7 @@ async function signUpWithClubCode(ctx: Ctx, { code }: Of<'club-code'>) {
     // A working account must not have its role, club or status rewritten by a
     // code (an admin opening a coach code would lock themselves out).
     if (ctx.isActive) return fail(409, ACTIVE_ACCOUNT_ERROR);
+    if (code.role === 'coach' && !ctx.phone) return fail(400, COACH_PHONE_REQUIRED);
     const parsedKids = parentChildren(ctx, code.role);
     if (!parsedKids.ok) return fail(400, parsedKids.error);
 
@@ -251,6 +252,8 @@ async function signUpWithEmailInvitation(ctx: Ctx) {
         email: ctx.email,
         firstName: ctx.firstName,
         lastName: ctx.lastName,
+        // Checked there: a coach invitation needs it (COACH_PHONE_REQUIRED).
+        phone: ctx.phone,
     });
     if (ctx.phone) {
         await db.update(users).set({ phone: ctx.phone }).where(eq(users.firebaseUid, ctx.uid));
@@ -263,6 +266,7 @@ async function signUpWithEmailInvitation(ctx: Ctx) {
 // to one (so approval can land them on that team's roster in one step).
 async function signUpWithAccessLink(ctx: Ctx, { link }: Of<'access-link'>) {
     if (ctx.isActive) return fail(409, ACTIVE_ACCOUNT_ERROR);
+    if (link.role === 'coach' && !ctx.phone) return fail(400, COACH_PHONE_REQUIRED);
     const parsedKids = parentChildren(ctx, link.role);
     if (!parsedKids.ok) return fail(400, parsedKids.error);
 

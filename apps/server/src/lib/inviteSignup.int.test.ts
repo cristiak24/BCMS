@@ -327,3 +327,25 @@ test('an email invitation brings the account in with the invited role and keeps 
         /altă adresă de email/,
     );
 });
+
+test('a new coach must give a phone number, whatever the invite (R3-19); nothing is spent', async () => {
+    const code = await clubCode('coach', 1);
+    const byCode = await signup(code.code, { phone: '' });
+    assert.equal(byCode.status, 400);
+    assert.match(String(byCode.body.error), /numărul de telefon/);
+    const retry = await signup(code.code, {}, { email: 'coach.cu.telefon@mail.ro' });
+    assert.equal(retry.status, 201, 'the single use was not spent by the refused attempt');
+
+    const byLink = await signup(await accessLink('coach'), { phone: '' });
+    assert.equal(byLink.status, 400);
+
+    // The email-invitation branch throws (the route turns it into a 400).
+    const token = await emailInvitation('coach.email@mail.ro', 'coach');
+    await assert.rejects(signup(token, { phone: '' }, { email: 'coach.email@mail.ro' }), /numărul de telefon/);
+});
+
+test('other roles keep the phone optional at this step', async () => {
+    const code = await clubCode('player');
+    const out = await signup(code.code, { phone: '' });
+    assert.equal(out.status, 201);
+});
