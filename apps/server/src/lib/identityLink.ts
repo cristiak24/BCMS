@@ -13,7 +13,7 @@ import { users } from '../db/schema';
  * someone else is never re-pointed at the caller.
  */
 
-type IdentityRow = Pick<typeof users.$inferSelect, 'firebaseUid'>;
+type IdentityRow = Pick<typeof users.$inferSelect, 'clerkUserId'>;
 
 /** Clerk user ids look like `user_2abc…`; anything else is a pre-Clerk (Firebase) uid. */
 export function isClerkUid(value: string) {
@@ -26,15 +26,15 @@ export function isClerkUid(value: string) {
  * anymore. A row bound to a different Clerk account never is.
  */
 export function canLinkToUid(row: IdentityRow, uid: string) {
-    if (!row.firebaseUid || row.firebaseUid === uid) return true;
-    return !isClerkUid(row.firebaseUid);
+    if (!row.clerkUserId || row.clerkUserId === uid) return true;
+    return !isClerkUid(row.clerkUserId);
 }
 
 export async function findOrLinkUser(identity: { uid: string; email: string | null }) {
     const [own] = await db
         .select()
         .from(users)
-        .where(or(eq(users.firebaseUid, identity.uid), eq(users.uid, identity.uid)))
+        .where(or(eq(users.clerkUserId, identity.uid), eq(users.uid, identity.uid)))
         .limit(1);
     if (own) return own;
 
@@ -48,10 +48,10 @@ export async function findOrLinkUser(identity: { uid: string; email: string | nu
     // row cannot both bind it.
     const [linked] = await db
         .update(users)
-        .set({ firebaseUid: identity.uid, updatedAt: new Date().toISOString() })
+        .set({ clerkUserId: identity.uid, updatedAt: new Date().toISOString() })
         .where(and(
             eq(users.id, byEmail.id),
-            byEmail.firebaseUid ? eq(users.firebaseUid, byEmail.firebaseUid) : isNull(users.firebaseUid),
+            byEmail.clerkUserId ? eq(users.clerkUserId, byEmail.clerkUserId) : isNull(users.clerkUserId),
         ))
         .returning();
     return linked ?? null;

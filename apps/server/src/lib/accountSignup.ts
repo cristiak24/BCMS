@@ -15,14 +15,14 @@ import { redeemGuardianInvite } from './guardianInvites';
 export type SignupIdentity = {
     /** The caller's existing (not active) account row, if they already have one. */
     existingUserId: number | null;
-    firebaseUid: string;
+    clerkUserId: string;
     email: string;
     name: string;
     firstName: string;
     lastName: string;
 };
 
-type Account = Pick<typeof users.$inferInsert, 'firebaseUid' | 'email' | 'name' | 'firstName' | 'lastName' | 'phone' | 'role' | 'status' | 'clubId'>;
+type Account = Pick<typeof users.$inferInsert, 'clerkUserId' | 'email' | 'name' | 'firstName' | 'lastName' | 'phone' | 'role' | 'status' | 'clubId'>;
 
 /** Creates the account, or rewrites the caller's unfinished one. Email is always stored lowercase (it is unique). */
 export async function upsertAccount(tx: Tx, existingUserId: number | null, account: Account) {
@@ -73,7 +73,7 @@ export async function registerWithTeamCode(input: SignupIdentity & {
 }) {
     return db.transaction(async (tx) => {
         const user = await upsertAccount(tx, input.existingUserId, {
-            firebaseUid: input.firebaseUid,
+            clerkUserId: input.clerkUserId,
             email: input.email,
             name: input.name,
             firstName: input.firstName,
@@ -105,7 +105,7 @@ export async function registerWithAccessLink(input: SignupIdentity & {
 }) {
     return db.transaction(async (tx) => {
         const user = await upsertAccount(tx, input.existingUserId, {
-            firebaseUid: input.firebaseUid,
+            clerkUserId: input.clerkUserId,
             email: input.email,
             name: input.name,
             firstName: input.firstName,
@@ -157,7 +157,7 @@ export async function registerWithGuardianInvite(input: SignupIdentity & {
     try {
         return await db.transaction(async (tx) => {
             const user = await upsertAccount(tx, input.existingUserId, {
-                firebaseUid: input.firebaseUid,
+                clerkUserId: input.clerkUserId,
                 email: input.email,
                 name: input.name,
                 firstName: input.firstName,

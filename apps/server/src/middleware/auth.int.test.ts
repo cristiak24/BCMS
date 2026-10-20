@@ -35,10 +35,10 @@ after(async () => {
 });
 
 const me = async (uid: string, email: string | null) => (await api.call('GET', '/me', { auth: bearer(uid, email) })).body.userId;
-const uidOf = async (id: number) => (await db.select().from(users).where(eq(users.id, id)))[0].firebaseUid;
+const uidOf = async (id: number) => (await db.select().from(users).where(eq(users.id, id)))[0].clerkUserId;
 
-async function row(email: string, firebaseUid: string | null) {
-    const [created] = await db.insert(users).values({ email, name: email, role: 'admin', status: 'active', clubId, firebaseUid }).returning();
+async function row(email: string, clerkUserId: string | null) {
+    const [created] = await db.insert(users).values({ email, name: email, role: 'admin', status: 'active', clubId, clerkUserId }).returning();
     return created.id;
 }
 

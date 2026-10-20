@@ -175,7 +175,7 @@ async function sendInviteEmail(params: { to: string; clubName: string; role: str
 
 export async function createSuperAdminInvitation(
   input: SuperAdminInviteInput,
-  actor: Pick<AuthenticatedRequest, 'user' | 'firebaseUser'> & { ip?: string; userAgent?: string } = {}
+  actor: Pick<AuthenticatedRequest, 'user' | 'clerkUser'> & { ip?: string; userAgent?: string } = {}
 ) {
   const email = normalizeEmail(input.email);
   const fullName = typeof input.fullName === 'string' ? input.fullName.trim().replace(/\s+/g, ' ') : '';
@@ -235,7 +235,7 @@ export async function createSuperAdminInvitation(
     entityType: 'invitation',
     entityId: invite.id,
     actorUserId: actor.user?.id ?? null,
-    actorUid: actor.firebaseUser?.uid ?? null,
+    actorUid: actor.clerkUser?.uid ?? null,
     actorRole: actor.user?.role ?? null,
     clubId: club.id,
     metadata: { email, fullName, role, clubId: club.id, clubName: club.name, emailSent },
@@ -261,7 +261,7 @@ export async function createSuperAdminInvitation(
 
 export async function resendClubInvitation(
   params: { inviteId: number; clubId: number },
-  actor: Pick<AuthenticatedRequest, 'user' | 'firebaseUser'> & { ip?: string; userAgent?: string } = {}
+  actor: Pick<AuthenticatedRequest, 'user' | 'clerkUser'> & { ip?: string; userAgent?: string } = {}
 ) {
   const rows = await db.select().from(invites)
     .where(and(eq(invites.id, params.inviteId), eq(invites.clubId, params.clubId)))
@@ -307,7 +307,7 @@ export async function resendClubInvitation(
     entityType: 'invitation',
     entityId: invite.id,
     actorUserId: actor.user?.id ?? null,
-    actorUid: actor.firebaseUser?.uid ?? null,
+    actorUid: actor.clerkUser?.uid ?? null,
     actorRole: actor.user?.role ?? null,
     clubId: club.id,
     metadata: { email: invite.email, role: invite.role, clubId: club.id, clubName: club.name, emailSent },
@@ -406,13 +406,13 @@ export async function validateInvitationToken(token: string) {
  */
 export async function acceptInvitation(params: {
   token: string;
-  firebaseUid: string;
+  clerkUserId: string;
   email: string | null;
   firstName?: string | null;
   lastName?: string | null;
   phone?: string | null;
 }) {
-  if (!params.firebaseUid) {
+  if (!params.clerkUserId) {
     throw new Error(INVITATION_ERRORS.notFound);
   }
   const email = normalizeEmail(params.email ?? '');
@@ -450,7 +450,7 @@ export async function acceptInvitation(params: {
   }
 
   const [ownRows, emailRows] = await Promise.all([
-    db.select().from(users).where(or(eq(users.firebaseUid, params.firebaseUid), eq(users.uid, params.firebaseUid))).limit(1),
+    db.select().from(users).where(or(eq(users.clerkUserId, params.clerkUserId), eq(users.uid, params.clerkUserId))).limit(1),
     db.select().from(users).where(sql`lower(${users.email}) = ${email}`).limit(1),
   ]);
   const own = ownRows[0];
@@ -458,7 +458,7 @@ export async function acceptInvitation(params: {
 
   // The invited address already has an account: it must be the caller's own,
   // or one nobody signs in to yet. Never someone else's.
-  if (byEmail && (own ? byEmail.id !== own.id : !canLinkToUid(byEmail, params.firebaseUid))) {
+  if (byEmail && (own ? byEmail.id !== own.id : !canLinkToUid(byEmail, params.clerkUserId))) {
     throw new Error(INVITATION_ERRORS.otherAccount);
   }
   const existing = own ?? byEmail ?? null;
@@ -480,7 +480,7 @@ export async function acceptInvitation(params: {
     }
 
     const account = {
-      firebaseUid: params.firebaseUid,
+      clerkUserId: params.clerkUserId,
       email,
       name: displayName,
       firstName,
@@ -497,7 +497,7 @@ export async function acceptInvitation(params: {
         .where(and(
           eq(users.id, existing.id),
           // Same guard as the read above, against a sign-in linking the row meanwhile.
-          existing.firebaseUid ? eq(users.firebaseUid, existing.firebaseUid) : isNull(users.firebaseUid),
+          existing.clerkUserId ? eq(users.clerkUserId, existing.clerkUserId) : isNull(users.clerkUserId),
         ))
         .returning({ id: users.id });
       if (!updated[0]) {
@@ -518,7 +518,7 @@ export async function acceptInvitation(params: {
     entityType: 'invitation',
     entityId: invite.id,
     actorUserId: userId,
-    actorUid: params.firebaseUid,
+    actorUid: params.clerkUserId,
     actorRole: invite.role,
     clubId: invite.clubId ?? null,
     metadata: { email, role: invite.role, clubId: invite.clubId, existingAccount: Boolean(existing) },
@@ -533,14 +533,14 @@ export async function acceptInvitation(params: {
 }
 
 export async function completeUserRegistration(params: {
-  firebaseUid: string;
+  clerkUserId: string;
   firstName: string;
   lastName: string;
   phone?: string | null;
   dateOfBirth?: string | null;
   avatarUrl?: string | null;
 }) {
-  const rows = await db.select().from(users).where(eq(users.firebaseUid, params.firebaseUid)).limit(1);
+  const rows = await db.select().from(users).where(eq(users.clerkUserId, params.clerkUserId)).limit(1);
   const user = rows[0];
 
   if (!user) {
@@ -565,7 +565,7 @@ export async function completeUserRegistration(params: {
     entityType: 'user',
     entityId: user.id,
     actorUserId: user.id,
-    actorUid: params.firebaseUid,
+    actorUid: params.clerkUserId,
     actorRole: user.role,
     clubId: user.clubId ?? null,
     metadata: {

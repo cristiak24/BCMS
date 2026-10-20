@@ -56,8 +56,8 @@ async function api(email: string, path: string, init: { method?: string; body?: 
 before(async () => {
     await createSchema();
     const [club] = await db.insert(clubs).values({ name: 'Club TZ', normalizedName: 'club tz' }).returning();
-    await db.insert(users).values({ email: ADMIN, firebaseUid: uidOf(ADMIN), name: 'Admin', role: 'admin', status: 'active', clubId: club.id });
-    const [parent] = await db.insert(users).values({ email: PARENT, firebaseUid: uidOf(PARENT), name: 'Părinte', role: 'parent', status: 'active', clubId: club.id }).returning();
+    await db.insert(users).values({ email: ADMIN, clerkUserId: uidOf(ADMIN), name: 'Admin', role: 'admin', status: 'active', clubId: club.id });
+    const [parent] = await db.insert(users).values({ email: PARENT, clerkUserId: uidOf(PARENT), name: 'Părinte', role: 'parent', status: 'active', clubId: club.id }).returning();
     const [team] = await db.insert(teams).values({
         frbTeamId: '', name: 'U12', frbLeagueId: '', leagueName: 'Liga', frbSeasonId: '', seasonName: '2026', inviteCode: 'TZ1234', clubId: club.id,
     }).returning();

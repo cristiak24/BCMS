@@ -43,9 +43,9 @@ async function match(teamId: number, clubId: number, coachId: number | null = nu
 before(async () => {
     await createSchema();
     const [club] = await db.insert(clubs).values({ name: 'Club', normalizedName: 'club' }).returning();
-    await db.insert(users).values({ email: 'admin@club.ro', name: 'Admin', role: 'admin', status: 'active', clubId: club.id, firebaseUid: 'user_admin' });
-    const [c12] = await db.insert(users).values({ email: 'coach12@club.ro', name: 'Antrenor U12', role: 'coach', status: 'active', clubId: club.id, firebaseUid: 'user_coach12' }).returning();
-    const [c14] = await db.insert(users).values({ email: 'coach14@club.ro', name: 'Antrenor U14', role: 'coach', status: 'active', clubId: club.id, firebaseUid: 'user_coach14' }).returning();
+    await db.insert(users).values({ email: 'admin@club.ro', name: 'Admin', role: 'admin', status: 'active', clubId: club.id, clerkUserId: 'user_admin' });
+    const [c12] = await db.insert(users).values({ email: 'coach12@club.ro', name: 'Antrenor U12', role: 'coach', status: 'active', clubId: club.id, clerkUserId: 'user_coach12' }).returning();
+    const [c14] = await db.insert(users).values({ email: 'coach14@club.ro', name: 'Antrenor U14', role: 'coach', status: 'active', clubId: club.id, clerkUserId: 'user_coach14' }).returning();
     u12 = await team('U12', 'AAA111', club.id, c12.id);
     u14 = await team('U14', 'BBB222', club.id, c14.id);
     u12Match = await match(u12, club.id);

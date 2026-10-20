@@ -37,7 +37,7 @@ router.post('/', authenticate, requireSuperadmin, async (req: AuthenticatedReque
       },
       {
         user: req.user,
-        firebaseUser: req.firebaseUser,
+        clerkUser: req.clerkUser,
         ip: req.ip,
         userAgent: req.get('user-agent') ?? undefined,
       },
@@ -102,11 +102,11 @@ router.post('/:token/accept', publicInviteLimiter, authenticate, async (req: Aut
     const token = String(req.params.token ?? '').trim();
     const result = await acceptInvitation({
       token,
-      firebaseUid: req.firebaseUser?.uid ?? '',
+      clerkUserId: req.clerkUser?.uid ?? '',
       // Only the verified email of the signed-in identity. A body `email` used
       // to be trusted here, which let anyone holding the link claim the
       // invited (or an existing) account.
-      email: req.firebaseUser?.email ?? null,
+      email: req.clerkUser?.email ?? null,
       firstName: req.body?.firstName ?? null,
       lastName: req.body?.lastName ?? null,
       phone: req.body?.phone ?? null,
@@ -121,7 +121,7 @@ router.post('/:token/accept', publicInviteLimiter, authenticate, async (req: Aut
 router.post('/registration/complete', authenticate, async (req: AuthenticatedRequest, res) => {
   try {
     const result = await completeUserRegistration({
-      firebaseUid: req.firebaseUser?.uid ?? '',
+      clerkUserId: req.clerkUser?.uid ?? '',
       firstName: String(req.body?.firstName ?? ''),
       lastName: String(req.body?.lastName ?? ''),
       phone: req.body?.phone ?? null,

@@ -53,7 +53,7 @@ export function auditRequest(
     ...input,
     clubId,
     actorUserId: req.user?.id == null ? null : Number(req.user.id),
-    actorUid: req.firebaseUser?.uid ?? null,
+    actorUid: req.clerkUser?.uid ?? null,
     actorRole: req.user?.role ?? null,
   });
 }

@@ -20,7 +20,7 @@ const admin = bearer('user_fin_admin', 'fin.admin@club.ro');
 before(async () => {
     await createSchema();
     const [club] = await db.insert(clubs).values({ name: 'Club Bani', normalizedName: 'club bani' }).returning();
-    await db.insert(users).values({ email: 'fin.admin@club.ro', name: 'Admin', role: 'admin', status: 'active', clubId: club.id, firebaseUid: 'user_fin_admin' });
+    await db.insert(users).values({ email: 'fin.admin@club.ro', name: 'Admin', role: 'admin', status: 'active', clubId: club.id, clerkUserId: 'user_fin_admin' });
     const [team] = await db.insert(teams).values({
         frbTeamId: '', name: 'U12', frbLeagueId: '', leagueName: 'Liga', frbSeasonId: '', seasonName: '2026', inviteCode: 'FIN123', clubId: club.id,
     }).returning();

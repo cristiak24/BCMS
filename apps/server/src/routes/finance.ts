@@ -101,7 +101,7 @@ function financeAuditActor(req: Request) {
 
     return {
         actorUserId: authed.user?.id ?? null,
-        actorUid: authed.firebaseUser?.uid ?? null,
+        actorUid: authed.clerkUser?.uid ?? null,
         actorRole: authed.user?.role ?? null,
         ipAddress: req.ip ?? null,
         userAgent: req.get('user-agent') ?? null,
@@ -321,7 +321,7 @@ function getPaymentsReturnUrl(req: Request) {
  */
 function getRequesterEmail(req: Request) {
     const authed = req as AuthenticatedRequest;
-    return authed.firebaseUser?.email ?? authed.user?.email ?? null;
+    return authed.clerkUser?.email ?? authed.user?.email ?? null;
 }
 
 async function getCurrentPlayer(req: Request): Promise<CurrentPlayer> {

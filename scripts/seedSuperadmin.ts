@@ -111,7 +111,7 @@ async function main() {
       await db.insert(users).values({
         id: nextProfileId,
         uid: userRecord.uid,
-        firebaseUid: userRecord.uid,
+        clerkUserId: userRecord.uid,
         email,
         name: `${firstName} ${lastName}`.trim(),
         firstName,

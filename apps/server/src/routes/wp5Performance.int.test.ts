@@ -39,7 +39,7 @@ before(async () => {
     await createSchema();
     const [club] = await db.insert(clubs).values({ name: 'Club', normalizedName: 'club' }).returning();
     clubId = club.id;
-    await db.insert(users).values({ email: 'adm@club.ro', name: 'Admin', role: 'admin', status: 'active', clubId, firebaseUid: 'user_adm' });
+    await db.insert(users).values({ email: 'adm@club.ro', name: 'Admin', role: 'admin', status: 'active', clubId, clerkUserId: 'user_adm' });
     const billingStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
     await db.insert(financialSettings).values({
         clubId, monthlyPlayerFee: 150, trainingLevy: 20, facilityFee: 0, autoAdjust: 1, paymentDueDay: 25,

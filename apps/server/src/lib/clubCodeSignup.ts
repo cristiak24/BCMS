@@ -23,7 +23,7 @@ export async function registerWithClubCode(input: ClubCodeSignup) {
     const needsApproval = input.code.role === 'coach';
     return db.transaction(async (tx) => {
         const user = await upsertAccount(tx, input.existingUserId, {
-            firebaseUid: input.firebaseUid,
+            clerkUserId: input.clerkUserId,
             email: input.email,
             name: input.name,
             firstName: input.firstName,

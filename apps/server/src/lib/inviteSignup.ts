@@ -110,7 +110,7 @@ async function signUpWithGuardianInvite(ctx: Ctx, { invite }: Of<'guardian'>) {
     }
     const signedUp = await registerWithGuardianInvite({
         existingUserId: ctx.existingUserId,
-        firebaseUid: ctx.uid,
+        clerkUserId: ctx.uid,
         email: ctx.email,
         name: ctx.name,
         firstName: ctx.firstName,
@@ -145,7 +145,7 @@ async function signUpWithTeamCode(ctx: Ctx, { hit }: Of<'team'>) {
 
     const { user, requests } = await registerWithTeamCode({
         existingUserId: ctx.existingUserId,
-        firebaseUid: ctx.uid,
+        clerkUserId: ctx.uid,
         email: ctx.email,
         name: ctx.name,
         firstName: ctx.firstName,
@@ -202,7 +202,7 @@ async function signUpWithClubCode(ctx: Ctx, { code }: Of<'club-code'>) {
 
         const { user, status, requested, requestCreated } = await registerWithClubCode({
             existingUserId: ctx.existingUserId,
-            firebaseUid: ctx.uid,
+            clerkUserId: ctx.uid,
             email: ctx.email,
             name: ctx.name,
             firstName: ctx.firstName,
@@ -248,7 +248,7 @@ async function signUpWithClubCode(ctx: Ctx, { code }: Of<'club-code'>) {
 async function signUpWithEmailInvitation(ctx: Ctx) {
     const result = await acceptInvitation({
         token: ctx.token,
-        firebaseUid: ctx.uid,
+        clerkUserId: ctx.uid,
         email: ctx.email,
         firstName: ctx.firstName,
         lastName: ctx.lastName,
@@ -256,7 +256,7 @@ async function signUpWithEmailInvitation(ctx: Ctx) {
         phone: ctx.phone,
     });
     if (ctx.phone) {
-        await db.update(users).set({ phone: ctx.phone }).where(eq(users.firebaseUid, ctx.uid));
+        await db.update(users).set({ phone: ctx.phone }).where(eq(users.clerkUserId, ctx.uid));
     }
     return created(result as Record<string, unknown>);
 }
@@ -277,7 +277,7 @@ async function signUpWithAccessLink(ctx: Ctx, { link }: Of<'access-link'>) {
 
     const { user, queuedForTeam, requestCreated } = await registerWithAccessLink({
         existingUserId: ctx.existingUserId,
-        firebaseUid: ctx.uid,
+        clerkUserId: ctx.uid,
         email: ctx.email,
         name: ctx.name,
         firstName: ctx.firstName,

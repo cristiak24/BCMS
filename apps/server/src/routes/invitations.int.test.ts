@@ -56,7 +56,7 @@ const accept = (token: string, auth: string, body: Record<string, unknown> = { p
     api.call('POST', `/api/invitations/${encodeURIComponent(token)}/accept`, { auth, body });
 
 test('a foreign account cannot claim an invitation by posting the invited email', async () => {
-    await db.insert(users).values({ email: 'admin2@club.ro', name: 'Admin B', role: 'admin', status: 'active', clubId: clubB, firebaseUid: 'user_admin2' });
+    await db.insert(users).values({ email: 'admin2@club.ro', name: 'Admin B', role: 'admin', status: 'active', clubId: clubB, clerkUserId: 'user_admin2' });
     const { token, id } = await invitation('admin2@club.ro', 'admin', clubB);
 
     const out = await accept(token, bearer('user_attacker', 'attacker@evil.test'), { email: 'admin2@club.ro' });
@@ -64,7 +64,7 @@ test('a foreign account cannot claim an invitation by posting the invited email'
     assert.match(out.body.error, /altă adresă de email/);
 
     const admin = await user('admin2@club.ro');
-    assert.equal(admin.firebaseUid, 'user_admin2');
+    assert.equal(admin.clerkUserId, 'user_admin2');
     assert.equal(admin.clubId, clubB);
     assert.equal(await user('attacker@evil.test'), undefined);
     assert.equal((await inviteRow(id)).status, 'pending');
@@ -90,7 +90,7 @@ test('an invitation works once: a replay is refused, also through signup', async
     const first = await accept(token, bearer('user_coach_new', 'coach.new@club.ro'), { firstName: 'Ion', lastName: 'Pop', phone: '0722 000 111' });
     assert.equal(first.status, 201);
     const coach = await user('coach.new@club.ro');
-    assert.equal(coach.firebaseUid, 'user_coach_new');
+    assert.equal(coach.clerkUserId, 'user_coach_new');
     assert.equal(coach.role, 'coach');
     const row = await inviteRow(id);
     assert.equal(row.status, 'accepted');
@@ -105,7 +105,7 @@ test('an invitation works once: a replay is refused, also through signup', async
         body: { name: 'Alt Om', inviteToken: token, phone: '+40722000000' },
     });
     assert.equal(viaSignup.status, 400);
-    assert.equal((await user('coach.new@club.ro')).firebaseUid, 'user_coach_new');
+    assert.equal((await user('coach.new@club.ro')).clerkUserId, 'user_coach_new');
 
     const validated = await api.call('GET', `/api/invitations/${encodeURIComponent(token)}`);
     assert.equal(validated.status, 200);
@@ -121,7 +121,7 @@ test('two simultaneous accepts of one link: exactly one wins', async () => {
 });
 
 test('an existing account bound to another sign-in is never re-pointed', async () => {
-    await db.insert(users).values({ email: 'owned@club.ro', name: 'Owned', role: 'coach', status: 'active', clubId: clubA, firebaseUid: 'user_owner' });
+    await db.insert(users).values({ email: 'owned@club.ro', name: 'Owned', role: 'coach', status: 'active', clubId: clubA, clerkUserId: 'user_owner' });
     const { token, id } = await invitation('owned@club.ro', 'admin', clubB);
 
     // Same (verified) email, different Clerk account, e.g. a re-created sign-in.
@@ -130,7 +130,7 @@ test('an existing account bound to another sign-in is never re-pointed', async (
     assert.match(out.body.error, /Există deja un cont/);
 
     const owned = await user('owned@club.ro');
-    assert.equal(owned.firebaseUid, 'user_owner');
+    assert.equal(owned.clerkUserId, 'user_owner');
     assert.equal(owned.role, 'coach');
     assert.equal(owned.clubId, clubA);
     assert.equal((await inviteRow(id)).status, 'pending');
@@ -142,7 +142,7 @@ test('a row nobody signs in to yet is linked by the invited, verified email', as
     const out = await accept(token, bearer('user_prepared', 'Prepared@Club.ro'));
     assert.equal(out.status, 201);
     const prepared = await user('prepared@club.ro');
-    assert.equal(prepared.firebaseUid, 'user_prepared');
+    assert.equal(prepared.clerkUserId, 'user_prepared');
     assert.equal(prepared.status, 'active');
 });
 

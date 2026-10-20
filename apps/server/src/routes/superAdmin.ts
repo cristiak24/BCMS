@@ -46,7 +46,7 @@ router.use(authenticate, requireSuperadmin);
 function actorFields(req: AuthenticatedRequest) {
     return {
         actorUserId: req.user?.id ?? null,
-        actorUid: req.firebaseUser?.uid ?? null,
+        actorUid: req.clerkUser?.uid ?? null,
         actorRole: req.user?.role ?? null,
     };
 }

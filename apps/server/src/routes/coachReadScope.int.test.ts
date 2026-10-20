@@ -55,9 +55,9 @@ async function training(teamId: number, clubId: number) {
 before(async () => {
     await createSchema();
     const [club] = await db.insert(clubs).values({ name: 'Club', normalizedName: 'club' }).returning();
-    await db.insert(users).values({ email: 'adm@club.ro', name: 'Admin', role: 'admin', status: 'active', clubId: club.id, firebaseUid: 'user_adm' });
-    const [c12] = await db.insert(users).values({ email: 'c12@club.ro', name: 'Antrenor U12', role: 'coach', status: 'active', clubId: club.id, firebaseUid: 'user_c12' }).returning();
-    const [c14] = await db.insert(users).values({ email: 'c14@club.ro', name: 'Antrenor U14', role: 'coach', status: 'active', clubId: club.id, firebaseUid: 'user_c14' }).returning();
+    await db.insert(users).values({ email: 'adm@club.ro', name: 'Admin', role: 'admin', status: 'active', clubId: club.id, clerkUserId: 'user_adm' });
+    const [c12] = await db.insert(users).values({ email: 'c12@club.ro', name: 'Antrenor U12', role: 'coach', status: 'active', clubId: club.id, clerkUserId: 'user_c12' }).returning();
+    const [c14] = await db.insert(users).values({ email: 'c14@club.ro', name: 'Antrenor U14', role: 'coach', status: 'active', clubId: club.id, clerkUserId: 'user_c14' }).returning();
     u12 = await team('U12', 'AAA111', club.id, c12.id);
     u14 = await team('U14', 'BBB222', club.id, c14.id);
     luca = await player(club.id, 'Luca', u12, '+40700000012');

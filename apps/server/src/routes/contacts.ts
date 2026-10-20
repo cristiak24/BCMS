@@ -198,7 +198,7 @@ router.put(
                     entityType: 'player',
                     entityId: playerId,
                     actorUserId: req.user?.id ?? null,
-                    actorUid: req.firebaseUser?.uid ?? null,
+                    actorUid: req.clerkUser?.uid ?? null,
                     actorRole: req.user?.role ?? null,
                     clubId,
                     metadata: { fields: changed },

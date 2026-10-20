@@ -76,7 +76,7 @@ router.post('/', async (req: AuthenticatedRequest, res) => {
       entityType: 'club',
       entityId: club.id,
       actorUserId: req.user?.id ?? null,
-      actorUid: req.firebaseUser?.uid ?? null,
+      actorUid: req.clerkUser?.uid ?? null,
       actorRole: req.user?.role ?? null,
       clubId: club.id,
       metadata: { name },

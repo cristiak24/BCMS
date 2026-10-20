@@ -43,7 +43,7 @@ function signup(overrides: Partial<Parameters<typeof registerWithClubCode>[0]> &
     const { role = 'parent', ...rest } = overrides;
     return registerWithClubCode({
         existingUserId: null,
-        firebaseUid: `uid_${seq}`,
+        clerkUserId: `uid_${seq}`,
         email: `User${seq}@Mail.ro`,
         name: `Părinte ${seq}`,
         firstName: 'Părinte',
@@ -129,7 +129,7 @@ test('a failed signup leaves nothing behind', async () => {
     const before = await db.select().from(users);
     const playersBefore = await db.select().from(players);
     await assert.rejects(() => signup({
-        firebaseUid: 'uid_broken',
+        clerkUserId: 'uid_broken',
         children: [{ firstName: 'Bun', lastName: 'Copil', birthDate: '2015-01-01' }, { firstName: 'Rau', lastName: 'Copil', birthDate: 'abcd-01-01' }],
     }));
     assert.equal((await db.select().from(users)).length, before.length);
@@ -143,7 +143,7 @@ test('a coach code waits for an admin, once, however often it is opened', async 
         role: 'coach',
         team: null,
         existingUserId: first.user.id,
-        firebaseUid: first.user.firebaseUid ?? 'uid_coach',
+        clerkUserId: first.user.clerkUserId ?? 'uid_coach',
     });
     assert.equal(again.user.id, first.user.id);
     const waiting = await db.select().from(accessRequests)

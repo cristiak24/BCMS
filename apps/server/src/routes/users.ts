@@ -61,7 +61,7 @@ router.use(authenticate);
 // GET /api/users/me
 router.get('/me', async (req: AuthenticatedRequest, res) => {
     try {
-        const uid = req.firebaseUser?.uid;
+        const uid = req.clerkUser?.uid;
         const user = req.user ?? (uid ? await findUserByUid(uid) : null);
 
         if (!user) {
@@ -211,7 +211,7 @@ router.patch('/:id', requireRoles(['admin']), async (req: AuthenticatedRequest, 
             entityType: 'user',
             entityId: user.id,
             actorUserId: req.user?.id ?? null,
-            actorUid: req.firebaseUser?.uid ?? null,
+            actorUid: req.clerkUser?.uid ?? null,
             actorRole: req.user?.role ?? null,
             clubId: user.clubId ?? null,
             metadata: {

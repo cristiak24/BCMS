@@ -10,9 +10,8 @@ export type User = typeof users.$inferSelect;
 export interface AuthenticatedRequest extends Request {
     /** The caller's row; absent when the verified identity has no profile yet. */
     user?: User;
-    // Despite the name (kept to avoid touching every call site), this holds
-    // the verified Clerk identity: { uid: <clerk user id>, email }.
-    firebaseUser?: ClerkAuthUser;
+    /** The verified Clerk identity: { uid: <Clerk user id>, email }. */
+    clerkUser?: ClerkAuthUser;
 }
 
 export const authenticate = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -25,7 +24,7 @@ export const authenticate = async (req: AuthenticatedRequest, res: Response, nex
         const token = authHeader.split('Bearer ')[1];
         const decodedToken = await verifyBearerToken(token);
 
-        req.firebaseUser = decodedToken;
+        req.clerkUser = decodedToken;
 
         // The caller's row; a first sign-in is linked by verified email only
         // when that row isn't someone else's (lib/identityLink.ts).

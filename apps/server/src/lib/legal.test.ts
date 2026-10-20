@@ -11,7 +11,7 @@ test('the export never carries credentials or payment-provider ids', () => {
         passwordHash: 'x',
         stripeCustomerId: 'cus_1',
         uid: 'u',
-        firebaseUid: 'f',
+        clerkUserId: 'f',
         name: 'Ana',
     });
     assert.deepEqual(cleaned, { id: 7, email: 'a@b.ro', name: 'Ana' });

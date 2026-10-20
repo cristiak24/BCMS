@@ -40,7 +40,7 @@ function identity(overrides: Partial<SignupIdentity> = {}): SignupIdentity {
     seq += 1;
     return {
         existingUserId: null,
-        firebaseUid: `uid_${seq}`,
+        clerkUserId: `uid_${seq}`,
         email: `Person${seq}@Mail.ro`,
         name: `Persoana ${seq}`,
         firstName: 'Persoana',
@@ -88,7 +88,7 @@ test('a team code signup that fails leaves no account behind', async () => {
     const before = await countUsers();
     const requestsBefore = (await db.select().from(familyJoinRequests)).length;
     await assert.rejects(() => registerWithTeamCode({
-        ...identity({ firebaseUid: 'uid_broken_team' }),
+        ...identity({ clerkUserId: 'uid_broken_team' }),
         signup: { kind: 'parent', phone, children: [ana] },
         team: { id: 999_999, clubId },
     }));
@@ -104,7 +104,7 @@ test('retrying with the same unfinished account rewrites it instead of adding an
     });
     const before = await countUsers();
     const again = await registerWithTeamCode({
-        ...identity({ existingUserId: first.user.id, firebaseUid: first.user.firebaseUid ?? 'uid_retry' }),
+        ...identity({ existingUserId: first.user.id, clerkUserId: first.user.clerkUserId ?? 'uid_retry' }),
         signup: { kind: 'parent', phone, children: [luca] },
         team: { id: teamId, clubId },
     });
@@ -124,7 +124,7 @@ test('an access link for a player waits for an admin once, however often it is o
     assert.equal(first.user.status, 'pending');
     assert.equal(first.queuedForTeam, false);
     await registerWithAccessLink({
-        ...identity({ existingUserId: first.user.id, firebaseUid: first.user.firebaseUid ?? 'uid_link' }),
+        ...identity({ existingUserId: first.user.id, clerkUserId: first.user.clerkUserId ?? 'uid_link' }),
         phone,
         link: { role: 'player', clubId },
         team: null,
@@ -187,7 +187,7 @@ test('an access link signup that fails halfway leaves no account behind', async 
     const before = await countUsers();
     const playersBefore = (await db.select().from(players)).length;
     await assert.rejects(() => registerWithAccessLink({
-        ...identity({ firebaseUid: 'uid_broken_link' }),
+        ...identity({ clerkUserId: 'uid_broken_link' }),
         phone,
         link: { role: 'parent', clubId },
         team: null,
@@ -245,7 +245,7 @@ test('losing the race leaves an existing unfinished account exactly as it was', 
         children: null,
     });
     const result = await registerWithGuardianInvite({
-        ...identity({ existingUserId: waiting.user.id, firebaseUid: waiting.user.firebaseUid ?? 'uid_wait' }),
+        ...identity({ existingUserId: waiting.user.id, clerkUserId: waiting.user.clerkUserId ?? 'uid_wait' }),
         phone,
         token,
         clubId,
@@ -269,7 +269,7 @@ test('retrying a team code signup queues only what is not already waiting', asyn
     assert.equal(first.requests.length, 1);
 
     const retry = await registerWithTeamCode({
-        ...identity({ existingUserId: first.user.id, firebaseUid: first.user.firebaseUid ?? 'uid_retry_team' }),
+        ...identity({ existingUserId: first.user.id, clerkUserId: first.user.clerkUserId ?? 'uid_retry_team' }),
         signup: { kind: 'parent', phone, children: [{ ...ana, firstName: 'ANA' }] },
         team: { id: teamId, clubId },
     });
@@ -277,7 +277,7 @@ test('retrying a team code signup queues only what is not already waiting', asyn
     assert.equal((await joinRequestsOf(first.user.id)).length, 1);
 
     const extra = await registerWithTeamCode({
-        ...identity({ existingUserId: first.user.id, firebaseUid: first.user.firebaseUid ?? 'uid_retry_team' }),
+        ...identity({ existingUserId: first.user.id, clerkUserId: first.user.clerkUserId ?? 'uid_retry_team' }),
         signup: { kind: 'parent', phone, children: [ana, luca] },
         team: { id: teamId, clubId },
     });
@@ -293,7 +293,7 @@ test('a denied request does not block asking again', async () => {
     });
     await db.update(familyJoinRequests).set({ status: 'denied' }).where(eq(familyJoinRequests.userId, first.user.id));
     const again = await registerWithTeamCode({
-        ...identity({ existingUserId: first.user.id, firebaseUid: first.user.firebaseUid ?? 'uid_denied_team' }),
+        ...identity({ existingUserId: first.user.id, clerkUserId: first.user.clerkUserId ?? 'uid_denied_team' }),
         signup: { kind: 'parent', phone, children: [ana] },
         team: { id: teamId, clubId },
     });

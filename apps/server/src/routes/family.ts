@@ -194,7 +194,7 @@ router.post('/players/:id/invites', limiter, async (req: AuthenticatedRequest, r
             entityType: 'player',
             entityId: managed.player.id,
             actorUserId: req.user?.id ?? null,
-            actorUid: req.firebaseUser?.uid ?? null,
+            actorUid: req.clerkUser?.uid ?? null,
             actorRole: req.user?.role ?? null,
             clubId: managed.clubId,
             metadata: null,

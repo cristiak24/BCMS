@@ -27,7 +27,7 @@ const PRIVILEGED_ROLES = new Set(['admin', 'superadmin']);
 const ACCOUNTS_CACHE_TTL_MS = 15_000;
 const accountsCacheKey = (clubId: number) => `club-admin:accounts:${clubId}`;
 
-// Explicit, safe column projection — never expose passwordHash / firebaseUid / uid.
+// Explicit, safe column projection — never expose passwordHash / clerkUserId / uid.
 const safeUserColumns = {
     id: users.id,
     email: users.email,
@@ -191,7 +191,7 @@ router.post('/accounts/invitations', rateLimit({ bucket: 'club-admin:invite', li
             },
             {
                 user: req.user,
-                firebaseUser: req.firebaseUser,
+                clerkUser: req.clerkUser,
                 ip: req.ip,
                 userAgent: req.get('user-agent') ?? undefined,
             },
@@ -258,7 +258,7 @@ router.patch('/accounts/:id', rateLimit({ bucket: 'club-admin:mutate', limit: 30
             entityType: 'user',
             entityId: id,
             actorUserId: req.user?.id ?? null,
-            actorUid: req.firebaseUser?.uid ?? null,
+            actorUid: req.clerkUser?.uid ?? null,
             actorRole: req.user?.role ?? null,
             clubId: actor.clubId,
             metadata: { previousRole: currentUser.role, nextRole },
@@ -308,7 +308,7 @@ router.post('/accounts/:id/deactivate', rateLimit({ bucket: 'club-admin:mutate',
                 entityType: 'invitation',
                 entityId: inviteId,
                 actorUserId: req.user?.id ?? null,
-                actorUid: req.firebaseUser?.uid ?? null,
+                actorUid: req.clerkUser?.uid ?? null,
                 actorRole: req.user?.role ?? null,
                 clubId: actor.clubId,
                 metadata: { email: invite.email, role: invite.role },
@@ -370,7 +370,7 @@ router.post('/accounts/:id/deactivate', rateLimit({ bucket: 'club-admin:mutate',
             entityType: 'user',
             entityId: id,
             actorUserId: req.user?.id ?? null,
-            actorUid: req.firebaseUser?.uid ?? null,
+            actorUid: req.clerkUser?.uid ?? null,
             actorRole: req.user?.role ?? null,
             clubId: actor.clubId,
             metadata: {
@@ -412,7 +412,7 @@ router.post('/accounts/:id/resend', rateLimit({ bucket: 'club-admin:invite', lim
             { inviteId, clubId: actor.clubId! },
             {
                 user: req.user,
-                firebaseUser: req.firebaseUser,
+                clerkUser: req.clerkUser,
                 ip: req.ip,
                 userAgent: req.get('user-agent') ?? undefined,
             },
@@ -466,7 +466,7 @@ router.post('/accounts/:id/reactivate', rateLimit({ bucket: 'club-admin:mutate',
             entityType: 'user',
             entityId: id,
             actorUserId: req.user?.id ?? null,
-            actorUid: req.firebaseUser?.uid ?? null,
+            actorUid: req.clerkUser?.uid ?? null,
             actorRole: req.user?.role ?? null,
             clubId: actor.clubId,
             metadata: { email: targetUser.email, role: targetUser.role },
@@ -598,7 +598,7 @@ router.delete('/accounts/:id', rateLimit({ bucket: 'club-admin:mutate', limit: 3
         // Remove the sign-in too, otherwise the person could still log in to a
         // Clerk session with no profile behind it. Best effort: the DB row is
         // already gone, so a Clerk failure is logged rather than surfaced.
-        const clerkIds = [...new Set([targetUser.firebaseUid, targetUser.uid].filter((value): value is string => Boolean(value)))];
+        const clerkIds = [...new Set([targetUser.clerkUserId, targetUser.uid].filter((value): value is string => Boolean(value)))];
         for (const clerkId of clerkIds) {
             try {
                 await deleteClerkUser(clerkId);
@@ -612,7 +612,7 @@ router.delete('/accounts/:id', rateLimit({ bucket: 'club-admin:mutate', limit: 3
             entityType: 'user',
             entityId: id,
             actorUserId: req.user?.id ?? null,
-            actorUid: req.firebaseUser?.uid ?? null,
+            actorUid: req.clerkUser?.uid ?? null,
             actorRole: req.user?.role ?? null,
             clubId: actor.clubId,
             metadata: { email: targetUser.email, name: targetUser.name, role: targetUser.role, deletedPlayerIds: playerIdsToRemove, archivedPlayerIds: playerIdsToArchive },

@@ -24,7 +24,7 @@ const signupUidLimiter = rateLimit({
     bucket: 'auth:signup',
     limit: 10,
     windowMs: 60_000,
-    key: (req) => (req.firebaseUser?.uid ? `uid:${req.firebaseUser.uid}` : null),
+    key: (req) => (req.clerkUser?.uid ? `uid:${req.clerkUser.uid}` : null),
 });
 
 async function findClubName(clubId?: number | null) {
@@ -44,7 +44,7 @@ async function findSelfTeamIds(req: AuthenticatedRequest) {
 function buildAuthUser(user: typeof users.$inferSelect, clubName: string | null, teamIds: string[]) {
     return {
         id: user.id,
-        uid: user.firebaseUid ?? user.uid ?? '',
+        uid: user.clerkUserId ?? user.uid ?? '',
         email: user.email,
         name: user.name,
         firstName: user.firstName,
@@ -115,7 +115,7 @@ router.post('/superadmin/create-admin-invite', authenticate, requireSuperadmin, 
             clubId: Number(req.body?.clubId),
         }, {
             user: req.user,
-            firebaseUser: req.firebaseUser,
+            clerkUser: req.clerkUser,
             ip: req.ip,
             userAgent: req.get('user-agent') ?? undefined,
         });
@@ -152,7 +152,7 @@ router.get('/invites/validate', inviteValidateLimiter as any, async (req: any, r
 router.post('/complete-invite-signup', signupIpLimiter, authenticate, signupUidLimiter, async (req: AuthenticatedRequest, res: any) => {
     try {
         // authenticate() sets the verified identity before it calls next().
-        const identity = req.firebaseUser!;
+        const identity = req.clerkUser!;
         const outcome = await completeInviteSignup({
             body: req.body,
             identity: { uid: identity.uid, email: identity.email || '' },

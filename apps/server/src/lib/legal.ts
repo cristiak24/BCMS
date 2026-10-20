@@ -10,7 +10,7 @@ export const PRIVACY_REQUEST_TYPES = ['erasure'] as const;
 export type PrivacyRequestType = (typeof PRIVACY_REQUEST_TYPES)[number];
 
 /** Columns that are never handed back to the person, even in their own export. */
-const EXPORT_HIDDEN_USER_FIELDS = ['passwordHash', 'stripeCustomerId', 'uid', 'firebaseUid'] as const;
+const EXPORT_HIDDEN_USER_FIELDS = ['passwordHash', 'stripeCustomerId', 'uid', 'clerkUserId'] as const;
 
 export function stripHiddenUserFields<T extends Record<string, unknown>>(user: T) {
     const copy: Record<string, unknown> = { ...user };

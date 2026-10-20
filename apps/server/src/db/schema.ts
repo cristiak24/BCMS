@@ -41,7 +41,9 @@ export const financialDocuments = pgTable("financial_documents", {
 export const users = pgTable("users", {
 	id: serial().primaryKey().notNull(),
 	uid: varchar({ length: 255 }), // Keep for backwards compatibility
-	firebaseUid: varchar("firebase_uid", { length: 255 }),
+	// The Clerk user id. The column keeps its pre-Clerk (Firebase) name; only
+	// the TypeScript name changed, so no migration is needed.
+	clerkUserId: varchar("firebase_uid", { length: 255 }),
 	email: varchar({ length: 255 }).notNull(),
 	passwordHash: text("password_hash"),
 	name: varchar({ length: 255 }).notNull(),
@@ -64,7 +66,7 @@ export const users = pgTable("users", {
 	emailNotifications: boolean("email_notifications").default(true).notNull(),
 }, (table) => [
 	unique("users_email_unique").on(table.email),
-	unique("users_firebase_uid_unique").on(table.firebaseUid),
+	unique("users_firebase_uid_unique").on(table.clerkUserId),
 	index("users_club_id_idx").on(table.clubId),
 ]);
 
