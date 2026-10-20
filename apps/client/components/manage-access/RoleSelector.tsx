@@ -152,12 +152,20 @@ export function AccessButton({
 export type TeamOption = { id: number; name: string };
 
 /**
- * Optional team for a parent invite: the children who register with it are
- * placed in that team directly. Hidden for other roles and for clubs with no
- * teams.
+ * Optional team for a parent or player invite: a parent's children land in
+ * that team, and a player approved by a club admin joins its roster in the
+ * same step. Hidden for roles with no team to land on, and for clubs with
+ * no teams.
  */
-export function TeamPicker({ teams, selectedTeamId, onSelect }: { teams: TeamOption[]; selectedTeamId: number | null; onSelect: (teamId: number | null) => void }) {
+export function TeamPicker({ teams, selectedTeamId, onSelect, role = 'parent' }: { teams: TeamOption[]; selectedTeamId: number | null; onSelect: (teamId: number | null) => void; role?: InviteRole }) {
     if (teams.length === 0) return null;
+    const hint = selectedTeamId != null
+        ? role === 'player'
+            ? 'După aprobarea unui admin, jucătorul intră direct în lotul acestei echipe.'
+            : 'Copiii se înscriu direct în această echipă, fără alt pas de alegere.'
+        : role === 'player'
+            ? 'Fără echipă, jucătorul aprobat rămâne neîncadrat până îl adaugi tu într-o echipă.'
+            : 'Fără echipă, copiii rămân neîncadrați până îi adaugi tu într-o echipă.';
     return (
         <View>
             <FieldLabel hint="opțional">Echipă</FieldLabel>
@@ -168,9 +176,7 @@ export function TeamPicker({ teams, selectedTeamId, onSelect }: { teams: TeamOpt
                 ))}
             </View>
             <Text className="text-[11.5px] mt-1.5 leading-4" style={{ color: 'var(--c-faint)' }}>
-                {selectedTeamId != null
-                    ? 'Copiii se înscriu direct în această echipă, fără alt pas de alegere.'
-                    : 'Fără echipă, copiii rămân neîncadrați până îi adaugi tu într-o echipă.'}
+                {hint}
             </Text>
         </View>
     );

@@ -3,11 +3,12 @@ import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db';
-import { accessRequests, clubs, familyJoinRequests, playerGuardians, players, teams, users } from '../db/schema';
+import { accessRequests, clubs, familyJoinRequests, playerGuardians, players, playersToTeams, teams, users } from '../db/schema';
 import { closeDb, createSchema } from '../test/pgliteDb';
 import { ensurePendingAccessRequest, registerWithAccessLink, registerWithGuardianInvite, registerWithTeamCode, type SignupIdentity } from './accountSignup';
 import { registerWithClubCode } from './clubCodeSignup';
 import { createGuardianInvite } from './guardianInvites';
+import { placeApprovedPlayerOnTeam } from './manageAccessRepository';
 
 /**
  * The team-code, access-link and guardian-invite signups against a real
@@ -132,6 +133,23 @@ test('an access link for a player waits for an admin once, however often it is o
     const waiting = await db.select().from(accessRequests)
         .where(and(eq(accessRequests.userId, first.user.id), eq(accessRequests.status, 'pending')));
     assert.equal(waiting.length, 1);
+});
+
+test('an access link for a player with a team carries that team on the pending request', async () => {
+    const result = await registerWithAccessLink({
+        ...identity(),
+        phone,
+        link: { role: 'player', clubId },
+        team: { id: teamId, name: 'U12' },
+        children: null,
+    });
+    assert.equal(result.queuedForTeam, false);
+    const requests = await db.select().from(accessRequests).where(eq(accessRequests.userId, result.user.id));
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].requestedRole, 'player');
+    assert.equal(requests[0].teamId, teamId);
+    // No roster row yet — that only happens once an admin approves the request.
+    assert.equal((await db.select().from(players).where(eq(players.userId, result.user.id))).length, 0);
 });
 
 test('a team access link sends a parent’s children to the team requests, not the admin queue', async () => {
@@ -328,4 +346,60 @@ test('a second parent whose signup is retried stays waiting for the club', async
     assert.equal(retry.requested.length, 0);
     assert.equal((await db.select().from(users).where(eq(users.id, first.user.id)))[0].status, 'pending');
     assert.equal((await joinRequestsOf(first.user.id)).length, 1);
+});
+
+test('approving a player access request with a team creates the roster row', async () => {
+    const { user } = await registerWithAccessLink({
+        ...identity(),
+        phone,
+        link: { role: 'player', clubId },
+        team: { id: teamId, name: 'U12' },
+        children: null,
+    });
+
+    await placeApprovedPlayerOnTeam({ userId: user.id, userName: user.name, userEmail: user.email, teamId });
+
+    const [player] = await db.select().from(players).where(eq(players.userId, user.id));
+    assert.ok(player);
+    assert.equal(player.teamId, teamId);
+    assert.equal(player.email, user.email);
+    const memberships = await db.select().from(playersToTeams).where(and(eq(playersToTeams.playerId, player.id), eq(playersToTeams.teamId, teamId)));
+    assert.equal(memberships.length, 1);
+});
+
+test('approving a player request claims an admin-pre-created unclaimed row by email instead of duplicating it', async () => {
+    const [preCreated] = await db.insert(players).values({
+        name: 'Pre Created', firstName: 'Pre', lastName: 'Created', status: 'active', email: 'preclaimed@mail.ro',
+    }).returning();
+    const { user } = await registerWithAccessLink({
+        ...identity({ email: 'preclaimed@mail.ro' }),
+        phone,
+        link: { role: 'player', clubId },
+        team: { id: teamId, name: 'U12' },
+        children: null,
+    });
+
+    await placeApprovedPlayerOnTeam({ userId: user.id, userName: user.name, userEmail: user.email, teamId });
+
+    const rows = await db.select().from(players).where(eq(players.email, 'preclaimed@mail.ro'));
+    assert.equal(rows.length, 1, 'claims the existing row instead of inserting a second one');
+    assert.equal(rows[0].id, preCreated.id);
+    assert.equal(rows[0].userId, user.id);
+    assert.equal(rows[0].teamId, teamId);
+});
+
+test('approving a second request for a player already on the team does not duplicate the membership', async () => {
+    const { user } = await registerWithAccessLink({
+        ...identity(),
+        phone,
+        link: { role: 'player', clubId },
+        team: { id: teamId, name: 'U12' },
+        children: null,
+    });
+    await placeApprovedPlayerOnTeam({ userId: user.id, userName: user.name, userEmail: user.email, teamId });
+    await placeApprovedPlayerOnTeam({ userId: user.id, userName: user.name, userEmail: user.email, teamId });
+
+    const [player] = await db.select().from(players).where(eq(players.userId, user.id));
+    const memberships = await db.select().from(playersToTeams).where(and(eq(playersToTeams.playerId, player.id), eq(playersToTeams.teamId, teamId)));
+    assert.equal(memberships.length, 1);
 });

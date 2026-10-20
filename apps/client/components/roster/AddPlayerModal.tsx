@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { Plus, Search, X } from 'lucide-react';
@@ -12,6 +12,12 @@ import { birthYearRange, playerDraftFromSearch } from '../../utils/rosterParse';
 type PlayerDraft = { firstName: string; lastName: string; birthYear: string };
 
 const SEARCH_DEBOUNCE_MS = 300;
+const BROWSE_PAGE_SIZE = 20;
+// The sheet's slide-in animation (.rn-modal[data-animation="slide"] in
+// global.css) runs 320ms. Autofocusing immediately pops the keyboard while
+// the sheet is still rising, so the viewport jumps mid-animation — delay
+// focus past it on mobile; desktop has no on-screen keyboard to fight.
+const MOBILE_FOCUS_DELAY_MS = 360;
 
 interface AddPlayerModalProps {
   visible: boolean;
@@ -40,6 +46,15 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
   // the selected team (POST /teams/:id/players/bulk, one row).
   const [draft, setDraft] = useState<PlayerDraft | null>(null);
   const [creating, setCreating] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // No query typed yet: browse the roster-visible players, newest first and
+  // paged, instead of showing an empty "start typing" state.
+  const isBrowseMode = debouncedQuery.length < 2;
+  const [browseResults, setBrowseResults] = useState<Player[]>([]);
+  const [browseHasMore, setBrowseHasMore] = useState(false);
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -47,8 +62,14 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
       setSearchQuery('');
       setDebouncedQuery('');
       setSearchResults([]);
+      setBrowseResults([]);
+      setBrowseHasMore(false);
       setError(null);
       setDraft(null);
+
+      const focusDelay = isMobile ? MOBILE_FOCUS_DELAY_MS : 0;
+      const timer = setTimeout(() => searchInputRef.current?.focus(), focusDelay);
+      return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
@@ -85,6 +106,51 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
       cancelled = true;
     };
   }, [debouncedQuery]);
+
+  useEffect(() => {
+    if (!visible || !isBrowseMode) return;
+
+    let cancelled = false;
+    setBrowseLoading(true);
+
+    teamsApi
+      .browsePlayers({ limit: BROWSE_PAGE_SIZE, offset: 0 })
+      .then((page) => {
+        if (cancelled) return;
+        setBrowseResults(page.items);
+        setBrowseHasMore(page.hasMore);
+      })
+      .catch((browseError) => {
+        console.error('Browse players error:', browseError);
+        if (!cancelled) {
+          setBrowseResults([]);
+          setBrowseHasMore(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setBrowseLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, isBrowseMode]);
+
+  const loadMoreBrowseResults = () => {
+    if (loadingMore || browseLoading || !browseHasMore) return;
+    setLoadingMore(true);
+    teamsApi
+      .browsePlayers({ limit: BROWSE_PAGE_SIZE, offset: browseResults.length })
+      .then((page) => {
+        setBrowseResults((current) => [...current, ...page.items]);
+        setBrowseHasMore(page.hasMore);
+      })
+      .catch((browseError) => console.error('Browse players error:', browseError))
+      .finally(() => setLoadingMore(false));
+  };
+
+  const listData = isBrowseMode ? browseResults : searchResults;
+  const listLoading = isBrowseMode ? browseLoading : searching;
 
   const addPlayerToRoster = async (player: Player) => {
     if (!selectedTeamId) {
@@ -253,15 +319,15 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
               >
                 <Search size={17} color="var(--c-faint)" />
                 <TextInput
+                  ref={searchInputRef}
                   placeholder="Caută după nume, email sau tricou..."
                   placeholderTextColor="var(--c-faint)"
                   className="ml-2.5 flex-1 text-[14px] font-medium outline-none"
                   style={{ color: 'var(--c-ink)' }}
-                  autoFocus
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                 />
-                {searching ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : null}
+                {listLoading ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : null}
               </View>
 
               {error ? (
@@ -319,7 +385,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                 </ScrollView>
               ) : (
               <FlatList
-                data={searchResults}
+                data={listData}
                 keyExtractor={(item: Player) => item.id.toString()}
                 style={{ flex: 1, marginTop: 12 }}
                 contentContainerStyle={{ flexGrow: 1, gap: 8, paddingBottom: 12 }}
@@ -360,18 +426,18 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                   );
                 }}
                 ListEmptyComponent={() => {
-                  if (searching) {
+                  if (listLoading) {
                     return (
                       <View className="flex-1 items-center justify-center rounded-[14px] p-6" style={{ minHeight: 220, backgroundColor: 'var(--c-surface-2)' }}>
                         <ActivityIndicator size="small" color="var(--c-brand-fg)" />
                         <Text className="mt-2.5 text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>
-                          Se caută sportivi...
+                          {isBrowseMode ? 'Se încarcă sportivii...' : 'Se caută sportivi...'}
                         </Text>
                       </View>
                     );
                   }
 
-                  if (searchQuery.length > 1) {
+                  if (!isBrowseMode) {
                     return (
                       <View className="flex-1 items-center justify-center rounded-[14px] p-6" style={{ minHeight: 220, backgroundColor: 'var(--c-surface-2)' }}>
                         <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>
@@ -398,14 +464,30 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                         <Search size={19} color="var(--c-brand-fg)" />
                       </View>
                       <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>
-                        Începe să scrii pentru a căuta
+                        Niciun sportiv disponibil
                       </Text>
                       <Text className="mt-1.5 text-center text-[12.5px] font-medium leading-5" style={{ color: 'var(--c-muted)' }}>
-                        Folosește cel puțin 2 caractere pentru a găsi sportivi în baza de date.
+                        Sportivii din club vor apărea aici, sau caută după nume, email ori tricou.
                       </Text>
                     </View>
                   );
                 }}
+                ListFooterComponent={isBrowseMode && browseHasMore ? () => (
+                  <Pressable
+                    onPress={loadMoreBrowseResults}
+                    disabled={loadingMore}
+                    className="ui-press h-11 items-center justify-center rounded-[12px] border mt-1"
+                    style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
+                  >
+                    {loadingMore ? (
+                      <ActivityIndicator size="small" color="var(--c-brand-fg)" />
+                    ) : (
+                      <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>
+                        Încarcă mai mulți
+                      </Text>
+                    )}
+                  </Pressable>
+                ) : undefined}
               />
               )}
             </View>

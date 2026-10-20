@@ -43,6 +43,8 @@ export async function ensurePendingAccessRequest(
     user: { id: number; name: string | null; email: string },
     clubId: number,
     role: typeof accessRequests.$inferInsert.requestedRole,
+    /** A player-role link's team: approval lands them on this team's roster. */
+    teamId: number | null = null,
 ) {
     const waiting = await tx.select({ id: accessRequests.id }).from(accessRequests)
         .where(and(
@@ -60,6 +62,7 @@ export async function ensurePendingAccessRequest(
         userName: user.name,
         userEmail: user.email,
         requestedRole: role,
+        teamId,
     }).onConflictDoNothing().returning({ id: accessRequests.id });
     return inserted.length > 0;
 }
@@ -96,7 +99,7 @@ export async function registerWithTeamCode(input: SignupIdentity & {
 export async function registerWithAccessLink(input: SignupIdentity & {
     phone: string | null;
     link: { role: string; clubId: number };
-    /** The link's team, already checked to belong to the club; only matters for parents with children. */
+    /** The link's team: for a parent, where their children wait for approval; for a player, the team their access request carries. */
     team: { id: number; name: string } | null;
     children: ChildInput[] | null;
 }) {
@@ -131,7 +134,10 @@ export async function registerWithAccessLink(input: SignupIdentity & {
         if (input.children) {
             await createChildrenForParent({ userId: user.id, teamId: null, children: input.children, tx });
         }
-        const requestCreated = await ensurePendingAccessRequest(tx, user, input.link.clubId, input.link.role as typeof accessRequests.$inferInsert.requestedRole);
+        // A player-role link with a team: the request carries it, so approval
+        // can land the player on that team's roster in one step.
+        const requestTeamId = !input.children && input.team ? input.team.id : null;
+        const requestCreated = await ensurePendingAccessRequest(tx, user, input.link.clubId, input.link.role as typeof accessRequests.$inferInsert.requestedRole, requestTeamId);
         return { user, queuedForTeam: false, requestCreated };
     });
 }

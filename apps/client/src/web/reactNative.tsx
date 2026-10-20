@@ -4,6 +4,7 @@ import React, {
   InputHTMLAttributes,
   ReactNode,
   TextareaHTMLAttributes,
+  forwardRef,
   useCallback,
   useEffect,
   useMemo,
@@ -564,6 +565,7 @@ export function FlatList<T>({
   renderItem,
   keyExtractor,
   ListEmptyComponent,
+  ListFooterComponent,
   ItemSeparatorComponent,
   className,
   contentContainerStyle,
@@ -575,10 +577,15 @@ export function FlatList<T>({
   keyExtractor?: (item: T, index: number) => string;
 }) {
   const items = data || [];
+  const footer = ListFooterComponent
+    ? (typeof ListFooterComponent === 'function' ? <ListFooterComponent /> : ListFooterComponent)
+    : null;
+
   if (!items.length && ListEmptyComponent) {
     return (
       <ScrollView className={className} contentContainerStyle={contentContainerStyle} style={style} {...props}>
         {typeof ListEmptyComponent === 'function' ? <ListEmptyComponent /> : ListEmptyComponent}
+        {footer}
       </ScrollView>
     );
   }
@@ -595,11 +602,12 @@ export function FlatList<T>({
             : null}
         </React.Fragment>
       ))}
+      {footer}
     </ScrollView>
   );
 }
 
-export function TextInput({
+export const TextInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, AnyProps>(function TextInput({
   multiline,
   onChangeText,
   value,
@@ -618,7 +626,7 @@ export function TextInput({
   className,
   style,
   ...props
-}: AnyProps & { autoCorrect?: boolean | string }) {
+}, ref) {
   const common = {
     ...props,
     // RN takes a boolean; the DOM attribute is "on"/"off".
@@ -641,11 +649,12 @@ export function TextInput({
   };
 
   if (multiline) {
-    return <textarea {...(common as TextareaHTMLAttributes<HTMLTextAreaElement>)} />;
+    return <textarea ref={ref as React.Ref<HTMLTextAreaElement>} {...(common as TextareaHTMLAttributes<HTMLTextAreaElement>)} />;
   }
 
   return (
     <input
+      ref={ref as React.Ref<HTMLInputElement>}
       {...(common as InputHTMLAttributes<HTMLInputElement>)}
       type={
         secureTextEntry ? 'password'
@@ -656,7 +665,7 @@ export function TextInput({
       }
     />
   );
-}
+}) as ShimComponent<HTMLInputElement | HTMLTextAreaElement>;
 
 export function Image({
   source,

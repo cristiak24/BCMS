@@ -117,7 +117,9 @@ export default function InviteLinkGenerator({
                     <RoleSelector selectedRole={selectedRole} onSelectRole={onRoleChange} />
                 </View>
 
-                {selectedRole === 'parent' ? <TeamPicker teams={teams} selectedTeamId={selectedTeamId} onSelect={onTeamChange} /> : null}
+                {selectedRole === 'parent' || selectedRole === 'player' ? (
+                    <TeamPicker teams={teams} selectedTeamId={selectedTeamId} onSelect={onTeamChange} role={selectedRole} />
+                ) : null}
 
                 <View>
                     <FieldLabel hint="după expirare linkul nu mai funcționează">Valabil</FieldLabel>
