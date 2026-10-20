@@ -24,7 +24,12 @@ test.describe('invitație', () => {
   test('the invited person accepts once; the token cannot be used again', async () => {
     const { invite } = seedIds();
     const invited = await apiAs(invite.email);
-    const first = await invited.post(`invitations/${invite.token}/accept`, { data: { firstName: 'Invitat', lastName: 'Nou' } });
+    // A coach invitation: no phone number, no account (R3-19) — and the
+    // invitation stays usable.
+    const noPhone = await invited.post(`invitations/${invite.token}/accept`, { data: { firstName: 'Invitat', lastName: 'Nou' } });
+    expect(noPhone.status()).toBe(400);
+    expect((await noPhone.json()).error).toMatch(/numărul de telefon/);
+    const first = await invited.post(`invitations/${invite.token}/accept`, { data: { firstName: 'Invitat', lastName: 'Nou', phone: '0722 000 111' } });
     expect(first.status()).toBe(201);
     const me = await (await invited.get('auth/me')).json();
     expect(me.user.email).toBe(invite.email);
