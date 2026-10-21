@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, TextInput, ActivityIndicator } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import Button from '../ui/Button';
+import { FinanceCard, FinanceCardHeader } from './FinanceCard';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import FilterChips from '../ui/FilterChips';
 import SelectField from '../ui/SelectField';
@@ -251,28 +252,28 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
     };
 
     return (
-        <View className="w-full rounded-[16px] p-4 md:p-5 border mb-5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
-            <View className="flex-row items-start justify-between gap-3 flex-wrap mb-3">
-                <View className="flex-1 min-w-[220px]">
-                    <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Restanțe și solduri</Text>
-                    <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
-                        Calculat la fel ca pe pagina de plăți a fiecărui jucător.
-                    </Text>
-                </View>
-                {/* Two groups that each stay on one line: balances (export, reload)
-                    and payments (month + export). At 375px the four controls used
-                    to break over three rows. */}
-                <View className="flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
-                    <View className="flex-row items-center gap-2">
-                        <Button size="sm" icon="file-download" label="Export solduri" loading={exportingBalances} disabled={loading || !balances.length} onPress={() => void exportBalances()} />
-                        <Button size="sm" icon="refresh" label="Reîncarcă" iconOnlyOnMobile onPress={() => void load()} disabled={loading} />
+        <FinanceCard className="mb-5">
+            <FinanceCardHeader
+                icon="account-balance-wallet"
+                tone="brand"
+                title="Restanțe și solduri"
+                subtitle="Calculat la fel ca pe pagina de plăți a fiecărui jucător."
+                wideActions
+                actions={
+                    // Two groups that each stay on one line: balances (export, reload)
+                    // and payments (month + export); on phones each fills the width.
+                    <View className="flex-col lg:flex-row lg:items-center gap-2 w-full lg:w-auto">
+                        <View className="flex-row items-center gap-2">
+                            <Button size="sm" icon="file-download" label="Export solduri" className="flex-1 lg:flex-none" loading={exportingBalances} disabled={loading || !balances.length} onPress={() => void exportBalances()} />
+                            <Button size="sm" icon="refresh" label="Reîncarcă" iconOnlyOnMobile onPress={() => void load()} disabled={loading} />
+                        </View>
+                        <View className="flex-row items-center gap-2">
+                            <SelectField<string> label="Luna exportului de plăți" value={exportMonth} onChange={setExportMonth} options={monthOptions} className="flex-1 min-w-0 lg:flex-none lg:w-[170px]" />
+                            <Button size="sm" icon="file-download" label="Export plăți" loading={exporting} onPress={() => void exportPayments()} />
+                        </View>
                     </View>
-                    <View className="flex-row items-center gap-2">
-                        <SelectField<string> label="Luna exportului de plăți" value={exportMonth} onChange={setExportMonth} options={monthOptions} className="flex-1 min-w-0 sm:flex-none sm:w-[170px]" />
-                        <Button size="sm" icon="file-download" label="Export plăți" loading={exporting} onPress={() => void exportPayments()} />
-                    </View>
-                </View>
-            </View>
+                }
+            />
 
             <View className="flex-col md:flex-row md:items-center gap-2 mb-3">
                 <FilterChips<Filter>
@@ -461,7 +462,7 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                     </View>
                 ) : null}
             </ConfirmDialog>
-        </View>
+        </FinanceCard>
     );
 }
 

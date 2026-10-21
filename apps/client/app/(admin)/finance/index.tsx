@@ -19,6 +19,8 @@ import { EmptyState, SkeletonBlock } from '../../../components/dashboard/ScreenS
 import { dash } from '../../../components/dashboard/dashboardTheme';
 import { plural } from '../../../utils/plural';
 import Button from '../../../components/ui/Button';
+import FilterChips from '../../../components/ui/FilterChips';
+import { FinanceCard, FinanceCardHeader } from '../../../components/finance/FinanceCard';
 
 const DOCUMENTS_PAGE = 20;
 
@@ -57,16 +59,16 @@ const EMPTY_UPLOAD_MODAL: UploadModalState = {
 
 /* ─── Status meta helper ────────────────────────────────────────── */
 const STATUS_META: Record<AccountingStatus, { label: string; fg: string; bg: string; icon: keyof typeof MaterialIcons.glyphMap }> = {
-    pending: { label: 'În așteptare', fg: dash.warningDeep, bg: 'rgba(245,158,11,0.12)', icon: 'schedule' },
-    approved: { label: 'Aprobat', fg: dash.successDeep, bg: 'rgba(16,185,129,0.12)', icon: 'check-circle' },
-    rejected: { label: 'Respins', fg: dash.dangerDeep, bg: 'rgba(239,68,68,0.1)', icon: 'warning-amber' },
+    pending: { label: 'În așteptare', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)', icon: 'schedule' },
+    approved: { label: 'Aprobat', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)', icon: 'check-circle' },
+    rejected: { label: 'Respins', fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)', icon: 'warning-amber' },
 };
 
-const DOC_FILTERS: { key: 'all' | AccountingStatus; label: string }[] = [
+const DOC_FILTERS: { key: 'all' | AccountingStatus; label: string; dot?: string }[] = [
     { key: 'all', label: 'Toate' },
-    { key: 'pending', label: 'În așteptare' },
-    { key: 'approved', label: 'Aprobate' },
-    { key: 'rejected', label: 'Respinse' },
+    { key: 'pending', label: 'În așteptare', dot: 'var(--c-warning)' },
+    { key: 'approved', label: 'Aprobate', dot: 'var(--c-success)' },
+    { key: 'rejected', label: 'Respinse', dot: 'var(--c-danger)' },
 ];
 
 function mapFinancialDocuments(documents: FinancialDocument[]): UploadEntry[] {
@@ -104,24 +106,61 @@ function formatCurrency(amount: number, currency = 'ron') {
 }
 
 /* ─── Shared visual primitives ──────────────────────────────────── */
-const cardStyle = { backgroundColor: dash.surface, borderColor: dash.hairline, ...dash.shadow.card };
-
-function SectionHeader({ icon, iconBg, iconFg, title, subtitle }: {
-    icon: keyof typeof MaterialIcons.glyphMap;
-    iconBg: string;
-    iconFg: string;
-    title: string;
-    subtitle: string;
+/** One fee setting (Cotizație, Zi limită): the value, or a field + Salvează / Anulează. */
+function SettingTile({ label, canEdit, editing, onEdit, loading, value, unit, input, onInput, placeholder, maxLength, saving, onSave, onCancel }: {
+    label: string;
+    canEdit: boolean;
+    editing: boolean;
+    onEdit: () => void;
+    loading: boolean;
+    value: string;
+    unit: string;
+    input: string;
+    onInput: (text: string) => void;
+    placeholder: string;
+    maxLength?: number;
+    saving: boolean;
+    onSave: () => void;
+    onCancel: () => void;
 }) {
     return (
-        <View className="flex-row items-center gap-3 mb-4 min-w-0">
-            <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: iconBg }}>
-                <MaterialIcons name={icon} size={18} color={iconFg} />
+        <View className="rounded-[12px] border px-3.5 py-3 min-w-0" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
+            <View className="flex-row items-center justify-between gap-2 h-7 mb-1.5">
+                <Text className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
+                {canEdit && !editing ? (
+                    <Button size="sm" variant="ghost" icon="edit" label="Modifică" accessibilityLabel={`Modifică ${label.toLowerCase()}`} className="h-7 -mr-1.5" onPress={onEdit} />
+                ) : null}
             </View>
-            <View className="flex-1 min-w-0">
-                <Text className="f-display text-[16px] font-bold" style={{ color: dash.ink, letterSpacing: '-0.015em' } as any}>{title}</Text>
-                <Text className="t-meta mt-0.5" style={{ color: dash.muted }}>{subtitle}</Text>
-            </View>
+            {editing ? (
+                <View className="gap-2.5">
+                    <View className="flex-row items-center h-10 rounded-[10px] border pr-3" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border-strong, var(--c-border))' } as any}>
+                        <TextInput
+                            value={input}
+                            onChangeText={onInput}
+                            keyboardType="numeric"
+                            maxLength={maxLength}
+                            placeholder={placeholder}
+                            placeholderTextColor="var(--c-faint)"
+                            accessibilityLabel={label}
+                            autoFocus
+                            className="flex-1 h-full px-3 text-[16px] font-bold t-num"
+                            style={{ color: 'var(--c-ink)' }}
+                        />
+                        <Text className="text-[12px] font-medium shrink-0" style={{ color: 'var(--c-faint)' }}>{unit}</Text>
+                    </View>
+                    <View className="flex-row gap-2">
+                        <Button size="sm" label="Anulează" className="flex-1" disabled={saving} onPress={onCancel} />
+                        <Button size="sm" variant="primary" icon="save" label="Salvează" className="flex-1" loading={saving} onPress={onSave} />
+                    </View>
+                </View>
+            ) : loading ? (
+                <SkeletonBlock width={120} height={28} />
+            ) : (
+                <View className="flex-row items-baseline gap-1.5">
+                    <Text className="f-display t-num text-[26px] font-extrabold leading-none" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any}>{value}</Text>
+                    <Text className="text-[13px] font-medium" style={{ color: 'var(--c-muted)' }}>{unit}</Text>
+                </View>
+            )}
         </View>
     );
 }
@@ -537,393 +576,202 @@ export default function FinancialSettingsPage() {
 
                     <BalancesCard onPaymentRecorded={() => void loadSummary()} />
 
-                    {/* ── Row: Monthly Fee + Upload ─────────────────── */}
-                    <View className={`gap-4 mb-5 ${isMobile ? '' : 'flex-row'}`}>
-
-                        {/* Monthly Fee Card */}
-                        <View className={`flex-1 rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in`} style={cardStyle}>
-                            <SectionHeader
-                                icon="account-balance-wallet"
-                                iconBg="rgba(99,91,255,0.1)"
-                                iconFg={dash.accent}
+                    {/* ── Fees: the monthly fee + due day, then the extra fees ── */}
+                    <View className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5 items-start">
+                        <FinanceCard>
+                            <FinanceCardHeader
+                                icon="payments"
+                                tone="brand"
                                 title="Cotizație lunară"
-                                subtitle="Gestionează taxa lunară per jucător"
+                                subtitle="Taxa lunară per jucător și ziua limită de plată."
                             />
 
-                            <View className={`${isMobile ? '' : 'flex-row gap-3'} mb-3`}>
-                            <View className={`rounded-[12px] p-3.5 border flex-1 ${isMobile ? 'mb-3' : ''}`} style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
-                                <View className="flex-row justify-between items-center mb-3">
-                                    <Text className="font-bold text-[11px] uppercase tracking-wider shrink" style={{ color: dash.muted }}>Cotizație</Text>
-                                    {!editingFee && canEditFees && (
-                                        <Pressable onPress={() => setEditingFee(true)} className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-[10px] shrink-0" style={{ backgroundColor: 'rgba(99,91,255,0.08)' }}>
-                                            <MaterialIcons name="edit" size={12} color={dash.accent} />
-                                            <Text className="text-[12px] font-bold" style={{ color: dash.accent }}>Modifică</Text>
-                                        </Pressable>
-                                    )}
-                                </View>
-
-                                {editingFee ? (
-                                    <View>
-                                        <View className="flex-row items-center mb-4">
-                                            <TextInput
-                                                value={monthlyFeeInput}
-                                                onChangeText={setMonthlyFeeInput}
-                                                keyboardType="numeric"
-                                                className="flex-1 rounded-[11px] h-11 px-4 text-[18px] font-bold mr-3 border"
-                                                style={{ backgroundColor: dash.surface, borderColor: dash.hairlineStrong, color: dash.ink }}
-                                                placeholder="0"
-                                                placeholderTextColor={dash.faint}
-                                            />
-                                            <Text className="text-[18px] font-bold" style={{ color: dash.faint }}>RON / lună</Text>
-                                        </View>
-                                        <View className="flex-row gap-3">
-                                            <Pressable
-                                                onPress={handleSaveMonthlyFee}
-                                                disabled={savingFee}
-                                                className="flex-1 h-10 rounded-[11px] items-center justify-center flex-row gap-1.5"
-                                                style={{ backgroundColor: 'var(--c-brand-surface)' }}
-                                            >
-                                                {savingFee
-                                                    ? <ActivityIndicator color="white" size="small" />
-                                                    : <><MaterialIcons name="save" size={14} color="#fff" /><Text className="text-white font-bold">Salvează</Text></>
-                                                }
-                                            </Pressable>
-                                            <Pressable
-                                                onPress={() => {
-                                                    setEditingFee(false);
-                                                    setMonthlyFeeInput(String(settings?.monthlyPlayerFee || 0));
-                                                }}
-                                                className="flex-1 h-10 rounded-[11px] items-center justify-center"
-                                                style={{ backgroundColor: dash.lineSoft }}
-                                            >
-                                                <Text className="font-bold" style={{ color: dash.muted }}>Anulează</Text>
-                                            </Pressable>
-                                        </View>
-                                    </View>
-                                ) : (
-                                    loadingSettings ? (
-                                        <View className="flex-row items-center py-1">
-                                            <SkeletonBlock width={140} height={40} />
-                                        </View>
-                                    ) : (
-                                        <View className="flex-row items-end">
-                                            <Text className="t-num text-[32px] font-bold leading-none" style={{ color: dash.ink }}>{settings?.monthlyPlayerFee || 0}</Text>
-                                            <Text className="text-[18px] font-bold ml-2 mb-1" style={{ color: dash.faint }}>RON / lună</Text>
-                                        </View>
-                                    )
-                                )}
+                            <View className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                                <SettingTile
+                                    label="Cotizație"
+                                    canEdit={canEditFees}
+                                    editing={editingFee}
+                                    onEdit={() => setEditingFee(true)}
+                                    loading={loadingSettings}
+                                    value={String(settings?.monthlyPlayerFee || 0)}
+                                    unit="RON / lună"
+                                    input={monthlyFeeInput}
+                                    onInput={setMonthlyFeeInput}
+                                    placeholder="0"
+                                    saving={savingFee}
+                                    onSave={handleSaveMonthlyFee}
+                                    onCancel={() => {
+                                        setEditingFee(false);
+                                        setMonthlyFeeInput(String(settings?.monthlyPlayerFee || 0));
+                                    }}
+                                />
+                                <SettingTile
+                                    label="Zi limită"
+                                    canEdit={canEditFees}
+                                    editing={editingDueDay}
+                                    onEdit={() => setEditingDueDay(true)}
+                                    loading={loadingSettings}
+                                    value={String(settings?.paymentDueDay || 25)}
+                                    unit="a lunii următoare"
+                                    input={dueDayInput}
+                                    onInput={setDueDayInput}
+                                    placeholder="25"
+                                    maxLength={2}
+                                    saving={savingDueDay}
+                                    onSave={handleSaveDueDay}
+                                    onCancel={() => {
+                                        setEditingDueDay(false);
+                                        setDueDayInput(String(settings?.paymentDueDay || 25));
+                                    }}
+                                />
                             </View>
 
-                            {/* Payment due day */}
-                            <View className="rounded-[12px] p-3.5 border flex-1" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
-                                <View className="flex-row justify-between items-center mb-3">
-                                    <Text className="font-bold text-[11px] uppercase tracking-wider" style={{ color: dash.muted }}>Zi limită</Text>
-                                    {!editingDueDay && canEditFees && (
-                                        <Pressable onPress={() => setEditingDueDay(true)} className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-[10px] shrink-0" style={{ backgroundColor: 'rgba(99,91,255,0.08)' }}>
-                                            <MaterialIcons name="edit" size={12} color={dash.accent} />
-                                            <Text className="text-[12px] font-bold" style={{ color: dash.accent }}>Modifică</Text>
-                                        </Pressable>
-                                    )}
-                                </View>
-
-                                {editingDueDay ? (
-                                    <View>
-                                        <View className="flex-row items-center mb-3">
-                                            <Text className="text-[15px] font-bold mr-3" style={{ color: dash.faint }}>Ziua</Text>
-                                            <TextInput
-                                                value={dueDayInput}
-                                                onChangeText={setDueDayInput}
-                                                keyboardType="numeric"
-                                                maxLength={2}
-                                                className="w-[80px] rounded-[11px] h-11 px-4 text-[18px] font-bold border text-center"
-                                                style={{ backgroundColor: dash.surface, borderColor: dash.hairlineStrong, color: dash.ink }}
-                                                placeholder="25"
-                                                placeholderTextColor={dash.faint}
-                                            />
-                                            <Text className="text-[15px] font-bold ml-3 flex-1" style={{ color: dash.faint }}>a lunii următoare</Text>
-                                        </View>
-                                        <View className="flex-row gap-3">
-                                            <Pressable
-                                                onPress={handleSaveDueDay}
-                                                disabled={savingDueDay}
-                                                className="flex-1 h-10 rounded-[11px] items-center justify-center flex-row gap-1.5"
-                                                style={{ backgroundColor: 'var(--c-brand-surface)' }}
-                                            >
-                                                {savingDueDay
-                                                    ? <ActivityIndicator color="white" size="small" />
-                                                    : <><MaterialIcons name="save" size={14} color="#fff" /><Text className="text-white font-bold">Salvează</Text></>
-                                                }
-                                            </Pressable>
-                                            <Pressable
-                                                onPress={() => {
-                                                    setEditingDueDay(false);
-                                                    setDueDayInput(String(settings?.paymentDueDay || 25));
-                                                }}
-                                                className="flex-1 h-10 rounded-[11px] items-center justify-center"
-                                                style={{ backgroundColor: dash.lineSoft }}
-                                            >
-                                                <Text className="font-bold" style={{ color: dash.muted }}>Anulează</Text>
-                                            </Pressable>
-                                        </View>
-                                    </View>
-                                ) : (
-                                    loadingSettings ? (
-                                        <SkeletonBlock width={120} height={32} />
-                                    ) : (
-                                        <View className="flex-row items-end">
-                                            <Text className="t-num text-[28px] font-bold leading-none" style={{ color: dash.ink }}>{settings?.paymentDueDay || 25}</Text>
-                                            <Text className="text-[15px] font-bold ml-2 mb-1" style={{ color: dash.faint }}>a lunii următoare</Text>
-                                        </View>
-                                    )
-                                )}
-                            </View>
-                            </View>
-
-                            <View className="flex-row items-center p-3 rounded-[11px]" style={{ backgroundColor: 'rgba(37,99,235,0.06)' }}>
-                                <MaterialIcons name="info-outline" size={16} color={dash.accentBlue} style={{ marginRight: 8 }} />
-                                <Text className="text-[12px] font-medium flex-1" style={{ color: dash.accentBlue }}>
+                            <View className="flex-row items-start gap-2 rounded-[10px] px-3 py-2.5" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+                                <MaterialIcons name="info-outline" size={15} color="var(--c-muted)" style={{ marginTop: 1 }} />
+                                <Text className="flex-1 text-[12px] leading-[17px]" style={{ color: 'var(--c-muted)' }}>
                                     Ex: ziua 25 înseamnă că, până pe 25 august, jucătorii pot plăti cotizația pe luna iulie.
                                 </Text>
                             </View>
-                        </View>
+                        </FinanceCard>
 
-                        {/* Upload Actions Card */}
-                        <View className={`flex-1 rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in`} style={cardStyle}>
-                            <SectionHeader
-                                icon="receipt-long"
-                                iconBg="rgba(245,158,11,0.12)"
-                                iconFg={dash.warningDeep}
-                                title="Încărcare documente"
-                                subtitle="Cheltuieli și facturi"
-                            />
-
-                            <View className={`flex-row gap-3 ${isMobile ? '' : 'flex-1'}`}>
-                                <Pressable
-                                    onPress={() => handleStartUpload('expense')}
-                                    disabled={pickingFile === 'expense'}
-                                    className="flex-1 ui-press rounded-[14px] border-[1.5px] border-dashed items-center justify-center py-5 px-3"
-                                    style={{ backgroundColor: 'rgba(245,158,11,0.05)', borderColor: 'rgba(245,158,11,0.3)' }}
-                                >
-                                    {pickingFile === 'expense' ? (
-                                        <ActivityIndicator size="small" color={dash.warningDeep} />
-                                    ) : (
-                                        <>
-                                            <View className="w-10 h-10 rounded-[11px] items-center justify-center mb-2" style={{ backgroundColor: 'rgba(245,158,11,0.12)' }}>
-                                                <MaterialIcons name="receipt-long" size={20} color={dash.warningDeep} />
-                                            </View>
-                                            <Text className="text-[14px] font-bold mb-0.5" style={{ color: dash.ink }}>Cheltuieli</Text>
-                                            <Text className="text-[12px] font-medium text-center" style={{ color: dash.faint }}>Încarcă bonuri sau chitanțe</Text>
-                                        </>
-                                    )}
-                                </Pressable>
-
-                                <Pressable
-                                    onPress={() => handleStartUpload('invoice')}
-                                    disabled={pickingFile === 'invoice'}
-                                    className="flex-1 ui-press rounded-[14px] border-[1.5px] border-dashed items-center justify-center py-5 px-3"
-                                    style={{ backgroundColor: 'rgba(37,99,235,0.05)', borderColor: 'rgba(37,99,235,0.25)' }}
-                                >
-                                    {pickingFile === 'invoice' ? (
-                                        <ActivityIndicator size="small" color={dash.accentBlue} />
-                                    ) : (
-                                        <>
-                                            <View className="w-10 h-10 rounded-[11px] items-center justify-center mb-2" style={{ backgroundColor: 'rgba(37,99,235,0.1)' }}>
-                                                <MaterialIcons name="payment" size={20} color={dash.accentBlue} />
-                                            </View>
-                                            <Text className="text-[14px] font-bold mb-0.5" style={{ color: dash.ink }}>Facturi</Text>
-                                            <Text className="text-[12px] font-medium text-center" style={{ color: dash.faint }}>Încarcă facturi fiscale</Text>
-                                        </>
-                                    )}
-                                </Pressable>
-                            </View>
-                        </View>
+                        <FeeExtrasCard
+                            settings={settings}
+                            readOnly={!canEditFees}
+                            onSaved={(next) => { setSettings(next); void loadSummary(); }}
+                        />
                     </View>
 
-                    <FeeExtrasCard
-                        settings={settings}
-                        readOnly={!canEditFees}
-                        onSaved={(next) => { setSettings(next); void loadSummary(); }}
-                    />
+                    {/* ── Documents register (with its upload actions) + recent payments ── */}
+                    <View className="grid grid-cols-1 xl:grid-cols-5 gap-5 items-start">
 
-                    {/* ── Row: Documents Ledger + Recent Payments ──── */}
-                    <View className={`gap-6 items-start ${isMobile ? '' : 'flex-row'}`}>
+                        <FinanceCard className="xl:col-span-3">
+                            <FinanceCardHeader
+                                icon="receipt-long"
+                                tone="warning"
+                                title="Registru documente"
+                                subtitle="Cheltuieli și facturi trimise la contabilitate."
+                                actions={
+                                    <>
+                                        <Button size="sm" icon="upload-file" label="Cheltuială" className="flex-1 sm:flex-none" loading={pickingFile === 'expense'} onPress={() => void handleStartUpload('expense')} accessibilityLabel="Încarcă o cheltuială (bon sau chitanță)" />
+                                        <Button size="sm" icon="upload-file" label="Factură" className="flex-1 sm:flex-none" loading={pickingFile === 'invoice'} onPress={() => void handleStartUpload('invoice')} accessibilityLabel="Încarcă o factură fiscală" />
+                                    </>
+                                }
+                            />
 
-                        {/* Documents Ledger */}
-                        <View className={`w-full rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in ${isMobile ? '' : 'xl:flex-[3]'}`} style={cardStyle}>
-                            <View className="flex-row items-start justify-between mb-1 flex-wrap gap-3">
-                                <SectionHeader
-                                    icon="receipt-long"
-                                    iconBg="rgba(37,99,235,0.1)"
-                                    iconFg={dash.accentBlue}
-                                    title="Registru documente"
-                                    subtitle="Cheltuieli și facturi transmise către contabilitate"
+                            <View className="flex-col md:flex-row md:items-center gap-2 mb-3">
+                                <FilterChips<'all' | AccountingStatus>
+                                    label="Filtru documente"
+                                    value={documentFilter}
+                                    onChange={setDocumentFilter}
+                                    options={DOC_FILTERS.map((f) => ({
+                                        key: f.key,
+                                        label: f.label,
+                                        dot: f.dot,
+                                        count: f.key === 'all' ? uploads.length : uploads.filter((u) => u.accountingStatus === f.key).length,
+                                    }))}
                                 />
-                            </View>
-
-                            <View className="flex-row items-center gap-2 rounded-[12px] px-3 h-11 border mb-4" style={{ backgroundColor: dash.lineSoft, borderColor: dash.hairline }}>
-                                <MaterialIcons name="search" size={16} color={dash.faint} />
-                                <TextInput
-                                    value={documentSearch}
-                                    onChangeText={setDocumentSearch}
-                                    placeholder="Caută document..."
-                                    placeholderTextColor={dash.faint}
-                                    className="text-[13px] font-medium flex-1"
-                                    style={{ color: dash.ink }}
-                                />
-                                {documentSearch.length > 0 && (
-                                    <Pressable onPress={() => setDocumentSearch('')}>
-                                        <MaterialIcons name="close" size={16} color={dash.faint} />
-                                    </Pressable>
-                                )}
-                            </View>
-
-                            <View className="flex-row flex-wrap gap-2 mb-5">
-                                {DOC_FILTERS.map((f) => {
-                                    const active = documentFilter === f.key;
-                                    const count = f.key === 'all' ? uploads.length : uploads.filter(u => u.accountingStatus === f.key).length;
-                                    return (
-                                        <Pressable
-                                            key={f.key}
-                                            onPress={() => setDocumentFilter(f.key)}
-                                            className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border"
-                                            style={{
-                                                backgroundColor: active ? 'rgba(99,91,255,0.08)' : dash.lineSoft,
-                                                borderColor: active ? 'rgba(99,91,255,0.25)' : dash.hairline,
-                                            }}
-                                        >
-                                            <Text className="text-[12px] font-bold" style={{ color: active ? dash.accent : dash.muted }}>{f.label}</Text>
-                                            <View className="w-[18px] h-[18px] rounded-full items-center justify-center" style={{ backgroundColor: active ? dash.accent : dash.line }}>
-                                                <Text className="text-[10px] font-bold" style={{ color: active ? '#fff' : dash.muted }}>{count}</Text>
-                                            </View>
-                                        </Pressable>
-                                    );
-                                })}
-                            </View>
-
-                            <ScrollView style={{ maxHeight: 520 }} showsVerticalScrollIndicator={false}>
-                                {loadingDocuments ? (
-                                    <View className="gap-3">
-                                        {[0, 1, 2].map((i) => (
-                                            <View key={i} className="p-4 rounded-[16px] border" style={{ borderColor: dash.hairline }}>
-                                                <SkeletonBlock width="40%" height={12} className="mb-2" />
-                                                <SkeletonBlock width="70%" height={16} />
-                                            </View>
-                                        ))}
-                                    </View>
-                                ) : filteredUploads.length === 0 ? (
-                                    <EmptyState
-                                        title="Niciun document găsit"
-                                        message={documentSearch || documentFilter !== 'all' ? 'Încearcă alt filtru sau șterge căutarea.' : 'Documentele încărcate vor apărea aici.'}
-                                        icon="receipt-long"
+                                <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 border md:ml-auto md:w-[220px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
+                                    <MaterialIcons name="search" size={15} color="var(--c-faint)" />
+                                    <TextInput
+                                        value={documentSearch}
+                                        onChangeText={setDocumentSearch}
+                                        placeholder="Caută document"
+                                        placeholderTextColor="var(--c-faint)"
+                                        accessibilityLabel="Caută document"
+                                        className="flex-1 text-[13px]"
+                                        style={{ color: 'var(--c-ink)' }}
                                     />
-                                ) : (
-                                    <View className="gap-3">
-                                        {filteredUploads.slice(0, visibleDocuments).map((entry) => {
-                                            const meta = STATUS_META[entry.accountingStatus];
-                                            const isUpdating = updatingDocId === entry.id;
-                                            return (
-                                                <View key={entry.id} className="p-4 rounded-[16px] border" style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
-                                                    <View className="flex-row items-start justify-between gap-3 mb-2">
-                                                        <View className="flex-row items-center flex-1 min-w-0">
-                                                            <View className="w-9 h-9 rounded-[11px] items-center justify-center mr-3" style={{ backgroundColor: entry.type === 'expense' ? 'rgba(245,158,11,0.12)' : 'rgba(37,99,235,0.1)' }}>
-                                                                <MaterialIcons name={entry.type === 'expense' ? 'receipt-long' : 'payment'} size={16} color={entry.type === 'expense' ? dash.warningDeep : dash.accentBlue} />
-                                                            </View>
-                                                            <View className="flex-1 min-w-0">
-                                                                <Text className="text-[13px] font-bold" style={{ color: dash.ink }} numberOfLines={1}>{entry.label}</Text>
-                                                                <Text className="text-[11px] font-medium mt-0.5" style={{ color: dash.muted }}>
-                                                                    {entry.uploadedAt.toLocaleDateString('ro-RO')} · {entry.type === 'expense' ? 'Cheltuială' : 'Factură'}
-                                                                </Text>
-                                                            </View>
-                                                        </View>
-                                                        <Text className="text-[14px] font-black" style={{ color: dash.ink }}>{formatCurrency(entry.amount)}</Text>
+                                    {documentSearch.length > 0 && (
+                                        <Pressable onPress={() => setDocumentSearch('')} accessibilityLabel="Șterge căutarea">
+                                            <MaterialIcons name="close" size={15} color="var(--c-faint)" />
+                                        </Pressable>
+                                    )}
+                                </View>
+                            </View>
+
+                            {loadingDocuments ? (
+                                <View className="gap-2">
+                                    {[0, 1, 2].map((i) => <SkeletonBlock key={i} width="100%" height={56} />)}
+                                </View>
+                            ) : filteredUploads.length === 0 ? (
+                                <EmptyState
+                                    title="Niciun document găsit"
+                                    message={documentSearch || documentFilter !== 'all' ? 'Încearcă alt filtru sau șterge căutarea.' : 'Încarcă o cheltuială sau o factură; apare aici până o verifică contabilitatea.'}
+                                    icon="receipt-long"
+                                />
+                            ) : (
+                                // One bordered list with dividers, not a card per document
+                                // inside a 520px inner scroller.
+                                <View className="rounded-[12px] border overflow-hidden" style={{ borderColor: 'var(--c-border)' } as any}>
+                                    {filteredUploads.slice(0, visibleDocuments).map((entry, index) => {
+                                        const meta = STATUS_META[entry.accountingStatus];
+                                        const isUpdating = updatingDocId === entry.id;
+                                        const expense = entry.type === 'expense';
+                                        return (
+                                            <View key={entry.id} className={`px-3.5 py-3 gap-2 ${index ? 'border-t' : ''}`} style={{ borderColor: 'var(--c-border)' } as any}>
+                                                <View className="flex-row items-center gap-3">
+                                                    <View className="w-8 h-8 rounded-[9px] items-center justify-center shrink-0" style={{ backgroundColor: expense ? 'var(--c-warning-bg)' : 'var(--c-sky-bg)' }}>
+                                                        <MaterialIcons name={expense ? 'receipt-long' : 'payment'} size={15} color={expense ? 'var(--c-warning-fg)' : 'var(--c-sky-fg)'} />
                                                     </View>
-
-                                                    <View className="flex-row items-center justify-between flex-wrap gap-2 mt-1">
-                                                        <View className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ backgroundColor: meta.bg }}>
-                                                            <MaterialIcons name={meta.icon} size={12} color={meta.fg} />
-                                                            <Text className="text-[11px] font-semibold" style={{ color: meta.fg }}>{meta.label}</Text>
-                                                        </View>
-
-                                                        <View className="flex-row items-center gap-2">
-                                                            {entry.documentUrl ? (
-                                                                <Pressable
-                                                                    onPress={() => void openDocumentUrl(entry.documentUrl)}
-                                                                    className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-[10px]"
-                                                                    style={{ backgroundColor: dash.lineSoft }}
-                                                                >
-                                                                    <MaterialIcons name="file-download" size={13} color={dash.muted} />
-                                                                    <Text className="text-[11px] font-bold" style={{ color: dash.muted }}>Vezi</Text>
-                                                                </Pressable>
-                                                            ) : null}
-                                                            {entry.accountingStatus === 'pending' && (
-                                                                isUpdating ? (
-                                                                    <ActivityIndicator size="small" color={dash.accent} />
-                                                                ) : (
-                                                                    <>
-                                                                        <Pressable
-                                                                            onPress={() => handleUpdateDocumentStatus(entry.id, 'processed')}
-                                                                            className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-[10px]"
-                                                                            style={{ backgroundColor: 'rgba(16,185,129,0.1)' }}
-                                                                        >
-                                                                            <MaterialIcons name="check-circle" size={13} color={dash.successDeep} />
-                                                                            <Text className="text-[11px] font-bold" style={{ color: dash.successDeep }}>Aprobă</Text>
-                                                                        </Pressable>
-                                                                        <Pressable
-                                                                            onPress={() => { setReviewReason(''); setReviewDialog({ id: entry.id, mode: 'reject' }); }}
-                                                                            className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-[10px]"
-                                                                            style={{ backgroundColor: 'rgba(239,68,68,0.08)' }}
-                                                                        >
-                                                                            <MaterialIcons name="close" size={13} color={dash.dangerDeep} />
-                                                                            <Text className="text-[11px] font-bold" style={{ color: dash.dangerDeep }}>Respinge</Text>
-                                                                        </Pressable>
-                                                                    </>
-                                                                )
-                                                            )}
-                                                            {entry.accountingStatus !== 'pending' && !isUpdating ? (
-                                                                <Pressable
-                                                                    onPress={() => { setReviewReason(''); setReviewDialog({ id: entry.id, mode: 'reopen' }); }}
-                                                                    className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-[10px]"
-                                                                    style={{ backgroundColor: dash.lineSoft }}
-                                                                    accessibilityLabel="Redeschide documentul"
-                                                                >
-                                                                    <MaterialIcons name="undo" size={13} color={dash.muted} />
-                                                                    <Text className="text-[11px] font-bold" style={{ color: dash.muted }}>Redeschide</Text>
-                                                                </Pressable>
-                                                            ) : null}
-                                                        </View>
+                                                    <View className="flex-1 min-w-0">
+                                                        <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{entry.label}</Text>
+                                                        <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+                                                            {entry.uploadedAt.toLocaleDateString('ro-RO')} · {expense ? 'Cheltuială' : 'Factură'}
+                                                        </Text>
                                                     </View>
-
-                                                    {entry.accountingNote && entry.accountingStatus !== 'pending' && (
-                                                        <View className="mt-2.5 rounded-[10px] p-2.5" style={{ backgroundColor: dash.lineSoft }}>
-                                                            <Text className="text-[11px] font-medium italic" style={{ color: dash.muted }}>„{entry.accountingNote}”</Text>
-                                                        </View>
-                                                    )}
+                                                    <Text className="t-num text-[14px] font-bold shrink-0" style={{ color: 'var(--c-ink)' }}>{formatCurrency(entry.amount)}</Text>
                                                 </View>
-                                            );
-                                        })}
-                                        {filteredUploads.length > visibleDocuments ? (
-                                            <View className="items-center">
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    label={`Arată încă ${Math.min(DOCUMENTS_PAGE, filteredUploads.length - visibleDocuments)} (din ${filteredUploads.length})`}
-                                                    onPress={() => setVisibleDocuments((count) => count + DOCUMENTS_PAGE)}
-                                                />
-                                            </View>
-                                        ) : null}
-                                    </View>
-                                )}
-                            </ScrollView>
-                        </View>
 
-                        {/* Recent Payments */}
-                        <View className={`w-full rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in ${isMobile ? '' : 'xl:flex-[2]'}`} style={cardStyle}>
-                            <SectionHeader
+                                                <View className="flex-row items-center justify-between flex-wrap gap-2 sm:pl-11">
+                                                    <View className="flex-row items-center gap-1.5 px-2 h-6 rounded-full" style={{ backgroundColor: meta.bg }}>
+                                                        <MaterialIcons name={meta.icon} size={12} color={meta.fg} />
+                                                        <Text className="text-[11.5px] font-semibold" style={{ color: meta.fg }}>{meta.label}</Text>
+                                                    </View>
+
+                                                    <View className="flex-row items-center gap-1.5 ml-auto">
+                                                        {entry.documentUrl ? (
+                                                            <Button size="sm" icon="file-download" label="Vezi" iconOnlyOnMobile accessibilityLabel={`Vezi documentul ${entry.label}`} onPress={() => void openDocumentUrl(entry.documentUrl)} />
+                                                        ) : null}
+                                                        {isUpdating ? (
+                                                            <ActivityIndicator size="small" color="var(--c-brand-fg)" />
+                                                        ) : entry.accountingStatus === 'pending' ? (
+                                                            <>
+                                                                <Button size="sm" variant="danger" icon="close" label="Respinge" onPress={() => { setReviewReason(''); setReviewDialog({ id: entry.id, mode: 'reject' }); }} />
+                                                                <Button size="sm" variant="primary" icon="check" label="Aprobă" onPress={() => void handleUpdateDocumentStatus(entry.id, 'processed')} />
+                                                            </>
+                                                        ) : (
+                                                            <Button size="sm" icon="undo" label="Redeschide" iconOnlyOnMobile accessibilityLabel="Redeschide documentul" onPress={() => { setReviewReason(''); setReviewDialog({ id: entry.id, mode: 'reopen' }); }} />
+                                                        )}
+                                                    </View>
+                                                </View>
+
+                                                {/* "Aprobat de contabilitate" only repeats the badge; a rejection keeps its reason. */}
+                                                {entry.accountingNote && entry.accountingStatus === 'rejected' ? (
+                                                    <Text className="text-[12px] sm:pl-11" style={{ color: 'var(--c-muted)' }}>{entry.accountingNote}</Text>
+                                                ) : null}
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            )}
+                            {!loadingDocuments && filteredUploads.length > visibleDocuments ? (
+                                <View className="items-center mt-3">
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        label={`Arată încă ${Math.min(DOCUMENTS_PAGE, filteredUploads.length - visibleDocuments)} (din ${filteredUploads.length})`}
+                                        onPress={() => setVisibleDocuments((count) => count + DOCUMENTS_PAGE)}
+                                    />
+                                </View>
+                            ) : null}
+                        </FinanceCard>
+
+                        <FinanceCard className="xl:col-span-2">
+                            <FinanceCardHeader
                                 icon="payment"
-                                iconBg="rgba(16,185,129,0.1)"
-                                iconFg={dash.successDeep}
+                                tone="success"
                                 title="Plăți recente"
-                                subtitle="Încasări jucători prin Stripe / club"
+                                subtitle="Încasări prin card și la club."
                             />
 
                             {loadingRecentPayments ? (
@@ -959,7 +807,7 @@ export default function FinancialSettingsPage() {
                                     })}
                                 </View>
                             )}
-                        </View>
+                        </FinanceCard>
                     </View>
                 </View>
             )}
@@ -967,13 +815,12 @@ export default function FinancialSettingsPage() {
             {activeTab === 'Payment Gateways' && (
                 <View className="mb-20">
                     <StripeConnectCard returned={params.connect === 'return'} />
-                    <View className={`rounded-[16px] ${isMobile ? 'p-4' : 'p-5'} border dash-fade-in`} style={cardStyle}>
+                    <FinanceCard>
                         <View className={`gap-6 ${isMobile ? '' : 'flex-row items-start justify-between'}`}>
                             <View className="flex-1">
-                                <SectionHeader
+                                <FinanceCardHeader
                                     icon="payment"
-                                    iconBg="rgba(99,91,255,0.1)"
-                                    iconFg={dash.accent}
+                                    tone="brand"
                                     title="Stripe"
                                     subtitle="Checkout pentru plățile jucătorilor"
                                 />
@@ -1012,7 +859,7 @@ export default function FinancialSettingsPage() {
                                 Evenimente recomandate în Stripe: checkout.session.completed, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed și checkout.session.expired.
                             </Text>
                         </View>
-                    </View>
+                    </FinanceCard>
                 </View>
             )}
 
@@ -1060,12 +907,8 @@ export default function FinancialSettingsPage() {
                 />
 
                 <View className="flex-row gap-3">
-                    <Pressable onPress={closeUploadModal} disabled={uploadModal.submitting} className="flex-1 h-[48px] rounded-[12px] items-center justify-center" style={{ backgroundColor: dash.lineSoft }}>
-                        <Text className="font-bold" style={{ color: dash.muted }}>Anulează</Text>
-                    </Pressable>
-                    <Pressable onPress={handleConfirmUpload} disabled={uploadModal.submitting} className="flex-1 h-[48px] rounded-[12px] items-center justify-center" style={{ backgroundColor: 'var(--c-brand-surface)' }}>
-                        {uploadModal.submitting ? <ActivityIndicator color="#fff" size="small" /> : <Text className="font-bold text-white">Încarcă documentul</Text>}
-                    </Pressable>
+                    <Button label="Anulează" className="flex-1" disabled={uploadModal.submitting} onPress={closeUploadModal} />
+                    <Button variant="primary" icon="upload-file" label="Încarcă documentul" className="flex-1" loading={uploadModal.submitting} onPress={() => void handleConfirmUpload()} />
                 </View>
             </ModalShell>
 

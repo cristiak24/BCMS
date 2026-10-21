@@ -46,7 +46,7 @@ export default function PageHero({
         >
             <View
                 pointerEvents="none"
-                className="absolute rounded-full"
+                className="page-hero-tint absolute rounded-full"
                 style={{ width: 300, height: 300, right: -70, top: -130, backgroundColor: 'var(--c-surface-tint)', opacity: 0.85 }}
             />
             <CourtLines />

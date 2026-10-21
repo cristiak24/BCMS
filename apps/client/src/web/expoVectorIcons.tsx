@@ -53,6 +53,7 @@ import {
   Search,
   Send,
   Settings,
+  SlidersHorizontal,
   Shield,
   ShieldCheck,
   Tent,
@@ -231,6 +232,7 @@ const iconMap: Record<string, typeof Circle> = {
   search: Search,
   send: Send,
   settings: Settings,
+  tune: SlidersHorizontal,
   // A shield, not a building: this name marks TEAMS everywhere it is used.
   shield: Shield,
   sports: Trophy,

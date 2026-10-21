@@ -18,3 +18,9 @@ html[data-theme="dark"] .bg-white\/50 {
 
 /* Low-opacity white overlays (subtle inner panels on heroes) read fine as a
    faint light wash on the dark hero — leave them translucent. */
+
+/* PageHero's corner circle: on dark surfaces the indigo tint at 0.85 read as a
+   glowing blob behind the stat tiles. Keep it as a faint accent. */
+html[data-theme="dark"] .page-hero-tint {
+  opacity: 0.35 !important;
+}

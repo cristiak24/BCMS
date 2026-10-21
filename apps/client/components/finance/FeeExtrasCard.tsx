@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput } from '@/src/web/reactNative';
+import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import Button from '../ui/Button';
+import { FinanceCard, FinanceCardHeader } from './FinanceCard';
 import { financeApi, type FinancialSettings } from '../../services/financeApi';
 
 /**
@@ -13,11 +15,12 @@ function currentMonth() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export default function FeeExtrasCard({ settings, onSaved, readOnly = false }: {
+export default function FeeExtrasCard({ settings, onSaved, readOnly = false, className }: {
     settings: FinancialSettings | null;
     onSaved: (next: FinancialSettings) => void;
     /** The accountant sees the fees but only the club admin changes them. */
     readOnly?: boolean;
+    className?: string;
 }) {
     const [levy, setLevy] = useState('');
     const [facility, setFacility] = useState('');
@@ -61,10 +64,15 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false }: {
         }
     };
 
+    // Label above a bordered field with the unit inside it, bottom-aligned so a
+    // label that wraps on a narrow column doesn't push its field out of line.
     const field = (label: string, value: string, onChange: (text: string) => void, suffix: string, invalid = false, placeholder?: string) => (
-        <View className="flex-1 min-w-[150px]">
-            <Text className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>{label}</Text>
-            <View className="flex-row items-center gap-2">
+        <View className="min-w-0 justify-end">
+            <Text className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--c-muted)' }}>{label}</Text>
+            <View
+                className="flex-row items-center h-10 rounded-[10px] border pr-3"
+                style={{ borderColor: invalid ? 'var(--c-danger-border)' : 'var(--c-border)', backgroundColor: readOnly ? 'var(--c-surface-2)' : 'var(--c-surface)' } as any}
+            >
                 <TextInput
                     value={value}
                     onChangeText={onChange}
@@ -72,32 +80,37 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false }: {
                     placeholderTextColor="var(--c-faint)"
                     accessibilityLabel={label}
                     editable={!readOnly}
-                    className="flex-1 h-10 rounded-[10px] px-3 border text-[15px] font-semibold"
-                    style={{ borderColor: invalid ? 'var(--c-danger-border)' : 'var(--c-border)', color: 'var(--c-ink)', backgroundColor: 'var(--c-surface)' } as any}
+                    className="flex-1 h-full px-3 text-[15px] font-semibold t-num"
+                    style={{ color: 'var(--c-ink)' }}
                 />
-                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-faint)' }}>{suffix}</Text>
+                <Text className="text-[12px] font-medium shrink-0" style={{ color: 'var(--c-faint)' }}>{suffix}</Text>
             </View>
         </View>
     );
 
     return (
-        <View className="w-full rounded-[16px] p-4 md:p-5 border mb-5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
-            <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Alte taxe și evidența restanțelor</Text>
-            <Text className="t-meta mt-0.5 mb-3" style={{ color: 'var(--c-muted)' }}>
-                Taxele lunare de mai jos se adaugă cotizației pentru fiecare jucător activ.
-            </Text>
+        <FinanceCard className={className}>
+            <FinanceCardHeader
+                icon="tune"
+                tone="purple"
+                title="Alte taxe și restanțe"
+                subtitle="Se adaugă cotizației pentru fiecare jucător activ."
+            />
 
-            <View className="flex-row flex-wrap gap-3 mb-3">
+            <View className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 {field('Contribuție antrenament', levy, setLevy, 'RON / lună', !(Number.isFinite(levyValue) && levyValue >= 0))}
                 {field('Taxă bază sportivă', facility, setFacility, 'RON / lună', !(Number.isFinite(facilityValue) && facilityValue >= 0))}
-                {field('Restanțe din luna', startMonth, setStartMonth, 'AAAA-LL', !monthValid, 'ex. 2026-09')}
+                {field('Restanțe începând cu luna', startMonth, setStartMonth, 'AAAA-LL', !monthValid, 'ex. 2026-09')}
             </View>
 
-            <Text className="text-[12px] mb-3" style={{ color: 'var(--c-muted)' }}>
-                {startMonth
-                    ? 'Taxele neplătite din această lună încoace rămân de plată și devin restanțe după ziua limită. Lunile dinaintea înscrierii unui jucător nu se facturează.'
-                    : 'Necompletat: se cere doar luna curentă, iar lunile trecute neplătite nu apar ca restanțe.'}
-            </Text>
+            <View className="flex-row items-start gap-2 rounded-[10px] px-3 py-2.5 mb-3" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+                <MaterialIcons name="info-outline" size={15} color="var(--c-muted)" style={{ marginTop: 1 }} />
+                <Text className="flex-1 text-[12px] leading-[17px]" style={{ color: 'var(--c-muted)' }}>
+                    {startMonth
+                        ? 'Taxele neplătite din această lună încoace rămân de plată și devin restanțe după ziua limită. Lunile dinaintea înscrierii unui jucător nu se facturează.'
+                        : 'Necompletat: se cere doar luna curentă, iar lunile trecute neplătite nu apar ca restanțe.'}
+                </Text>
+            </View>
 
             {readOnly ? (
                 <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>Doar administratorul clubului poate modifica taxele.</Text>
@@ -109,6 +122,6 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false }: {
                     ) : null}
                 </View>
             )}
-        </View>
+        </FinanceCard>
     );
 }

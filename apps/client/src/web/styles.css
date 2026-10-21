@@ -160,9 +160,12 @@ input:-webkit-autofill:focus {
   scroll-snap-align: start;
 }
 
+/* No border reset here: Tailwind's preflight already gives inputs a 0-width
+   solid border. `border: 0` also set border-style to none, so the `border`
+   class (width only) never drew anything and every bordered input rendered
+   as bare floating text. */
 .rn-text-input {
   background: transparent;
-  border: 0;
   color: inherit;
   font: inherit;
   min-width: 0;
