@@ -101,14 +101,14 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
-  # bcms.ro (Cloudflare) builds the `deploy/web` branch, not feat/…: this job
+  # bcms.ro (Cloudflare) builds the `deploy/web` branch, not main: this job
   # moves that branch to the tested commit only once every gate above passed,
   # so a red push never reaches the site (Render already waits for CI).
   # Fast-forward only — an older run finishing late can't roll the site back.
   # A push made with GITHUB_TOKEN starts no new workflow run.
   publish-web:
     name: Publică bcms.ro (deploy/web)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/mobile-responsive-and-dark-mode'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [server, client, lint, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 5
