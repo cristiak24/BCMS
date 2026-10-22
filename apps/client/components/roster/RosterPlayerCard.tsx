@@ -2,9 +2,9 @@ import React from 'react';
 import { Image, Pressable, Text, View } from '@/src/web/reactNative';
 import { MoreHorizontal } from 'lucide-react';
 import { Player } from '../../services/teamsApi';
-import AttendanceBar from './AttendanceBar';
 import StatusBadge from './StatusBadge';
 import RosterCheckbox from './RosterCheckbox';
+import { DenseRow } from '../ui/DenseList';
 
 interface RosterPlayerCardProps {
   player: Player;
@@ -21,6 +21,12 @@ interface RosterPlayerCardProps {
   onEdit: () => void;
 }
 
+/**
+ * One player on the phone roster: a row of a DenseList, not a card. It used
+ * to be a bordered card per player with an attendance bar on a second line,
+ * which drew "no data" as a red 0% bar; attendance is now text in the meta
+ * line, „—” when nothing was marked.
+ */
 export default function RosterPlayerCard({
   player,
   categoryLabel,
@@ -43,59 +49,43 @@ export default function RosterPlayerCard({
       ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)' }
       : { bg: 'var(--c-surface-3)', fg: 'var(--c-ink-soft)' }; // „De plată”: owed, not late
   const attendanceTone = attendanceRate == null ? 'var(--c-faint)' : attendanceRate >= 75 ? 'var(--c-success-fg)' : attendanceRate >= 60 ? 'var(--c-warning-fg)' : 'var(--c-danger-fg)';
-  const meta = [player.number ? `#${player.number}` : null, player.position, teamLabel].filter(Boolean).join(' · ');
+  const meta = [player.number ? `#${player.number}` : null, teamLabel].filter(Boolean).join(' · ');
   void categoryLabel;
 
-  // Two lines per player: identity, then attendance + payment. It used to be
-  // ~190px of labelled sub-cards (POZIȚIE / CATEGORIE / PREZENȚĂ) per player.
   return (
-    <Pressable
-      onPress={onPress}
-      className="rounded-[14px] border px-3 py-3 text-left"
-      style={{
-        backgroundColor: selected ? 'var(--c-surface-tint)' : 'var(--c-surface)',
-        borderColor: selected ? 'var(--c-brand-border)' : 'var(--c-border)',
-      } as any}
-    >
-      <View className="flex-row items-center gap-3">
-        <RosterCheckbox checked={selected} onToggle={onToggleSelect} accessibilityLabel={`Selectează ${fullName}`} />
-        <View className="h-10 w-10 items-center justify-center rounded-full overflow-hidden shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+    <DenseRow selected={selected}>
+      <RosterCheckbox checked={selected} onToggle={onToggleSelect} accessibilityLabel={`Selectează ${fullName}`} />
+      <Pressable onPress={onPress} accessibilityRole="link" accessibilityLabel={fullName} className="flex-1 min-w-0 flex-row items-center gap-2.5 text-left">
+        {/* No avatar on a phone: the initials repeat the name and cost the width the name needs. */}
+        <View aria-hidden className="hidden sm:flex h-9 w-9 items-center justify-center rounded-full overflow-hidden shrink-0" style={{ backgroundColor: 'var(--c-surface-3)' }}>
           {player.avatarUrl ? (
             <Image source={{ uri: player.avatarUrl }} className="h-full w-full" />
           ) : (
-            <Text className="text-[13px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{initials}</Text>
+            <Text className="text-[12px] font-bold" style={{ color: 'var(--c-ink-soft)' }}>{initials}</Text>
           )}
         </View>
         <View className="flex-1 min-w-0">
           <View className="flex-row items-center gap-2 min-w-0">
-            <Text className="text-[14.5px] font-semibold shrink" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{fullName}</Text>
+            <Text className="flex-1 min-w-0 text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{fullName}</Text>
             {showStatusChip && !isActive ? <StatusBadge label="Inactiv" tone="gray" /> : null}
+            <View className="flex-row items-center gap-1 rounded-full px-2 py-0.5 shrink-0" style={{ backgroundColor: payTone.bg }}>
+              <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: payTone.fg }} />
+              <Text className="text-[11.5px] font-semibold" style={{ color: payTone.fg }} numberOfLines={1}>{paymentLabel}</Text>
+            </View>
           </View>
-          <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{meta}</Text>
+          <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+            {meta} · <Text className="t-num" style={{ color: attendanceTone }}>{attendanceRate == null ? 'prezență —' : `${attendanceRate}% prezență`}</Text>
+          </Text>
         </View>
-        <Pressable
-          onPress={(event: any) => {
-            event.stopPropagation();
-            onEdit();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`Acțiuni pentru ${fullName}`}
-          className="h-8 w-8 items-center justify-center rounded-[9px] shrink-0"
-        >
-          <MoreHorizontal color="var(--c-muted)" size={18} />
-        </Pressable>
-      </View>
-
-      <View className="mt-2.5 flex-row items-center gap-3 pl-[30px]">
-        <Text className="t-num text-[12.5px] font-bold w-[38px]" style={{ color: attendanceTone }}>{attendanceRate == null ? '—' : `${attendanceRate}%`}</Text>
-        <View className="flex-1 min-w-0">
-          <AttendanceBar value={attendanceRate ?? 0} />
-        </View>
-        <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1 shrink-0" style={{ backgroundColor: payTone.bg }}>
-          <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: payTone.fg }} />
-          <Text className="text-[11.5px] font-semibold" style={{ color: payTone.fg }} numberOfLines={1}>{paymentLabel}</Text>
-        </View>
-      </View>
-    </Pressable>
+      </Pressable>
+      <Pressable
+        onPress={onEdit}
+        accessibilityRole="button"
+        accessibilityLabel={`Acțiuni pentru ${fullName}`}
+        className="h-10 w-8 -mr-1.5 items-center justify-center rounded-[9px] shrink-0"
+      >
+        <MoreHorizontal color="var(--c-muted)" size={18} />
+      </Pressable>
+    </DenseRow>
   );
 }

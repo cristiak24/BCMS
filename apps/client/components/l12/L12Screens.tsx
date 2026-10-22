@@ -14,6 +14,7 @@ import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
 import SelectField from '../ui/SelectField';
 import FilterChips from '../ui/FilterChips';
+import { DenseList } from '../ui/DenseList';
 import Pagination, { usePagination } from '../ui/Pagination';
 import L12Editor, { EMPTY_LINEUP, Input, L12_MIN_PLAYERS, lineupForRoster, resolveTeamGender, sortLineupPlayers, validateLineup } from './L12Editor';
 import { exportGaps, resolveMatchSides, withTeamCoach } from '../../utils/l12Export';
@@ -378,11 +379,12 @@ export function L12HomeScreen() {
                   />
                 ) : (
                   <>
-                    <View className="block xl:columns-2 xl:gap-x-4">
+                    {/* One chronological column: xl:columns-2 read Sat 24 → Mon 26 → Sun 25 across. */}
+                    <View className="gap-4 mb-4">
                       {dayGroups.map((group) => (
-                        <View key={group.key + group.label} className="gap-2 mb-4 break-inside-avoid">
+                        <View key={group.key + group.label} className="gap-2">
                           <DayHeading label={group.label} count={group.matches.length} />
-                          <View className="gap-2 ui-stagger">
+                          <DenseList label={`Meciuri · ${group.label}`}>
                             {group.matches.map((match) => {
                               const [home, away] = sidesOf(match.title);
                               // The club's team is usually one of the two sides already.
@@ -399,7 +401,7 @@ export function L12HomeScreen() {
                                 />
                               );
                             })}
-                          </View>
+                          </DenseList>
                         </View>
                       ))}
                     </View>

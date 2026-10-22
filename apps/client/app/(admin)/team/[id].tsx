@@ -3,10 +3,11 @@ import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput, Alert 
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import {
     ArrowLeft, Users, UserPlus, Copy, Check, Pencil, Calendar, ClipboardCheck,
-    Search, X, Trash2, Shield, ListOrdered, History,
-    CalendarClock, LayoutGrid, List, ShieldCheck, Receipt, BarChart3,
+    Search, X, UserMinus, Shield, ListOrdered, History,
+    CalendarClock, ShieldCheck, Receipt, BarChart3,
 } from 'lucide-react';
 import TeamSeasonTable from '../../../components/stats/TeamSeasonTable';
+import { DenseAvatar, DenseHeader, DenseHeading, DenseList, DenseRow } from '../../../components/ui/DenseList';
 import { teamsApi, Team, Player, Coach, TeamStats, TeamPlayerStat } from '../../../services/teamsApi';
 import {
     GENDER_LABELS, LEVEL_LABELS, isFrbTeam, computeAge, medicalStatus, MEDICAL_META,
@@ -25,7 +26,6 @@ import { ATTENDANCE_PERIOD_LABEL } from '../../../utils/attendanceRate';
 import { plural, pluralWord } from '../../../utils/plural';
 
 type TabKey = 'roster' | 'events' | 'history' | 'stats' | 'frb';
-type RosterView = 'grid' | 'list';
 
 function attendanceColor(rate: number | null) {
     if (rate == null) return 'var(--c-faint)';
@@ -46,7 +46,6 @@ export default function TeamDetailsScreen() {
     const [loading, setLoading] = useState(true);
 
     const [tab, setTab] = useState<TabKey>('roster');
-    const [rosterView, setRosterView] = useState<RosterView>('grid');
     const [rosterQuery, setRosterQuery] = useState('');
     const [showAdd, setShowAdd] = useState(false);
     const [showBulk, setShowBulk] = useState(false);
@@ -360,16 +359,6 @@ export default function TeamDetailsScreen() {
                                         className="w-full h-10 rounded-[12px] border border-[var(--c-border)] bg-[var(--c-surface-2)] pl-9 pr-3 text-[13px] font-semibold text-[color:var(--c-ink-strong)]"
                                     />
                                 </View>
-                                {players.length > 0 && (
-                                    <View className="flex-row rounded-[12px] border border-[var(--c-border)] overflow-hidden flex-none">
-                                        <Pressable onPress={() => setRosterView('grid')} className={`flex-row items-center gap-1.5 h-10 px-3 ${rosterView === 'grid' ? 'bg-[var(--c-brand-surface)]' : 'bg-[var(--c-surface)]'}`} accessibilityLabel="Vizualizare grid">
-                                            <LayoutGrid size={14} color={rosterView === 'grid' ? 'var(--c-surface)' : 'var(--c-muted)'} />
-                                        </Pressable>
-                                        <Pressable onPress={() => setRosterView('list')} className={`flex-row items-center gap-1.5 h-10 px-3 border-l border-[var(--c-border)] ${rosterView === 'list' ? 'bg-[var(--c-brand-surface)]' : 'bg-[var(--c-surface)]'}`} accessibilityLabel="Vizualizare listă">
-                                            <List size={14} color={rosterView === 'list' ? 'var(--c-surface)' : 'var(--c-muted)'} />
-                                        </Pressable>
-                                    </View>
-                                )}
                                 <Pressable onPress={() => setShowAdd((v) => !v)} className={`flex-row items-center gap-1.5 h-10 px-4 rounded-[12px] ${showAdd ? 'bg-[var(--c-surface-tint)] border border-[var(--c-brand-border)]' : 'bg-[var(--c-brand-surface)]'}`}>
                                     {showAdd ? <X size={15} color="var(--c-brand-fg)" /> : <UserPlus size={15} color="var(--c-surface)" />}
                                     <Text className={`text-[13px] font-semibold ${showAdd ? 'text-[color:var(--c-brand-fg)]' : 'text-[color:var(--c-on-brand)]'}`}>{showAdd ? 'Închide' : 'Adaugă jucător'}</Text>
@@ -395,40 +384,32 @@ export default function TeamDetailsScreen() {
                                 </View>
                             ) : filteredPlayers.length === 0 ? (
                                 <Text className="text-center text-[color:var(--c-faint)] text-[13px] py-10 font-bold">Niciun jucător nu corespunde căutării.</Text>
-                            ) : rosterView === 'grid' ? (
-                                <View className="grid grid-cols-1 xl:grid-cols-2 gap-2.5">
-                                    {filteredPlayers.map((p) => (
-                                        <PlayerRosterCard
-                                            key={p.id}
-                                            player={p}
-                                            stat={statsByPlayer.get(p.id)}
-                                            removing={removingId === p.id}
-                                            onOpen={() => router.push(`/admin/player/${p.id}` as any)}
-                                            onRemove={() => handleRemovePlayer(p)}
-                                        />
-                                    ))}
-                                </View>
                             ) : (
-                                <View className="flex-col rounded-[14px] border border-[var(--c-border)] overflow-hidden">
-                                    <View className="hidden md:flex flex-row items-center gap-3 px-3.5 py-2 bg-[var(--c-surface-2)] border-b border-[var(--c-border)]">
-                                        <Text className="text-[10px] font-black uppercase tracking-widest text-[color:var(--c-faint)] flex-1">Jucător</Text>
-                                        <Text className="text-[10px] font-black uppercase tracking-widest text-[color:var(--c-faint)] w-[150px]">Prezență</Text>
-                                        <Text className="text-[10px] font-black uppercase tracking-widest text-[color:var(--c-faint)] w-[84px]">Plată</Text>
-                                        <Text className="text-[10px] font-black uppercase tracking-widest text-[color:var(--c-faint)] w-[112px]">Medical</Text>
-                                        <View className="w-[72px]" />
-                                    </View>
-                                    {filteredPlayers.map((p, i) => (
+                                // One dense list. The default used to be a grid of bordered cards
+                                // (one per player), with the list behind a toggle.
+                                <DenseList
+                                    label="Lotul echipei"
+                                    header={
+                                        <DenseHeader>
+                                            <DenseHeading className="flex-1">Jucător</DenseHeading>
+                                            <DenseHeading className="w-[150px]">Prezență</DenseHeading>
+                                            <DenseHeading className="w-[84px]">Plată</DenseHeading>
+                                            <DenseHeading className="w-[112px]">Viză medicală</DenseHeading>
+                                            <View className="w-[72px]" />
+                                        </DenseHeader>
+                                    }
+                                >
+                                    {filteredPlayers.map((p) => (
                                         <PlayerRosterRow
                                             key={p.id}
                                             player={p}
                                             stat={statsByPlayer.get(p.id)}
                                             removing={removingId === p.id}
-                                            last={i === filteredPlayers.length - 1}
                                             onOpen={() => router.push(`/admin/player/${p.id}` as any)}
                                             onRemove={() => handleRemovePlayer(p)}
                                         />
                                     ))}
-                                </View>
+                                </DenseList>
                             )}
                         </View>
                     )}
@@ -528,11 +509,11 @@ function PaymentPill({ status }: { status: 'paid' | 'due' | 'pending' | 'none' }
 function RowActions({ removing, onOpen, onRemove }: { removing: boolean; onOpen: () => void; onRemove: () => void }) {
     return (
         <View className="flex-row items-center gap-0.5 flex-none">
-            <Pressable onPress={onOpen} className="w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[var(--c-surface-3)]" accessibilityLabel="Detalii jucător">
+            <Pressable onPress={onOpen} className="w-9 h-9 rounded-[9px] items-center justify-center hover:bg-[var(--c-surface-3)]" accessibilityLabel="Detalii jucător">
                 <Pencil size={14} color="var(--c-muted)" />
             </Pressable>
-            <Pressable onPress={onRemove} disabled={removing} className="w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[var(--c-danger-bg)]" accessibilityLabel="Scoate din echipă">
-                {removing ? <ActivityIndicator size="small" color="var(--c-danger)" /> : <Trash2 size={14} color="var(--c-danger)" />}
+            <Pressable onPress={onRemove} disabled={removing} className="w-9 h-9 rounded-[9px] items-center justify-center hover:bg-[var(--c-danger-bg)]" accessibilityLabel="Scoate din echipă">
+                {removing ? <ActivityIndicator size="small" color="var(--c-danger)" /> : <UserMinus size={15} color="var(--c-danger)" />}
             </Pressable>
         </View>
     );
@@ -545,11 +526,13 @@ function AttendanceMeter({ stat, showCount }: { stat: TeamPlayerStat | undefined
         <View className="w-full">
             <View className="flex-row items-center justify-between mb-1">
                 <Text className="text-[11px] font-semibold text-[color:var(--c-faint)]">Prezență</Text>
-                <Text className="text-[11px] font-black" style={{ color: col }}>{rate != null ? `${rate}%` : 'N/A'}</Text>
+                <Text className="t-num text-[11px] font-semibold" style={{ color: col }}>{rate != null ? `${rate}%` : '—'}</Text>
             </View>
-            <View className="h-1.5 rounded-full bg-[var(--c-surface-3)] overflow-hidden">
-                <View className="h-full rounded-full" style={{ width: `${rate ?? 0}%`, backgroundColor: col }} />
-            </View>
+            {rate != null ? (
+                <View className="h-1.5 rounded-full bg-[var(--c-surface-3)] overflow-hidden">
+                    <View className="h-full rounded-full" style={{ width: `${rate}%`, backgroundColor: col }} />
+                </View>
+            ) : null}
             {showCount && stat && stat.total > 0 && (
                 <Text className="text-[10px] font-semibold text-[color:var(--c-faint)] mt-1">{stat.present}/{stat.total} {pluralWord(stat.total, 'sesiune', 'sesiuni')}</Text>
             )}
@@ -557,46 +540,30 @@ function AttendanceMeter({ stat, showCount }: { stat: TeamPlayerStat | undefined
     );
 }
 
-function PlayerRosterCard({ player: p, stat, removing, onOpen, onRemove }: RowProps) {
+function PlayerRosterRow({ player: p, stat, removing, onOpen, onRemove }: RowProps) {
     const age = computeAge(p.birthYear);
     const med = MEDICAL_META[medicalStatus(p.medicalCheckExpiry)];
+    const rate = stat?.attendanceRate ?? null;
+    const meta = `${age ? `${age} ani` : 'Vârstă nespecificată'}${p.number != null ? ` · #${p.number}` : ''}`;
     return (
-        <View className="flex-col rounded-[16px] border border-[var(--c-border)] hover:border-[var(--c-border)] hover:bg-[var(--c-surface-2)] px-3.5 py-3 transition-colors ui-lift">
-            <View className="flex-row items-center gap-3">
-                <View className="w-11 h-11 rounded-[13px] bg-[var(--c-surface-tint)] items-center justify-center flex-none">
-                    <Text className="text-[14px] font-black text-[color:var(--c-brand-fg)]">{p.firstName.charAt(0)}{p.lastName.charAt(0)}</Text>
-                </View>
+        <DenseRow className="hover:bg-[var(--c-surface-2)] transition-colors">
+            <Pressable onPress={onOpen} accessibilityRole="link" accessibilityLabel={`${p.firstName} ${p.lastName}`} className="flex-1 min-w-0 flex-row items-center gap-3 text-left">
+                <DenseAvatar className="hidden sm:flex" initials={`${p.firstName.charAt(0)}${p.lastName.charAt(0)}`} />
                 <View className="flex-1 min-w-0">
-                    <Text className="f-display text-[14px] font-extrabold text-[color:var(--c-ink-strong)]" numberOfLines={1}>{p.firstName} {p.lastName}</Text>
-                    <Text className="text-[11.5px] font-semibold text-[color:var(--c-faint)]">{age ? `${age} ani` : 'Vârstă nespecificată'}{p.number != null ? ` · #${p.number}` : ''}</Text>
-                </View>
-                <RowActions removing={removing} onOpen={onOpen} onRemove={onRemove} />
-            </View>
-            <View className="flex-row items-center gap-3 mt-3">
-                <View className="flex-1 min-w-0"><AttendanceMeter stat={stat} showCount /></View>
-                <View className="flex-col items-end gap-1 flex-none">
-                    <PaymentPill status={stat?.paymentStatus ?? 'none'} />
-                    <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: med.bg }}>
-                        <Text className="text-[11px] font-semibold" style={{ color: med.fg }}>{med.label}</Text>
+                    <Text className="text-[14px] font-semibold text-[color:var(--c-ink)]" numberOfLines={1}>{p.firstName} {p.lastName}</Text>
+                    <Text className="t-meta text-[color:var(--c-muted)] md:hidden" numberOfLines={1}>
+                        {meta} · <Text className="t-num" style={{ color: attendanceColor(rate) }}>{rate != null ? `${rate}% prezență` : 'prezență —'}</Text>
+                    </Text>
+                    <Text className="t-meta text-[color:var(--c-muted)] hidden md:flex" numberOfLines={1}>{meta}</Text>
+                    {/* Phones: payment and clearance under the name instead of their own columns. */}
+                    <View className="md:hidden flex-row flex-wrap items-center gap-1.5 mt-1">
+                        <PaymentPill status={stat?.paymentStatus ?? 'none'} />
+                        <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: med.bg }}>
+                            <Text className="text-[11px] font-semibold" style={{ color: med.fg }}>{med.label}</Text>
+                        </View>
                     </View>
                 </View>
-            </View>
-        </View>
-    );
-}
-
-function PlayerRosterRow({ player: p, stat, removing, last, onOpen, onRemove }: RowProps & { last: boolean }) {
-    const age = computeAge(p.birthYear);
-    const med = MEDICAL_META[medicalStatus(p.medicalCheckExpiry)];
-    return (
-        <View className={`flex-row items-center gap-3 px-3.5 py-2.5 hover:bg-[var(--c-surface-2)] transition-colors ${last ? '' : 'border-b border-[var(--c-border)]'}`}>
-            <View className="w-9 h-9 rounded-[11px] bg-[var(--c-surface-tint)] items-center justify-center flex-none">
-                <Text className="text-[12px] font-black text-[color:var(--c-brand-fg)]">{p.firstName.charAt(0)}{p.lastName.charAt(0)}</Text>
-            </View>
-            <View className="flex-1 min-w-0">
-                <Text className="text-[13.5px] font-black text-[color:var(--c-ink-strong)]" numberOfLines={1}>{p.firstName} {p.lastName}</Text>
-                <Text className="text-[11px] font-semibold text-[color:var(--c-faint)]">{age ? `${age} ani` : 'Vârstă nespecificată'}{p.number != null ? ` · #${p.number}` : ''}</Text>
-            </View>
+            </Pressable>
             <View className="w-[150px] hidden md:flex flex-none"><AttendanceMeter stat={stat} /></View>
             <View className="w-[84px] hidden md:flex flex-none"><PaymentPill status={stat?.paymentStatus ?? 'none'} /></View>
             <View className="w-[112px] hidden md:flex flex-none">
@@ -605,6 +572,6 @@ function PlayerRosterRow({ player: p, stat, removing, last, onOpen, onRemove }: 
                 </View>
             </View>
             <RowActions removing={removing} onOpen={onOpen} onRemove={onRemove} />
-        </View>
+        </DenseRow>
     );
 }

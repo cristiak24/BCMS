@@ -2,6 +2,7 @@ import { parseApiDate } from '@/utils/dates';
 import { Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import Button from '../ui/Button';
+import { DenseRow } from '../ui/DenseList';
 import type { L12OverviewMatch } from '../../services/l12Api';
 import { plural } from '../../utils/plural';
 
@@ -31,8 +32,9 @@ export function matchKind(match: L12OverviewMatch): MatchKind {
 
 export const KIND_META: Record<MatchKind, { label: string; plural: string; fg: string; bg: string }> = {
   frb: { label: 'Oficial FRB', plural: 'Oficiale FRB', fg: 'var(--c-brand-fg)', bg: 'var(--c-surface-tint)' },
-  amical: { label: 'Amical', plural: 'Amicale', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)' },
-  municipal: { label: 'Municipal', plural: 'Municipale', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)' },
+  // Not success/warning: a green „Amical” read like the green „Gata” next to it.
+  amical: { label: 'Amical', plural: 'Amicale', fg: 'var(--c-sky-fg)', bg: 'var(--c-sky-bg)' },
+  municipal: { label: 'Municipal', plural: 'Municipale', fg: 'var(--c-purple-fg)', bg: 'var(--c-purple-bg)' },
 };
 
 export function KindBadge({ kind }: { kind: MatchKind }) {
@@ -130,23 +132,21 @@ export function LineupStatus({ set, count, align = 'end' }: { set: boolean; coun
   );
 }
 
-function DateBlock({ iso, kind, played }: { iso: string; kind: MatchKind; played: boolean }) {
+/** Neutral date tile: the match type is the badge, not a coloured field. */
+function DateBlock({ iso, played }: { iso: string; played: boolean }) {
   const date = parseApiDate(iso);
-  const meta = KIND_META[kind];
   const valid = !Number.isNaN(date.getTime());
   return (
     <View
-      className="w-[50px] sm:w-[56px] items-center justify-center py-2 shrink-0"
-      style={{ backgroundColor: meta.bg, opacity: played ? 0.7 : 1 }}
+      aria-hidden
+      className="w-11 items-center justify-center py-1.5 rounded-[10px] shrink-0"
+      style={{ backgroundColor: 'var(--c-surface-2)', opacity: played ? 0.7 : 1 }}
     >
-      <Text className="text-[10px] font-semibold capitalize" style={{ color: meta.fg, opacity: 0.85 }}>
+      <Text className="text-[11px] font-semibold capitalize" style={{ color: 'var(--c-muted)' }}>
         {valid ? date.toLocaleDateString('ro-RO', { weekday: 'short' }).replace('.', '') : ''}
       </Text>
-      <Text className="f-display text-[20px] font-extrabold leading-none mt-0.5" style={{ color: meta.fg }}>
+      <Text className="f-display t-num text-[18px] font-bold leading-none mt-0.5" style={{ color: 'var(--c-ink)' }}>
         {valid ? date.getDate() : '–'}
-      </Text>
-      <Text className="text-[10px] font-semibold mt-0.5" style={{ color: meta.fg, opacity: 0.85 }}>
-        {valid ? date.toLocaleDateString('ro-RO', { month: 'short' }).replace('.', '') : ''}
       </Text>
     </View>
   );
@@ -176,45 +176,47 @@ export function MatchTicket({
 }) {
   const kind = matchKind(match);
   const sides = [home, away].filter((side): side is string => Boolean(side));
+  // A row of the day's DenseList; it used to be a card per match.
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`L12 pentru ${match.title}`}
-      className="ui-lift ui-press home-row flex-row items-stretch overflow-hidden rounded-[14px] border text-left"
-      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}
-    >
-      <DateBlock iso={match.startTime} kind={kind} played={played} />
+    <DenseRow className="hover:bg-[var(--c-surface-2)] transition-colors">
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="link"
+        accessibilityLabel={`L12 pentru ${match.title}`}
+        className="flex-1 min-w-0 flex-row items-center gap-3 text-left"
+      >
+        <DateBlock iso={match.startTime} played={played} />
 
-      <View className="flex-1 min-w-0 px-3 py-2 gap-1.5 justify-center">
-        <View className="gap-1">
-          {sides.map((side) => (
-            <View key={side} className="flex-row items-center gap-2 min-w-0">
-              <TeamAvatar name={side} mine={isOwnSide(side, match.teamName)} />
-              <Text className="f-display text-[13.5px] font-semibold flex-1 min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{side}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
-          <View className="flex-row items-center gap-1">
-            <MaterialIcons name="schedule" size={13} color="var(--c-faint)" />
-            <Text className="t-num t-meta font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{timeOf(match.startTime)}</Text>
+        <View className="flex-1 min-w-0 gap-1.5 justify-center">
+          <View className="gap-1">
+            {sides.map((side) => (
+              <View key={side} className="flex-row items-center gap-2 min-w-0">
+                <TeamAvatar name={side} mine={isOwnSide(side, match.teamName)} />
+                <Text className="f-display text-[13.5px] font-semibold flex-1 min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{side}</Text>
+              </View>
+            ))}
           </View>
-          <KindBadge kind={kind} />
-          {showTeam && match.teamName ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{match.teamName}</Text> : null}
-          {played ? <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>jucat</Text> : null}
+
+          <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
+            <View className="flex-row items-center gap-1">
+              <MaterialIcons name="schedule" size={13} color="var(--c-faint)" />
+              <Text className="t-num t-meta font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{timeOf(match.startTime)}</Text>
+            </View>
+            <KindBadge kind={kind} />
+            {showTeam && match.teamName ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{match.teamName}</Text> : null}
+            {played ? <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>jucat</Text> : null}
+          </View>
+
+          <View className="sm:hidden">
+            <LineupStatus set={match.hasLineup} count={match.playerCount} align="start" />
+          </View>
         </View>
 
-        <View className="sm:hidden">
-          <LineupStatus set={match.hasLineup} count={match.playerCount} align="start" />
+        <View className="hidden sm:flex items-end justify-center pl-2 shrink-0">
+          <LineupStatus set={match.hasLineup} count={match.playerCount} />
         </View>
-      </View>
-
-      <View className="hidden sm:flex items-end justify-center pr-3 pl-2 shrink-0">
-        <LineupStatus set={match.hasLineup} count={match.playerCount} />
-      </View>
-    </Pressable>
+      </Pressable>
+    </DenseRow>
   );
 }
 

@@ -7,10 +7,12 @@ import PageContainer from '../ui/PageContainer';
 import PageHero from '../admin/PageHero';
 import SelectField from '../ui/SelectField';
 import Button from '../ui/Button';
+import { DenseAvatar, DenseList, DenseRow } from '../ui/DenseList';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
 import { getInitials } from '../coach/coachDisplay';
+import { plural } from '../../utils/plural';
 import GuardiansPanel from '../family/GuardiansPanel';
 
 /**
@@ -140,18 +142,11 @@ function PlayerCard({
   };
 
   return (
-    <View
-      className="ui-lift rounded-[14px] border p-3.5 gap-3 min-w-0"
-      style={{ backgroundColor: 'var(--c-surface)', borderColor: editing ? 'var(--c-brand-fg)' : 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
-    >
+    <DenseRow stacked selected={editing}>
       <View className="flex-row items-center gap-3 min-w-0">
-        <View className="h-10 w-10 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-          <Text className="text-[12.5px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>
-            {player.number != null ? `#${player.number}` : getInitials(player.firstName, player.lastName)}
-          </Text>
-        </View>
+        <DenseAvatar initials={player.number != null ? `#${player.number}` : getInitials(player.firstName, player.lastName)} />
         <View className="flex-1 min-w-0">
-          <Text className="f-display text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.01em' } as any} numberOfLines={1}>{name}</Text>
+          <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{name}</Text>
           <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{teamNames || 'Fără echipă'}</Text>
         </View>
         {!editing && !readOnly ? (
@@ -180,7 +175,7 @@ function PlayerCard({
       </View>
 
       {editing ? (
-        <View className="gap-3">
+        <View className="gap-3 md:pl-12">
           <Field label="Telefon jucător" phone value={draft.phone ?? ''} onChange={set('phone')} placeholder={player.accountPhone ?? '07xx xxx xxx'} />
           <View className="flex-row gap-2">
             <Field label="Părinte 1" value={draft.guardianName ?? ''} onChange={set('guardianName')} placeholder="Nume" />
@@ -207,7 +202,8 @@ function PlayerCard({
           </View>
         </View>
       ) : hasAny ? (
-        <View className="gap-2.5 pt-3 border-t" style={{ borderColor: 'var(--c-border)' } as any}>
+        // Under the name, not behind a separator: these are the row's details.
+        <View className="gap-2.5 pl-12 md:flex-row md:flex-wrap md:gap-x-8">
           <PhoneLine label="Jucător" phone={ownPhone} hint={!player.phone && player.accountPhone ? 'din profil' : undefined} />
           {accounts.map((account) => (
             <PhoneLine key={account.userId} label="Părinte" name={account.name} phone={account.phone} hint="cont" />
@@ -215,49 +211,39 @@ function PlayerCard({
           {player.guardianPhone || player.guardianName ? <PhoneLine label="Părinte 1" name={player.guardianName} phone={player.guardianPhone} /> : null}
           {player.guardian2Phone || player.guardian2Name ? <PhoneLine label="Părinte 2" name={player.guardian2Name} phone={player.guardian2Phone} /> : null}
         </View>
-      ) : readOnly ? (
-        <Text className="text-[13px]" style={{ color: 'var(--c-faint)' }}>Niciun număr de telefon încă.</Text>
       ) : (
-        <Pressable onPress={() => { setDraft(player); setEditing(true); }} accessibilityRole="button" className="ui-press flex-row items-center gap-1.5 self-start min-h-[32px]">
-          <MaterialIcons name="add" size={15} color="var(--c-brand-fg)" />
-          <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Adaugă numere de telefon</Text>
-        </Pressable>
+        // Quiet: an indigo „Adaugă numere” on every row without a number spent
+        // the brand colour nine times on one screen. The edit button adds them.
+        <Text className="t-meta pl-12" style={{ color: 'var(--c-faint)' }}>Niciun număr de telefon încă.</Text>
       )}
 
       {family && !editing ? (
-        <View className="pt-3 border-t" style={{ borderColor: 'var(--c-border)' } as any}>
+        <View className="md:pl-12">
           <GuardiansPanel bare playerId={player.id} playerName={`${player.firstName} ${player.lastName}`.trim()} onNotify={onNotify} />
         </View>
       ) : null}
-    </View>
+    </DenseRow>
   );
 }
 
 function StaffCard({ person, showMissing }: { person: StaffContact; showMissing?: boolean }) {
   return (
-    <View
-      className="ui-lift rounded-[14px] border p-3.5 gap-3 min-w-0"
-      style={{ backgroundColor: 'var(--c-surface)', borderColor: person.ownTeam ? 'color-mix(in srgb, var(--c-brand-fg) 45%, var(--c-border))' : 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
-    >
+    <DenseRow stacked>
       <View className="flex-row items-center gap-3 min-w-0">
-        <View className="h-10 w-10 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: person.role === 'coach' ? 'var(--c-surface-tint)' : 'var(--c-purple-bg)' }}>
-          <Text className="text-[12.5px] font-bold" style={{ color: person.role === 'coach' ? 'var(--c-brand-fg)' : 'var(--c-purple-fg)' }}>
-            {getInitials(person.name.split(' ')[0], person.name.split(' ').slice(1).join(' '))}
-          </Text>
-        </View>
+        <DenseAvatar initials={getInitials(person.name.split(' ')[0], person.name.split(' ').slice(1).join(' '))} />
         <View className="flex-1 min-w-0">
-          <Text className="f-display text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.01em' } as any} numberOfLines={1}>{person.name}</Text>
+          <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{person.name}</Text>
           <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
             {[ROLE_LABEL[person.role] ?? person.role, person.teams.map((t) => t.name).join(', ')].filter(Boolean).join(' · ')}
           </Text>
         </View>
       </View>
       {person.phone ? (
-        <PhoneLine label="Telefon" phone={person.phone} name={null} />
+        <View className="pl-12"><PhoneLine label="Telefon" phone={person.phone} name={null} /></View>
       ) : showMissing ? (
-        <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>Fără număr — îl poate adăuga din Profil.</Text>
+        <Text className="t-meta pl-12" style={{ color: 'var(--c-faint)' }}>Fără număr — îl poate adăuga din Profil.</Text>
       ) : null}
-    </View>
+    </DenseRow>
   );
 }
 
@@ -367,8 +353,8 @@ export default function ContactsScreen() {
           {error ? (
             <ErrorState title="Nu am putut încărca agenda" message={error} actionLabel="Reîncearcă" onAction={load} />
           ) : !data ? (
-            <View className="grid grid-cols-1 md:grid-cols-2 gap-2.5" accessibilityRole="progressbar" accessibilityLabel="Se încarcă agenda">
-              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[132px] w-full rounded-[14px]" />)}
+            <View className="gap-2" accessibilityRole="progressbar" accessibilityLabel="Se încarcă agenda">
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-[12px]" />)}
             </View>
           ) : data.mode === 'member' ? (
             staff.length === 0 ? (
@@ -384,9 +370,9 @@ export default function ContactsScreen() {
                 {staff.some((s) => s.ownTeam) ? (
                   <View>
                     <Text className="f-display text-[15px] font-bold mb-2.5" style={{ color: 'var(--c-ink-strong)' }}>Antrenorii echipei tale</Text>
-                    <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5 ui-stagger">
+                    <DenseList label="Antrenorii echipei tale">
                       {staff.filter((s) => s.ownTeam).map((s) => <StaffCard key={s.id} person={s} />)}
-                    </View>
+                    </DenseList>
                   </View>
                 ) : null}
                 {staff.some((s) => !s.ownTeam) ? (
@@ -394,9 +380,9 @@ export default function ContactsScreen() {
                     <Text className="f-display text-[15px] font-bold mb-2.5" style={{ color: 'var(--c-ink-strong)' }}>
                       {staff.some((s) => s.ownTeam) ? 'Restul clubului' : 'Staff-ul clubului'}
                     </Text>
-                    <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5 ui-stagger">
+                    <DenseList label="Restul clubului">
                       {staff.filter((s) => !s.ownTeam).map((s) => <StaffCard key={s.id} person={s} />)}
-                    </View>
+                    </DenseList>
                   </View>
                 ) : null}
               </View>
@@ -418,6 +404,15 @@ export default function ContactsScreen() {
                       ]}
                     />
                   ) : null}
+                  {/* One count instead of an „Adaugă numere” on every row without a number. */}
+                  {(() => {
+                    const missing = players.filter((p) => !(p.phone || p.accountPhone || p.guardianPhone || p.guardian2Phone || p.guardianAccounts?.length)).length;
+                    return missing && !(data.mode === 'staff' && data.canEdit === false) ? (
+                      <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
+                        {`${plural(missing, 'jucător nu are', 'jucători nu au')} niciun număr de telefon. Îl adaugi cu butonul de editare din rândul lui.`}
+                      </Text>
+                    ) : null;
+                  })()}
                   {players.length === 0 ? (
                     <EmptyState
                       compact
@@ -426,7 +421,7 @@ export default function ContactsScreen() {
                       message={query ? `Nimic pentru „${searchValue.trim()}”.` : 'Jucătorii din loturile clubului apar aici.'}
                     />
                   ) : (
-                    <View className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2.5">
+                    <DenseList label="Jucători">
                       {players.slice(0, visibleCount).map((p) => (
                         <PlayerCard
                           key={p.id}
@@ -437,7 +432,7 @@ export default function ContactsScreen() {
                           readOnly={data.mode === 'staff' && data.canEdit === false}
                         />
                       ))}
-                    </View>
+                    </DenseList>
                   )}
                   {players.length > visibleCount ? (
                     <View className="items-center mt-1">
@@ -453,9 +448,9 @@ export default function ContactsScreen() {
               ) : staff.length === 0 ? (
                 <EmptyState compact icon="contacts" title="Niciun membru al staff-ului" message={query ? `Nimic pentru „${searchValue.trim()}”.` : 'Antrenorii și adminii clubului apar aici.'} />
               ) : (
-                <View className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2.5 ui-stagger">
+                <DenseList label="Staff">
                   {staff.map((s) => <StaffCard key={s.id} person={s} showMissing />)}
-                </View>
+                </DenseList>
               )}
             </>
           )}

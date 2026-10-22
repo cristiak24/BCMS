@@ -20,11 +20,12 @@ import { formatCoachDate, formatCoachTimeRange } from '../../../components/coach
 import { AttendanceNoteInput, AttendanceNoteToggle } from '../../../components/attendance/AttendanceNoteField';
 import AttendanceMarkButtons from '../../../components/attendance/AttendanceMarkButtons';
 import AttendanceSaveStatus, { useSaveStatus } from '../../../components/attendance/AttendanceSaveStatus';
-import { attendanceMarkMeta, toAttendanceMark, type AttendanceMark } from '../../../utils/attendanceStatus';
+import { toAttendanceMark, type AttendanceMark } from '../../../utils/attendanceStatus';
 import { isAttendanceOpen } from '../../../utils/attendanceWindow';
 import { canMarkAttendance } from '../../../utils/eventPermissions';
 import { useSession } from '../../../context/AuthContext';
 import { plural } from '../../../utils/plural';
+import { DenseList, DenseRow } from '../../../components/ui/DenseList';
 
 /**
  * Admin "Notare prezență" for one event.
@@ -463,7 +464,7 @@ export default function AttendanceScreen() {
                 }}
               />
             ) : (
-              <View className="gap-2 ui-stagger">
+              <DenseList label="Prezența jucătorilor">
                 {visibleRows.map((row) => (
                   <AttendanceRow
                     key={row.id}
@@ -477,7 +478,7 @@ export default function AttendanceScreen() {
                     onSaveNote={() => saveNote(row.id)}
                   />
                 ))}
-              </View>
+              </DenseList>
             )}
           </View>
         </PageContainer>
@@ -525,21 +526,15 @@ function AttendanceRow({
   onNote: (note: string) => void;
   onSaveNote: () => void;
 }) {
-  const active = attendanceMarkMeta(row.status);
   const hasNote = Boolean(row.savedNote.trim());
   const dirty = noteDirty(row);
   const metaParts = [row.position, row.status ? null : 'Nemarcat'].filter(Boolean);
   const playerName = `${row.firstName} ${row.lastName}`;
 
   return (
-    <View
-      className="relative overflow-hidden rounded-[14px] border pl-4 pr-3 py-3 flex-col md:flex-row md:flex-wrap xl:flex-nowrap md:items-center gap-3 xl:gap-4"
-      style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any}
-    >
-      <View
-        className="absolute left-0 top-0 bottom-0 w-[3px]"
-        style={{ backgroundColor: active?.solid ?? 'var(--c-border-strong)', transition: 'background-color 0.2s ease' } as any}
-      />
+    // A row of the list, not a card with a coloured side stripe: the selected
+    // status button already says the status, and „Nemarcat” is in the meta line.
+    <DenseRow stacked className="md:flex-row md:flex-wrap xl:flex-nowrap md:items-center xl:gap-4">
 
       <View className="flex-row items-center gap-2 min-w-0 md:flex-1 xl:flex-none xl:w-[260px] 2xl:w-[300px] xl:shrink-0">
         <View className="flex-1 min-w-0">
@@ -573,6 +568,6 @@ function AttendanceRow({
       </View>
 
       <AttendanceMarkButtons value={row.status} playerName={playerName} busy={busy} disabled={locked} onMark={onStatus} />
-    </View>
+    </DenseRow>
   );
 }

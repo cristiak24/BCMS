@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, SkeletonBlock } from '../../components/dashboar
 import PageHero, { GlassStat } from '../../components/admin/PageHero';
 import Button from '../../components/ui/Button';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { DenseList } from '../../components/ui/DenseList';
 import PlayerRow from '../../components/roster/PlayerRow';
 import RosterPlayerCard from '../../components/roster/RosterPlayerCard';
 import RosterFilters from '../../components/roster/RosterFilters';
@@ -609,7 +610,8 @@ export default function RosterScreen() {
             {rosterTotal === 0 ? (
               <EmptyState title="Niciun sportiv în lot" message="Adaugă primul sportiv pentru a începe gestionarea prezenței și a plăților." icon="groups" />
             ) : paginatedPlayers.length ? (
-              paginatedPlayers.map((item) => {
+              <DenseList label="Sportivi">
+              {paginatedPlayers.map((item) => {
                 const categoryLabel = getCategoryLabel(item);
                 const attendanceRate = typeof item.attendanceRate === 'number' ? getAttendanceRate(item) : null;
                 const paymentStatus = item.paymentStatus || 'pending';
@@ -630,7 +632,8 @@ export default function RosterScreen() {
                     onEdit={() => handleOpenActions(item)}
                   />
                 );
-              })
+              })}
+              </DenseList>
             ) : (
               <EmptyState
                 title={hasActiveFilters ? 'Niciun sportiv nu corespunde filtrelor curente.' : 'Niciun sportiv găsit.'}

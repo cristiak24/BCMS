@@ -2,10 +2,12 @@ import React from 'react';
 import { StyleSheet, View } from '@/src/web/reactNative';
 
 interface AttendanceBarProps {
-  value: number;
+  /** null = no recorded sessions: no bar at all (it used to be drawn as a red 0%). */
+  value: number | null;
 }
 
 export default function AttendanceBar({ value }: AttendanceBarProps) {
+  if (value == null) return null;
   const width = `${Math.max(6, Math.min(value, 100))}%` as const;
   // Same thresholds as the percentage text next to it (75 / 60).
   const barColor = value >= 75 ? 'var(--c-success)' : value >= 60 ? 'var(--c-warning)' : 'var(--c-danger)';

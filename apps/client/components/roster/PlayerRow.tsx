@@ -93,7 +93,7 @@ export default function PlayerRow({
         <View style={styles.attendanceCell}>
           <Text style={[styles.attendanceText, { color: attendanceTone }] as any}>{attendanceRate == null ? '—' : `${attendanceRate}%`}</Text>
           <View style={styles.barWrap}>
-            <AttendanceBar value={attendanceRate ?? 0} />
+            <AttendanceBar value={attendanceRate} />
           </View>
         </View>
 
