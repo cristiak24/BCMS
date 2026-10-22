@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Pressable, ScrollView, StyleSheet, Alert } from '@/src/web/reactNative';
 import { useRouter } from '@/src/web/expoRouter';
-import { CreditCard, Download, Plus } from 'lucide-react';
+import { Download, Plus } from 'lucide-react';
 import { teamsApi, Player, RosterPage, RosterPageQuery, RosterSummary, Team } from '../../services/teamsApi';
 import { useResponsive } from '../../hooks/useResponsive';
 import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../components/HeaderContext';
@@ -9,6 +9,7 @@ import { dash } from '../../components/dashboard/dashboardTheme';
 import { EmptyState, ErrorState, SkeletonBlock } from '../../components/dashboard/ScreenStates';
 import PageHero, { GlassStat } from '../../components/admin/PageHero';
 import Button from '../../components/ui/Button';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import PlayerRow from '../../components/roster/PlayerRow';
 import RosterPlayerCard from '../../components/roster/RosterPlayerCard';
 import RosterFilters from '../../components/roster/RosterFilters';
@@ -66,6 +67,8 @@ export default function RosterScreen() {
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [showActionModal, setShowActionModal] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
+  // Reminders notify families, so they go out only after a confirmation.
+  const [confirmReminders, setConfirmReminders] = useState(false);
   const [playerActionBusy, setPlayerActionBusy] = useState(false);
 
   const [selectedTeam, setSelectedTeam] = useState('all');
@@ -336,7 +339,7 @@ export default function RosterScreen() {
     () => [
       { label: 'Orice plată', value: 'all' },
       { label: 'Plătit', value: 'paid' },
-      { label: 'În așteptare', value: 'pending' },
+      { label: 'De plată', value: 'pending' },
       { label: 'Restanță', value: 'overdue' },
     ],
     []
@@ -529,17 +532,13 @@ export default function RosterScreen() {
         actions={
           <View className="flex-row items-center gap-2">
             {pendingPayments > 0 ? (
-              <TouchableOpacity
-                onPress={handleSendReminders}
-                disabled={sendingReminders}
-                className="flex-row items-center gap-2 h-10 px-3.5 rounded-[10px]"
-                style={{ backgroundColor: sendingReminders ? dash.surfaceSubtle : 'var(--c-brand-surface)', boxShadow: sendingReminders ? undefined : 'var(--e-brand)' } as any}
-              >
-                <CreditCard size={15} color={sendingReminders ? dash.faint : 'var(--c-on-brand)'} />
-                <Text className="text-[12px] font-semibold" style={{ color: sendingReminders ? dash.faint : 'var(--c-on-brand)' }}>
-                  {sendingReminders ? 'Se trimite...' : `Trimite mementouri (${pendingPayments})`}
-                </Text>
-              </TouchableOpacity>
+              <Button
+                icon="notifications-active"
+                label={`Trimite mementouri (${pendingPayments})`}
+                variant="secondary"
+                loading={sendingReminders}
+                onPress={() => setConfirmReminders(true)}
+              />
             ) : null}
             <Button icon="add" label="Adaugă jucător" variant="primary" onPress={() => setShowAddModal(true)} />
           </View>
@@ -547,7 +546,7 @@ export default function RosterScreen() {
       >
         <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
           <GlassStat dot="var(--c-brand-fg)" value={formatAttendanceRate(attendanceValue)} label="Prezență" hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()} />
-          <GlassStat dot="var(--c-success)" value={`${rosterReadiness}%`} label="Plăți la zi" bar={rosterReadiness} />
+          <GlassStat dot="var(--c-success)" value={`${rosterReadiness}%`} label="Fără restanțe" bar={rosterReadiness} />
           <GlassStat dot="var(--c-muted)" value={rosterTotal} label="Sportivi în lot" />
           <GlassStat dot={pendingPayments > 0 ? 'var(--c-danger)' : 'var(--c-success)'} danger={pendingPayments > 0} value={pendingPayments} label="Cu restanțe" />
         </View>
@@ -711,6 +710,17 @@ export default function RosterScreen() {
       <ScrollView contentContainerStyle={styles.listContent} style={styles.screen}>
         {headerContent}
       </ScrollView>
+
+      <ConfirmDialog
+        visible={confirmReminders}
+        title="Trimiți mementouri de plată?"
+        message={`${pendingPayments === 1 ? 'Jucătorul cu restanțe primește' : `Cei ${plural(pendingPayments, 'jucător', 'jucători')} cu restanțe primesc`}, împreună cu părinții, o notificare în aplicație. Cine a primit deja un memento în ultimele 7 zile nu îl mai primește acum.`}
+        confirmLabel="Trimite mementouri"
+        icon="notifications-active"
+        loading={sendingReminders}
+        onConfirm={() => { void handleSendReminders().finally(() => setConfirmReminders(false)); }}
+        onCancel={() => { if (!sendingReminders) setConfirmReminders(false); }}
+      />
 
       <AddPlayerModal
         visible={showAddModal}

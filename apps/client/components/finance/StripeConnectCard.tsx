@@ -42,7 +42,7 @@ export default function StripeConnectCard({ returned }: { returned?: boolean }) 
 
     const ready = Boolean(status?.connected && status.chargesEnabled);
     const headline = !status?.available
-        ? 'Stripe nu este configurat pe server.'
+        ? 'Plățile cu cardul nu sunt încă activate pe platformă.'
         : ready
             ? 'Conectat: plățile online ajung direct în contul clubului.'
             : status?.connected
@@ -64,6 +64,11 @@ export default function StripeConnectCard({ returned }: { returned?: boolean }) 
                         <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ready ? 'var(--c-success)' : status?.connected ? 'var(--c-warning)' : 'var(--c-faint)' }} />
                         <Text className="text-[13.5px] font-semibold flex-1" style={{ color: 'var(--c-ink)' }}>{headline}</Text>
                     </View>
+                    {!status?.available ? (
+                        <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
+                            Le activează operatorul platformei. Până atunci, plățile primite cash sau prin transfer se înregistrează din Situație, cu „Încasează”.
+                        </Text>
+                    ) : null}
                     {status?.connected ? (
                         <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
                             Cont {status.accountId} · plăți {status.chargesEnabled ? 'active' : 'inactive'} · transferuri în bancă {status.payoutsEnabled ? 'active' : 'inactive'}

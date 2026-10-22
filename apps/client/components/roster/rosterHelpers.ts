@@ -35,7 +35,8 @@ export function getPaymentLabel(paymentStatus?: string | null) {
   const bucket = getPaymentBucket(paymentStatus);
   if (bucket === 'paid') return 'Plătit';
   if (bucket === 'overdue') return 'Restanță';
-  return 'În așteptare';
+  // Owed but not late yet — neutral, the same word as the team page.
+  return 'De plată';
 }
 
 export function isPaymentPaid(paymentStatus?: string | null) {

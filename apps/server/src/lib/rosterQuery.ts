@@ -57,7 +57,7 @@ export function paymentBucket(status?: string | null): 'paid' | 'pending' | 'ove
 
 function paymentLabel(status?: string | null) {
     const bucket = paymentBucket(status);
-    return bucket === 'paid' ? 'Plătit' : bucket === 'overdue' ? 'Restanță' : 'În așteptare';
+    return bucket === 'paid' ? 'Plătit' : bucket === 'overdue' ? 'Restanță' : 'De plată';
 }
 
 function paymentRank(status?: string | null) {

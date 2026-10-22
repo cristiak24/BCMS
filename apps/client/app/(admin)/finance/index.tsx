@@ -213,6 +213,7 @@ export default function FinancialSettingsPage() {
     const [stripeConfig, setStripeConfig] = useState<StripeAdminConfig | null>(null);
     const [recentPayments, setRecentPayments] = useState<AdminRecentPayment[]>([]);
     const [loadingStripeConfig, setLoadingStripeConfig] = useState(false);
+    const [showStripeDetails, setShowStripeDetails] = useState(false);
     const [loadingRecentPayments, setLoadingRecentPayments] = useState(false);
     const [hasLoadedFinanceMeta, setHasLoadedFinanceMeta] = useState(false);
     const [uploads, setUploads] = useState<UploadEntry[]>([]);
@@ -815,51 +816,50 @@ export default function FinancialSettingsPage() {
             {activeTab === 'Payment Gateways' && (
                 <View className="mb-20">
                     <StripeConnectCard returned={params.connect === 'return'} />
-                    <FinanceCard>
-                        <View className={`gap-6 ${isMobile ? '' : 'flex-row items-start justify-between'}`}>
-                            <View className="flex-1">
-                                <FinanceCardHeader
-                                    icon="payment"
-                                    tone="brand"
-                                    title="Stripe"
-                                    subtitle="Checkout pentru plățile jucătorilor"
-                                />
-
-                                <View
-                                    className="self-start px-4 py-2 rounded-full flex-row items-center gap-1.5"
-                                    style={{ backgroundColor: stripeConfig?.configured ? 'rgba(16,185,129,0.1)' : loadingStripeConfig ? 'rgba(37,99,235,0.08)' : 'rgba(239,68,68,0.08)' }}
-                                >
-                                    <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: stripeConfig?.configured ? dash.successDeep : loadingStripeConfig ? dash.accentBlue : dash.dangerDeep }} />
-                                    <Text className="text-[12.5px] font-semibold" style={{ color: stripeConfig?.configured ? dash.successDeep : loadingStripeConfig ? dash.accentBlue : dash.dangerDeep }}>
-                                        {loadingStripeConfig ? 'Se încarcă' : stripeConfig?.configured ? 'Activ' : 'Necesită configurare'}
-                                    </Text>
-                                </View>
+                    {/* Server-side Stripe setup: done by whoever runs the platform, so it
+                        stays folded away. The status the club acts on is the card above. */}
+                    <View className="w-full rounded-[16px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
+                        <Pressable
+                            onPress={() => setShowStripeDetails((open) => !open)}
+                            accessibilityRole="button"
+                            aria-expanded={showStripeDetails}
+                            className="flex-row items-center gap-3 px-4 md:px-5 py-3.5"
+                        >
+                            <View className="flex-1 min-w-0">
+                                <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>Detalii tehnice</Text>
+                                <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
+                                    Configurarea Stripe de pe server, pentru operatorul platformei.
+                                </Text>
                             </View>
+                            <View className={`transition-transform duration-200 ${showStripeDetails ? 'rotate-180' : ''}`}>
+                                <MaterialIcons name="expand-more" size={20} color="var(--c-muted)" />
+                            </View>
+                        </Pressable>
 
-                            <View className={`rounded-[18px] border ${isMobile ? 'p-4' : 'p-6 w-[460px]'}`} style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairline }}>
+                        {showStripeDetails ? (
+                            <View className="px-4 md:px-5 pb-4 border-t" style={{ borderColor: 'var(--c-border-soft)' } as any}>
                                 {[
-                                    { label: 'Mediu', value: loadingStripeConfig ? '...' : stripeConfig?.mode === 'live' ? 'Live' : 'Test' },
-                                    { label: 'Monedă', value: loadingStripeConfig ? '...' : (stripeConfig?.currency || 'ron').toUpperCase() },
-                                    { label: 'Cheie secretă', value: loadingStripeConfig ? '...' : stripeConfig?.secretKeyConfigured ? 'Configurat' : 'Lipsește' },
-                                    { label: 'Cheie publică', value: loadingStripeConfig ? '...' : stripeConfig?.publishableKeyConfigured ? 'Configurat în env' : 'Cheie de test' },
-                                    { label: 'Secret webhook', value: loadingStripeConfig ? '...' : stripeConfig?.webhookSecretConfigured ? 'Configurat' : 'Lipsește' },
-                                ].map((row, idx, arr) => (
-                                    <View key={row.label} className={`flex-row justify-between items-center py-2.5 ${idx < arr.length - 1 ? 'border-b' : ''}`} style={{ borderColor: dash.hairline }}>
-                                        <Text className="font-medium text-[13px]" style={{ color: dash.muted }}>{row.label}</Text>
-                                        <Text className="font-black text-[13px]" style={{ color: dash.ink }}>{row.value}</Text>
+                                    { label: 'Mediu', value: loadingStripeConfig ? '…' : stripeConfig?.mode === 'live' ? 'Live' : 'Test' },
+                                    { label: 'Monedă', value: loadingStripeConfig ? '…' : (stripeConfig?.currency || 'ron').toUpperCase() },
+                                    { label: 'Cheie secretă', value: loadingStripeConfig ? '…' : stripeConfig?.secretKeyConfigured ? 'Configurată' : 'Lipsește' },
+                                    { label: 'Cheie publică', value: loadingStripeConfig ? '…' : stripeConfig?.publishableKeyConfigured ? 'Configurată' : 'Cheie de test' },
+                                    { label: 'Secret webhook', value: loadingStripeConfig ? '…' : stripeConfig?.webhookSecretConfigured ? 'Configurat' : 'Lipsește' },
+                                ].map((row) => (
+                                    <View key={row.label} className="flex-row justify-between items-center gap-3 py-2.5 border-b" style={{ borderColor: 'var(--c-border-soft)' } as any}>
+                                        <Text className="text-[13px] font-medium" style={{ color: 'var(--c-muted)' }}>{row.label}</Text>
+                                        <Text className="text-[13px] font-semibold" style={{ color: row.value === 'Lipsește' ? 'var(--c-danger-fg)' : 'var(--c-ink)' }}>{row.value}</Text>
                                     </View>
                                 ))}
+                                <Text className="text-[13px] font-medium mt-3" style={{ color: 'var(--c-muted)' }}>URL webhook</Text>
+                                <Text className="text-[13px] font-semibold mt-0.5 break-anywhere" style={{ color: 'var(--c-ink)' }} selectable>
+                                    {stripeConfig?.webhookUrl || 'Se încarcă…'}
+                                </Text>
+                                <Text className="t-meta mt-2" style={{ color: 'var(--c-muted)' }}>
+                                    Evenimente de trimis din Stripe: checkout.session.completed, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed și checkout.session.expired.
+                                </Text>
                             </View>
-                        </View>
-
-                        <View className="mt-6 rounded-[18px] p-4" style={{ backgroundColor: 'rgba(37,99,235,0.06)' }}>
-                            <Text className="font-black text-[12px] uppercase tracking-wide mb-2" style={{ color: dash.accentBlue }}>URL webhook</Text>
-                            <Text className="font-bold text-[13px]" style={{ color: dash.ink }} selectable>{stripeConfig?.webhookUrl || 'Se încarcă...'}</Text>
-                            <Text className="text-[12px] font-medium mt-3" style={{ color: dash.accentBlue }}>
-                                Evenimente recomandate în Stripe: checkout.session.completed, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed și checkout.session.expired.
-                            </Text>
-                        </View>
-                    </FinanceCard>
+                        ) : null}
+                    </View>
                 </View>
             )}
 

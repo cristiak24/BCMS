@@ -66,7 +66,7 @@ function todayIso() {
 }
 
 function rowMeta(balance: PlayerBalanceSummary, currency: string) {
-    if (balance.state === 'paid') return balance.credit ? `La zi · avans ${money(balance.credit, currency)}` : 'La zi';
+    if (balance.state === 'paid') return balance.credit ? `Plătit · avans ${money(balance.credit, currency)}` : 'Plătit';
     if (balance.state === 'overdue') {
         const since = shortDate(balance.oldestOverdue);
         return `${plural(balance.overdueCount, 'taxă restantă', 'taxe restante')}${since ? ` · din ${since}` : ''}`;
@@ -282,7 +282,7 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                     onChange={(next) => { setFilter(next); setVisibleCount(PAGE); }}
                     options={[
                         { key: 'overdue', label: 'Cu restanțe', count: counts.overdue, dot: 'var(--c-danger)' },
-                        { key: 'owing', label: 'De plată', count: counts.owing, dot: 'var(--c-warning)' },
+                        { key: 'owing', label: 'De plată', count: counts.owing, dot: 'var(--c-faint)' },
                         { key: 'all', label: 'Toți', count: counts.all },
                     ]}
                 />
@@ -325,21 +325,26 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                                 className={`flex-row items-center gap-3 px-3.5 py-2.5 ${index ? 'border-t' : ''}`}
                                 style={{ borderColor: 'var(--c-border)' } as any}
                             >
-                                <View className="flex-1 min-w-0">
-                                    <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+                                {/* Phone: the reason („2 taxe restante · din …”) gets the full width under name and
+                                    amount, where it used to be cut. md+: it sits under the name, the amount spans both rows. */}
+                                <View className="flex-1 min-w-0 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-start">
+                                    <Text className="col-start-1 row-start-1 min-w-0 text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
                                         {balance.playerName}{balance.status === 'inactive' ? ` (${playerStatusLabel(balance.status).toLowerCase()})` : ''}
                                     </Text>
-                                    <Text className="t-meta mt-0.5" style={{ color: late ? 'var(--c-danger-fg)' : 'var(--c-muted)' }} numberOfLines={1}>
+                                    {/* The amount to chase leads: what is past due, not the total that includes fees not yet due. */}
+                                    <View className="col-start-2 row-start-1 md:row-span-2 items-end md:self-center">
+                                        <Text className="t-num text-[14px] font-bold" style={{ color: late ? 'var(--c-danger-fg)' : 'var(--c-ink)' }}>
+                                            {money(late ? balance.overdue : balance.outstanding, currency)}
+                                        </Text>
+                                        {late ? (
+                                            <Text className="t-meta t-num" style={{ color: 'var(--c-muted)' }}>
+                                                {balance.overdue !== balance.outstanding ? `restant din ${money(balance.outstanding, currency)}` : 'restant'}
+                                            </Text>
+                                        ) : null}
+                                    </View>
+                                    <Text className="col-span-2 md:col-span-1 row-start-2 t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
                                         {[balance.teamName, rowMeta(balance, currency)].filter(Boolean).join(' · ')}
                                     </Text>
-                                </View>
-                                <View className="items-end shrink-0">
-                                    <Text className="t-num text-[14px] font-bold" style={{ color: late ? 'var(--c-danger-fg)' : 'var(--c-ink)' }}>
-                                        {money(balance.outstanding, currency)}
-                                    </Text>
-                                    {late && balance.overdue !== balance.outstanding ? (
-                                        <Text className="text-[11px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{money(balance.overdue, currency)} restant</Text>
-                                    ) : null}
                                 </View>
                                 {balance.outstanding > 0 ? (
                                     <Button size="sm" variant="primary" icon="payments" label="Încasează" iconOnlyOnMobile accessibilityLabel={`Încasează de la ${balance.playerName}`} onPress={() => openPayment(balance)} />

@@ -243,9 +243,9 @@ export default function PlayerProfile() {
               />
               <GlassStat value={medMeta.label} label="Viză medicală" dot={medMeta.fg} />
               <GlassStat
-                value={paid ? 'La zi' : overdue > 0 ? money(overdue) : amountDue > 0 ? money(amountDue) : 'În așteptare'}
+                value={paid ? 'Plătit' : overdue > 0 ? money(overdue) : amountDue > 0 ? money(amountDue) : '—'}
                 label={overdue > 0 ? 'Restanță' : amountDue > 0 ? 'De plată' : 'Plată'}
-                dot={paid ? 'var(--c-success)' : overdue > 0 ? 'var(--c-danger)' : 'var(--c-warning)'}
+                dot={paid ? 'var(--c-success)' : overdue > 0 ? 'var(--c-danger)' : 'var(--c-faint)'}
                 danger={overdue > 0}
               />
             </View>

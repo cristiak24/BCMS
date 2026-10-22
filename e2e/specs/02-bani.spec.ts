@@ -57,7 +57,8 @@ test('a partial payment pays only its amount and the player stays in arrears', a
   await page.reload();
   const lucaRow = page.getByText('Luca Marin', { exact: true }).first()
     .locator('xpath=ancestor::*[.//*[normalize-space(text())="Încasează"]][1]');
-  await expect(lucaRow).toContainText(`${ron(after.overdue)} restant`);
+  // The row leads with what is past due; the total owed sits under it.
+  await expect(lucaRow).toContainText(`${ron(after.overdue)}restant din ${ron(after.outstanding)}`);
 });
 
 test('"restanță" is the same number on Dashboard, Lot and Finanțe', async ({ page }) => {

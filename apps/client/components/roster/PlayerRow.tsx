@@ -43,7 +43,7 @@ export default function PlayerRow({
     ? { bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' }
     : paymentLabel === 'Restanță'
       ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)' }
-      : { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' };
+      : { bg: 'var(--c-surface-3)', fg: 'var(--c-ink-soft)' }; // „De plată”: owed, not late
   const attendanceTone = attendanceRate == null ? 'var(--c-faint)' : attendanceRate >= 75 ? 'var(--c-success-fg)' : attendanceRate >= 60 ? 'var(--c-warning-fg)' : 'var(--c-danger-fg)';
   const medical = medicalStatus(player.medicalCheckExpiry);
   const medicalMeta = MEDICAL_META[medical];
