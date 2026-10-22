@@ -8,6 +8,9 @@ import { ApiError } from '../../../services/apiClient';
 import PageContainer from '../../../components/ui/PageContainer';
 import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import Button from '../../../components/ui/Button';
+import UnsavedBar from '../../../components/ui/UnsavedBar';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
+import { useUnloadGuard } from '../../../hooks/useUnloadGuard';
 import SelectField from '../../../components/ui/SelectField';
 import { FormField } from '../../../components/ui/FormField';
 import { Skeleton } from '../../../components/ui/Skeleton';
@@ -119,6 +122,12 @@ export default function PlayerProfile() {
     return JSON.stringify(original) !== JSON.stringify({ firstName, lastName, email, number, birthYear, status, medicalExpiry });
   }, [player, firstName, lastName, email, number, birthYear, status, medicalExpiry]);
 
+  // Save lived only in the hero: on a phone the clearance date is ~1.500px
+  // below it, and „Înapoi” dropped the edit without a word.
+  useUnloadGuard(dirty);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const requestBack = () => (dirty ? setLeaveOpen(true) : handleGoBack());
+
   const numberError = number && !/^\d{1,2}$/.test(number) ? 'Un număr între 0 și 99.' : null;
   const yearError = birthYear && !/^(19|20)\d{2}$/.test(birthYear) ? 'An de forma 2010.' : null;
 
@@ -197,7 +206,7 @@ export default function PlayerProfile() {
       <ScrollView className="flex-1" contentContainerClassName="pb-36" showsVerticalScrollIndicator={false}>
         <PageContainer>
           <View className="mb-3 self-start">
-            <Button icon="chevron-left" label="Înapoi" size="sm" onPress={handleGoBack} />
+            <Button icon="chevron-left" label="Înapoi" size="sm" onPress={requestBack} />
           </View>
 
           <PageHero
@@ -362,6 +371,24 @@ export default function PlayerProfile() {
           </View>
         </PageContainer>
       </ScrollView>
+      {dirty ? (
+        <UnsavedBar
+          label={numberError || yearError ? 'Corectează câmpurile marcate' : 'Modificări nesalvate'}
+          saving={saving}
+          onSave={() => void handleSave()}
+          onDiscard={() => player && hydrate(player)}
+        />
+      ) : null}
+      <ConfirmDialog
+        visible={leaveOpen}
+        destructive
+        title="Pleci fără să salvezi?"
+        message={`Modificările din profilul lui ${`${firstName} ${lastName}`.trim() || 'jucătorului'} se pierd.`}
+        confirmLabel="Pleacă fără salvare"
+        cancelLabel="Rămân pe pagină"
+        onConfirm={() => { setLeaveOpen(false); handleGoBack(); }}
+        onCancel={() => setLeaveOpen(false)}
+      />
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </View>
   );

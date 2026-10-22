@@ -7,7 +7,7 @@ import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../../components/Heade
 import PageHero from '../../../components/admin/PageHero';
 import PageContainer from '../../../components/ui/PageContainer';
 import { Skeleton } from '../../../components/ui/Skeleton';
-import { ErrorState } from '../../../components/ui/ScreenState';
+import { EmptyState, ErrorState } from '../../../components/ui/ScreenState';
 
 /**
  * "Fișă meci" — pulled live from FRB's own game-detail widget (the one their
@@ -63,6 +63,8 @@ export default function MatchDetailScreen() {
   const [detail, setDetail] = useState<GameDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // No FRB game id yet: the normal "not published" state, not a failure.
+  const notPublished = !id || !seasonId;
 
   const { setSearchPlaceholder, setHeaderActions, setMobileFab } = useHeader();
 
@@ -79,7 +81,6 @@ export default function MatchDetailScreen() {
 
   const loadData = useCallback(async () => {
     if (!id || !seasonId) {
-      setError('Acest meci nu are încă o fișă publicată de FRB.');
       setLoading(false);
       return;
     }
@@ -136,12 +137,22 @@ export default function MatchDetailScreen() {
           <View className="max-w-[920px] w-full self-center">
             <Text className="sr-only" accessibilityRole="header" aria-level={1}>Fișa meciului</Text>
             {backButton}
-            <ErrorState
-              title="Fișa meciului nu e disponibilă"
-              message={error ?? 'FRB nu a publicat încă detalii pentru acest meci.'}
-              actionLabel={id && seasonId ? 'Reîncearcă' : undefined}
-              onAction={id && seasonId ? loadData : undefined}
-            />
+            {notPublished ? (
+              <View className="rounded-[16px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}>
+                <EmptyState
+                  icon="event-busy"
+                  title="Fișa FRB nu e publicată încă"
+                  message="FRB publică fișa meciului (scorul pe sferturi, sala, arbitrii) după ce confirmă meciul la ei. Revino aici după ce se joacă."
+                />
+              </View>
+            ) : (
+              <ErrorState
+                title="Fișa meciului nu s-a încărcat"
+                message={error ?? 'FRB nu a răspuns. Încearcă din nou peste câteva momente.'}
+                actionLabel="Reîncearcă"
+                onAction={loadData}
+              />
+            )}
           </View>
         </PageContainer>
       </ScrollView>

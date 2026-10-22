@@ -340,7 +340,8 @@ export default function DocumentsScreen() {
             subtitle="Regulamente, formulare și alte PDF-uri ale clubului."
             actions={canUpload ? <Button label="Încarcă PDF" icon="upload-file" variant="primary" onPress={pickFile} /> : undefined}
           >
-            {data ? (
+            {/* Empty library: no "0 documente · 0 B din 150 MB" tiles, the empty state says it. */}
+            {data && data.documents.length > 0 ? (
               <View className="grid grid-cols-2 gap-2 max-w-[440px] ui-stagger">
                 <GlassStat value={data.documents.length} label={pluralWord(data.documents.length, 'document', 'documente')} dot="var(--c-brand-fg)" />
                 {canUpload ? (

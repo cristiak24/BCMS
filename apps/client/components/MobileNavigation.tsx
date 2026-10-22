@@ -2,7 +2,7 @@ import { Modal, Pressable, ScrollView, Text, View } from '@/src/web/reactNative'
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { theme } from '../constants/designSystem';
-import type { AdminMenuIconName } from './Sidebar';
+import { MenuBadge, type AdminMenuIconName } from './Sidebar';
 
 type BottomItem = {
   href: string;
@@ -15,6 +15,7 @@ type MenuItem = {
   href: string;
   label: string;
   icon: AdminMenuIconName;
+  badge?: number;
 };
 
 type MobileBottomNavigationProps = {
@@ -72,7 +73,9 @@ export function MobileBottomNavigation({
           onPress={onOpenMore}
           className="flex-1 items-center justify-center py-1 px-1"
           accessibilityRole="button"
-          accessibilityLabel="Toate secțiunile"
+          // Starts with the visible text (WCAG 2.5.3): „Toate secțiunile” alone
+          // could not be reached by saying "Mai mult".
+          accessibilityLabel="Mai mult: toate secțiunile"
         >
           <View className="items-center justify-center rounded-[18px] px-2 py-2 min-h-[52px] w-full" style={{ backgroundColor: moreIsActive ? 'var(--c-surface-tint)' : 'transparent' }}>
             <MaterialIcons name="apps" size={20} color={moreIsActive ? theme.colors.royal : theme.colors.faint} />
@@ -155,6 +158,7 @@ export function MobileNavigationSheet({
                     >
                       {item.label}
                     </Text>
+                    {item.badge ? <MenuBadge count={item.badge} /> : null}
                   </Pressable>
                 );
               })}

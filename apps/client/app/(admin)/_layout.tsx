@@ -9,6 +9,7 @@ import { useResponsive } from '../../hooks/useResponsive';
 import AppHeader from '../../components/AppHeader';
 import { InstallBanner } from '../../components/pwa/InstallApp';
 import { MobileBottomNavigation, MobileNavigationSheet } from '../../components/MobileNavigation';
+import { privacyRequestsApi } from '../../services/privacyApi';
 
 const MOBILE_NAV_ITEMS = [
     { href: '/admin/dashboard' as const, label: 'Acasă', icon: 'grid-view' as const, match: 'dashboard' },
@@ -117,9 +118,26 @@ function AdminLayoutContent() {
     const mobileNavItems = isAccountant ? ACCOUNTANT_MOBILE_NAV_ITEMS : isStaff ? STAFF_MOBILE_NAV_ITEMS : MOBILE_NAV_ITEMS;
 
     const activeAdminItem = getActiveAdminItem(pathname, menuItems);
+
+    // Open GDPR requests as a badge on „Date personale” (admin menu only).
+    // Re-read when leaving that page, so a resolved request clears the count.
+    const isClubAdmin = role === 'admin' || role === 'superadmin';
+    const onPrivacyPage = pathname.startsWith('/admin/privacy');
+    const [openPrivacyRequests, setOpenPrivacyRequests] = useState(0);
+    useEffect(() => {
+        if (!isClubAdmin || onPrivacyPage) return undefined;
+        let active = true;
+        privacyRequestsApi.list('open')
+            .then((rows) => { if (active) setOpenPrivacyRequests(rows.length); })
+            .catch(() => undefined);
+        return () => { active = false; };
+    }, [isClubAdmin, onPrivacyPage]);
+
     const availableMenuItems = useMemo(
-        () => menuItems.filter((item) => !item.superadminOnly || isSuperadmin(session)),
-        [session, menuItems],
+        () => menuItems
+            .filter((item) => !item.superadminOnly || isSuperadmin(session))
+            .map((item) => (item.href === '/admin/privacy' && openPrivacyRequests ? { ...item, badge: openPrivacyRequests } : item)),
+        [session, menuItems, openPrivacyRequests],
     );
 
     const isDashboard = pathname.includes('dashboard') || pathname === '/admin';
@@ -143,7 +161,7 @@ function AdminLayoutContent() {
         <div className="flex flex-1 min-h-screen bg-[#EAF1F8] lg:flex-row flex-col">
             {/* Keyboard users skip the menu (12+ stops) straight to the page. */}
             <a href="#continut" className="skip-link">Sari la conținut</a>
-            <Sidebar items={menuItems} />
+            <Sidebar items={availableMenuItems} />
 
             <div className="flex flex-1 min-w-0 flex-col relative">
                 <div className="lg:hidden sticky top-0 z-30">

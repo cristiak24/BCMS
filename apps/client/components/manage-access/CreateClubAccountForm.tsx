@@ -200,7 +200,8 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                 <View className="flex-row items-start gap-2.5">
                     <MaterialIcons name="schedule" size={16} color="var(--c-faint)" />
                     <Text className="flex-1 text-[12px] leading-4" style={{ color: 'var(--c-muted)' }}>
-                        Invitațiile expiră automat după 10 minute și pot fi anulate din Conturi.
+                        {/* Said "10 minutes": stale since server lib/inviteTtl.ts (24 h – 30 days, 7 days by default). */}
+                        Linkul din invitație e valabil cel puțin o zi (implicit 7 zile). Dacă expiră, îl retrimiți din Conturi, unde poți și anula invitația.
                     </Text>
                 </View>
 

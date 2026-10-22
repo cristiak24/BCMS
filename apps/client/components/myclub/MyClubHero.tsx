@@ -49,7 +49,7 @@ export default function MyClubHero({
                 <View className="grid grid-cols-3 lg:grid-cols-6 gap-2 ui-stagger">
                     <GlassStat value={stats.total} label="Echipe" dot="var(--c-brand-fg)" />
                     <GlassStat value={stats.players} label="Jucători" dot="var(--c-muted)" />
-                    <GlassStat value={stats.frb} label="Din FRB" dot="var(--c-danger)" />
+                    <GlassStat value={stats.frb} label="Din FRB" dot={stats.frb ? 'var(--c-danger)' : 'var(--c-faint)'} />
                     <GlassStat value={stats.manual} label="Manuale" dot="var(--c-success)" />
                     <GlassStat value={stats.masculine} label="Masculine" dot="var(--c-gender-m)" />
                     <GlassStat value={stats.feminine} label="Feminine" dot="var(--c-gender-f)" />

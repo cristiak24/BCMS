@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text, TextInput, View } from '@/src/web/r
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { gamesApi, type Game, type GamePayload, type OpponentEntry } from '../../services/gamesApi';
 import type { GameMode } from '../../utils/gameStats';
+import { plural } from '../../utils/plural';
 
 /**
  * Before the tip-off: how detailed, who plays, who starts, the opponent, and
@@ -88,6 +89,14 @@ export default function GameSetup({
     setNumbersInput('');
   };
 
+  // What still blocks the start, said on the button itself. The button used to
+  // be enabled at (0/5) and only then show an error above it, far from the list.
+  const blocker = roster.length < 5
+    ? `Bifează încă ${plural(5 - roster.length, 'jucător', 'jucători')} care joacă`
+    : starters.length !== 5
+      ? `Alege încă ${plural(5 - starters.length, 'titular', 'titulari')}`
+      : null;
+
   const start = async () => {
     if (roster.length < 5) return setError('Alege cel puțin 5 jucători pentru meci.');
     if (starters.length !== 5) return setError('Alege exact 5 jucători care încep (apasă pe „Titular”).');
@@ -160,15 +169,16 @@ export default function GameSetup({
             const playing = roster.includes(p.playerId);
             const starter = starters.includes(p.playerId);
             return (
-              <View key={p.playerId} className="flex-row items-center gap-2.5 rounded-[11px] px-3 py-2" style={{ backgroundColor: playing ? 'var(--c-surface-2)' : 'transparent', opacity: playing ? 1 : 0.6 }}>
-                <Pressable onPress={() => toggleRoster(p.playerId)} accessibilityRole={'checkbox' as any} accessibilityState={{ checked: playing } as any} accessibilityLabel={`${p.firstName} ${p.lastName} joacă`} className="flex-1 min-w-0 flex-row items-center gap-2.5 text-left">
+              <View key={p.playerId} className="flex-row items-center gap-2.5 rounded-[11px] px-3" style={{ backgroundColor: playing ? 'var(--c-surface-2)' : 'transparent', opacity: playing ? 1 : 0.6 }}>
+                {/* The whole line is the target (44px), not just the 20px of text. */}
+                <Pressable onPress={() => toggleRoster(p.playerId)} accessibilityRole={'checkbox' as any} accessibilityState={{ checked: playing } as any} accessibilityLabel={`${p.firstName} ${p.lastName} joacă`} className="flex-1 min-w-0 min-h-11 flex-row items-center gap-2.5 text-left">
                   <MaterialIcons name={playing ? 'check-box' : 'check-box-outline-blank'} size={18} color={playing ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
                   <Text className="t-num w-8 text-[13px] font-bold" style={{ color: 'var(--c-muted)' }}>{p.number ? `#${p.number}` : '—'}</Text>
                   <Text className="flex-1 text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{p.firstName} {p.lastName}</Text>
                 </Pressable>
                 {playing ? (
                   <Pressable onPress={() => toggleStarter(p.playerId)} accessibilityRole="button" accessibilityState={{ selected: starter }}
-                    className="h-8 px-2.5 rounded-[9px] border items-center justify-center"
+                    className="h-10 px-3 rounded-[10px] border items-center justify-center"
                     style={{ borderColor: starter ? 'var(--c-success)' : 'var(--c-border)', backgroundColor: starter ? 'var(--c-success-bg)' : 'var(--c-surface)', opacity: !starter && starters.length >= 5 ? 0.5 : 1 } as any}>
                     <Text className="text-[12px] font-bold" style={{ color: starter ? 'var(--c-success-fg)' : 'var(--c-muted)' }}>Titular</Text>
                   </Pressable>
@@ -190,7 +200,7 @@ export default function GameSetup({
           className="h-11 rounded-[10px] border px-3 text-[14px] font-medium outline-none"
           style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}
         />
-        <Pressable onPress={() => setTrackOpponents((v) => !v)} accessibilityRole={'checkbox' as any} accessibilityState={{ checked: trackOpponents } as any} className="flex-row items-center gap-2 text-left">
+        <Pressable onPress={() => setTrackOpponents((v) => !v)} accessibilityRole={'checkbox' as any} accessibilityState={{ checked: trackOpponents } as any} className="min-h-11 flex-row items-center gap-2 text-left">
           <MaterialIcons name={trackOpponents ? 'check-box' : 'check-box-outline-blank'} size={18} color={trackOpponents ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
           <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>Țin punctele și faulturile pe jucătorii lor</Text>
         </Pressable>
@@ -249,17 +259,22 @@ export default function GameSetup({
         </View>
       </Card>
 
-      {error ? <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text> : null}
+      {error ? <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-danger-fg)' }} accessibilityRole="alert">{error}</Text> : null}
+      {/* Read out as the count changes, next to the button it unlocks. */}
+      <Text className="t-meta text-center" style={{ color: 'var(--c-muted)' }} aria-live="polite">
+        {`${plural(roster.length, 'jucător', 'jucători')} în meci · ${starters.length}/5 titulari`}
+      </Text>
       <Pressable
         onPress={start}
-        disabled={saving}
+        disabled={saving || blocker != null}
         accessibilityRole="button"
+        accessibilityState={{ disabled: saving || blocker != null, busy: saving }}
         className="ui-press h-12 rounded-[12px] flex-row items-center justify-center gap-2"
-        style={{ backgroundColor: 'var(--c-brand-surface)', opacity: saving ? 0.7 : 1 } as any}
+        style={{ backgroundColor: 'var(--c-brand-surface)', opacity: saving ? 0.7 : blocker ? 0.55 : 1 } as any}
       >
         {saving ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : <MaterialIcons name="sports-basketball" size={18} color="var(--c-on-brand)" />}
         <Text className="text-[15px] font-bold" style={{ color: 'var(--c-on-brand)' }}>
-          {keeper && keeper !== myUserId ? 'Salvează și trimite statisticianului' : 'Începe meciul'}
+          {blocker ?? (keeper && keeper !== myUserId ? 'Salvează și trimite statisticianului' : 'Începe meciul')}
         </Text>
       </Pressable>
     </View>

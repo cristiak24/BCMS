@@ -35,7 +35,8 @@ export default function UnsavedBar({
         style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-lg, 0 12px 32px rgba(0,0,0,0.18))', pointerEvents: 'auto' } as any}
       >
         <View className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--c-warning)' }} />
-        <Text className="flex-1 min-w-0 text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+        {/* Two lines on a 375px phone: next to both buttons, "Modificări nesalvate" was cut to "Modificări …". */}
+        <Text className="flex-1 min-w-0 text-[13.5px] font-semibold leading-tight" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>
           {label}
         </Text>
         {onDiscard ? (

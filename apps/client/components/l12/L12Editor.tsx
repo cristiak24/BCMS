@@ -109,6 +109,7 @@ export function Input({
   invalid,
   upper,
   className,
+  onBlur,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -119,6 +120,7 @@ export function Input({
   invalid?: boolean;
   upper?: boolean;
   className?: string;
+  onBlur?: () => void;
 }) {
   return (
     <TextInput
@@ -132,6 +134,8 @@ export function Input({
       placeholder={placeholder}
       placeholderTextColor="var(--c-faint)"
       accessibilityLabel={label}
+      aria-invalid={invalid || undefined}
+      onBlur={onBlur}
       keyboardType={numeric ? 'number-pad' : undefined}
       maxLength={maxLength}
       className={`h-9 rounded-[9px] border px-2.5 text-[13.5px] font-medium outline-none min-w-0 w-full ${numeric ? 't-num text-center font-bold' : ''} ${className ?? ''}`}
@@ -324,12 +328,15 @@ export default function L12Editor({
   rosterLoading,
   showMatchDetails = true,
   known = [],
+  opponentMissing,
 }: {
   lineup: L12Lineup;
   onChange: (next: L12Lineup) => void;
   roster: Player[];
   rosterLoading?: boolean;
   showMatchDetails?: boolean;
+  /** Match sheets whose title names no opponent: is the Adversar field empty? */
+  opponentMissing?: boolean;
   /** Sheet rows seen before (L12 constant, saved sheet): licence/citizenship are reused when a player is added. */
   known?: L12Player[];
 }) {
@@ -461,6 +468,8 @@ export default function L12Editor({
     },
     { key: 'coach', ok: Boolean(headCoach), severity: 'warn', label: headCoach ? 'Antrenor principal' : 'Fără antrenor principal', detail: headCoach || undefined },
     { key: 'visa', ok: visaIssues.length === 0, severity: 'warn', label: visaIssues.length ? `${visaIssues.length} fără viză valabilă` : 'Vize medicale valabile', detail: visaIssues.slice(0, 2).map((r) => r.player.lastName).join(', ') || undefined },
+    // The opponent belongs on the sheet too; it used to show only as a red field.
+    ...(opponentMissing == null ? [] : [{ key: 'opponent', ok: !opponentMissing, severity: 'warn' as const, label: opponentMissing ? 'Adversar lipsă' : 'Adversar completat', detail: opponentMissing ? 'Se completează sus, sub titlu' : undefined }]),
   ];
   const passed = checks.filter((c) => c.ok).length;
   // Errors block a usable sheet; warnings only nag.

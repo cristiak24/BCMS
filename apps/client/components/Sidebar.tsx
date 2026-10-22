@@ -8,7 +8,7 @@ import { useResponsive } from '../hooks/useResponsive';
 
 export type AdminMenuIconName = keyof typeof MaterialIcons.glyphMap;
 
-export const ADMIN_MENU_ITEMS: { label: string; icon: AdminMenuIconName; href: string; superadminOnly?: boolean }[] = [
+export const ADMIN_MENU_ITEMS: { label: string; icon: AdminMenuIconName; href: string; superadminOnly?: boolean; badge?: number }[] = [
     { label: 'Acasă', icon: 'grid-view', href: '/admin/dashboard' },
     // One distinct glyph per entry: three shields (club, access, compliance)
     // and one silhouette for both Conturi and Lot read as the same item.
@@ -27,6 +27,8 @@ export const ADMIN_MENU_ITEMS: { label: string; icon: AdminMenuIconName; href: s
     // entry the header title also fell back to the first item ("Dashboard").
     { label: 'Conformitate', icon: 'medical-services', href: '/admin/compliance' },
     { label: 'Jurnal', icon: 'history', href: '/admin/audit-log' },
+    // GDPR requests have a 30-day legal deadline; they were reachable only from a notification.
+    { label: 'Date personale', icon: 'security', href: '/admin/privacy' },
     { label: 'Utilizatori', icon: 'person-search', href: '/admin/users', superadminOnly: true },
 ];
 
@@ -35,6 +37,15 @@ type SidebarProps = {
     /** Line under the logo; defaults to the signed-in user's club. */
     subtitle?: string;
 };
+
+/** Open-items count next to a menu label (e.g. open GDPR requests). */
+export function MenuBadge({ count }: { count: number }) {
+    return (
+        <View className="min-w-[20px] h-5 px-1.5 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-danger-bg)' }}>
+            <Text className="t-num text-[11px] font-bold" style={{ color: 'var(--c-danger-fg)' }}>{count}</Text>
+        </View>
+    );
+}
 
 export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarProps) {
     const { pathname } = useLocation();
@@ -101,9 +112,10 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarP
                                             color={isActive ? 'var(--c-on-brand)' : 'var(--c-muted)'}
                                         />
                                     </View>
-                                    <Text className="text-[13px]" style={{ color: isActive ? 'var(--c-brand-fg)' : 'var(--c-muted)', fontWeight: isActive ? '800' : '600' } as any} numberOfLines={1}>
+                                    <Text className="flex-1 min-w-0 text-[13px]" style={{ color: isActive ? 'var(--c-brand-fg)' : 'var(--c-muted)', fontWeight: isActive ? '800' : '600' } as any} numberOfLines={1}>
                                         {item.label}
                                     </Text>
+                                    {item.badge ? <MenuBadge count={item.badge} /> : null}
                                 </View>
                             </NavLink>
                             {isActive && (

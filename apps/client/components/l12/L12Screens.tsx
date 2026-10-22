@@ -9,6 +9,7 @@ import PageContainer from '../ui/PageContainer';
 import PageHeader from '../ui/PageHeader';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import UnsavedBar from '../ui/UnsavedBar';
+import { useUnloadGuard } from '../../hooks/useUnloadGuard';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
@@ -66,18 +67,6 @@ function sidesOf(title: string): [string, string | null] {
   const clean = stripKindPrefix(title);
   const sides = clean.split(/\s+vs\.?\s+/i).map((part) => part.trim());
   return sides.length === 2 ? [sides[0], sides[1]] : [clean, null];
-}
-
-function useUnloadGuard(active: boolean) {
-  useEffect(() => {
-    if (!active) return undefined;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [active]);
 }
 
 function BackButton({ label, onPress }: { label: string; onPress: () => void }) {
@@ -514,6 +503,8 @@ export function L12MatchScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   // The match's opponent (events.opponent), saved with the sheet.
   const [opponent, setOpponent] = useState('');
+  // Red only after the field was left empty, never on first load.
+  const [opponentTouched, setOpponentTouched] = useState(false);
   const [savedOpponent, setSavedOpponent] = useState('');
   // A sheet with gaps waits for "Exportă oricum".
   const [exportConfirm, setExportConfirm] = useState<{ kind: 'pdf' | 'word'; gaps: string[] } | null>(null);
@@ -715,7 +706,20 @@ export function L12MatchScreen() {
               {!titleHasSides ? (
                 <View className="mt-3 max-w-[360px]">
                   <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Adversar</Text>
-                  <Input label="Adversar" placeholder="Numele echipei adverse" maxLength={160} value={opponent} onChange={setOpponent} invalid={!opponent.trim()} />
+                  <Input
+                    label="Adversar"
+                    placeholder="Numele echipei adverse"
+                    maxLength={160}
+                    value={opponent}
+                    onChange={setOpponent}
+                    onBlur={() => setOpponentTouched(true)}
+                    invalid={opponentTouched && !opponent.trim()}
+                  />
+                  {opponentTouched && !opponent.trim() ? (
+                    <Text className="text-[12px] font-semibold mt-1.5" style={{ color: 'var(--c-danger-fg)' }}>
+                      Completează adversarul: apare pe foaia L12.
+                    </Text>
+                  ) : null}
                 </View>
               ) : null}
               <View className="flex-row flex-wrap gap-1.5 mt-3">
@@ -744,7 +748,7 @@ export function L12MatchScreen() {
         </View>
       </View>
 
-      <L12Editor lineup={draft} onChange={setDraft} roster={roster} rosterLoading={rosterLoading} known={known} />
+      <L12Editor lineup={draft} onChange={setDraft} roster={roster} rosterLoading={rosterLoading} known={known} opponentMissing={titleHasSides ? undefined : !opponent.trim()} />
 
       <ActionSheet
         visible={menuOpen}

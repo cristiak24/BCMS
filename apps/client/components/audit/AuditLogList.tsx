@@ -2,6 +2,7 @@ import { parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from '@/src/web/reactNative';
 import Button from '../ui/Button';
+import { EmptyState } from '../ui/ScreenState';
 import SelectField from '../ui/SelectField';
 import type { AuditLogEntry, AuditLogFilters, AuditLogPage } from '../../services/clubAdminApi';
 import { plural } from '../../utils/plural';
@@ -206,9 +207,17 @@ export default function AuditLogList({ load }: { load: (filters: AuditLogFilters
                     <Button size="sm" label="Încearcă din nou" onPress={() => void fetchPage()} />
                 </View>
             ) : !data?.logs.length ? (
-                <View className="py-8 items-center">
-                    <Text className="text-[13px]" style={{ color: 'var(--c-muted)' }}>Nicio acțiune înregistrată pentru acest filtru.</Text>
-                </View>
+                // „pentru acest filtru” read wrong under „Toate acțiunile”: say which case it is.
+                <EmptyState
+                    compact
+                    icon="history"
+                    title={category === 'all' ? 'Nicio acțiune înregistrată încă' : 'Nimic în această categorie'}
+                    message={category === 'all'
+                        ? 'Aici apar schimbările la conturi, evenimente, prezență, meciuri, documente și plăți, cu cine și când.'
+                        : 'Alege altă categorie sau „Toate acțiunile”.'}
+                    actionLabel={category === 'all' ? undefined : 'Toate acțiunile'}
+                    onAction={category === 'all' ? undefined : () => { setCategory('all'); setPage(1); }}
+                />
             ) : (
                 <AuditEntries logs={data.logs} />
             )}
