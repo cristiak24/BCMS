@@ -398,7 +398,7 @@ export default function CreateTeamWizard({
                                     <Pressable
                                         key={p.id}
                                         onPress={() => { setSelectedPlayers((prev) => [...prev, p]); setPlayerResults((prev) => prev.filter((rp) => rp.id !== p.id)); }}
-                                        className="flex-row items-center justify-between px-3.5 py-2.5 rounded-[12px] bg-[#F8FAFC] border border-[#F1F5F9] hover:bg-[#F1F5F9]"
+                                        className="flex-row items-center justify-between px-3.5 py-2.5 rounded-[12px] bg-[#F8FAFC] border border-[#F1F5F9] hover:bg-[var(--c-surface-3)]"
                                     >
                                         <Text className="text-[13px] font-bold text-[#0E2041]">{p.firstName} {p.lastName}</Text>
                                         <Plus size={14} color="var(--c-brand-fg)" />

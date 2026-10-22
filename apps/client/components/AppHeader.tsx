@@ -379,7 +379,7 @@ function ProfileActionsMenu({
           <View className="p-2">
             <Pressable
               onPress={onViewProfile}
-              className="min-h-[48px] rounded-[16px] px-3 flex-row items-center active:bg-[#F4F8FD]"
+              className="min-h-[48px] rounded-[16px] px-3 flex-row items-center active:bg-[var(--c-surface-2)]"
               accessibilityRole="button"
             >
               <View className="w-9 h-9 rounded-[14px] bg-[#EAF2FF] items-center justify-center mr-3">
@@ -392,7 +392,7 @@ function ProfileActionsMenu({
             <Pressable
               onPress={onLogout}
               disabled={loggingOut}
-              className={`min-h-[48px] rounded-[16px] px-3 flex-row items-center mt-1 active:bg-[#FFF1F2] ${loggingOut ? 'opacity-70' : ''}`}
+              className={`min-h-[48px] rounded-[16px] px-3 flex-row items-center mt-1 active:bg-[var(--c-danger-bg)] ${loggingOut ? 'opacity-70' : ''}`}
               accessibilityRole="button"
             >
               <View className="w-9 h-9 rounded-[14px] bg-[#FFE4E6] items-center justify-center mr-3">

@@ -129,6 +129,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                                     setErrors((current) => ({ ...current, label: undefined }));
                                 }}
                                 placeholder="ex. Andrei Popescu"
+                                accessibilityLabel="Etichetă (vizibilă doar adminilor)"
                                 autoCapitalize="sentences"
                                 className="rounded-[10px] border px-3.5 h-11 text-[14px]"
                                 style={inputStyle(Boolean(errors.label))}
@@ -145,6 +146,7 @@ export default function CreateClubAccountForm({ onCreated }: Props) {
                                     setErrors((current) => ({ ...current, email: undefined }));
                                 }}
                                 placeholder="nume@exemplu.ro"
+                                accessibilityLabel="Email"
                                 autoCapitalize="none"
                                 keyboardType="email-address"
                                 className="rounded-[10px] border px-3.5 h-11 text-[14px]"

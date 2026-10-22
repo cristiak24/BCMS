@@ -174,7 +174,7 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
                 <Text className="text-[10px] font-black uppercase tracking-widest text-[#0B7A55]">Încasat</Text>
               </View>
               <Text className="text-[18px] font-black text-[#0B7A55]">{loading ? '—' : formatCurrency(collected, currency)}</Text>
-              <Text className="text-[10px] font-bold text-[#0B7A55]/70 mt-0.5">{plural(paid.length, 'plată', 'plăți')}</Text>
+              <Text className="text-[10px] font-bold text-[color:var(--c-success-fg)] mt-0.5">{plural(paid.length, 'plată', 'plăți')}</Text>
             </View>
             <View className="flex-1 rounded-2xl bg-[#FEF3C7] p-4">
               <View className="flex-row items-center gap-1.5 mb-1">
@@ -182,7 +182,7 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
                 <Text className="text-[10px] font-black uppercase tracking-widest text-[#B45309]">În așteptare</Text>
               </View>
               <Text className="text-[18px] font-black text-[#B45309]">{loading ? '—' : pending.length}</Text>
-              <Text className="text-[10px] font-bold text-[#B45309]/70 mt-0.5">tranzacții</Text>
+              <Text className="text-[10px] font-bold text-[color:var(--c-warning-fg)] mt-0.5">tranzacții</Text>
             </View>
           </View>
 
@@ -191,7 +191,7 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
             {!showForm ? (
               <Pressable
                 onPress={() => setShowForm(true)}
-                className="flex-row items-center justify-center gap-2 h-11 rounded-2xl bg-[#0B7A55] active:bg-[#0a6449]"
+                className="flex-row items-center justify-center gap-2 h-11 rounded-2xl bg-[#0B7A55] active:opacity-90"
               >
                 <Banknote size={16} color="#fff" />
                 <Text className="text-white text-[12px] font-black uppercase tracking-wide">Adaugă plată cash</Text>
@@ -271,7 +271,7 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
                 <Pressable
                   onPress={handleSubmit}
                   disabled={!canSubmit}
-                  className={`flex-row items-center justify-center gap-2 h-11 rounded-2xl mt-3 ${canSubmit ? 'bg-[#1D3E90] active:bg-[#15316f]' : 'bg-gray-300'}`}
+                  className={`flex-row items-center justify-center gap-2 h-11 rounded-2xl mt-3 ${canSubmit ? 'bg-[#1D3E90] active:bg-[var(--c-brand-strong)]' : 'bg-[var(--c-surface-3)]'}`}
                 >
                   {submitting ? <ActivityIndicator size="small" color="#fff" /> : (
                     <>

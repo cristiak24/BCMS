@@ -45,7 +45,7 @@ async function openScreenAfterDeploy(page: Page) {
   });
 
   const reloaded = page.waitForEvent('load');
-  await page.getByRole('button', { name: 'Conformitate' }).first().click();
+  await page.getByRole('link', { name: 'Conformitate', exact: true }).first().click();
   await reloaded;
 
   expect(staleRequests.length, 'the screen asked for a chunk the "old" app no longer had').toBeGreaterThan(0);

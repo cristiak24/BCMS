@@ -36,7 +36,7 @@ test('a simple match from setup to final, with an offline stretch', async ({ pag
   // Setup: simple mode, the first five as starters, the opponent's name.
   await page.getByRole('button', { name: /^Simplu/ }).click();
   for (const name of ['Luca Marin', 'Matei Popescu', 'Andrei Vasile', 'Mihai Georgescu', 'Tudor Pop']) {
-    await page.getByRole('button', { name: `${name} joacă` }).locator('xpath=..').getByRole('button', { name: 'Titular' }).click();
+    await page.getByRole('checkbox', { name: `${name} joacă` }).locator('xpath=..').getByRole('button', { name: 'Titular' }).click();
   }
   await page.getByLabel('Numele echipei adverse').fill('CS Oaspeți');
   await page.getByRole('button', { name: 'Începe meciul' }).click();

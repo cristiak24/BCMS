@@ -21,7 +21,7 @@ test('switching child reloads the screens for that child', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Deschide echipa U12 Masculin' })).toBeVisible();
 
   await page.getByRole('button', { name: /Schimbă copilul/ }).click();
-  await page.getByRole('menu').getByRole('button').filter({ hasText: 'Ana Dumitrescu' }).click();
+  await page.getByRole('menu').getByRole('menuitem').filter({ hasText: 'Ana Dumitrescu' }).click();
   await expect(page.getByRole('button', { name: 'Copil: Ana Dumitrescu. Schimbă copilul' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Deschide echipa U14 Feminin' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Deschide echipa U12 Masculin' })).toHaveCount(0);
@@ -33,7 +33,7 @@ test('switching child reloads the screens for that child', async ({ page }) => {
   await expect(page.getByText('Antrenament U12')).toHaveCount(0);
 
   await page.getByRole('button', { name: /Schimbă copilul/ }).click();
-  await page.getByRole('menu').getByRole('button').filter({ hasText: 'Matei Popescu' }).click();
+  await page.getByRole('menu').getByRole('menuitem').filter({ hasText: 'Matei Popescu' }).click();
   await expect(page.getByText('Antrenament U12').first()).toBeVisible();
   await expect(page.getByText('Antrenament U14')).toHaveCount(0);
 });

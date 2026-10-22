@@ -355,6 +355,7 @@ export default function TeamDetailsScreen() {
                                         value={rosterQuery}
                                         onChangeText={setRosterQuery}
                                         placeholder="Caută în lot"
+                                        accessibilityLabel="Caută în lot"
                                         placeholderTextColor="var(--c-faint)"
                                         className="w-full h-10 rounded-[12px] border border-[var(--c-border)] bg-[var(--c-surface-2)] pl-9 pr-3 text-[13px] font-semibold text-[color:var(--c-ink-strong)]"
                                     />

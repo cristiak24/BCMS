@@ -134,7 +134,7 @@ const CalendarCell = React.memo(({
       style={{ width: '14.28%', height: cellHeight }}
       className={`border-[0.5px] border-[#EDF2F9] px-1.5 py-1.5 relative overflow-hidden transition-colors ${
         day.isToday ? 'bg-[#EAF2FF]' : day.isSelected ? 'bg-[#F4F8FD]' : isBusy ? 'bg-[#FAFCFF]' : 'bg-white'
-      } hover:bg-[#F4F8FD]`}
+      } hover:bg-[var(--c-surface-2)]`}
     >
       {day.isToday && <View className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#1D3E90]" />}
 
@@ -179,7 +179,7 @@ const CalendarCell = React.memo(({
         {overflow > 0 && (
           <TouchableOpacity onPress={open} activeOpacity={0.7} className="self-start mt-[1px]">
             <View className="bg-slate-100 rounded-full px-2 py-[2px]">
-              <Text style={{ fontSize: 9, fontWeight: '800', color: 'var(--c-muted)' }}>+{overflow} încă</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: 'var(--c-muted)' }}>+{overflow} încă</Text>
             </View>
           </TouchableOpacity>
         )}

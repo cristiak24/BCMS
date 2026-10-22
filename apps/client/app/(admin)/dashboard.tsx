@@ -606,6 +606,8 @@ export default function Dashboard() {
                   <View className="flex-1 min-w-0">
                     <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{formatToday()}</Text>
                     <Text
+                      accessibilityRole="header"
+                      aria-level={1}
                       className="f-display text-[22px] md:text-[28px] font-extrabold mt-1 leading-tight"
                       style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.035em' } as any}
                       numberOfLines={2}

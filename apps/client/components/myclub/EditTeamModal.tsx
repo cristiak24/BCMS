@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, TextInput, ActivityIndicator, Modal } from '@/src/web/reactNative';
-import { X } from 'lucide-react';
+import { View, Text, Pressable, ActivityIndicator, Modal, ScrollView } from '@/src/web/reactNative';
+import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { teamsApi, Team, Coach, TeamGender, TeamLevel } from '../../services/teamsApi';
 import { basketballApi, type Season, type Team as FrbTeam } from '../../services/basketballApi';
 import { eventsApi } from '../../services/eventsApi';
+import Button from '../ui/Button';
+import FilterChips from '../ui/FilterChips';
+import SelectField from '../ui/SelectField';
+import { FormField } from '../ui/FormField';
+import ThemedCheckbox from './ThemedCheckbox';
 
-const normalizeName = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const normalizeName = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
 /** Best guess for "the same club" in another season's FRB team list. */
 function findSameTeam(teams: FrbTeam[], name: string) {
@@ -18,6 +23,24 @@ function findSameTeam(teams: FrbTeam[], name: string) {
         ?? null;
 }
 
+const LEVEL_OPTIONS: { key: TeamLevel | ''; label: string }[] = [
+    { key: '', label: 'Fără nivel' },
+    { key: 'national', label: 'Național' },
+    { key: 'municipal', label: 'Municipal' },
+    { key: 'initiere', label: 'Inițiere' },
+];
+
+/** Visible label over a SelectField (which carries the same text as its accessible name). */
+function FieldLabel({ children }: { children: string }) {
+    return <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>{children}</Text>;
+}
+
+/**
+ * Edit a team's name, sex, level, coach, FRB season and active flag.
+ * Built on the shared primitives: it was the last pre-overhaul dialog
+ * (uppercase labels, 28px radius, shadow-2xl, hardcoded navy that stayed
+ * light in dark mode).
+ */
 export default function EditTeamModal({
     team,
     coaches,
@@ -124,144 +147,122 @@ export default function EditTeamModal({
         }
     };
 
+    const close = saving ? () => undefined : onClose;
+    const coachOptions = [
+        { key: '', label: 'Fără antrenor' },
+        ...coaches.map((coach) => ({ key: String(coach.id), label: coach.name })),
+    ];
+    const seasonOptions = [
+        ...(!seasons.some((season) => season.id === seasonId) && seasonId ? [{ key: seasonId, label: team.seasonName || seasonId }] : []),
+        ...seasons.map((season) => ({ key: season.id, label: season.text })),
+    ];
+
     return (
-        <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-        <Pressable className="flex-1 bg-[#0E2041]/40 items-center justify-center px-4" onPress={onClose}>
-            <Pressable className="bg-white w-full max-w-[480px] rounded-[28px] p-6 shadow-2xl" onPress={(event: any) => event.stopPropagation?.()}>
-                <View className="flex-row items-center justify-between mb-5">
-                    <Text className="text-[18px] font-black text-[#0E2041]">Editează echipa</Text>
-                    <Pressable onPress={onClose} className="w-9 h-9 rounded-full bg-[#F8FAFC] items-center justify-center border border-gray-100">
-                        <X size={16} color="var(--c-muted)" />
-                    </Pressable>
-                </View>
-
-                <View className="gap-4">
-                    <View>
-                        <Text className="text-[10px] font-black text-[#1D3E90] uppercase tracking-widest mb-1.5 ml-1">Nume echipă</Text>
-                        <TextInput
-                            value={name}
-                            onChangeText={setName}
-                            className="w-full h-[48px] rounded-[14px] border border-gray-200 px-4 text-[14px] font-bold text-[#0E2041] bg-[#F8FAFC]"
-                        />
-                    </View>
-
-                    <View className="flex-row gap-3">
-                        <View className="flex-1">
-                            <Text className="text-[10px] font-black text-[#1D3E90] uppercase tracking-widest mb-1.5 ml-1">Sex</Text>
-                            <View className="flex-row bg-[#F4F8FD] p-1 rounded-[14px] border border-[#DDE7F5] h-[46px]">
-                                {(['M', 'F'] as const).map((g) => (
-                                    <Pressable
-                                        key={g}
-                                        onPress={() => setGender(g)}
-                                        className={`flex-1 items-center justify-center rounded-[11px] ${gender === g ? 'bg-[#123A97]' : ''}`}
-                                    >
-                                        <Text className={`text-[13px] font-black ${gender === g ? 'text-white' : 'text-[#94A3B8]'}`}>{g === 'M' ? 'Masculin' : 'Feminin'}</Text>
-                                    </Pressable>
-                                ))}
-                            </View>
-                        </View>
-                        <View className="flex-1">
-                            <Text className="text-[10px] font-black text-[#1D3E90] uppercase tracking-widest mb-1.5 ml-1">Nivel</Text>
-                            <select
-                                value={level}
-                                onChange={(e) => setLevel(e.target.value as TeamLevel | '')}
-                                className="w-full h-[46px] rounded-[14px] border border-gray-200 px-3 text-[13px] font-bold text-[#0E2041] bg-[#F8FAFC]"
-                            >
-                                <option value="">Fără nivel</option>
-                                <option value="national">Național</option>
-                                <option value="municipal">Municipal</option>
-                                <option value="initiere">Inițiere</option>
-                            </select>
-                        </View>
-                    </View>
-
-                    <View>
-                        <Text className="text-[10px] font-black text-[#1D3E90] uppercase tracking-widest mb-1.5 ml-1">Antrenor</Text>
-                        <select
-                            value={coachId}
-                            onChange={(e) => setCoachId(e.target.value === '' ? '' : Number(e.target.value))}
-                            className="w-full h-[46px] rounded-[14px] border border-gray-200 px-3 text-[13px] font-bold text-[#0E2041] bg-[#F8FAFC]"
+        <Modal visible transparent animationType="fade" onRequestClose={close}>
+            <View className="flex-1 items-center justify-center p-4">
+                {/* The backdrop is a layer behind the card, not its parent: a parent
+                    <button> would have put every field and button inside a button. */}
+                <Pressable
+                    accessibilityLabel="Închide"
+                    onPress={close}
+                    tabIndex={-1}
+                    className="absolute inset-0"
+                    style={{ backgroundColor: 'rgba(2, 8, 23, 0.62)' }}
+                />
+                <View
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Editează echipa"
+                    className="relative w-full max-w-[480px] max-h-[90vh] rounded-[18px] border flex-col overflow-hidden shadow-[var(--e-lg)]"
+                    style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
+                >
+                    <View className="flex-row items-center justify-between gap-3 px-5 pt-5 pb-3">
+                        <Text accessibilityRole="header" className="f-display text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>Editează echipa</Text>
+                        <Pressable
+                            onPress={close}
+                            accessibilityLabel="Închide"
+                            className="w-10 h-10 -mr-2 rounded-[10px] items-center justify-center hover:bg-[var(--c-surface-3)]"
                         >
-                            <option value="">Fără antrenor</option>
-                            {coaches.map((c) => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                        </select>
+                            <MaterialIcons name="close" size={18} color="var(--c-muted)" />
+                        </Pressable>
                     </View>
 
-                    {isFrbTeam ? (
-                        <View className="rounded-[14px] border p-3.5 gap-3" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
-                            <View>
-                                <Text className="text-[13px] font-bold" style={{ color: 'var(--c-ink)' }}>Sezon FRB</Text>
-                                <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }}>
-                                    Meciurile din calendar vin din sezonul ales aici. Acum: {team.seasonName || '—'}.
-                                </Text>
+                    <ScrollView className="flex-1" contentContainerClassName="px-5 pb-5 gap-4">
+                        <FormField label="Nume echipă" value={name} onChangeText={setName} maxLength={120} />
+
+                        <View className="flex-row flex-wrap gap-4">
+                            <View className="min-w-[180px] flex-1">
+                                <FieldLabel>Sex</FieldLabel>
+                                <FilterChips
+                                    label="Sex"
+                                    value={gender}
+                                    onChange={setGender}
+                                    scrollOnMobile={false}
+                                    options={[{ key: 'M', label: 'Masculin' }, { key: 'F', label: 'Feminin' }]}
+                                />
                             </View>
-                            <select
-                                value={seasonId}
-                                onChange={(e) => changeSeason(e.target.value)}
-                                aria-label="Sezon FRB"
-                                className="native-field h-11 w-full rounded-[11px] border px-3 text-[14px] font-medium"
-                                style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' }}
-                            >
-                                {!seasons.some((season) => season.id === seasonId) && seasonId ? (
-                                    <option value={seasonId}>{team.seasonName || seasonId}</option>
+                            <View className="min-w-[180px] flex-1">
+                                <FieldLabel>Nivel</FieldLabel>
+                                <SelectField label="Nivel" value={level} onChange={setLevel} options={LEVEL_OPTIONS} />
+                            </View>
+                        </View>
+
+                        <View>
+                            <FieldLabel>Antrenor</FieldLabel>
+                            <SelectField
+                                label="Antrenor"
+                                value={coachId === '' ? '' : String(coachId)}
+                                onChange={(next) => setCoachId(next === '' ? '' : Number(next))}
+                                options={coachOptions}
+                            />
+                        </View>
+
+                        {isFrbTeam ? (
+                            <View className="rounded-[12px] border p-3.5 gap-3" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}>
+                                <View>
+                                    <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink)' }}>Sezon FRB</Text>
+                                    <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
+                                        Meciurile din calendar vin din sezonul ales aici. Acum: {team.seasonName || '—'}.
+                                    </Text>
+                                </View>
+                                <SelectField label="Sezon FRB" value={seasonId} onChange={(next) => void changeSeason(next)} options={seasonOptions} />
+                                {seasonChanged ? (
+                                    loadingSeasonTeams ? (
+                                        <View className="flex-row items-center gap-2">
+                                            <ActivityIndicator size="small" color="var(--c-brand-fg)" />
+                                            <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Se încarcă echipele sezonului…</Text>
+                                        </View>
+                                    ) : (
+                                        <View>
+                                            <FieldLabel>Echipa în noul sezon</FieldLabel>
+                                            <SelectField
+                                                label="Echipa FRB în noul sezon"
+                                                value={frbTeamId}
+                                                onChange={setFrbTeamId}
+                                                options={[{ key: '', label: 'Alege echipa' }, ...seasonTeams.map((frbTeam) => ({ key: frbTeam.id, label: frbTeam.name }))]}
+                                            />
+                                        </View>
+                                    )
                                 ) : null}
-                                {seasons.map((season) => (
-                                    <option key={season.id} value={season.id}>{season.text}</option>
-                                ))}
-                            </select>
-                            {seasonChanged ? (
-                                loadingSeasonTeams ? (
-                                    <View className="flex-row items-center gap-2">
-                                        <ActivityIndicator size="small" color="var(--c-brand-fg)" />
-                                        <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-muted)' }}>Se încarcă echipele sezonului…</Text>
-                                    </View>
-                                ) : (
-                                    <View>
-                                        <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Echipa în noul sezon</Text>
-                                        <select
-                                            value={frbTeamId}
-                                            onChange={(e) => setFrbTeamId(e.target.value)}
-                                            aria-label="Echipa FRB în noul sezon"
-                                            className="native-field h-11 w-full rounded-[11px] border px-3 text-[14px] font-medium"
-                                            style={{ backgroundColor: 'var(--c-surface)', borderColor: frbTeamId ? 'var(--c-border)' : 'var(--c-warning)', color: 'var(--c-ink)' }}
-                                        >
-                                            <option value="">Alege echipa</option>
-                                            {seasonTeams.map((frbTeam) => (
-                                                <option key={frbTeam.id} value={frbTeam.id}>{frbTeam.name}</option>
-                                            ))}
-                                        </select>
-                                    </View>
-                                )
-                            ) : null}
+                            </View>
+                        ) : null}
+
+                        <View className="flex-row items-center gap-2.5">
+                            <ThemedCheckbox checked={isActive} onToggle={() => setIsActive((value) => !value)} ariaLabel="Echipă activă" size={18} />
+                            <Text className="text-[13px] font-medium" style={{ color: 'var(--c-ink)' }} aria-hidden>Echipă activă</Text>
                         </View>
-                    ) : null}
 
-                    <Pressable onPress={() => setIsActive((v) => !v)} className="flex-row items-center gap-2.5">
-                        <View className={`w-5 h-5 rounded-[6px] border-2 items-center justify-center ${isActive ? 'bg-[#1D3E90] border-[#1D3E90]' : 'border-gray-300'}`}>
-                            {isActive && <View className="w-2 h-2 rounded-[2px] bg-white" />}
-                        </View>
-                        <Text className="text-[13px] font-bold text-[#0E2041]">Echipă activă</Text>
-                    </Pressable>
+                        {error ? (
+                            <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-danger-fg)' }} accessibilityRole="alert">{error}</Text>
+                        ) : null}
+                    </ScrollView>
 
-                    {error && <Text className="text-[12.5px] font-bold text-red-600">{error}</Text>}
+                    <View className="flex-row justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: 'var(--c-border-soft)' }}>
+                        <Button label="Anulează" variant="secondary" onPress={close} disabled={saving} />
+                        <Button label="Salvează" variant="primary" onPress={() => void handleSave()} loading={saving} />
+                    </View>
                 </View>
-
-                <View className="flex-row gap-3 mt-6">
-                    <Pressable onPress={onClose} className="flex-1 h-[50px] rounded-[14px] border border-gray-200 items-center justify-center bg-white">
-                        <Text className="text-[#64748B] font-black uppercase tracking-widest text-[12px]">Anulează</Text>
-                    </Pressable>
-                    <Pressable
-                        onPress={handleSave}
-                        disabled={saving}
-                        className={`flex-1 h-[50px] rounded-[14px] items-center justify-center ${saving ? 'bg-[#93C5FD]' : 'bg-[#1D3E90]'}`}
-                    >
-                        {saving ? <ActivityIndicator size="small" color="var(--c-surface)" /> : <Text className="text-white font-black uppercase tracking-widest text-[12px]">Salvează</Text>}
-                    </Pressable>
-                </View>
-            </Pressable>
-        </Pressable>
+            </View>
         </Modal>
     );
 }

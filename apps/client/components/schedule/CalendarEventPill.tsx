@@ -31,7 +31,7 @@ export function CalendarEventPill({ event, dateKey, onPress }: { event: Calendar
     >
       {/* One line cut by characters, not words: a line clamp moved the title
           to the (hidden) second line in narrow cells and left only "21:00 …". */}
-      <Text style={{ fontSize: 10, fontWeight: '800', color: solid ? meta.onSolid : meta.onSoft, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as any}>
+      <Text style={{ fontSize: 11, fontWeight: '800', color: solid ? meta.onSolid : meta.onSoft, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as any}>
         {continued ? (
           `↳ ${event.title}`
         ) : (

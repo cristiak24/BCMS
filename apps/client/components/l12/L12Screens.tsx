@@ -690,6 +690,10 @@ export function L12MatchScreen() {
           <View pointerEvents="none" className="absolute rounded-full" style={{ width: 220, height: 220, right: -50, top: -100, backgroundColor: 'var(--c-surface-tint)', opacity: 0.8 }} />
           <View className="relative flex-col lg:flex-row lg:items-start gap-3">
             <View className="flex-1 min-w-0">
+              {/* The visible title is a pair of team badges; readers get one page title. */}
+              <Text className="sr-only" accessibilityRole="header" aria-level={1}>
+                {`Formular L-12 · ${homeTeam}${awayTeam ? ` – ${awayTeam}` : ''}`}
+              </Text>
               <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Formular L-12 · {team.name}</Text>
               <View className="mt-2 flex-col md:flex-row md:items-center gap-x-3 gap-y-1.5">
                 <View className="flex-row items-center gap-2 min-w-0">
@@ -921,6 +925,7 @@ export function L12TemplateScreen() {
           <View pointerEvents="none" className="absolute rounded-full" style={{ width: 220, height: 220, right: -50, top: -100, backgroundColor: 'var(--c-surface-tint)', opacity: 0.8 }} />
           <View className="relative flex-col lg:flex-row lg:items-start gap-3">
             <View className="flex-1 min-w-0">
+              <Text className="sr-only" accessibilityRole="header" aria-level={1}>{`L12 constant · ${team.name}`}</Text>
               <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>L12 constant</Text>
               <View className="flex-row items-center gap-2.5 mt-2 min-w-0">
                 <TeamAvatar name={team.name} mine size={34} />

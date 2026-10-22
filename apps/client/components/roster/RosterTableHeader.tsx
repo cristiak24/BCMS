@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'var(--c-surface-2)',
   },
   label: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
     textTransform: 'uppercase',

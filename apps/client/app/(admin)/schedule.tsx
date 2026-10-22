@@ -555,6 +555,8 @@ export default function ScheduleScreen() {
           (on phones the view icons sit at the right of the same row). */}
       {isMobile ? (
         <View className="flex-row items-center justify-between gap-2 px-4 pt-3">
+          {/* The hero (and its h1) is desktop-only; the app header shows "Program" visually. */}
+          <Text className="sr-only" accessibilityRole="header" aria-level={1}>Calendarul clubului</Text>
           {topTabs}
           {activeTab === 'Monthly' ? (
             <ScheduleViewSwitcher view={scheduleView} onViewChange={changeView} iconOnly />

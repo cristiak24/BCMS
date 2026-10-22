@@ -822,7 +822,7 @@ export default function FinancialSettingsPage() {
                         <Pressable
                             onPress={() => setShowStripeDetails((open) => !open)}
                             accessibilityRole="button"
-                            aria-expanded={showStripeDetails}
+                            accessibilityState={{ expanded: showStripeDetails }}
                             className="flex-row items-center gap-3 px-4 md:px-5 py-3.5"
                         >
                             <View className="flex-1 min-w-0">

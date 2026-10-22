@@ -185,6 +185,7 @@ export default function TeamFiltersBar({
                         value={searchDraft}
                         onChangeText={setSearchDraft}
                         placeholder="Caută echipă, categorie sau antrenor"
+                        accessibilityLabel="Caută echipă, categorie sau antrenor"
                         placeholderTextColor="var(--c-faint)"
                         className="w-full h-9 rounded-[9px] border pl-8 pr-8 text-[13px] font-medium"
                         style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}

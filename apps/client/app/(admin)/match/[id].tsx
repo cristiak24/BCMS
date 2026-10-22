@@ -134,6 +134,7 @@ export default function MatchDetailScreen() {
       <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
         <PageContainer>
           <View className="max-w-[920px] w-full self-center">
+            <Text className="sr-only" accessibilityRole="header" aria-level={1}>Fișa meciului</Text>
             {backButton}
             <ErrorState
               title="Fișa meciului nu e disponibilă"

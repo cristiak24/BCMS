@@ -107,7 +107,7 @@ export default function TeamEventsPanel({ teamId, scope }: { teamId: number; sco
                         const meta = metaFor(e.type);
                         const Icon = meta.icon;
                         return (
-                            <View key={e.id} className="flex-row items-center gap-3 rounded-[14px] border border-[#F1F5F9] hover:bg-[#FBFDFF] px-3.5 py-3 transition-colors">
+                            <View key={e.id} className="flex-row items-center gap-3 rounded-[14px] border border-[#F1F5F9] hover:bg-[var(--c-surface-2)] px-3.5 py-3 transition-colors">
                                 <View className="w-10 h-10 rounded-[12px] items-center justify-center flex-none" style={{ backgroundColor: meta.tint }}>
                                     <Icon size={17} color={meta.accent} />
                                 </View>

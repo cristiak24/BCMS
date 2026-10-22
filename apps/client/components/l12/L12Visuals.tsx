@@ -65,7 +65,9 @@ export function isOwnSide(side: string | null, teamName: string | null) {
 
 export function TeamAvatar({ name, mine, size = 22 }: { name: string; mine?: boolean; size?: number }) {
   return (
+    // Decorative: the team name is always written next to it.
     <View
+      aria-hidden
       className="items-center justify-center rounded-full shrink-0"
       style={{
         width: size,
@@ -75,7 +77,7 @@ export function TeamAvatar({ name, mine, size = 22 }: { name: string; mine?: boo
     >
       <Text
         className="f-display font-bold"
-        style={{ fontSize: Math.round(size * 0.4), color: mine ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)' }}
+        style={{ fontSize: Math.max(11, Math.round(size * 0.4)), color: mine ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)' }}
       >
         {initials(name)}
       </Text>
@@ -337,7 +339,7 @@ export function L12Hero({
         <View className="flex-1 min-w-0 gap-3">
           <View>
             <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Liste de joc · L12</Text>
-            <Text className="f-display text-[20px] md:text-[24px] font-extrabold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any}>
+            <Text accessibilityRole="header" aria-level={1} className="f-display text-[20px] md:text-[24px] font-extrabold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any}>
               {title}
             </Text>
             <Text className="text-[13px] mt-1 max-w-[520px]" style={{ color: 'var(--c-muted)' }}>{subtitle}</Text>

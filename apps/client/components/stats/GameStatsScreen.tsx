@@ -100,7 +100,7 @@ export default function GameStatsScreen() {
       </Pressable>
       <View>
         <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Statistică meci · {data.team.name}</Text>
-        <Text className="f-display text-[20px] md:text-[24px] font-extrabold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any}>{data.event.title}</Text>
+        <Text accessibilityRole="header" aria-level={1} className="f-display text-[20px] md:text-[24px] font-extrabold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any}>{data.event.title}</Text>
         <Text className="t-meta mt-1" style={{ color: 'var(--c-muted)' }}>{[formatWhen(data.event.startTime), data.event.location].filter(Boolean).join(' · ')}</Text>
       </View>
     </View>

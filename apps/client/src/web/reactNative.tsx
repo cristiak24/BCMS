@@ -203,13 +203,18 @@ function omitNativeProps(props: AnyProps) {
     ...rest
   } = props;
 
+  // accessibilityState used to be dropped here, so no chip was ever announced
+  // as selected, no radio as checked, no busy button as busy. Explicit aria-*
+  // props in `rest` still win.
+  const stateAria = accessibilityState ? ariaStateProps(accessibilityState, accessibilityRole) : {};
+
   return {
     // Whatever is left is forwarded to a DOM element. It stays loosely typed:
     // the named RN callback types on AnyProps (onScroll's RN payload, etc.)
     // would otherwise clash with the DOM's own handler signatures.
     // RN's nativeID is the DOM id (ConfirmDialog points aria-describedby at
     // one); forwarding it raw only produced a React unknown-prop warning.
-    rest: (nativeID != null && rest.id == null ? { ...rest, id: nativeID } : rest) as Record<string, any>,
+    rest: { ...stateAria, ...(nativeID != null && rest.id == null ? { ...rest, id: nativeID } : rest) } as Record<string, any>,
     native: {
       accessibilityLabel,
       accessibilityRole,
@@ -237,6 +242,29 @@ function ariaRoleProps(role: string | undefined, level: number | undefined) {
   if (role === 'adjustable') return { role: 'slider' };
   if (role === 'text' || role === 'none') return {};
   return { role };
+}
+
+/** Roles whose selection ARIA expresses with aria-selected. */
+const SELECTABLE_ROLES = new Set(['tab', 'option', 'row', 'gridcell', 'columnheader', 'rowheader', 'treeitem']);
+const CHECKABLE_ROLES = new Set(['radio', 'checkbox', 'switch', 'menuitemradio', 'menuitemcheckbox']);
+
+/**
+ * RN accessibilityState → ARIA. `selected` depends on the role: a tab is
+ * aria-selected, a radio aria-checked, and a plain button (a filter chip) is a
+ * toggle, aria-pressed — aria-selected on a <button> is ignored by readers.
+ */
+function ariaStateProps(state: Record<string, unknown>, role: string | undefined) {
+  const out: Record<string, unknown> = {};
+  if (state.disabled) out['aria-disabled'] = true;
+  if (state.busy) out['aria-busy'] = true;
+  if (typeof state.expanded === 'boolean') out['aria-expanded'] = state.expanded;
+  if (state.checked != null) out['aria-checked'] = state.checked;
+  if (typeof state.selected === 'boolean') {
+    if (role && SELECTABLE_ROLES.has(role)) out['aria-selected'] = state.selected;
+    else if (role && CHECKABLE_ROLES.has(role)) out['aria-checked'] ??= state.selected;
+    else if (!role || role === 'button' || role === 'togglebutton') out['aria-pressed'] = state.selected;
+  }
+  return out;
 }
 
 function cx(...values: Array<string | undefined | false>) {
@@ -304,7 +332,7 @@ function createBox(tag: keyof React.JSX.IntrinsicElements, defaultClassName?: st
     return (
       <Element
         {...domProps}
-        aria-disabled={disabled || undefined}
+        aria-disabled={disabled || domProps['aria-disabled'] || undefined}
         aria-label={native.accessibilityLabel ?? domProps['aria-label']}
         data-testid={native.testID}
         ref={onLayout ? mergeRefs(ref, layoutRef) : ref}
@@ -370,6 +398,11 @@ export const Pressable = React.forwardRef<HTMLElement, AnyProps>(function Pressa
   const { rest, native } = omitNativeProps(props);
   const { children, className, disabled, onClick, style, type, ...domProps } = rest;
   const nested = React.useContext(PressableNestingContext);
+  // A radio, tab, checkbox or link rendered as a bare <button> was announced as
+  // "button", and aria-checked/aria-selected are invalid there without the role.
+  const roleProps: { role?: string } = native.accessibilityRole && native.accessibilityRole !== 'button'
+    ? ariaRoleProps(native.accessibilityRole, undefined)
+    : {};
 
   const handleClick = disabled
     ? undefined
@@ -387,11 +420,11 @@ export const Pressable = React.forwardRef<HTMLElement, AnyProps>(function Pressa
   const rendered = nested ? (
     <div
       {...domProps}
-      aria-disabled={disabled || undefined}
+      aria-disabled={disabled || domProps['aria-disabled'] || undefined}
       aria-label={native.accessibilityLabel ?? domProps['aria-label']}
       data-testid={native.testID}
       ref={ref as any}
-      role="button"
+      role={domProps.role ?? roleProps.role ?? 'button'}
       tabIndex={disabled ? undefined : 0}
       onClick={handleClick}
       onKeyDown={
@@ -411,8 +444,9 @@ export const Pressable = React.forwardRef<HTMLElement, AnyProps>(function Pressa
     </div>
   ) : (
     <button
+      {...roleProps}
       {...domProps}
-      aria-disabled={disabled || undefined}
+      aria-disabled={disabled || domProps['aria-disabled'] || undefined}
       // Without this, every icon-only button in the app (delete, edit, close,
       // open menu) reached a screen reader as an unnamed "button": the prop was
       // destructured out of `rest` but never rendered.

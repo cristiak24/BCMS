@@ -60,7 +60,7 @@ test('the event page shows 19:00', async ({ page }) => {
 test('the calendar shows 19:00 – 20:30', async ({ page }) => {
   await signIn(page, 'admin');
   await page.goto('/admin/schedule');
-  await page.getByRole('button', { name: 'Agendă' }).click();
+  await page.getByRole('tab', { name: 'Agendă' }).click();
   const entry = page.getByRole('button').filter({ hasText: TITLE });
   await expect(entry.first()).toContainText('19:00 - 20:30');
 });

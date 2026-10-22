@@ -44,7 +44,7 @@
   --c-ink-strong: #0A0C1B;    /* headings / darkest */
   --c-ink-soft: #343A52;      /* secondary text */
   --c-muted: #5B6279;         /* muted text — 6.1:1 on white */
-  --c-faint: #6F7790;         /* faint / placeholder — 4.6:1 on white (was #7D869F at 3.7:1, below AA for the 11–12px meta text it carries) */
+  --c-faint: #646B83;         /* faint / placeholder — 5.3:1 on white, 4.85:1 on --c-bg, 4.6:1 on --c-surface-tint. #6F7790 was 4.45:1 on white (the 4.6 claimed here was wrong) and 4.08:1 on the page */
 
   /* ── Borders ──────────────────────────────────
      Hairlines only. A visible border and a shadow are two ways of saying the

@@ -204,7 +204,7 @@ export default function TeamMedicalVisaModal({ visible, teamId, teamName, onClos
             <Pressable
               onPress={handleSubmit}
               disabled={!canSubmit}
-              className={`px-6 py-3.5 rounded-[14px] shadow-sm flex-row items-center gap-2 ${canSubmit ? 'bg-[#1D3E90] hover:bg-[#152e6b]' : 'bg-gray-300'}`}
+              className={`px-6 py-3.5 rounded-[14px] shadow-sm flex-row items-center gap-2 ${canSubmit ? 'bg-[#1D3E90] hover:bg-[var(--c-brand-strong)]' : 'bg-[var(--c-surface-3)]'}`}
             >
               {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text className="font-black text-[13px] tracking-wide text-white uppercase">Setează ({selectedPlayerIds.length})</Text>}
             </Pressable>
