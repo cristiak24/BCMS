@@ -286,7 +286,7 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                         { key: 'all', label: 'Toți', count: counts.all },
                     ]}
                 />
-                <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 border md:ml-auto md:w-[240px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
+                <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 [@media(pointer:coarse)]:h-10 border md:ml-auto md:w-[240px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
                     <MaterialIcons name="search" size={15} color="var(--c-faint)" />
                     <TextInput
                         value={query}
@@ -430,13 +430,16 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                             </View>
                             <View className="flex-1">
                                 <Text className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Data</Text>
-                                <TextInput
+                                {/* The browser's date picker (same YYYY-MM-DD value) instead of typing AAAA-LL-ZZ. */}
+                                <input
+                                    type="date"
                                     value={date}
-                                    onChangeText={setDate}
-                                    placeholder="AAAA-LL-ZZ"
-                                    accessibilityLabel="Data plății"
-                                    className="h-10 rounded-[10px] px-3 border text-[14px]"
-                                    style={{ borderColor: validDate ? 'var(--c-border)' : 'var(--c-danger-border)', color: 'var(--c-ink)', backgroundColor: 'var(--c-surface)' } as any}
+                                    max={new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' })}
+                                    onChange={(event) => setDate(event.target.value)}
+                                    aria-label="Data plății"
+                                    aria-invalid={validDate ? undefined : true}
+                                    className="w-full h-10 rounded-[10px] px-3 border text-[14px] outline-none"
+                                    style={{ borderColor: validDate ? 'var(--c-border)' : 'var(--c-danger-border)', color: 'var(--c-ink)', backgroundColor: 'var(--c-surface)', colorScheme: 'light dark' }}
                                 />
                             </View>
                         </View>
@@ -463,7 +466,7 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                         />
 
                         {!validDate ? (
-                            <Text className="text-[12px]" style={{ color: 'var(--c-danger-fg)' }}>Data trebuie să fie de forma AAAA-LL-ZZ și nu poate fi în viitor.</Text>
+                            <Text className="text-[12px]" style={{ color: 'var(--c-danger-fg)' }}>Alege o dată de azi sau din trecut.</Text>
                         ) : null}
                         {formError ? <Text className="text-[12px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{formError}</Text> : null}
                     </View>

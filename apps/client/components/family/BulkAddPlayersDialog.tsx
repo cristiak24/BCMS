@@ -150,7 +150,7 @@ export default function BulkAddPlayersDialog({
 
           <View className="flex-row justify-end gap-2 mt-5">
             <Pressable onPress={onClose} disabled={saving} accessibilityRole="button" className="ui-press h-11 px-4 rounded-[11px] items-center justify-center">
-              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Anulează</Text>
+              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Renunță</Text>
             </Pressable>
             <Pressable
               onPress={save}

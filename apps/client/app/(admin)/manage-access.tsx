@@ -242,7 +242,7 @@ export default function ManageAccessScreen() {
                             <View className="gap-3">
                                 <FamilyRequestsPanel onNotify={showToast} onCountChange={setFamilyCount} />
 
-                                <Text className="text-[14px] font-bold mt-3" style={{ color: 'var(--c-ink)' }}>Cereri de acces (link / cont)</Text>
+                                <Text accessibilityRole="header" className="text-[14px] font-bold mt-3" style={{ color: 'var(--c-ink)' }}>Cereri de acces (link / cont)</Text>
                                 <View className="flex-row items-center gap-2">
                                     <View className="flex-1 min-w-0">
                                         <FilterChips
@@ -256,7 +256,7 @@ export default function ManageAccessScreen() {
                                         onPress={() => void loadRequests()}
                                         accessibilityRole="button"
                                         accessibilityLabel="Reîncarcă cererile"
-                                        className="ui-press w-8 h-8 rounded-[9px] border items-center justify-center shrink-0"
+                                        className="ui-press tap-40 w-8 h-8 rounded-[9px] border items-center justify-center shrink-0"
                                         style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
                                     >
                                         <MaterialIcons name="refresh" size={17} color="var(--c-muted)" />
@@ -293,7 +293,7 @@ export default function ManageAccessScreen() {
                 title={pendingDeny ? `Respingi cererea lui ${pendingDeny.userName}?` : ''}
                 message="Cererea va fi respinsă, dar contul rămâne neschimbat (nu este dezactivat). Poți aproba o cerere viitoare oricând."
                 confirmLabel="Respinge"
-                cancelLabel="Anulează"
+                cancelLabel="Renunță"
                 onConfirm={() => {
                     if (pendingDeny) {
                         handleDeny(pendingDeny.id);

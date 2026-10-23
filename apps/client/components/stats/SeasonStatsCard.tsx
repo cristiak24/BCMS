@@ -59,7 +59,7 @@ export default function SeasonStatsCard({ playerId }: { playerId: number }) {
           <MaterialIcons name="sports-basketball" size={17} color="var(--c-brand-fg)" />
         </View>
         <View className="flex-1 min-w-[140px]">
-          <Text className="f-display text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>
+          <Text accessibilityRole="header" className="f-display text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>
             Sezonul {data?.season.label ?? ''}
           </Text>
           {data ? (

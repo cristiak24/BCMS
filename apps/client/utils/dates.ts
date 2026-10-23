@@ -76,3 +76,23 @@ export function calendarDayToIso(day: string): string | null {
   const date = new Date(`${day}T12:00:00.000Z`);
   return isValidDate(date) && date.toISOString().slice(0, 10) === day ? date.toISOString() : null;
 }
+
+/**
+ * The app's display formats, one per job (critique 2 counted ~7 for the same
+ * thing):
+ *   formatDate      „23 oct. 2026”    a date in a list, a card, a record
+ *   formatDateTime  „23 oct., 14:05”  a moment this season (expiry, last change)
+ * Day headings („vineri, 23 octombrie”) and the calendar's own labels stay
+ * with their screens. Invalid input gives ''.
+ */
+export function formatDate(value: string | number | Date | null | undefined): string {
+  if (value == null || value === '') return '';
+  const date = parseApiDate(value);
+  return isValidDate(date) ? date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+}
+
+export function formatDateTime(value: string | number | Date | null | undefined): string {
+  if (value == null || value === '') return '';
+  const date = parseApiDate(value);
+  return isValidDate(date) ? date.toLocaleString('ro-RO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+}

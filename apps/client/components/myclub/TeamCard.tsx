@@ -70,7 +70,7 @@ export default function TeamCard({
             <View className="flex-row items-start gap-3">
                 <TeamAvatar name={team.name} mine size={38} />
 
-                <Pressable onPress={onOpen} className="flex-1 min-w-0 flex-col items-start">
+                <Pressable onPress={onOpen} className="tap-40 flex-1 min-w-0 flex-col items-start">
                     <Text className="f-display text-[15px] font-bold leading-tight text-left" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.015em' } as any} numberOfLines={2}>
                         {team.name}
                     </Text>
@@ -156,7 +156,7 @@ export default function TeamCard({
             <Pressable
                 onPress={onOpen}
                 accessibilityRole="button"
-                className="ui-press flex-row items-center justify-center gap-1.5 mt-3 h-8 rounded-[9px]"
+                className="ui-press flex-row items-center justify-center gap-1.5 mt-3 h-8 [@media(pointer:coarse)]:h-10 rounded-[9px]"
                 style={{ backgroundColor: 'var(--c-surface-tint)' } as any}
             >
                 <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Deschide echipa</Text>

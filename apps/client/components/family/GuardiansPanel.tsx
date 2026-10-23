@@ -76,7 +76,7 @@ export default function GuardiansPanel({ playerId, playerName, onNotify, bare = 
             <MaterialIcons name="family-restroom" size={18} color="var(--c-purple-fg)" />
           </View>
           <View className="flex-1 min-w-0">
-            <Text className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>Părinți</Text>
+            <Text accessibilityRole="header" className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>Părinți</Text>
             <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Conturi legate de {playerName}</Text>
           </View>
         </View>
@@ -122,7 +122,7 @@ export default function GuardiansPanel({ playerId, playerName, onNotify, bare = 
           onPress={invite}
           disabled={inviting}
           accessibilityRole="button"
-          className="ui-press self-start h-9 px-3 rounded-[10px] border flex-row items-center gap-1.5"
+          className="ui-press self-start h-9 [@media(pointer:coarse)]:h-10 px-3 rounded-[10px] border flex-row items-center gap-1.5"
           style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
         >
           {inviting ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="person-add" size={15} color="var(--c-brand-fg)" />}
@@ -137,7 +137,7 @@ export default function GuardiansPanel({ playerId, playerName, onNotify, bare = 
         title={unlinking ? `Dezlegi ${unlinking.name} de ${playerName}?` : ''}
         message="Părintele nu mai vede programul, prezența și plățile copilului. Contul lui rămâne."
         confirmLabel="Dezleagă"
-        cancelLabel="Anulează"
+        cancelLabel="Renunță"
         onConfirm={() => {
           if (unlinking) void unlink(unlinking);
           setUnlinking(null);

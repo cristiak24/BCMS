@@ -164,17 +164,18 @@ export default function GameSetup({
       </Card>
 
       <Card title={`Jucători · ${roster.length}`} hint={`Bifează cine joacă și alege cei 5 titulari (${starters.length}/5).`}>
-        <View className="gap-1.5">
-          {lineup.map((p) => {
+        {/* One list with dividers (it was a tinted block per player); who sits out reads quieter by colour, not opacity. */}
+        <View className={lineup.length ? 'rounded-[12px] border overflow-hidden' : ''} style={{ borderColor: 'var(--c-border)' }}>
+          {lineup.map((p, index) => {
             const playing = roster.includes(p.playerId);
             const starter = starters.includes(p.playerId);
             return (
-              <View key={p.playerId} className="flex-row items-center gap-2.5 rounded-[11px] px-3" style={{ backgroundColor: playing ? 'var(--c-surface-2)' : 'transparent', opacity: playing ? 1 : 0.6 }}>
+              <View key={p.playerId} className={`flex-row items-center gap-2.5 px-3 ${index > 0 ? 'border-t' : ''}`} style={{ borderColor: 'var(--c-border-soft)' }}>
                 {/* The whole line is the target (44px), not just the 20px of text. */}
                 <Pressable onPress={() => toggleRoster(p.playerId)} accessibilityRole={'checkbox' as any} accessibilityState={{ checked: playing } as any} accessibilityLabel={`${p.firstName} ${p.lastName} joacă`} className="flex-1 min-w-0 min-h-11 flex-row items-center gap-2.5 text-left">
                   <MaterialIcons name={playing ? 'check-box' : 'check-box-outline-blank'} size={18} color={playing ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
                   <Text className="t-num w-8 text-[13px] font-bold" style={{ color: 'var(--c-muted)' }}>{p.number ? `#${p.number}` : '—'}</Text>
-                  <Text className="flex-1 text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{p.firstName} {p.lastName}</Text>
+                  <Text className="flex-1 text-[14px] font-semibold" style={{ color: playing ? 'var(--c-ink)' : 'var(--c-muted)' }} numberOfLines={1}>{p.firstName} {p.lastName}</Text>
                 </Pressable>
                 {playing ? (
                   <Pressable onPress={() => toggleStarter(p.playerId)} accessibilityRole="button" accessibilityState={{ selected: starter }}

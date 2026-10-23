@@ -40,7 +40,7 @@ export default function CoachHandoverDialog({
       title={`Dezactivezi contul lui ${personName}?`}
       message={`${personName} antrenează ${request?.teams.map((t) => t.name).join(', ') ?? ''}. Un antrenor dezactivat ar rămâne alocat ${teamCount === 1 ? 'echipei' : 'echipelor'} și nimeni nu le-ar mai putea prelua. Alege cine preia ${teamCount === 1 ? 'echipa' : 'echipele'}.`}
       confirmLabel="Dezactivează și realocă"
-      cancelLabel="Anulează"
+      cancelLabel="Renunță"
       loading={loading}
       onConfirm={() => onConfirm(handoverTarget(choice))}
       onCancel={onCancel}

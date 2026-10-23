@@ -1,4 +1,4 @@
-import { parseApiDate } from '@/utils/dates';
+import { formatDate as formatDisplayDate } from '@/utils/dates';
 import { View, Text, TextInput, Pressable, ActivityIndicator } from '@/src/web/reactNative';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { useCallback, useEffect, useState } from 'react';
@@ -32,10 +32,7 @@ const STATUS_VIEW: Record<string, { label: string; dot: string; fg: string }> = 
 };
 
 function formatDate(iso: string | null | undefined) {
-    if (!iso) return '—';
-    const date = parseApiDate(iso);
-    if (Number.isNaN(date.getTime())) return '—';
-    return date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' });
+    return formatDisplayDate(iso) || '—';
 }
 
 function SectionLabel({ children }: { children: string }) {
@@ -313,7 +310,7 @@ export default function UserDetail() {
                         className="min-h-[48px] px-6 py-3 rounded-2xl border items-center justify-center"
                         style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
                     >
-                        <Text className="font-black" style={{ color: 'var(--c-ink-soft)' }}>Anulează</Text>
+                        <Text className="font-black" style={{ color: 'var(--c-ink-soft)' }}>Renunță</Text>
                     </Pressable>
                     <Pressable
                         onPress={handleSave}

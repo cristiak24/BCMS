@@ -166,12 +166,14 @@ function KpiCard({
     >
       <View className="flex-row items-center justify-between gap-2 min-w-0">
         <View className="flex-row items-center gap-2 min-w-0 flex-1">
-          {/* Small tick in the tone colour — the only accent on the card. */}
-          <View className="w-[3px] h-3 rounded-full shrink-0" style={{ backgroundColor: accent.solid }} />
+          {/* A tick only when the figure needs attention: colour carries a state, it doesn't decorate. */}
+          {tone === 'warning' || tone === 'danger' ? (
+            <View className="w-[3px] h-3 rounded-full shrink-0" style={{ backgroundColor: accent.solid }} />
+          ) : null}
           <Text className="t-eyebrow flex-1 min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
         </View>
-        <View className="hidden sm:flex w-7 h-7 rounded-[9px] items-center justify-center shrink-0" style={{ backgroundColor: accent.bg }}>
-          <MaterialIcons name={icon} size={15} color={accent.fg} />
+        <View className="hidden sm:flex w-7 h-7 rounded-[9px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+          <MaterialIcons name={icon} size={15} color="var(--c-muted)" />
         </View>
       </View>
 
@@ -207,8 +209,8 @@ function KpiCard({
   );
 }
 
-function QuickAction({ icon, tone, label, detail, onPress }: { icon: string; tone: Tone; label: string; detail: string; onPress: () => void }) {
-  const accent = ACCENT[tone];
+/** Shortcut card. One accent for all of them — they used to be four hues for four links. */
+function QuickAction({ icon, label, detail, onPress }: { icon: string; label: string; detail: string; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
@@ -217,8 +219,8 @@ function QuickAction({ icon, tone, label, detail, onPress }: { icon: string; ton
       className="home-card rounded-[14px] border px-3 py-2.5 flex-row items-center gap-2.5 min-w-0 text-left"
       style={CARD as any}
     >
-      <View className="w-8 h-8 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: accent.bg }}>
-        <MaterialIcons name={icon} size={17} color={accent.fg} />
+      <View className="w-8 h-8 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+        <MaterialIcons name={icon} size={17} color="var(--c-brand-fg)" />
       </View>
       <View className="flex-1 min-w-0">
         <Text className="f-display text-[13.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{label}</Text>
@@ -254,14 +256,14 @@ function SectionCard({
           <MaterialIcons name={icon} size={16} color={accent.fg} />
         </View>
         <View className="flex-1 min-w-0">
-          <Text className="f-display text-[15px] font-bold" style={{ color: 'var(--c-ink)', letterSpacing: '-0.015em' } as any} numberOfLines={1}>{title}</Text>
+          <Text accessibilityRole="header" className="f-display text-[15px] font-bold" style={{ color: 'var(--c-ink)', letterSpacing: '-0.015em' } as any} numberOfLines={1}>{title}</Text>
           {subtitle ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{subtitle}</Text> : null}
         </View>
         {action ? (
           <Pressable
             onPress={action.onPress}
             accessibilityRole="link"
-            className="home-row ui-press flex-row items-center gap-1 rounded-[8px] border px-2.5 h-8 shrink-0 hover:bg-[var(--c-surface-2)]"
+            className="home-row ui-press tap-40 flex-row items-center gap-1 rounded-[8px] border px-2.5 h-8 shrink-0 hover:bg-[var(--c-surface-2)]"
             style={{ borderColor: 'var(--c-border)' } as any}
           >
             <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{action.label}</Text>
@@ -503,7 +505,7 @@ export default function Dashboard() {
   const attention = useMemo<AttentionItem[]>(() => {
     const items: AttentionItem[] = [];
     if (summary?.expiredVisasCount) {
-      items.push({ key: 'visas', icon: 'medical-services', tone: 'danger', title: `${plural(summary.expiredVisasCount, 'viză medicală expirată', 'vize medicale expirate')}`, detail: 'Sportivii nu pot juca până la reînnoire', href: '/admin/compliance' });
+      items.push({ key: 'visas', icon: 'medical-services', tone: 'danger', title: `${plural(summary.expiredVisasCount, 'viză medicală expirată', 'vize medicale expirate')}`, detail: 'Fără viză valabilă nu se poate juca', href: '/admin/compliance' });
     }
     // Visas only: expiringItems also carries the monthly fee („COTIZAȚIE LUNARĂ”), which
     // showed up here as "1 viză expiră în 7 zile" with no clearance due that week.
@@ -573,18 +575,18 @@ export default function Dashboard() {
           </View>
         </View>
       ) : (
-        <View className="px-3 md:px-4 pb-3.5 gap-2 ui-stagger">
-          {attention.map((item) => {
+        // One list with dividers, flush under the card header (it was a bordered card per row).
+        <View className="-mt-3 ui-stagger">
+          {attention.map((item, index) => {
             const tone = ACCENT[item.tone];
             return (
               <Pressable
                 key={item.key}
                 onPress={() => go(item.href)}
                 accessibilityRole="link"
-                className="home-row ui-press relative overflow-hidden flex-row items-center gap-3 rounded-[12px] border pl-3.5 pr-3 py-2.5 text-left hover:bg-[var(--c-surface-2)]"
+                className={`home-row ui-press flex-row items-center gap-3 px-4 md:px-5 py-3 text-left hover:bg-[var(--c-surface-2)] ${index > 0 ? 'border-t' : ''}`}
                 style={{ borderColor: 'var(--c-border-soft)' } as any}
               >
-                <View pointerEvents="none" className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full" style={{ backgroundColor: tone.solid }} />
                 <View className="w-8 h-8 rounded-[9px] items-center justify-center shrink-0" style={{ backgroundColor: tone.bg }}>
                   <MaterialIcons name={item.icon} size={16} color={tone.fg} />
                 </View>
@@ -700,13 +702,13 @@ export default function Dashboard() {
 
               {/* Quick actions */}
               <View className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 ui-stagger">
-                <QuickAction icon="calendar-month" tone="brand" label="Program" detail="Antrenamente, meciuri" onPress={() => go('/admin/schedule')} />
-                <QuickAction icon="assignment" tone="sky" label="Liste L12" detail="Loturile pentru meciuri" onPress={() => go('/admin/l12')} />
-                <QuickAction icon="verified-user" tone="success" label="Conformitate" detail="Vize și documente" onPress={() => go('/admin/compliance')} />
+                <QuickAction icon="calendar-month" label="Program" detail="Antrenamente, meciuri" onPress={() => go('/admin/schedule')} />
+                <QuickAction icon="assignment" label="Liste L12" detail="Loturile pentru meciuri" onPress={() => go('/admin/l12')} />
+                <QuickAction icon="verified-user" label="Conformitate" detail="Vize și documente" onPress={() => go('/admin/compliance')} />
                 {canSeeFinance ? (
-                  <QuickAction icon="insights" tone="purple" label="Finanțe" detail="Încasări și cheltuieli" onPress={() => go('/admin/finance')} />
+                  <QuickAction icon="insights" label="Finanțe" detail="Încasări și cheltuieli" onPress={() => go('/admin/finance')} />
                 ) : (
-                  <QuickAction icon="contacts" tone="purple" label="Contacte" detail="Telefoanele clubului" onPress={() => go('/admin/contacts')} />
+                  <QuickAction icon="contacts" label="Contacte" detail="Telefoanele clubului" onPress={() => go('/admin/contacts')} />
                 )}
               </View>
 
@@ -744,14 +746,14 @@ export default function Dashboard() {
                         )}
                       </View>
                     ) : (
-                      <View className="px-3 md:px-4 pb-3.5 gap-3">
+                      // Day groups of rows with dividers, flush in the card (it was a bordered card per event).
+                      <View className="pb-1">
                         {upcoming.map((group) => (
-                          <View key={group.key} className="gap-1.5">
-                            <View className="flex-row items-center gap-2 px-1.5 pt-1">
+                          <View key={group.key}>
+                            <View className="px-4 md:px-5 pt-3 pb-1.5">
                               <Text className="t-eyebrow" style={{ color: group.label === 'Azi' ? 'var(--c-brand-fg)' : 'var(--c-muted)' }}>{group.label}</Text>
-                              <View className="flex-1 h-px" style={{ backgroundColor: 'var(--c-border-soft)' }} />
                             </View>
-                            <View className="gap-1.5 ui-stagger">
+                            <View className="ui-stagger">
                               {group.items.map((event) => {
                                 const meta = getEventTypeMeta(event.type);
                                 return (
@@ -759,7 +761,7 @@ export default function Dashboard() {
                                     key={event.id}
                                     onPress={() => go(`/admin/event/${event.id}`)}
                                     accessibilityRole="link"
-                                    className="home-row ui-press flex-row items-center gap-3 rounded-[12px] border px-2.5 py-2.5 text-left hover:bg-[var(--c-surface-2)]"
+                                    className="home-row ui-press flex-row items-center gap-3 border-t px-4 md:px-5 py-2.5 text-left hover:bg-[var(--c-surface-2)]"
                                     style={{ borderColor: 'var(--c-border-soft)' } as any}
                                   >
                                     <View className="w-[54px] h-[46px] rounded-[12px] items-center justify-center shrink-0" style={{ backgroundColor: meta.soft }}>
@@ -804,14 +806,14 @@ export default function Dashboard() {
                         <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Niciun rezultat FRB pentru echipele clubului încă.</Text>
                       </View>
                     ) : (
-                      <View className="px-3 md:px-4 pb-3.5 gap-2">
+                      <View className="pb-1">
                         {record ? (
-                          <View className="flex-row h-1.5 rounded-full overflow-hidden mx-1 mb-1" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+                          <View className="flex-row h-1.5 rounded-full overflow-hidden mx-4 md:mx-5 mb-3" style={{ backgroundColor: 'var(--c-surface-3)' }}>
                             <View className="ui-bar h-full" style={{ width: `${(record.wins / record.total) * 100}%`, backgroundColor: 'var(--c-success)' } as any} />
                             <View className="ui-bar h-full" style={{ width: `${(record.losses / record.total) * 100}%`, backgroundColor: 'var(--c-danger)' } as any} />
                           </View>
                         ) : null}
-                        <View className="gap-2 ui-stagger">
+                        <View className="ui-stagger">
                           {results.map((m, index) => {
                             const win = m.result === 'W';
                             const loss = m.result === 'L';
@@ -825,7 +827,7 @@ export default function Dashboard() {
                               <Row
                                 key={`${m.savedTeamName}-${m.date}-${index}`}
                                 {...(open ? { onPress: open, accessibilityRole: 'link', accessibilityLabel: `Detalii meci: ${m.homeTeam} – ${m.awayTeam}` } : {})}
-                                className={`flex-row items-center gap-3 rounded-[12px] border pl-3 ${open ? 'pr-2 home-row ui-press text-left hover:bg-[var(--c-surface-2)]' : 'pr-3'} py-2.5`}
+                                className={`flex-row items-center gap-3 border-t pl-4 md:pl-5 ${open ? 'pr-3 md:pr-4 home-row ui-press text-left hover:bg-[var(--c-surface-2)]' : 'pr-4 md:pr-5'} py-2.5`}
                                 style={{ borderColor: 'var(--c-border-soft)' } as any}
                               >
                                 <View

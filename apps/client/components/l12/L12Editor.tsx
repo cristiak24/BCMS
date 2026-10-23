@@ -21,6 +21,9 @@ import { defaultU22 } from '../../utils/l12Export';
  * applied by the screens and shown in their header.
  */
 
+/** Always on the staff card; the other roles show once filled or on „Alte roluri”. */
+const CORE_STAFF = new Set<L12StaffRole>(['headCoach', 'assistantCoach1']);
+
 export const EMPTY_LINEUP: L12Lineup = { competition: null, gender: null, players: [], staff: {}, captainPlayerId: null };
 
 /** Basketball needs five on court; FRB sheets carry up to twelve. */
@@ -450,6 +453,13 @@ export default function L12Editor({
   const foreignCount = lineup.players.filter(isForeign).length;
   const naturalizedCount = lineup.players.filter((p) => p.naturalized).length;
   const staffFilled = L12_STAFF_ROLES.filter(({ key }) => lineup.staff[key]?.name.trim()).length;
+  // 9 roles × name + licence were 18 fields up front. Start with the two
+  // coaches and whatever is filled; the rest open on demand (sheet and export
+  // still carry all nine).
+  const [allStaff, setAllStaff] = useState(false);
+  const staffShown = L12_STAFF_ROLES.filter(({ key }) => allStaff || CORE_STAFF.has(key)
+    || Boolean(lineup.staff[key]?.name.trim() || lineup.staff[key]?.license.trim()));
+  const staffHidden = L12_STAFF_ROLES.length - staffShown.length;
 
   const checks: { key: string; ok: boolean; label: string; detail?: string; severity: 'error' | 'warn' }[] = [
     { key: 'count', ok: count >= L12_MIN_PLAYERS, severity: 'error', label: `${count}/${L12_MAX_PLAYERS} jucători`, detail: count < L12_MIN_PLAYERS ? `Minimum ${L12_MIN_PLAYERS} pentru joc` : undefined },
@@ -602,7 +612,7 @@ export default function L12Editor({
                 <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Competiția</Text>
                 <Input
                   label="Competiția"
-                  placeholder="Campionatul Național 2026/2027"
+                  placeholder="ex. Campionatul Național 2026/2027"
                   maxLength={255}
                   value={lineup.competition ?? ''}
                   onChange={(competition) => onChange({ ...lineup, competition })}
@@ -688,7 +698,7 @@ export default function L12Editor({
 
         <Card title="Staff tehnic" meta={<Text className="t-num text-[13px] font-semibold" style={{ color: 'var(--c-faint)' }}>{staffFilled}/{L12_STAFF_ROLES.length}</Text>}>
           <View className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3">
-            {L12_STAFF_ROLES.map(({ key, label }) => {
+            {staffShown.map(({ key, label }) => {
               const entry = lineup.staff[key] ?? { name: '', license: '' };
               const required = key === 'headCoach';
               return (
@@ -709,6 +719,19 @@ export default function L12Editor({
               );
             })}
           </View>
+          {staffHidden > 0 || allStaff ? (
+            <Pressable
+              onPress={() => setAllStaff((value) => !value)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: allStaff }}
+              className="ui-press tap-40 self-start flex-row items-center gap-1 mt-3 h-8 px-1 -ml-1 rounded-[8px]"
+            >
+              <MaterialIcons name={allStaff ? 'expand-less' : 'expand-more'} size={18} color="var(--c-brand-fg)" />
+              <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
+                {allStaff ? 'Doar rolurile completate' : `Alte roluri (${staffHidden})`}
+              </Text>
+            </Pressable>
+          ) : null}
         </Card>
       </View>
 

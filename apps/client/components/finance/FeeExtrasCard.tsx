@@ -100,7 +100,22 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false, cla
             <View className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 {field('Contribuție antrenament', levy, setLevy, 'RON / lună', !(Number.isFinite(levyValue) && levyValue >= 0))}
                 {field('Taxă bază sportivă', facility, setFacility, 'RON / lună', !(Number.isFinite(facilityValue) && facilityValue >= 0))}
-                {field('Restanțe începând cu luna', startMonth, setStartMonth, 'AAAA-LL', !monthValid, 'ex. 2026-09')}
+                {/* A month picker (same YYYY-MM value) instead of typing AAAA-LL; browsers without one show a text field with the hint. */}
+                <View className="min-w-0 justify-end">
+                    <Text className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--c-muted)' }}>Restanțe începând cu luna</Text>
+                    <input
+                        type="month"
+                        value={startMonth}
+                        max={currentMonth()}
+                        placeholder="ex. 2026-09"
+                        disabled={readOnly}
+                        onChange={(event) => setStartMonth(event.target.value)}
+                        aria-label="Restanțe începând cu luna"
+                        aria-invalid={monthValid ? undefined : true}
+                        className="w-full h-10 rounded-[10px] border px-3 text-[15px] font-semibold t-num outline-none"
+                        style={{ borderColor: monthValid ? 'var(--c-border)' : 'var(--c-danger-border)', color: 'var(--c-ink)', backgroundColor: readOnly ? 'var(--c-surface-2)' : 'var(--c-surface)', colorScheme: 'light dark' }}
+                    />
+                </View>
             </View>
 
             <View className="flex-row items-start gap-2 rounded-[10px] px-3 py-2.5 mb-3" style={{ backgroundColor: 'var(--c-surface-2)' }}>

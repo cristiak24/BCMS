@@ -10,7 +10,7 @@ import { clubAdminApi } from '../../services/clubAdminApi';
 import { manageAccessApi } from '../../services/manageAccessApi';
 import { familyRequestsApi, formatTeamCode, type TeamJoinCode } from '../../services/familyRequestsApi';
 import { getPublicAppUrl } from '../../config/serverUrl';
-import { parseApiDate } from '../../utils/dates';
+import { formatDateTime, parseApiDate } from '../../utils/dates';
 import { plural } from '../../utils/plural';
 import { buildInviteRegistrationUrl, DEFAULT_REFRESH_INTERVAL_MINUTES } from '../../utils/manageAccess';
 import type { InviteCodeItem, InviteLinkItem } from '../../types/manageAccess';
@@ -64,9 +64,7 @@ const defaultUses = (who: Who) => (who === 'parent' ? '2' : '25');
 
 const withTeam = (who: Who) => who === 'parent' || who === 'player';
 
-function formatExpiry(iso: string) {
-    return parseApiDate(iso).toLocaleString('ro-RO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-}
+const formatExpiry = formatDateTime;
 
 function signupLink(token: string) {
     return `${getPublicAppUrl()}/signup?inviteToken=${encodeURIComponent(token)}`;
@@ -690,7 +688,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                         style={{ borderColor: 'var(--c-border)' }}
                     >
                         {step === 1 ? (
-                            <Button label="Anulează" onPress={onClose} />
+                            <Button label="Renunță" onPress={onClose} />
                         ) : (
                             <Button label="Înapoi" icon="arrow-back" disabled={busy} onPress={() => goToStep(step === 3 ? 2 : 1)} />
                         )}

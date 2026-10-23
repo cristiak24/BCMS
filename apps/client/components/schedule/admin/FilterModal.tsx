@@ -5,6 +5,7 @@ import { Team } from '../../../services/teamsApi';
 import { EVENT_TYPE_META, EventType } from '../scheduleShared';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { plural } from '../../../utils/plural';
+import Button from '../../ui/Button';
 
 const EVENT_TYPES: EventType[] = ['training', 'match', 'camp', 'medical', 'admin'];
 
@@ -15,7 +16,7 @@ function SectionLabel({ icon, children }: { icon?: React.ReactNode; children: Re
   return (
     <View className="flex-row items-center gap-2 mb-3">
       {icon}
-      <Text className="text-[11px] font-black text-slate-400 uppercase tracking-[0.18em]">{children}</Text>
+      <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{children}</Text>
     </View>
   );
 }
@@ -259,7 +260,7 @@ export function FilterModal({
           </ScrollView>
 
           {/* Footer */}
-          <View className={`${isMobile ? 'px-5 py-4' : 'px-6 py-4'} border-t border-[#EEF3F9] bg-[#FBFCFE] flex-row items-center justify-between gap-4`}>
+          <View className={`${isMobile ? 'px-5 py-4' : 'px-6 py-4'} border-t flex-row items-center justify-between gap-4`} style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
             <TouchableOpacity
               onPress={() => {
                 setFilterType(null);
@@ -270,17 +271,12 @@ export function FilterModal({
                 setTeamQuery('');
               }}
               disabled={activeCount === 0}
-              className={activeCount === 0 ? 'opacity-40' : ''}
+              accessibilityRole="button"
+              className={`tap-40 justify-center ${activeCount === 0 ? 'opacity-40' : ''}`}
             >
-              <Text className="text-slate-500 font-black text-[12px] uppercase tracking-widest">Șterge tot</Text>
+              <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Șterge filtrele</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={onClose}
-              className="rounded-[10px] px-6 h-11 items-center justify-center"
-              style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)' } as any}
-            >
-              <Text className="text-white font-semibold uppercase tracking-wide text-[12px]">Aplică</Text>
-            </TouchableOpacity>
+            <Button variant="primary" label="Aplică" onPress={onClose} className="px-6" />
           </View>
         </View>
       </Pressable>

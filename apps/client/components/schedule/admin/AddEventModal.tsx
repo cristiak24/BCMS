@@ -509,7 +509,7 @@ export function AddEventModal({
               className="ui-press h-11 px-5 rounded-[11px] items-center justify-center border"
               style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', opacity: addingEvent ? 0.6 : 1 } as any}
             >
-              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Anulează</Text>
+              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Renunță</Text>
             </Pressable>
             <Pressable
               onPress={handleSubmit}

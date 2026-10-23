@@ -117,7 +117,8 @@ export function ScheduleWeekView({
                 backgroundColor: isToday ? 'var(--c-surface-tint)' : undefined,
               } as any}
             >
-              <View className="w-10 items-center shrink-0" style={{ opacity: isPast ? 0.55 : 1 }}>
+              {/* Past days read quieter through colour, not opacity (0.55 took the labels under 4.5:1). */}
+              <View className="w-10 items-center shrink-0">
                 <Text className="t-eyebrow" style={{ color: isToday ? 'var(--c-brand-fg)' : 'var(--c-faint)' }}>
                   {WEEKDAY_LABELS[index]}
                 </Text>
@@ -125,7 +126,7 @@ export function ScheduleWeekView({
                   className="w-8 h-8 rounded-full items-center justify-center mt-1"
                   style={{ backgroundColor: isToday ? 'var(--c-brand-surface)' : 'transparent' }}
                 >
-                  <Text className="t-num text-[15px] font-bold" style={{ color: isToday ? 'var(--c-on-brand)' : 'var(--c-ink)' }}>
+                  <Text className="t-num text-[15px] font-bold" style={{ color: isToday ? 'var(--c-on-brand)' : isPast ? 'var(--c-muted)' : 'var(--c-ink)' }}>
                     {day.getDate()}
                   </Text>
                 </View>

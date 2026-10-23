@@ -113,7 +113,7 @@ function AddChildDialog({ visible, onClose, onSent }: { visible: boolean; onClos
           {error ? <Text className="text-[12.5px] font-semibold mt-3" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text> : null}
           <View className="flex-row justify-end gap-2 mt-5">
             <Pressable onPress={onClose} disabled={sending} accessibilityRole="button" className="ui-press h-11 px-4 rounded-[11px] items-center justify-center">
-              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Anulează</Text>
+              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Renunță</Text>
             </Pressable>
             <Pressable
               onPress={submit}

@@ -235,7 +235,7 @@ export default function ComplianceScreen() {
                 {selected.length > 0 ? (
                   <View className="flex-row items-center gap-3 rounded-[12px] px-3.5 py-2.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
                     <Text className="flex-1 text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
-                      {plural(selected.length, 'sportiv selectat', 'sportivi selectați')}
+                      {selected.length.toLocaleString('ro-RO')} în selecție
                     </Text>
                     <Button size="sm" variant="ghost" label="Deselectează" onPress={() => setSelected([])} />
                     <Button size="sm" variant="primary" icon="event-available" label="Actualizează viza" onPress={() => openEditor(selected)} />
@@ -277,7 +277,7 @@ export default function ComplianceScreen() {
                             <Pressable
                               onPress={() => router.push(`/admin/player/${player.id}` as any)}
                               accessibilityRole="link"
-                              className="flex-1 md:flex-[2] min-w-0 flex-row items-center gap-3 pl-1 md:pl-2"
+                              className="tap-40 flex-1 md:flex-[2] min-w-0 flex-row items-center gap-3 pl-1 md:pl-2"
                             >
                               <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-3)' }}>
                                 <Text className="text-[12px] font-bold" style={{ color: 'var(--c-ink-soft)' }}>{initials(player)}</Text>

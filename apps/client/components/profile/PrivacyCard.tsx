@@ -1,4 +1,4 @@
-import { parseApiDate } from '@/utils/dates';
+import { formatDate as formatDisplayDate } from '@/utils/dates';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -15,9 +15,7 @@ const LEGAL_LINKS = [
 ];
 
 function formatDate(value: string | null) {
-  if (!value) return '';
-  const date = parseApiDate(value);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' });
+  return formatDisplayDate(value);
 }
 
 /** GDPR self-service: read the policies, download your data, ask for erasure. */

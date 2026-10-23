@@ -72,19 +72,17 @@ function isManageableMember(account: ClubAdminAccount) {
 
 const PAGE_SIZE = 20;
 
-// Role-tinted avatars so the list scans by colour.
+// Neutral avatars and role chips; the brand tint marks only the accounts that
+// run the club. A colour per role (green players, purple parents, amber
+// accountant) was decoration — the role is written next to it anyway.
+const NEUTRAL_ROLE = { tint: 'var(--c-surface-3)', fg: 'var(--c-ink-soft)' };
 const ROLE_VISUAL: Record<string, { tint: string; fg: string }> = {
-    coach: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-fg)' },
-    player: { tint: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },
-    parent: { tint: 'var(--c-purple-bg)', fg: 'var(--c-purple-fg)' },
     admin: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-strong)' },
     superadmin: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-strong)' },
-    accountant: { tint: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' },
-    staff: { tint: 'var(--c-surface-3)', fg: 'var(--c-muted)' },
 };
 
 function roleVisual(role: string) {
-    return ROLE_VISUAL[role] ?? { tint: 'var(--c-surface-3)', fg: 'var(--c-muted)' };
+    return ROLE_VISUAL[role] ?? NEUTRAL_ROLE;
 }
 
 function initialsOf(name: string, email: string) {
@@ -522,10 +520,10 @@ export default function ManageAccountsScreen() {
             return {
                 title: `${label}: ${plural(n, 'cont', 'conturi')}?`,
                 message: pending.action === 'deactivate'
-                    ? 'Membrii activi selectați pierd accesul până la reactivare. Restul sunt săriți.'
+                    ? 'Conturile active din selecție pierd accesul până la reactivare. Restul rămân neschimbate.'
                     : pending.action === 'reactivate'
-                        ? 'Membrii dezactivați selectați își recapătă accesul. Restul sunt săriți.'
-                        : `Membrii activi selectați devin ${roleLabel(pending.action).toLowerCase()}. Restul sunt săriți.`,
+                        ? 'Conturile dezactivate din selecție își recapătă accesul. Restul rămân neschimbate.'
+                        : `Conturile active din selecție devin ${roleLabel(pending.action).toLowerCase()}. Restul rămân neschimbate.`,
                 confirmLabel: label,
                 destructive: pending.action === 'deactivate',
             };
@@ -603,9 +601,9 @@ export default function ManageAccountsScreen() {
                             <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
                                 {/* Labels agree with the number: it read "1 Jucători", "1 Părinți". */}
                                 <GlassStat dot="var(--c-success)" value={counts.active} label={counts.active === 1 ? 'Cont activ' : 'Conturi active'} />
-                                <GlassStat dot="var(--c-brand-fg)" value={filterCounts.coach} label={filterCounts.coach === 1 ? 'Antrenor' : 'Antrenori'} />
-                                <GlassStat dot="var(--c-sky)" value={filterCounts.player} label={filterCounts.player === 1 ? 'Jucător' : 'Jucători'} />
-                                <GlassStat dot="var(--c-purple)" value={filterCounts.parent} label={filterCounts.parent === 1 ? 'Părinte' : 'Părinți'} />
+                                <GlassStat dot="var(--c-faint)" value={filterCounts.coach} label={filterCounts.coach === 1 ? 'Antrenor' : 'Antrenori'} />
+                                <GlassStat dot="var(--c-faint)" value={filterCounts.player} label={filterCounts.player === 1 ? 'Jucător' : 'Jucători'} />
+                                <GlassStat dot="var(--c-faint)" value={filterCounts.parent} label={filterCounts.parent === 1 ? 'Părinte' : 'Părinți'} />
                             </View>
                         ) : null}
                     </PageHero>

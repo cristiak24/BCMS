@@ -418,7 +418,7 @@ export default function Scorer({
           ? `${playerTag(rosterById.get(fouledOutAction.playerId))} are 5 faulturi și nu mai poate juca. Îl treci totuși pe teren?`
           : `${playerTag(selectedPlayer)} are 5 faulturi și nu mai poate juca. Înregistrezi totuși „${TYPE_LABEL[fouledOutAction?.type ?? 'p2'] ?? ''}”?`}
         confirmLabel={fouledOutAction?.kind === 'sub' ? 'Da, intră' : 'Da, înregistrează'}
-        cancelLabel="Anulează"
+        cancelLabel="Renunță"
         onConfirm={() => {
           const pending = fouledOutAction;
           setFouledOutAction(null);
@@ -437,7 +437,7 @@ export default function Scorer({
           ? `Scor final ${teamName} ${s.box.us} – ${s.box.them} ${opponentName}. După încheiere, fișa rămâne de citit; acțiunile nu se mai pot modifica.`
           : 'Faulturile de echipă se resetează. Jucătorii de pe teren rămân aceiași.'}
         confirmLabel={confirm === 'finish' ? 'Încheie meciul' : 'Începe sfertul următor'}
-        cancelLabel="Anulează"
+        cancelLabel="Renunță"
         onConfirm={() => {
           const action = confirm;
           setConfirm(null);

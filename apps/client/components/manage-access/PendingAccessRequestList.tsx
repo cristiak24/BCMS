@@ -1,6 +1,7 @@
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { Text, View } from '@/src/web/reactNative';
 import { SkeletonList } from '../ui/Skeleton';
+import { EmptyState } from '../ui/ScreenState';
 import type { AccessRequestItem, AccessRequestStatus } from '../../types/manageAccess';
 import { AccessButton, ROLE_LABELS } from './RoleSelector';
 
@@ -83,15 +84,8 @@ export default function PendingAccessRequestList({
         const copy = searching
             ? { title: 'Niciun rezultat', body: 'Nicio cerere nu se potrivește căutării.' }
             : EMPTY_COPY[filter];
-        return (
-            <View className="ui-rise rounded-[14px] border border-dashed px-4 py-10 items-center" style={{ borderColor: 'var(--c-border)' } as any}>
-                <View className="w-11 h-11 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-                    <MaterialIcons name={searching ? 'search-off' : 'mark-email-read'} size={22} color="var(--c-brand-fg)" />
-                </View>
-                <Text className="text-[15px] font-bold mt-3" style={{ color: 'var(--c-ink)' }}>{copy.title}</Text>
-                <Text className="t-meta text-center mt-1 max-w-[320px]" style={{ color: 'var(--c-muted)' }}>{copy.body}</Text>
-            </View>
-        );
+        // The shared compact empty state, like Cereri above it, Jurnal and Documente.
+        return <EmptyState compact icon={searching ? 'search-off' : 'mark-email-read'} title={copy.title} message={copy.body} />;
     }
 
     return (

@@ -151,7 +151,8 @@ export default function PrivacyRequestsScreen({ platform = false }: { platform?:
       <PageContainer>
         <PageHeader
           keepTitleOnMobile
-          title="Cereri privind datele personale"
+          // The club admin's menu calls this page „Date personale”; one name everywhere.
+          title={platform ? 'Cereri privind datele personale' : 'Date personale'}
           subtitle={platform
             ? 'Cererile de ștergere din toate cluburile. Răspunsul e obligatoriu în cel mult 30 de zile de la cerere.'
             : 'Cererile de ștergere ale membrilor clubului. Răspunsul e obligatoriu în cel mult 30 de zile de la cerere.'}
@@ -190,6 +191,7 @@ export default function PrivacyRequestsScreen({ platform = false }: { platform?:
           </View>
         ) : rows.length === 0 ? (
           <EmptyState
+            compact
             icon="verified-user"
             title={filter === 'open' ? 'Nicio cerere deschisă' : 'Nicio cerere'}
             message={filter === 'open' ? 'Când cineva cere ștergerea datelor din Profil, cererea apare aici.' : 'Cererile închise apar aici, cu nota de rezolvare.'}
@@ -214,7 +216,7 @@ export default function PrivacyRequestsScreen({ platform = false }: { platform?:
         title="Marchezi cererea rezolvată?"
         message={`Fă întâi ce a cerut ${resolving?.requester.name || 'persoana'}: șterge sau anonimizează datele, ori explică ce trebuie păstrat legal (de ex. plățile, pentru contabilitate). Persoana primește nota de mai jos în aplicație.`}
         confirmLabel="Marchează rezolvată"
-        cancelLabel="Anulează"
+        cancelLabel="Renunță"
         loading={saving}
         onConfirm={resolve}
         onCancel={() => setResolving(null)}

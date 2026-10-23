@@ -163,6 +163,7 @@ export function MatchTicket({
   match,
   home,
   away,
+  note,
   showTeam,
   played,
   onPress,
@@ -170,6 +171,8 @@ export function MatchTicket({
   match: L12OverviewMatch;
   home: string;
   away: string | null;
+  /** The event title, when the sides don't come from it (manual matches). */
+  note?: string | null;
   showTeam: boolean;
   played: boolean;
   onPress: () => void;
@@ -204,6 +207,7 @@ export function MatchTicket({
             </View>
             <KindBadge kind={kind} />
             {showTeam && match.teamName ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{match.teamName}</Text> : null}
+            {note ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{note}</Text> : null}
             {played ? <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>jucat</Text> : null}
           </View>
 
@@ -262,7 +266,7 @@ export function DayHeading({ label, count }: { label: string; count: number }) {
   return (
     <View className="flex-row items-center gap-2.5 px-0.5">
       {today ? <View className="ui-ping w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--c-brand-fg)' }} /> : null}
-      <Text className="f-display text-[15px] font-bold" style={{ color: today ? 'var(--c-brand-fg)' : 'var(--c-ink)' }}>{label}</Text>
+      <Text accessibilityRole="header" className="f-display text-[15px] font-bold" style={{ color: today ? 'var(--c-brand-fg)' : 'var(--c-ink)' }}>{label}</Text>
       <Text className="t-num t-meta" style={{ color: 'var(--c-faint)' }}>{plural(count, 'meci', 'meciuri')}</Text>
       <View className="flex-1 h-px" style={{ backgroundColor: 'var(--c-border-soft)' }} />
     </View>

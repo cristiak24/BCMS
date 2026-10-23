@@ -149,7 +149,7 @@ function SettingTile({ label, canEdit, editing, onEdit, loading, value, unit, in
                         <Text className="text-[12px] font-medium shrink-0" style={{ color: 'var(--c-faint)' }}>{unit}</Text>
                     </View>
                     <View className="flex-row gap-2">
-                        <Button size="sm" label="Anulează" className="flex-1" disabled={saving} onPress={onCancel} />
+                        <Button size="sm" label="Renunță" className="flex-1" disabled={saving} onPress={onCancel} />
                         <Button size="sm" variant="primary" icon="save" label="Salvează" className="flex-1" loading={saving} onPress={onSave} />
                     </View>
                 </View>
@@ -197,7 +197,7 @@ export default function FinancialSettingsPage() {
     const canEditFees = session?.role === 'admin' || session?.role === 'superadmin';
     // Back from Stripe's onboarding (?tab=online&connect=return) → the online tab.
     const params = useLocalSearchParams<{ tab?: string; connect?: string }>();
-    const [activeTab, setActiveTab] = useState(params.tab === 'online' ? 'Payment Gateways' : 'Finances');
+    const [activeTab, setActiveTab] = useState(params.tab === 'online' ? 'Payment Gateways' : params.tab === 'setari' ? 'Settings' : 'Finances');
 
     /* ─── Settings state ───────────────────────────────────────── */
     const [settings, setSettings] = useState<FinancialSettings | null>(null);
@@ -498,8 +498,8 @@ export default function FinancialSettingsPage() {
     /* ═══════════════════════════════════════════════════════════════
        RENDER
        ═══════════════════════════════════════════════════════════════ */
-    const TABS = ['Finances', 'Payment Gateways'];
-    const TAB_LABELS: Record<string, string> = { Finances: 'Situație', 'Payment Gateways': 'Plăți online' };
+    const TABS = ['Finances', 'Payment Gateways', 'Settings'];
+    const TAB_LABELS: Record<string, string> = { Finances: 'Situație', 'Payment Gateways': 'Plăți online', Settings: 'Setări' };
 
     return (
         <ScrollView
@@ -519,6 +519,7 @@ export default function FinancialSettingsPage() {
                     <View
                         className="flex-row gap-[2px] rounded-[10px] p-[3px] self-start"
                         style={{ backgroundColor: 'var(--c-surface-3)' }}
+                        accessibilityRole={'tablist' as any}
                     >
                         {TABS.map(tab => {
                             const active = activeTab === tab;
@@ -526,6 +527,8 @@ export default function FinancialSettingsPage() {
                                 <Pressable
                                     key={tab}
                                     onPress={() => setActiveTab(tab)}
+                                    accessibilityRole={'tab' as any}
+                                    accessibilityState={{ selected: active }}
                                     className="tap-40 rounded-[8px] px-3.5 h-8 justify-center"
                                     style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
                                 >
@@ -570,15 +573,13 @@ export default function FinancialSettingsPage() {
             </PageHero>
 
             {/* ═══════════════════════════════════════════════════════
-               TAB: Finances
+               TAB: Settings — set once a season (fee, due day, extra fees).
+               They sat between the daily work on Situație (~2.900px at 375).
                ═══════════════════════════════════════════════════════ */}
-            {activeTab === 'Finances' && (
+            {activeTab === 'Settings' && (
                 <View className="mb-20">
-
-                    <BalancesCard onPaymentRecorded={() => void loadSummary()} />
-
                     {/* ── Fees: the monthly fee + due day, then the extra fees ── */}
-                    <View className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5 items-start">
+                    <View className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
                         <FinanceCard>
                             <FinanceCardHeader
                                 icon="payments"
@@ -641,6 +642,16 @@ export default function FinancialSettingsPage() {
                             onSaved={(next) => { setSettings(next); void loadSummary(); }}
                         />
                     </View>
+                </View>
+            )}
+
+            {/* ═══════════════════════════════════════════════════════
+               TAB: Finances
+               ═══════════════════════════════════════════════════════ */}
+            {activeTab === 'Finances' && (
+                <View className="mb-20">
+
+                    <BalancesCard onPaymentRecorded={() => void loadSummary()} />
 
                     {/* ── Documents register (with its upload actions) + recent payments ── */}
                     <View className="grid grid-cols-1 xl:grid-cols-5 gap-5 items-start">
@@ -671,7 +682,7 @@ export default function FinancialSettingsPage() {
                                         count: f.key === 'all' ? uploads.length : uploads.filter((u) => u.accountingStatus === f.key).length,
                                     }))}
                                 />
-                                <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 border md:ml-auto md:w-[220px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
+                                <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 [@media(pointer:coarse)]:h-10 border md:ml-auto md:w-[220px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
                                     <MaterialIcons name="search" size={15} color="var(--c-faint)" />
                                     <TextInput
                                         value={documentSearch}
@@ -679,7 +690,7 @@ export default function FinancialSettingsPage() {
                                         placeholder="Caută document"
                                         placeholderTextColor="var(--c-faint)"
                                         accessibilityLabel="Caută document"
-                                        className="flex-1 text-[13px]"
+                                        className="flex-1 self-stretch text-[13px]"
                                         style={{ color: 'var(--c-ink)' }}
                                     />
                                     {documentSearch.length > 0 && (
@@ -711,8 +722,8 @@ export default function FinancialSettingsPage() {
                                         return (
                                             <View key={entry.id} className={`px-3.5 py-3 gap-2 ${index ? 'border-t' : ''}`} style={{ borderColor: 'var(--c-border)' } as any}>
                                                 <View className="flex-row items-center gap-3">
-                                                    <View className="w-8 h-8 rounded-[9px] items-center justify-center shrink-0" style={{ backgroundColor: expense ? 'var(--c-warning-bg)' : 'var(--c-sky-bg)' }}>
-                                                        <MaterialIcons name={expense ? 'receipt-long' : 'payment'} size={15} color={expense ? 'var(--c-warning-fg)' : 'var(--c-sky-fg)'} />
+                                                    <View className="w-8 h-8 rounded-[9px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+                                                        <MaterialIcons name={expense ? 'receipt-long' : 'payment'} size={15} color="var(--c-muted)" />
                                                     </View>
                                                     <View className="flex-1 min-w-0">
                                                         <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{entry.label}</Text>
@@ -907,7 +918,7 @@ export default function FinancialSettingsPage() {
                 />
 
                 <View className="flex-row gap-3">
-                    <Button label="Anulează" className="flex-1" disabled={uploadModal.submitting} onPress={closeUploadModal} />
+                    <Button label="Renunță" className="flex-1" disabled={uploadModal.submitting} onPress={closeUploadModal} />
                     <Button variant="primary" icon="upload-file" label="Încarcă documentul" className="flex-1" loading={uploadModal.submitting} onPress={() => void handleConfirmUpload()} />
                 </View>
             </ModalShell>

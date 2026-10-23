@@ -25,7 +25,7 @@ export function AttendanceNoteToggle({
       accessibilityRole="button"
       accessibilityLabel={open ? 'Ascunde nota' : hasNote ? 'Vezi nota' : 'Adaugă notă'}
       accessibilityState={{ expanded: open }}
-      className={`ui-press w-9 h-9 rounded-[10px] border items-center justify-center shrink-0 ${className}`}
+      className={`ui-press tap-40 w-9 h-9 rounded-[10px] border items-center justify-center shrink-0 ${className}`}
       style={{
         borderColor: hasNote ? 'color-mix(in srgb, var(--c-brand-fg) 35%, transparent)' : 'var(--c-border)',
         backgroundColor: hasNote ? 'var(--c-surface-tint)' : 'var(--c-surface-2)',

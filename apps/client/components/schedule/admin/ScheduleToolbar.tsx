@@ -104,7 +104,7 @@ export function ScheduleViewSwitcher({
             accessibilityLabel={label}
             accessibilityRole={'tab' as any}
             accessibilityState={{ selected: active }}
-            className={`flex-row items-center gap-1.5 ${iconOnly ? 'h-8 w-9 [@media(pointer:coarse)]:h-10' : 'h-[28px] px-2.5 [@media(pointer:coarse)]:h-10'} rounded-[8px] justify-center`}
+            className={`flex-row items-center gap-1.5 ${iconOnly ? 'h-8 w-9 [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10' : 'h-[28px] px-2.5 [@media(pointer:coarse)]:h-10'} rounded-[8px] justify-center`}
             style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
           >
             <Icon size={iconOnly ? 15 : 14} color={active ? 'var(--c-brand-fg)' : 'var(--c-muted)'} />
@@ -358,7 +358,7 @@ export function ScheduleToolbar({
           >
             <ChevronLeft size={17} color="var(--c-ink-soft)" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={onToday} accessibilityLabel={todayLabel} className="flex-1 min-w-0 items-center justify-center h-9">
+          <TouchableOpacity onPress={onToday} accessibilityLabel={todayLabel} className="flex-1 min-w-0 items-center justify-center h-9 [@media(pointer:coarse)]:h-10">
             <Text className="text-[16px] font-bold leading-tight" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{monthTitle}</Text>
             <Text className="text-[11.5px] font-medium" style={{ color: 'var(--c-faint)' }}>{countLabel}</Text>
           </TouchableOpacity>

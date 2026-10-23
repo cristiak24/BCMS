@@ -414,7 +414,7 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNot
             ? 'Codul vechi nu mai funcționează. Cererile deja trimise rămân.'
             : `Copiii fără niciun nume identic în club devin jucători noi în echipa cererii.${matched ? ` ${matched === 1 ? 'Cererea cu un jucător cu același nume rămâne' : `Cele ${matched} cereri cu un jucător cu același nume rămân`} pentru verificarea ta, una câte una.` : ''}`}
         confirmLabel={confirm?.kind === 'deny' ? 'Respinge' : confirm?.kind === 'rotate' ? 'Schimbă codul' : 'Aprobă toți'}
-        cancelLabel="Anulează"
+        cancelLabel="Renunță"
         onConfirm={() => {
           const action = confirm;
           setConfirm(null);

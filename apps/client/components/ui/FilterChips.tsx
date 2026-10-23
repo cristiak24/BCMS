@@ -43,7 +43,7 @@ export default function FilterChips<T extends string>({
   label?: string;
 }) {
   const row = (
-    <View className="flex-row items-center gap-1.5" accessibilityRole={'group' as any} accessibilityLabel={label}>
+    <View className={`flex-row items-center gap-1.5 ${scrollOnMobile ? '' : 'flex-wrap'}`} accessibilityRole={'group' as any} accessibilityLabel={label}>
       {options.map((option) => {
         const active = option.key === value;
         return (
@@ -80,7 +80,7 @@ export default function FilterChips<T extends string>({
             {option.count != null && option.count > 0 ? (
               <Text
                 className="text-[11px] font-semibold"
-                style={{ color: active ? 'rgba(255,255,255,0.75)' : 'var(--c-faint)' }}
+                style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-faint)' }}
               >
                 {option.count}
               </Text>

@@ -283,7 +283,7 @@ export default function AttendanceScreen() {
       onPress={goBack}
       accessibilityRole="button"
       accessibilityLabel="Înapoi la program"
-      className="ui-press self-start h-9 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5"
+      className="ui-press self-start h-9 [@media(pointer:coarse)]:h-10 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
     >
       <MaterialIcons name="chevron-left" size={18} color="var(--c-ink-soft)" />
@@ -349,14 +349,14 @@ export default function AttendanceScreen() {
           <PageHero
             eyebrow="Prezență"
             title={event.title}
-            subtitle={roster.length > 0 ? `${marked} din ${counts.all} marcați${counts.unmarked ? ` · ${counts.unmarked} încă nemarcați` : ' · toți jucătorii sunt marcați'}` : undefined}
+            subtitle={roster.length > 0 ? `Prezență marcată: ${marked} din ${counts.all}${counts.unmarked ? ` · ${counts.unmarked} fără marcaj` : ' · lista e completă'}` : undefined}
             leading={roster.length > 0 ? (
               <ProgressRing
                 value={markedPercent}
                 size={56}
                 stroke={6}
                 color={markedPercent === 100 ? 'var(--c-success)' : 'var(--c-brand-fg)'}
-                label={`${marked} din ${counts.all} marcați`}
+                label={`Prezență marcată: ${marked} din ${counts.all}`}
               >
                 {markedPercent === 100 ? (
                   <MaterialIcons name="check" size={20} color="var(--c-success-fg)" />
@@ -372,7 +372,7 @@ export default function AttendanceScreen() {
             actions={counts.unmarked > 0 && !locked ? (
               <Button
                 icon="done-all"
-                label={`Restul prezenți (${counts.unmarked})`}
+                label={`Prezență pentru rest (${counts.unmarked})`}
                 loading={bulkSaving}
                 onPress={() => setBulkConfirmOpen(true)}
               />
@@ -399,9 +399,9 @@ export default function AttendanceScreen() {
             </View>
             {roster.length > 0 ? (
               <View className="grid grid-cols-3 gap-2 max-w-[520px] ui-stagger">
-                <GlassStat value={counts.present + counts.late} label="Prezenți" dot="var(--c-success)" hint={counts.late ? plural(counts.late, 'întârziat', 'întârziați') : undefined} />
-                <GlassStat value={counts.absent} label="Absenți" dot="var(--c-danger)" />
-                <GlassStat value={counts.medical} label="Motivați" dot="var(--c-warning)" />
+                <GlassStat value={counts.present + counts.late} label="Prezențe" dot="var(--c-success)" hint={counts.late ? plural(counts.late, 'întârziere', 'întârzieri') : undefined} />
+                <GlassStat value={counts.absent} label="Absențe" dot="var(--c-danger)" />
+                <GlassStat value={counts.medical} label="Motivate" dot="var(--c-warning)" />
               </View>
             ) : null}
           </PageHero>
@@ -415,11 +415,11 @@ export default function AttendanceScreen() {
                 onChange={setFilter}
                 options={[
                   { key: 'all', label: 'Toți', count: counts.all },
-                  { key: 'unmarked', label: 'Nemarcați', dot: 'var(--c-border-strong)', count: counts.unmarked },
-                  { key: 'present', label: 'Prezenți', dot: 'var(--c-success)', count: counts.present },
-                  { key: 'late', label: 'Întârziați', dot: 'var(--c-brand-fg)', count: counts.late },
-                  { key: 'absent', label: 'Absenți', dot: 'var(--c-danger)', count: counts.absent },
-                  { key: 'medical', label: 'Motivați', dot: 'var(--c-warning)', count: counts.medical },
+                  { key: 'unmarked', label: 'Fără marcaj', dot: 'var(--c-border-strong)', count: counts.unmarked },
+                  { key: 'present', label: 'Prezențe', dot: 'var(--c-success)', count: counts.present },
+                  { key: 'late', label: 'Întârzieri', dot: 'var(--c-brand-fg)', count: counts.late },
+                  { key: 'absent', label: 'Absențe', dot: 'var(--c-danger)', count: counts.absent },
+                  { key: 'medical', label: 'Motivate', dot: 'var(--c-warning)', count: counts.medical },
                 ]}
               />
             ) : null}
@@ -487,10 +487,10 @@ export default function AttendanceScreen() {
       <ConfirmDialog
         visible={bulkConfirmOpen}
         icon="done-all"
-        title="Marchează restul prezenți"
-        message={`${plural(counts.unmarked, 'jucător nemarcat va fi trecut', 'jucători nemarcați vor fi trecuți')} ca prezenți. Cei deja marcați nu se schimbă.`}
+        title="Marchezi prezența pentru rest?"
+        message={`Cine nu are încă marcaj (${counts.unmarked}) primește „Prezent”. Marcajele existente nu se schimbă.`}
         confirmLabel="Marchează"
-        cancelLabel="Anulează"
+        cancelLabel="Renunță"
         loading={bulkSaving}
         onConfirm={markRemainingPresent}
         onCancel={() => setBulkConfirmOpen(false)}
@@ -528,12 +528,12 @@ function AttendanceRow({
 }) {
   const hasNote = Boolean(row.savedNote.trim());
   const dirty = noteDirty(row);
-  const metaParts = [row.position, row.status ? null : 'Nemarcat'].filter(Boolean);
+  const metaParts = [row.position, row.status ? null : 'Fără marcaj'].filter(Boolean);
   const playerName = `${row.firstName} ${row.lastName}`;
 
   return (
     // A row of the list, not a card with a coloured side stripe: the selected
-    // status button already says the status, and „Nemarcat” is in the meta line.
+    // status button already says the status, and „Fără marcaj” is in the meta line.
     <DenseRow stacked className="md:flex-row md:flex-wrap xl:flex-nowrap md:items-center xl:gap-4">
 
       <View className="flex-row items-center gap-2 min-w-0 md:flex-1 xl:flex-none xl:w-[260px] 2xl:w-[300px] xl:shrink-0">

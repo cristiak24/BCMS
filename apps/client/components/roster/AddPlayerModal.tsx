@@ -388,7 +388,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                 data={listData}
                 keyExtractor={(item: Player) => item.id.toString()}
                 style={{ flex: 1, marginTop: 12 }}
-                contentContainerStyle={{ flexGrow: 1, gap: 8, paddingBottom: 12 }}
+                contentContainerStyle={{ flexGrow: 1, paddingBottom: 12 }}
                 keyboardShouldPersistTaps="handled"
                 renderItem={({ item }: { item: Player }) => {
                   const initials = `${item.firstName?.[0] || 'P'}${item.lastName?.[0] || ''}`.toUpperCase();
@@ -397,8 +397,9 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                     <Pressable
                       onPress={() => addPlayerToRoster(item)}
                       disabled={isAdding}
-                      className="ui-press flex-row items-center rounded-[14px] border px-3 py-2.5"
-                      style={{ minHeight: 64, backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border-soft)' } as any}
+                      // Rows with dividers in the sheet, not a bordered card each.
+                      className="ui-press flex-row items-center border-b px-1 py-2.5 hover:bg-[var(--c-surface-2)]"
+                      style={{ minHeight: 60, borderColor: 'var(--c-border-soft)' } as any}
                     >
                       <View
                         className="h-10 w-10 items-center justify-center rounded-[11px]"

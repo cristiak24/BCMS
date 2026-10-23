@@ -39,7 +39,7 @@ function Card({ title, icon, right, children }: { title: string; icon: string; r
         <View className="w-8 h-8 rounded-[9px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
           <MaterialIcons name={icon} size={17} color="var(--c-brand-fg)" />
         </View>
-        <Text className="f-display flex-1 text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{title}</Text>
+        <Text accessibilityRole="header" className="f-display flex-1 text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{title}</Text>
         {right}
       </View>
       {children}

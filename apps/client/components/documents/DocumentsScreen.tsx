@@ -143,7 +143,7 @@ function UploadPanel({
 
       <View className="flex-row justify-end gap-2">
         <Pressable onPress={onCancel} disabled={uploading} accessibilityRole="button" className="ui-press h-10 px-4 rounded-[10px] items-center justify-center">
-          <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Anulează</Text>
+          <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Renunță</Text>
         </Pressable>
         <Pressable
           onPress={submit}
@@ -385,15 +385,14 @@ export default function DocumentsScreen() {
           ) : (
             <>
               {data.documents.length === 0 ? (
-                <View className="rounded-[16px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
-                  <EmptyState
-                    icon="folder"
-                    title="Niciun document încă"
-                    message={canUpload ? 'Încarcă regulamentul, formularele sau orice PDF util membrilor clubului.' : 'Documentele publicate de club vor apărea aici.'}
-                    actionLabel={canUpload ? 'Încarcă PDF' : undefined}
-                    onAction={canUpload ? pickFile : undefined}
-                  />
-                </View>
+                <EmptyState
+                  compact
+                  icon="folder"
+                  title="Niciun document încă"
+                  message={canUpload ? 'Încarcă regulamentul, formularele sau orice PDF util membrilor clubului.' : 'Documentele publicate de club vor apărea aici.'}
+                  actionLabel={canUpload ? 'Încarcă PDF' : undefined}
+                  onAction={canUpload ? pickFile : undefined}
+                />
               ) : visible.length === 0 ? (
                 <EmptyState compact icon="search-off" title="Niciun document găsit" message={`Nimic pentru „${searchValue.trim()}”.`} actionLabel="Arată toate" onAction={() => setSearchValue('')} />
               ) : (
@@ -422,7 +421,7 @@ export default function DocumentsScreen() {
         title={confirmDelete ? `Ștergi „${confirmDelete.title}”?` : ''}
         message="Documentul dispare pentru toți membrii clubului."
         confirmLabel="Șterge"
-        cancelLabel="Anulează"
+        cancelLabel="Renunță"
         onConfirm={() => {
           if (confirmDelete) void remove(confirmDelete);
           setConfirmDelete(null);

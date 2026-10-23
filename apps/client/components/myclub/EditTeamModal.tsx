@@ -258,7 +258,7 @@ export default function EditTeamModal({
                     </ScrollView>
 
                     <View className="flex-row justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: 'var(--c-border-soft)' }}>
-                        <Button label="Anulează" variant="secondary" onPress={close} disabled={saving} />
+                        <Button label="Renunță" variant="secondary" onPress={close} disabled={saving} />
                         <Button label="Salvează" variant="primary" onPress={() => void handleSave()} loading={saving} />
                     </View>
                 </View>

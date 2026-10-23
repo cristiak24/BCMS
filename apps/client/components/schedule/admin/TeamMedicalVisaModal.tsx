@@ -199,7 +199,7 @@ export default function TeamMedicalVisaModal({ visible, teamId, teamName, onClos
 
           <View className="flex-row justify-end gap-3 p-6 border-t border-gray-100 bg-gray-50/50">
             <Pressable onPress={onClose} className="px-6 py-3.5 rounded-[14px] bg-white border border-gray-200 shadow-sm">
-              <Text className="font-bold tracking-tight text-[#0D2040]">Anulează</Text>
+              <Text className="font-bold tracking-tight text-[#0D2040]">Renunță</Text>
             </Pressable>
             <Pressable
               onPress={handleSubmit}

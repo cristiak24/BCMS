@@ -1,6 +1,6 @@
-import { parseApiDate } from '@/utils/dates';
+import { formatDate as formatDisplayDate, parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { l12Api, type L12Event, type L12Lineup, type L12Overview, type L12OverviewMatch, type L12Team } from '../../services/l12Api';
@@ -37,7 +37,7 @@ function formatDate(iso: string | null | undefined, withTime = false) {
   if (!iso) return '';
   const date = parseApiDate(iso);
   if (Number.isNaN(date.getTime())) return '';
-  const day = date.toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const day = formatDisplayDate(date);
   return withTime ? `${day}, ${date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}` : day;
 }
 
@@ -67,6 +67,57 @@ function sidesOf(title: string): [string, string | null] {
   const clean = stripKindPrefix(title);
   const sides = clean.split(/\s+vs\.?\s+/i).map((part) => part.trim());
   return sides.length === 2 ? [sides[0], sides[1]] : [clean, null];
+}
+
+/**
+ * The sides the overview shows. FRB titles name both teams ("A vs B"); a manual
+ * match titled "Amical U12 (scorer)" is our team — the opponent is set on its
+ * L12 — instead of a made-up "U12 (scorer)" team with "US" initials. `note`
+ * keeps the title so the match stays recognisable.
+ */
+function overviewSides(match: L12OverviewMatch): { home: string; away: string | null; note: string | null } {
+  const [home, away] = sidesOf(match.title);
+  if (away || !match.teamName) return { home, away, note: null };
+  return { home: match.teamName, away: null, note: stripKindPrefix(match.title).trim() || null };
+}
+
+/** A friendly has no competition of its own: the team's league isn't prefilled for it. */
+function isFriendly(event: Pick<L12Event, 'title' | 'location'>) {
+  return /amical/i.test(`${event.title} ${event.location ?? ''}`);
+}
+
+/** Phone sheet for the secondary L12 filters: bottom sheet, „Gata” closes, Esc too. */
+function FiltersSheet({ visible, onClose, onReset, children }: { visible: boolean; onClose: () => void; onReset?: () => void; children: ReactNode }) {
+  useEffect(() => {
+    if (!visible || typeof document === 'undefined') return undefined;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [visible, onClose]);
+
+  if (!visible) return null;
+  return (
+    <Modal visible transparent onRequestClose={onClose}>
+      <Pressable accessibilityLabel="Închide filtrele" onPress={onClose} className="flex-1 justify-end" style={{ backgroundColor: 'rgba(2, 8, 23, 0.55)' }}>
+        <Pressable
+          onPress={(event: any) => event.stopPropagation()}
+          accessibilityRole={'dialog' as any}
+          accessibilityLabel="Filtre"
+          className="ui-rise w-full rounded-t-[20px] border overflow-hidden pb-[env(safe-area-inset-bottom)]"
+          style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: '0 28px 70px rgba(2, 8, 23, 0.35)' } as any}
+        >
+          <View className="flex-row items-center justify-between px-4 pt-4 pb-3 border-b" style={{ borderColor: 'var(--c-border)' }}>
+            <Text accessibilityRole="header" className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>Filtre</Text>
+            {onReset ? <Button size="sm" variant="ghost" label="Resetează" onPress={onReset} /> : null}
+          </View>
+          <View className="px-4 py-4 gap-4">{children}</View>
+          <View className="px-4 pb-4">
+            <Button variant="primary" label="Gata" onPress={onClose} className="w-full" />
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 }
 
 function BackButton({ label, onPress }: { label: string; onPress: () => void }) {
@@ -149,7 +200,7 @@ function Segmented<T extends string>({ value, onChange, options }: { value: T; o
             onPress={() => onChange(option.key)}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
-            className="ui-press px-3.5 h-[32px] rounded-[9px] flex-row items-center gap-1.5"
+            className="ui-press px-3.5 h-[32px] [@media(pointer:coarse)]:h-10 rounded-[9px] flex-row items-center gap-1.5"
             style={active ? ({ backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any) : undefined}
           >
             <Text className="text-[12.5px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>{option.label}</Text>
@@ -253,6 +304,10 @@ export function L12HomeScreen() {
   const upcomingCount = useMemo(() => liveMatches.filter(isUpcoming).length, [liveMatches, isUpcoming]);
   const filtersActive = teamFilter !== 'all' || monthFilter !== 'upcoming' || kindFilter !== 'all' || statusFilter !== 'all';
   const resetFilters = () => { setTeamFilter('all'); setMonthFilter('upcoming'); setKindFilter('all'); setStatusFilter('all'); };
+  // The filters that sit in the phone's „Filtre” sheet (status stays outside it).
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const extraFilterCount = (teamFilter !== 'all' ? 1 : 0) + (monthFilter !== 'upcoming' ? 1 : 0) + (kindFilter !== 'all' ? 1 : 0);
+  const resetExtraFilters = () => { setTeamFilter('all'); setMonthFilter('upcoming'); setKindFilter('all'); };
 
   const { page, totalPages, pageItems: pagedMatches, setPage, rangeStart, rangeEnd, total } = usePagination(
     filteredMatches,
@@ -295,9 +350,22 @@ export function L12HomeScreen() {
   const heroNext = useMemo<HeroNext | null>(() => {
     const match = unsetUpcoming[0] ?? upcomingMatches[0];
     if (!match) return null;
-    const [home, away] = sidesOf(match.title);
+    const { home, away } = overviewSides(match);
     return { match, home, away };
   }, [unsetUpcoming, upcomingMatches]);
+
+  // The same controls inline from sm up and inside the phone's „Filtre” sheet.
+  const teamSelect = data && data.teams.length > 1 ? (
+    <SelectField label="Echipă" icon="groups" options={teamOptions} value={teamFilter} onChange={setTeamFilter} className="min-w-0 lg:w-[280px]" />
+  ) : null;
+  const monthSelect = <SelectField label="Lună" icon="calendar-month" options={monthOptions} value={monthFilter} onChange={setMonthFilter} className="min-w-0 lg:w-[250px]" />;
+  const kindChips = <FilterChips label="Tip meci" options={kindOptions} value={kindFilter} onChange={setKindFilter} />;
+  const resetButton = (
+    <Pressable onPress={resetFilters} accessibilityRole="button" className="ui-press h-8 [@media(pointer:coarse)]:h-10 px-2.5 rounded-[9px] flex-row items-center gap-1 shrink-0">
+      <MaterialIcons name="close" size={14} color="var(--c-muted)" />
+      <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Resetează</Text>
+    </Pressable>
+  );
 
   return (
     <PageShell>
@@ -334,28 +402,42 @@ export function L12HomeScreen() {
               <EmptyState compact icon="sports-basketball" title="Niciun meci programat" message="Meciurile oficiale FRB, amicalele și meciurile municipale din Program apar aici." />
             ) : (
               <View className="gap-4">
-                <View className="gap-2.5">
-                  <View className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-row lg:items-center gap-2">
-                    {data.teams.length > 1 ? (
-                      <SelectField label="Echipă" icon="groups" options={teamOptions} value={teamFilter} onChange={setTeamFilter} className="min-w-0 lg:w-[280px]" />
-                    ) : null}
-                    <SelectField label="Lună" icon="calendar-month" options={monthOptions} value={monthFilter} onChange={setMonthFilter} className="min-w-0 lg:w-[250px]" />
+                {/* Phones: the status stays in view and Echipă / Lună / Tip meci move into
+                    one „Filtre” sheet — five stacked filter rows pushed the matches off screen. */}
+                <View className="sm:hidden flex-row items-center gap-2">
+                  <View className="flex-1 min-w-0">
+                    <Segmented value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
+                  </View>
+                  <Button
+                    size="sm"
+                    icon="tune"
+                    label={extraFilterCount ? `Filtre (${extraFilterCount})` : 'Filtre'}
+                    variant={extraFilterCount ? 'primary' : 'secondary'}
+                    onPress={() => setFiltersOpen(true)}
+                  />
+                </View>
+                <View className="hidden sm:flex gap-2.5">
+                  <View className="grid grid-cols-2 lg:flex lg:flex-row lg:items-center gap-2">
+                    {teamSelect}
+                    {monthSelect}
                     <View className="lg:ml-auto">
                       <Segmented value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
                     </View>
                   </View>
                   <View className="flex-row items-center gap-2">
-                    <View className="flex-1 min-w-0">
-                      <FilterChips label="Tip meci" options={kindOptions} value={kindFilter} onChange={setKindFilter} />
-                    </View>
-                    {filtersActive ? (
-                      <Pressable onPress={resetFilters} accessibilityRole="button" className="ui-press h-8 px-2.5 rounded-[9px] flex-row items-center gap-1 shrink-0">
-                        <MaterialIcons name="close" size={14} color="var(--c-muted)" />
-                        <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Resetează</Text>
-                      </Pressable>
-                    ) : null}
+                    <View className="flex-1 min-w-0">{kindChips}</View>
+                    {filtersActive ? resetButton : null}
                   </View>
                 </View>
+                <FiltersSheet visible={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={extraFilterCount ? resetExtraFilters : undefined}>
+                  {teamSelect}
+                  {monthSelect}
+                  <View className="gap-1.5">
+                    <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Tip meci</Text>
+                    {/* Wrapped in the sheet: a sideways-scrolling row cut „Municipale” at the edge. */}
+                    <FilterChips label="Tip meci" options={kindOptions} value={kindFilter} onChange={setKindFilter} scrollOnMobile={false} />
+                  </View>
+                </FiltersSheet>
 
                 {filteredMatches.length === 0 ? (
                   <EmptyState
@@ -375,7 +457,7 @@ export function L12HomeScreen() {
                           <DayHeading label={group.label} count={group.matches.length} />
                           <DenseList label={`Meciuri · ${group.label}`}>
                             {group.matches.map((match) => {
-                              const [home, away] = sidesOf(match.title);
+                              const { home, away, note } = overviewSides(match);
                               // The club's team is usually one of the two sides already.
                               const showTeam = teamFilter === 'all' && Boolean(match.teamName) && ![home, away].includes(match.teamName);
                               return (
@@ -384,6 +466,7 @@ export function L12HomeScreen() {
                                   match={match}
                                   home={home}
                                   away={away}
+                                  note={note}
                                   showTeam={showTeam}
                                   played={!isUpcoming(match)}
                                   onPress={() => router.push(`${base}/match/${match.eventId}` as any)}
@@ -444,9 +527,9 @@ function useRoster(teamId: number | null) {
   return { roster, loading };
 }
 
-/** A new sheet: the team's league and category, and its coach as head coach. */
-function defaultLineup(team: L12Team): L12Lineup {
-  return withTeamCoach({ ...EMPTY_LINEUP, competition: team.leagueName || null, gender: resolveTeamGender(team) }, team.coachName);
+/** A new sheet: the team's league (not for a friendly) and category, and its coach as head coach. */
+function defaultLineup(team: L12Team, friendly = false): L12Lineup {
+  return withTeamCoach({ ...EMPTY_LINEUP, competition: friendly ? null : team.leagueName || null, gender: resolveTeamGender(team) }, team.coachName);
 }
 
 /** The sheet's category always follows the team — it is not a user choice. */
@@ -547,14 +630,16 @@ export function L12MatchScreen() {
       setBaseline(withTeamGender(saved, team));
     } else if (template) {
       // Pre-filled from the template but not yet on this match: offer the save.
-      setDraft(withTeamCoach(withTeamGender(lineupForRoster({ ...template, competition: template.competition ?? team.leagueName ?? null }, roster), team), team.coachName));
+      const competition = event && isFriendly(event) ? null : template.competition ?? team.leagueName ?? null;
+      setDraft(withTeamCoach(withTeamGender(lineupForRoster({ ...template, competition }, roster), team), team.coachName));
       setBaseline(null);
     } else {
-      setDraft(defaultLineup(team));
-      setBaseline(defaultLineup(team));
+      const friendly = event ? isFriendly(event) : false;
+      setDraft(defaultLineup(team, friendly));
+      setBaseline(defaultLineup(team, friendly));
     }
     setSeeded(true);
-  }, [team, saved, template, roster, rosterLoading, seeded]);
+  }, [team, event, saved, template, roster, rosterLoading, seeded]);
 
   const opponentDirty = opponent.trim() !== savedOpponent.trim();
   const dirty = seeded && (snapshot(draft) !== snapshot(baseline) || opponentDirty);
@@ -788,7 +873,7 @@ export function L12MatchScreen() {
             ? `Foaia de acum devine formula de bază pentru meciurile următoare ale echipei ${team.name}.`
             : 'Jucătorii și staff-ul de pe foaie vor fi înlocuiți cu cei din L12-ul constant.'}
         confirmLabel={confirm === 'reset' ? 'Șterge' : confirm === 'saveTemplate' ? 'Salvează' : 'Încarcă'}
-        cancelLabel="Anulează"
+        cancelLabel="Renunță"
         onConfirm={() => {
           const action = confirm;
           setConfirm(null);

@@ -43,7 +43,7 @@ export default function ConfirmDialog({
     title,
     message,
     confirmLabel = 'Confirmă',
-    cancelLabel = 'Anulează',
+    cancelLabel = 'Renunță',
     destructive = false,
     loading = false,
     icon,

@@ -74,7 +74,7 @@ const ADMIN_SECTION_TITLES: { prefix: string; label: string }[] = [
     { prefix: '/admin/attendance/', label: 'Prezență' },
     { prefix: '/admin/stats/', label: 'Statistică meci' },
     { prefix: '/admin/users/', label: 'Utilizator' },
-    { prefix: '/admin/privacy', label: 'Cereri date personale' },
+    { prefix: '/admin/privacy', label: 'Date personale' },
 ];
 
 function getAdminPath(pathname: string) {
@@ -185,7 +185,7 @@ function AdminLayoutContent() {
                         showSearch={showHeaderSearch}
                         avatarUrl={session?.avatarUrl ?? undefined}
                         initials={getInitials()}
-                        onOpenMenu={() => setMobileMenuOpen(true)}
+                        // No ☰ here: „Mai mult” in the bottom bar opens the same menu (two triggers for one sheet).
                     />
                 </div>
 

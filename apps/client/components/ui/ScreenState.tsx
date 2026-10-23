@@ -135,7 +135,7 @@ export function EmptyState({ icon = 'inbox', title, message, actionLabel, onActi
         {actionLabel && onAction ? (
           <Pressable
             onPress={onAction}
-            className="h-9 rounded-[9px] px-3 items-center justify-center border shrink-0"
+            className="h-9 [@media(pointer:coarse)]:h-10 rounded-[9px] px-3 items-center justify-center border shrink-0"
             style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' }}
             accessibilityRole="button"
           >

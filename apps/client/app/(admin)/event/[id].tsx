@@ -233,7 +233,7 @@ export default function EventDetailScreen() {
       onPress={goBack}
       accessibilityRole="button"
       accessibilityLabel="Înapoi la program"
-      className="ui-press self-start h-9 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5 mb-4"
+      className="ui-press self-start h-9 [@media(pointer:coarse)]:h-10 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5 mb-4"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
     >
       <MaterialIcons name="chevron-left" size={18} color="var(--c-ink-soft)" />
@@ -385,7 +385,7 @@ export default function EventDetailScreen() {
               <Card
                 title="Unde"
                 trailing={event.location ? (
-                  <Pressable onPress={openMaps} accessibilityRole="link" accessibilityLabel="Deschide în Hărți" className="ui-press flex-row items-center gap-1">
+                  <Pressable onPress={openMaps} accessibilityRole="link" accessibilityLabel="Deschide în Hărți" className="ui-press tap-40 flex-row items-center gap-1">
                     <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Deschide în Hărți</Text>
                     <MaterialIcons name="chevron-right" size={16} color="var(--c-brand-fg)" />
                   </Pressable>
@@ -523,7 +523,7 @@ export default function EventDetailScreen() {
         title="Ștergi evenimentul?"
         message={`„${event.title}” și lista lui de prezență vor fi șterse definitiv.`}
         confirmLabel="Șterge"
-        cancelLabel="Anulează"
+        cancelLabel="Renunță"
         loading={deleting}
         onConfirm={deleteEvent}
         onCancel={() => setConfirmDelete(false)}

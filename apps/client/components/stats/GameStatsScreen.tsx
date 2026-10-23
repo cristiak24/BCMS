@@ -194,7 +194,7 @@ export default function GameStatsScreen() {
         title="Redeschizi meciul?"
         message="Meciul revine în desfășurare, ca să corectezi acțiunile din foaia de statistică. Scorul se recalculează din acțiuni, iar redeschiderea apare în jurnal. Încheie-l din nou după corectură."
         confirmLabel="Redeschide"
-        cancelLabel="Anulează"
+        cancelLabel="Renunță"
         loading={reopening}
         onConfirm={() => void reopen()}
         onCancel={() => setConfirmReopen(false)}

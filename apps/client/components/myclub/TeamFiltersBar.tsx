@@ -187,7 +187,7 @@ export default function TeamFiltersBar({
                         placeholder="Caută echipă, categorie sau antrenor"
                         accessibilityLabel="Caută echipă, categorie sau antrenor"
                         placeholderTextColor="var(--c-faint)"
-                        className="w-full h-9 rounded-[9px] border pl-8 pr-8 text-[13px] font-medium"
+                        className="w-full h-9 [@media(pointer:coarse)]:h-10 rounded-[9px] border pl-8 pr-8 text-[13px] font-medium"
                         style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}
                     />
                     {searchDraft.length > 0 && (
@@ -207,7 +207,7 @@ export default function TeamFiltersBar({
                 <Pressable
                     onPress={() => setExpanded((v) => !v)}
                     accessibilityLabel="Sortare și filtre"
-                    className="h-9 px-2.5 rounded-[9px] border flex-row items-center gap-1.5"
+                    className="h-9 [@media(pointer:coarse)]:h-10 px-2.5 rounded-[9px] border flex-row items-center gap-1.5"
                     style={expanded
                         ? { backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' }
                         : { backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}

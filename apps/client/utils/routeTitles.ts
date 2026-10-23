@@ -68,7 +68,7 @@ const ROUTE_TITLES: Array<[string, string]> = [
   ['/admin/users', 'Utilizatori'],
   ['/admin/users/:id', 'Utilizator'],
   ['/admin/audit-log', 'Jurnal'],
-  ['/admin/privacy', 'Cereri date personale'],
+  ['/admin/privacy', 'Date personale'],
 
   ['/super-admin', 'Super admin'],
   ['/super-admin/dashboard', 'Super admin'],

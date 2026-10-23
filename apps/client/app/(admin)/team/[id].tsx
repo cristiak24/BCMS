@@ -186,8 +186,9 @@ export default function TeamDetailsScreen() {
         { key: 'visa', label: 'Vize medicale', icon: 'verified-user', onPress: () => setMedicalVisaOpen(true) },
         { key: 'payments', label: 'Raport plăți', icon: 'receipt-long', onPress: () => setPaymentsReportOpen(true) },
     ];
-    const accentColor = frb ? 'var(--c-danger)' : 'var(--c-success)';
-    const crestTint = frb ? 'var(--c-danger-bg)' : 'var(--c-success-bg)';
+    // One crest colour: red for FRB teams and green for manual ones read as danger / OK.
+    const accentColor = 'var(--c-brand-fg)';
+    const crestTint = 'var(--c-surface-tint)';
     // The shared 30-day rate (utils/attendanceRate.ts), same as Dashboard and Lot.
     const monthlyAtt = stats?.attendance?.rate ?? stats?.monthlyAttendanceRate ?? null;
     const arrears = stats?.playersWithArrears ?? 0;
@@ -208,7 +209,7 @@ export default function TeamDetailsScreen() {
                             onPress={() => router.push('/admin/my-club-admin' as any)}
                             accessibilityRole="button"
                             accessibilityLabel="Înapoi la Clubul meu"
-                            className="flex-row items-center gap-2 h-9 w-9 lg:w-auto justify-center lg:justify-start lg:pl-2 lg:pr-3.5 rounded-[10px] shrink-0 border"
+                            className="flex-row items-center gap-2 h-9 w-9 [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10 lg:w-auto justify-center lg:justify-start lg:pl-2 lg:pr-3.5 rounded-[10px] shrink-0 border"
                             style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
                         >
                             <ArrowLeft size={16} color="var(--c-ink)" />
@@ -250,12 +251,13 @@ export default function TeamDetailsScreen() {
                         }
                     >
                         <View className="flex-row flex-wrap items-center gap-1.5">
-                            <View className="flex-row items-center gap-1 px-2 py-1 rounded-full" style={{ backgroundColor: crestTint }}>
-                                <Text className="text-[11px] font-semibold" style={{ color: frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}>{frb ? 'Sincronizat FRB' : 'Manual'}</Text>
+                            {/* Neutral tags: source, gender and level are facts, not states (they were green, red and pink). */}
+                            <View className="flex-row items-center gap-1 px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+                                <Text className="text-[11px] font-semibold" style={{ color: 'var(--c-muted)' }}>{frb ? 'Sincronizat FRB' : 'Manual'}</Text>
                             </View>
                             {team.gender && (
-                                <View className="px-2 py-1 rounded-full" style={{ backgroundColor: team.gender === 'M' ? 'var(--c-surface-tint)' : 'var(--c-danger-bg)' }}>
-                                    <Text className="text-[11px] font-semibold" style={{ color: team.gender === 'M' ? 'var(--c-gender-m)' : 'var(--c-gender-f)' }}>{GENDER_LABELS[team.gender]}</Text>
+                                <View className="px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--c-surface-3)' }}>
+                                    <Text className="text-[11px] font-semibold" style={{ color: 'var(--c-muted)' }}>{GENDER_LABELS[team.gender]}</Text>
                                 </View>
                             )}
                             {team.level && (
@@ -465,7 +467,7 @@ export default function TeamDetailsScreen() {
                         : undefined
                 }
                 confirmLabel="Scoate din echipă"
-                cancelLabel="Anulează"
+                cancelLabel="Renunță"
                 loading={removingId != null}
                 onConfirm={() => void confirmRemovePlayer()}
                 onCancel={() => setPlayerPendingRemoval(null)}

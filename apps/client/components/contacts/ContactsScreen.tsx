@@ -187,7 +187,7 @@ function PlayerCard({
           </View>
           <View className="flex-row justify-end gap-2">
             <Pressable onPress={() => setEditing(false)} disabled={saving} accessibilityRole="button" className="ui-press h-10 px-4 rounded-[10px] items-center justify-center">
-              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Anulează</Text>
+              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Renunță</Text>
             </Pressable>
             <Pressable
               onPress={save}

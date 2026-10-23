@@ -207,7 +207,7 @@ export default function RosterScreen() {
       'Elimină sportivul',
       `Elimini pe ${selectedPlayer.firstName} ${selectedPlayer.lastName} din lotul activ?`,
       [
-        { text: 'Anulează', style: 'cancel' },
+        { text: 'Renunță', style: 'cancel' },
         {
           text: 'Elimină',
           style: 'destructive',
@@ -408,10 +408,10 @@ export default function RosterScreen() {
     if (selectedIds.size === 0) return;
 
     Alert.alert(
-      'Elimină sportivii selectați',
+      'Elimini selecția din lot?',
       `Elimini ${plural(selectedIds.size, 'sportiv', 'sportivi')} din lotul activ?`,
       [
-        { text: 'Anulează', style: 'cancel' },
+        { text: 'Renunță', style: 'cancel' },
         {
           text: 'Elimină',
           style: 'destructive',
@@ -480,7 +480,7 @@ export default function RosterScreen() {
             flexDirection: 'row',
             alignItems: 'center',
             gap: 6,
-            boxShadow: '0 10px 24px -8px rgba(49, 46, 129, 0.7), 0 2px 6px rgba(0, 0, 0, 0.25)',
+            boxShadow: 'var(--e-lg)',
             zIndex: 30,
           } as any}
         >
@@ -557,7 +557,7 @@ export default function RosterScreen() {
       <View className="rounded-[16px] p-4 border" style={{ backgroundColor: dash.surface, borderColor: dash.hairlineStrong, ...dash.shadow.sm }}>
         <View className={`mb-4 ${isMobile ? 'gap-3' : 'flex-row items-center justify-between'}`}>
           <View>
-            <Text className="f-display text-[17px] font-bold" style={{ color: dash.ink, letterSpacing: '-0.015em' } as any}>
+            <Text accessibilityRole="header" className="f-display text-[17px] font-bold" style={{ color: dash.ink, letterSpacing: '-0.015em' } as any}>
               Sportivi
             </Text>
             <Text className="mt-0.5 text-[13px]" style={{ color: dash.muted }}>
@@ -567,7 +567,7 @@ export default function RosterScreen() {
           </View>
           <TouchableOpacity
             onPress={() => { void handleExportFilteredCsv(); }}
-            className="dash-btn-hover flex-row items-center self-start rounded-[10px] border h-9 px-3"
+            className="dash-btn-hover flex-row items-center self-start rounded-[10px] border h-9 [@media(pointer:coarse)]:h-10 px-3"
             style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairlineStrong }}
           >
             <Download color={dash.inkSoft} size={15} />
@@ -749,7 +749,7 @@ export default function RosterScreen() {
 
       <RosterFilterSheet
         visible={showBulkReassignSheet}
-        title="Mută sportivii selectați la echipa"
+        title="Mută selecția la echipa"
         icon="groups"
         items={teams.map((team) => ({ id: String(team.id), label: team.name }))}
         selectedId={null}

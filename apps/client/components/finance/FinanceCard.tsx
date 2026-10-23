@@ -9,13 +9,9 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
  */
 export type FinanceTone = 'brand' | 'warning' | 'sky' | 'success' | 'purple';
 
-const TONES: Record<FinanceTone, { bg: string; fg: string }> = {
-    brand: { bg: 'var(--c-surface-tint)', fg: 'var(--c-brand-fg)' },
-    warning: { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' },
-    sky: { bg: 'var(--c-sky-bg)', fg: 'var(--c-sky-fg)' },
-    success: { bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },
-    purple: { bg: 'var(--c-purple-bg)', fg: 'var(--c-purple-fg)' },
-};
+// Every card header shares one neutral tile; a hue per card (sky, amber,
+// green, purple) only decorated. `tone` stays in the props for the call sites.
+const TILE = { bg: 'var(--c-surface-3)', fg: 'var(--c-muted)' };
 
 export function FinanceCard({ children, className }: { children: ReactNode; className?: string }) {
     return (
@@ -29,7 +25,7 @@ export function FinanceCard({ children, className }: { children: ReactNode; clas
 }
 
 /** Icon chip + title + one-line description; `actions` sit right from sm (lg with wideActions) up, below on phones. */
-export function FinanceCardHeader({ icon, tone = 'brand', title, subtitle, actions, wideActions }: {
+export function FinanceCardHeader({ icon, title, subtitle, actions, wideActions }: {
     icon: string;
     tone?: FinanceTone;
     title: string;
@@ -38,7 +34,7 @@ export function FinanceCardHeader({ icon, tone = 'brand', title, subtitle, actio
     /** A full toolbar: it shares the title's row only from lg up. */
     wideActions?: boolean;
 }) {
-    const colors = TONES[tone];
+    const colors = TILE;
     return (
         <View className={`flex-col gap-3 mb-4 ${wideActions ? 'lg:flex-row lg:items-center' : 'sm:flex-row sm:items-center'}`}>
             <View className="flex-row items-center gap-3 flex-1 min-w-0">

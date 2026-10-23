@@ -62,7 +62,7 @@ export default function RosterPagination({
                 <Pressable
                   key={size}
                   onPress={() => onPageSizeChange(size)}
-                  className="dash-nav-btn"
+                  className="dash-nav-btn tap-40"
                   style={[styles.sizeButton, active && styles.pageButtonActive]}
                 >
                   <Text style={[styles.pageLabel, active && styles.pageLabelActive]}>{size}</Text>
@@ -77,7 +77,7 @@ export default function RosterPagination({
         <Pressable
           onPress={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="dash-nav-btn"
+          className="dash-nav-btn tap-40"
           style={[styles.navButton, currentPage === 1 && styles.disabledButton]}
         >
           <Text style={[styles.navLabel, currentPage === 1 && styles.disabledLabel]}>Anterior</Text>
@@ -91,7 +91,7 @@ export default function RosterPagination({
               <Pressable
                 key={page}
                 onPress={() => onPageChange(page)}
-                className="dash-nav-btn"
+                className="dash-nav-btn tap-40"
                 style={[styles.pageButton, active && styles.pageButtonActive]}
               >
                 <Text style={[styles.pageLabel, active && styles.pageLabelActive]}>{page}</Text>
@@ -103,7 +103,7 @@ export default function RosterPagination({
         <Pressable
           onPress={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="dash-nav-btn"
+          className="dash-nav-btn tap-40"
           style={[styles.navButton, currentPage === totalPages && styles.disabledButton]}
         >
           <Text style={[styles.navLabel, currentPage === totalPages && styles.disabledLabel]}>Următor</Text>
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   sizeButton: {
-    minWidth: 38,
+    minWidth: 40,
     height: 32,
     paddingHorizontal: 10,
     borderRadius: 16,
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   navButton: {
-    minHeight: 38,
+    minHeight: 40,
     paddingHorizontal: 14,
     borderRadius: 999,
     backgroundColor: 'rgba(37,99,235,0.08)',
@@ -172,9 +172,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   pageButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: dash.surfaceSubtle,
     alignItems: 'center',
     justifyContent: 'center',

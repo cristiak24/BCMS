@@ -5,6 +5,7 @@ import ConfirmDialog from '../ui/ConfirmDialog';
 import { SkeletonList } from '../ui/Skeleton';
 import { ROLE_LABELS } from './RoleSelector';
 import { manageAccessApi } from '../../services/manageAccessApi';
+import { formatDateTime } from '../../utils/dates';
 import type { InviteCodeItem, InviteCodeStatus } from '../../types/manageAccess';
 
 const STATUS_META: Record<InviteCodeStatus, { label: string; fg: string; bg: string }> = {
@@ -14,9 +15,7 @@ const STATUS_META: Record<InviteCodeStatus, { label: string; fg: string; bg: str
     revoked: { label: 'Revocat', fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)' },
 };
 
-function formatExpiry(iso: string) {
-    return new Date(iso).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-}
+const formatExpiry = formatDateTime;
 
 async function copyText(value: string) {
     try {
@@ -163,7 +162,7 @@ export default function InviteCodesPanel({ onNotify, reloadKey = 0 }: Props) {
         <View>
             <View className="w-full min-w-0">
                 <View className="flex-row items-center justify-between mb-2 px-0.5">
-                    <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>
+                    <Text accessibilityRole="header" className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>
                         Coduri active{activeCodes.length ? ` · ${activeCodes.length}` : ''}
                     </Text>
                     {pastCodes.length > 0 ? (
@@ -204,7 +203,7 @@ export default function InviteCodesPanel({ onNotify, reloadKey = 0 }: Props) {
                 title={pendingRevoke ? `Revoci codul ${pendingRevoke.code.replace(/-/g, '\u2011')}?` : ''}
                 message="Codul nu va mai putea fi folosit la înscriere. Conturile create deja cu el rămân active."
                 confirmLabel="Revocă"
-                cancelLabel="Anulează"
+                cancelLabel="Renunță"
                 onConfirm={() => {
                     if (pendingRevoke) void handleRevoke(pendingRevoke);
                     setPendingRevoke(null);

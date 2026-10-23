@@ -14,6 +14,8 @@ export type SheetAction = {
   onPress: () => void;
   tone?: 'default' | 'danger';
   hint?: string;
+  /** The action moves to another step of the same sheet instead of closing it. */
+  keepOpen?: boolean;
 };
 
 export default function ActionSheet({
@@ -62,7 +64,7 @@ export default function ActionSheet({
               return (
                 <Pressable
                   key={action.key}
-                  onPress={() => { onClose(); action.onPress(); }}
+                  onPress={() => { if (!action.keepOpen) onClose(); action.onPress(); }}
                   accessibilityRole={'menuitem' as any}
                   className="ui-press flex-row items-center gap-3 px-4 py-3 text-left hover:bg-[var(--c-surface-2)]"
                 >

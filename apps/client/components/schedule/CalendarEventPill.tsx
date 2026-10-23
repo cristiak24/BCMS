@@ -36,7 +36,8 @@ export function CalendarEventPill({ event, dateKey, onPress }: { event: Calendar
           `↳ ${event.title}`
         ) : (
           <>
-            <Text className="t-num" style={{ fontWeight: '700', opacity: 0.8, whiteSpace: 'nowrap' } as any}>{time}</Text>
+            {/* Lighter weight, not opacity: at 0.8 the time fell to 3.9:1 on the soft pills. */}
+            <Text className="t-num" style={{ fontWeight: '600', whiteSpace: 'nowrap' } as any}>{time}</Text>
             {` ${event.title}`}
           </>
         )}

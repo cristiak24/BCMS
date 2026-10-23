@@ -144,7 +144,7 @@ export default function ScheduleScreen() {
           flexDirection: 'row',
           alignItems: 'center',
           gap: 6,
-          boxShadow: '0 10px 24px -8px rgba(49, 46, 129, 0.7), 0 2px 6px rgba(0, 0, 0, 0.25)',
+          boxShadow: 'var(--e-lg)',
           zIndex: 30,
         } as any}
       >
@@ -464,10 +464,10 @@ export default function ScheduleScreen() {
 
             <View className={`${isWideDesktop ? 'shrink-0' : 'w-full'} gap-3`} style={isWideDesktop ? { width: 380 } : undefined}>
               <View className="flex-row items-center justify-between px-0.5">
-                <Text className="text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>
+                <Text accessibilityRole="header" className="text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>
                   Evenimente viitoare{upcomingCount ? <Text style={{ color: 'var(--c-faint)' }}>{` · ${upcomingCount}`}</Text> : null}
                 </Text>
-                <TouchableOpacity onPress={() => changeView('agenda')} className="h-8 justify-center px-1">
+                <TouchableOpacity onPress={() => changeView('agenda')} className="tap-40 h-8 justify-center px-1">
                   <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Vezi tot</Text>
                 </TouchableOpacity>
               </View>
