@@ -23,6 +23,8 @@ type AppHeaderProps = {
   topInset?: number;
   mobile?: boolean;
   onOpenMenu?: () => void;
+  /** False on pages that don't read the search value: a field that filters nothing is worse than none. */
+  showSearch?: boolean;
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -43,6 +45,7 @@ export default function AppHeader({
   searchPlaceholder,
   searchValue,
   onSearchChange,
+  showSearch = true,
   headerActions,
   avatarUrl,
   initials,
@@ -111,7 +114,7 @@ export default function AppHeader({
         className="flex lg:hidden px-4 pb-3 z-10 w-full border-b"
         style={{ paddingTop: 'max(16px, calc(env(safe-area-inset-top, 0px) + 8px))', backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
       >
-        {searchOpen ? (
+        {searchOpen && showSearch ? (
           // Search MODE — replaces the whole header row rather than adding a
           // second one, so the search costs zero extra vertical space when
           // it's not in use (the request: reclaim the always-on search bar).
@@ -171,6 +174,7 @@ export default function AppHeader({
             </View>
 
             <View className="flex-row items-center gap-1.5">
+              {showSearch ? (
               <Pressable
                 onPress={() => setSearchOpen(true)}
                 className="relative w-10 h-10 items-center justify-center rounded-[12px] border"
@@ -184,6 +188,7 @@ export default function AppHeader({
                   <View className="absolute top-2 right-2 w-2 h-2 rounded-full border-2" style={{ backgroundColor: 'var(--c-brand-surface)', borderColor: 'var(--c-surface)' } as any} />
                 ) : null}
               </Pressable>
+              ) : null}
               <Pressable
                 onPress={openNotifications}
                 className="relative w-10 h-10 items-center justify-center rounded-[12px] border"
@@ -244,6 +249,7 @@ export default function AppHeader({
       {/* Search is the flexible column: page actions keep their natural width
           and the search field gives way first when the viewport is narrow. */}
       <View style={{ flex: 1, maxWidth: 380, minWidth: 160 }}>
+        {showSearch ? (
         <View
           className="flex-row items-center rounded-[10px] px-3 py-2 border overflow-hidden focus-within:ring-2 focus-within:ring-[color:var(--c-brand-border)]"
           style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
@@ -259,6 +265,7 @@ export default function AppHeader({
             style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' } as any}
           />
         </View>
+        ) : null}
       </View>
 
       <View style={{ flexGrow: 1, flexShrink: 0, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>

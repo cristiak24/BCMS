@@ -599,10 +599,11 @@ export default function ManageAccountsScreen() {
                     >
                         {!loading ? (
                             <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
-                                <GlassStat dot="var(--c-success)" value={counts.active} label="Conturi active" />
-                                <GlassStat dot="var(--c-brand-fg)" value={filterCounts.coach} label="Antrenori" />
-                                <GlassStat dot="var(--c-sky)" value={filterCounts.player} label="Jucători" />
-                                <GlassStat dot="var(--c-purple)" value={filterCounts.parent} label="Părinți" />
+                                {/* Labels agree with the number: it read "1 Jucători", "1 Părinți". */}
+                                <GlassStat dot="var(--c-success)" value={counts.active} label={counts.active === 1 ? 'Cont activ' : 'Conturi active'} />
+                                <GlassStat dot="var(--c-brand-fg)" value={filterCounts.coach} label={filterCounts.coach === 1 ? 'Antrenor' : 'Antrenori'} />
+                                <GlassStat dot="var(--c-sky)" value={filterCounts.player} label={filterCounts.player === 1 ? 'Jucător' : 'Jucători'} />
+                                <GlassStat dot="var(--c-purple)" value={filterCounts.parent} label={filterCounts.parent === 1 ? 'Părinte' : 'Părinți'} />
                             </View>
                         ) : null}
                     </PageHero>

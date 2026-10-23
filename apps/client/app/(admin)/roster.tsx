@@ -541,7 +541,8 @@ export default function RosterScreen() {
                 onPress={() => setConfirmReminders(true)}
               />
             ) : null}
-            <Button icon="add" label="Adaugă jucător" variant="primary" onPress={() => setShowAddModal(true)} />
+            {/* Phones use the floating „+ Jucător”: here the button was cut to "Adaugă jucă…" and repeated it. */}
+            <Button icon="add" label="Adaugă jucător" variant="primary" className="hidden sm:flex" onPress={() => setShowAddModal(true)} />
           </View>
         }
       >

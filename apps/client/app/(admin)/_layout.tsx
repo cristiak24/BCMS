@@ -11,6 +11,14 @@ import { InstallBanner } from '../../components/pwa/InstallApp';
 import { MobileBottomNavigation, MobileNavigationSheet } from '../../components/MobileNavigation';
 import { privacyRequestsApi } from '../../services/privacyApi';
 
+// Pages that read the header search (useHeader().searchValue). Everywhere else
+// the field is hidden: on Acasă, Echipă, Jucător, Cont nou, Jurnal… typing in it
+// changed nothing. Add a route here when its page starts filtering by it.
+const SEARCHABLE_PREFIXES = [
+    '/admin/roster', '/admin/schedule', '/admin/attendance/', '/admin/manage-access', '/admin/manage-accounts',
+    '/admin/compliance', '/admin/contacts', '/admin/documents', '/admin/users',
+];
+
 const MOBILE_NAV_ITEMS = [
     { href: '/admin/dashboard' as const, label: 'Acasă', icon: 'grid-view' as const, match: 'dashboard' },
     { href: '/admin/finance' as const, label: 'Finanțe', icon: 'payments' as const, match: 'finance' },
@@ -119,6 +127,7 @@ function AdminLayoutContent() {
     const mobileNavItems = isAccountant ? ACCOUNTANT_MOBILE_NAV_ITEMS : isStaff ? STAFF_MOBILE_NAV_ITEMS : MOBILE_NAV_ITEMS;
 
     const activeAdminItem = getActiveAdminItem(pathname, menuItems);
+    const showHeaderSearch = SEARCHABLE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
     // Open GDPR requests as a badge on „Date personale” (admin menu only).
     // Re-read when leaving that page, so a resolved request clears the count.
@@ -173,6 +182,7 @@ function AdminLayoutContent() {
                         searchPlaceholder={searchPlaceholder}
                         searchValue={searchValue}
                         onSearchChange={setSearchValue}
+                        showSearch={showHeaderSearch}
                         avatarUrl={session?.avatarUrl ?? undefined}
                         initials={getInitials()}
                         onOpenMenu={() => setMobileMenuOpen(true)}
@@ -185,6 +195,7 @@ function AdminLayoutContent() {
                         searchPlaceholder={searchPlaceholder}
                         searchValue={searchValue}
                         onSearchChange={setSearchValue}
+                        showSearch={showHeaderSearch}
                         headerActions={headerActions}
                         avatarUrl={session?.avatarUrl ?? undefined}
                         initials={getInitials()}

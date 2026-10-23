@@ -346,6 +346,8 @@ router.get('/summary', async (req, res) => {
         res.json({
             activePlayerCount,
             playerCountChange,
+            // The figure the home shows: "+7" was this month's sign-ups minus last month's.
+            newPlayersThisMonth,
             teamCount,
             totalIncome,
             monthlyIncome,

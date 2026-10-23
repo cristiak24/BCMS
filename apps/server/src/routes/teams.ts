@@ -14,6 +14,21 @@ import { auditRequest } from '../services/auditService';
 /** Epoch ms of a DB timestamp (UTC text), 0 when missing — never the process zone. */
 const msOf = (value: unknown) => toDate(value)?.getTime() ?? 0;
 
+/**
+ * A player's clearance: expired (it had a date, now past) or missing (never
+ * entered). Teams used to report one "stale" number and label it "vize
+ * expirate", so 1 expired + 4 missing read as "5 vize expirate".
+ */
+function medicalCheckState(expiry: string | Date | null | undefined, now: number): 'valid' | 'expired' | 'missing' {
+    if (!expiry) return 'missing';
+    return msOf(expiry) < now ? 'expired' : 'valid';
+}
+
+/** Both counts, plus the old total for clients that still read it. */
+function medicalCheckTotals(expired: number, missing: number) {
+    return { expiredMedicalChecks: expired, missingMedicalChecks: missing, staleMedicalChecks: expired + missing };
+}
+
 const router = Router();
 
 router.use(authenticate);
@@ -201,13 +216,11 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
         // and asks for another coach (WP4B; deactivation now hands teams over).
         const disabledCoachIds = new Set(coachRows.filter((coach) => coach.status === 'disabled').map((coach) => coach.id));
         const now = Date.now();
-        const isMedicalCheckStale = (expiry: string | null) => !expiry || new Date(expiry).getTime() < now;
-
-        const statsByTeam = new Map<number, { playerIds: Set<number>; staleMedicalChecks: Set<number> }>();
+        const statsByTeam = new Map<number, { playerIds: Set<number>; expired: Set<number>; missing: Set<number> }>();
         const bucketFor = (teamId: number) => {
             let bucket = statsByTeam.get(teamId);
             if (!bucket) {
-                bucket = { playerIds: new Set(), staleMedicalChecks: new Set() };
+                bucket = { playerIds: new Set(), expired: new Set(), missing: new Set() };
                 statsByTeam.set(teamId, bucket);
             }
             return bucket;
@@ -217,12 +230,14 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
             if (player.teamId == null) return;
             const bucket = bucketFor(player.teamId);
             bucket.playerIds.add(player.id);
-            if (isMedicalCheckStale(player.medicalCheckExpiry)) bucket.staleMedicalChecks.add(player.id);
+            const state = medicalCheckState(player.medicalCheckExpiry, now);
+            if (state !== 'valid') bucket[state].add(player.id);
         });
         relationRows.forEach((row) => {
             const bucket = bucketFor(row.teamId);
             bucket.playerIds.add(row.playerId);
-            if (isMedicalCheckStale(row.medicalCheckExpiry)) bucket.staleMedicalChecks.add(row.playerId);
+            const state = medicalCheckState(row.medicalCheckExpiry, now);
+            if (state !== 'valid') bucket[state].add(row.playerId);
         });
 
         res.json(rows.map((team) => {
@@ -232,7 +247,7 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
                 coachName: team.coachId != null ? coachMap.get(team.coachId) ?? null : null,
                 coachDisabled: team.coachId != null && disabledCoachIds.has(team.coachId),
                 playerCount: stats ? stats.playerIds.size : 0,
-                staleMedicalChecks: stats ? stats.staleMedicalChecks.size : 0,
+                ...medicalCheckTotals(stats ? stats.expired.size : 0, stats ? stats.missing.size : 0),
             };
         }));
     } catch (e) {
@@ -359,7 +374,7 @@ router.post('/', requireTeamManager, async (req: AuthenticatedRequest, res) => {
             })
             .returning();
 
-        res.json({ ...mapTeam(inserted[0]), coachName, playerCount: 0, staleMedicalChecks: 0 });
+        res.json({ ...mapTeam(inserted[0]), coachName, playerCount: 0, ...medicalCheckTotals(0, 0) });
     } catch (e) {
         console.error('[POST /api/teams] error:', e);
         res.status(500).json({ error: 'Failed to create team' });
@@ -387,14 +402,17 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
                 : Promise.resolve([]),
         ]);
         const now = Date.now();
-        const staleMedicalChecks = teamPlayers.filter((player) => !player.medicalCheckExpiry || msOf(player.medicalCheckExpiry) < now).length;
+        const medicalChecks = medicalCheckTotals(
+            teamPlayers.filter((player) => medicalCheckState(player.medicalCheckExpiry, now) === 'expired').length,
+            teamPlayers.filter((player) => medicalCheckState(player.medicalCheckExpiry, now) === 'missing').length,
+        );
 
         res.json({
             ...mapTeam(access.team, req),
             coachName: coachRow[0]?.name ?? null,
             coachDisabled: coachRow[0]?.status === 'disabled',
             playerCount: teamPlayers.length,
-            staleMedicalChecks,
+            ...medicalChecks,
         });
     } catch (e) {
         console.error(`[GET /api/teams/${req.params.id}] error:`, e);
@@ -616,14 +634,17 @@ router.patch('/:id', requireTeamManager, async (req: AuthenticatedRequest, res) 
                 : Promise.resolve([]),
         ]);
         const now = Date.now();
-        const staleMedicalChecks = teamPlayers.filter((player) => !player.medicalCheckExpiry || msOf(player.medicalCheckExpiry) < now).length;
+        const medicalChecks = medicalCheckTotals(
+            teamPlayers.filter((player) => medicalCheckState(player.medicalCheckExpiry, now) === 'expired').length,
+            teamPlayers.filter((player) => medicalCheckState(player.medicalCheckExpiry, now) === 'missing').length,
+        );
 
         res.json({
             ...mapTeam(updated[0]),
             coachName: coachRow[0]?.name ?? null,
             coachDisabled: coachRow[0]?.status === 'disabled',
             playerCount: teamPlayers.length,
-            staleMedicalChecks,
+            ...medicalChecks,
         });
     } catch (e) {
         console.error(`[PATCH /api/teams/${req.params.id}] error:`, e);

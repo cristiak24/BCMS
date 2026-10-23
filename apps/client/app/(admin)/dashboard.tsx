@@ -41,6 +41,12 @@ import { plural } from '../../utils/plural';
 
 const DAY = 86400000;
 
+/** "octombrie" (or "oct." short) for offset 0, "septembrie" for -1 (local calendar month). */
+function monthName(offset: number, width: 'long' | 'short' = 'long') {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + offset, 1).toLocaleDateString('ro-RO', { month: width });
+}
+
 type RecentResult = Match & { savedTeamName: string; frbSeasonId: string };
 
 type Tone = 'danger' | 'warning' | 'brand' | 'success' | 'sky' | 'purple';
@@ -651,8 +657,12 @@ export default function Dashboard() {
                     tone="brand"
                     label="Jucători activi"
                     value={summary.activePlayerCount}
-                    hint={`în ${plural(summary.teamCount, 'echipă', 'echipe')}`}
-                    delta={summary.playerCountChange ? { label: `${summary.playerCountChange > 0 ? '+' : ''}${summary.playerCountChange}`, direction: summary.playerCountChange > 0 ? 'up' : 'down' } : null}
+                    // A plain fact instead of a "+7" chip that compared nothing the card said
+                    // (it was this month's sign-ups minus last month's).
+                    hint={[
+                      `în ${plural(summary.teamCount, 'echipă', 'echipe')}`,
+                      summary.newPlayersThisMonth ? `${plural(summary.newPlayersThisMonth, 'jucător nou', 'jucători noi')} în ${monthName(0)}` : null,
+                    ].filter(Boolean).join(' · ')}
                     onPress={() => go('/admin/roster')}
                   />
                   <KpiCard
@@ -668,10 +678,11 @@ export default function Dashboard() {
                   <KpiCard
                     icon="account-balance"
                     tone="success"
-                    label="Încasări"
+                    // The month in the label, the comparison in the hint: both used to be unsaid.
+                    label={`Încasări ${monthName(0, 'short')}`}
                     value={money(summary.monthlyIncome)}
                     suffix=" RON"
-                    hint={`Profit: ${money(summary.monthlyProfit)} RON`}
+                    hint={`${summary.incomeChangePercent != null ? `față de ${monthName(-1)} · ` : ''}profit ${money(summary.monthlyProfit)} RON`}
                     delta={summary.incomeChangePercent != null ? { label: `${summary.incomeChangePercent > 0 ? '+' : ''}${Math.round(summary.incomeChangePercent)}%`, direction: summary.incomeChangePercent > 0 ? 'up' : summary.incomeChangePercent < 0 ? 'down' : 'flat' } : null}
                     onPress={canSeeFinance ? () => go('/admin/finance') : undefined}
                   />

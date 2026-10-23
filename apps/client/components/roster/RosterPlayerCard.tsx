@@ -5,6 +5,7 @@ import { Player } from '../../services/teamsApi';
 import StatusBadge from './StatusBadge';
 import RosterCheckbox from './RosterCheckbox';
 import { DenseRow } from '../ui/DenseList';
+import { MEDICAL_META, medicalStatus } from '../myclub/teamDisplay';
 
 interface RosterPlayerCardProps {
   player: Player;
@@ -50,6 +51,7 @@ export default function RosterPlayerCard({
       : { bg: 'var(--c-surface-3)', fg: 'var(--c-ink-soft)' }; // „De plată”: owed, not late
   const attendanceTone = attendanceRate == null ? 'var(--c-faint)' : attendanceRate >= 75 ? 'var(--c-success-fg)' : attendanceRate >= 60 ? 'var(--c-warning-fg)' : 'var(--c-danger-fg)';
   const meta = [player.number ? `#${player.number}` : null, teamLabel].filter(Boolean).join(' · ');
+  const medicalMeta = MEDICAL_META[medicalStatus(player.medicalCheckExpiry)];
   void categoryLabel;
 
   return (
@@ -68,14 +70,21 @@ export default function RosterPlayerCard({
           <View className="flex-row items-center gap-2 min-w-0">
             <Text className="flex-1 min-w-0 text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{fullName}</Text>
             {showStatusChip && !isActive ? <StatusBadge label="Inactiv" tone="gray" /> : null}
-            <View className="flex-row items-center gap-1 rounded-full px-2 py-0.5 shrink-0" style={{ backgroundColor: payTone.bg }}>
-              <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: payTone.fg }} />
-              <Text className="text-[11.5px] font-semibold" style={{ color: payTone.fg }} numberOfLines={1}>{paymentLabel}</Text>
-            </View>
           </View>
           <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
             {meta} · <Text className="t-num" style={{ color: attendanceTone }}>{attendanceRate == null ? 'prezență —' : `${attendanceRate}% prezență`}</Text>
           </Text>
+          {/* Payment and clearance under the name, like the team page: on a phone the
+              clearance column was simply gone, so nobody could see who may play. */}
+          <View className="flex-row flex-wrap items-center gap-1.5 mt-1">
+            <View className="flex-row items-center gap-1 rounded-full px-2 py-0.5" style={{ backgroundColor: payTone.bg }}>
+              <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: payTone.fg }} />
+              <Text className="text-[11.5px] font-semibold" style={{ color: payTone.fg }} numberOfLines={1}>{paymentLabel}</Text>
+            </View>
+            <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: medicalMeta.bg }}>
+              <Text className="text-[11.5px] font-semibold" style={{ color: medicalMeta.fg }} numberOfLines={1}>{medicalMeta.label}</Text>
+            </View>
+          </View>
         </View>
       </Pressable>
       <Pressable

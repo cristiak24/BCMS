@@ -16,6 +16,8 @@ export interface ExpiringItem {
 export interface DashboardSummary {
     activePlayerCount: number;
     playerCountChange: number;  // jucători noi luna asta minus jucători noi luna trecută
+    /** Players added this calendar month. */
+    newPlayersThisMonth?: number;
     teamCount: number;
     totalIncome: number;        // venituri totale procesate (facturi + cotizații), fără cheltuieli
     monthlyIncome: number;      // venituri luna curentă

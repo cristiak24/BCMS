@@ -282,8 +282,9 @@ export default function TeamDetailsScreen() {
                             />
                             <GlassStat
                                 value={medicalIssues > 0 ? medicalIssues : 'La zi'}
-                                label={medicalIssues > 0 ? 'vize de rezolvat' : 'vize medicale'}
-                                shortLabel="vize"
+                                // Expired + missing: "fără viză valabilă", not "vize de rezolvat" (Acasă counts only expired ones).
+                                label={medicalIssues > 0 ? 'fără viză valabilă' : 'vize medicale'}
+                                shortLabel={medicalIssues > 0 ? 'fără viză' : 'vize'}
                                 dot={medicalIssues > 0 ? 'var(--c-warning)' : 'var(--c-success)'}
                             />
                             <GlassStat

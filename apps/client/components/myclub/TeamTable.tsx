@@ -3,7 +3,7 @@ import { View, Text, Pressable, ActivityIndicator } from '@/src/web/reactNative'
 import { RefreshCw, Pencil, Calendar, Trash2, AlertTriangle } from 'lucide-react';
 import type { Team } from '../../services/teamsApi';
 import type { SortKey, SortState } from '../../hooks/useTeamFilters';
-import { GENDER_LABELS, LEVEL_LABELS, formatRelativeDate, isFrbTeam } from './teamDisplay';
+import { GENDER_LABELS, LEVEL_LABELS, formatRelativeDate, isFrbTeam, teamClearance } from './teamDisplay';
 import ThemedCheckbox from './ThemedCheckbox';
 
 // Tokens only: the legacy hex classes here (`hover:bg-[#FBFDFF]` above all)
@@ -135,10 +135,10 @@ export default function TeamTable({
                                 <td className={CELL}>
                                     <View className="flex-row items-center gap-1.5">
                                         <Text className="t-num text-[12.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>{team.playerCount}</Text>
-                                        {team.staleMedicalChecks > 0 && (
-                                            <View className="flex-row items-center gap-0.5" accessibilityLabel={`${team.staleMedicalChecks} vize medicale de reînnoit`}>
+                                        {teamClearance(team).total > 0 && (
+                                            <View className="flex-row items-center gap-0.5" accessibilityLabel={teamClearance(team).label ?? undefined}>
                                                 <AlertTriangle size={11} color="var(--c-warning-fg)" />
-                                                <Text className="t-num text-[11px] font-semibold" style={{ color: 'var(--c-warning-fg)' }}>{team.staleMedicalChecks}</Text>
+                                                <Text className="t-num text-[11px] font-semibold" style={{ color: 'var(--c-warning-fg)' }}>{teamClearance(team).total}</Text>
                                             </View>
                                         )}
                                     </View>

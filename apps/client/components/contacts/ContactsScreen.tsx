@@ -287,10 +287,14 @@ export default function ContactsScreen() {
 
   const players = useMemo(() => {
     if (data?.mode !== 'staff') return [];
-    return data.players.filter((p) =>
-      (teamFilter === 'all' || p.teamIds.includes(Number(teamFilter)))
-      && matchesQuery(query, `${p.firstName} ${p.lastName}`, `${p.lastName} ${p.firstName}`, p.phone, p.accountPhone, p.guardianName, p.guardianPhone, p.guardian2Name, p.guardian2Phone, p.number != null ? `#${p.number}` : null));
-  }, [data, teamFilter, query]);
+    // By team, then by name — the list came in database order (#13, #5, #12…).
+    const teamOf = (p: PlayerContact) => p.teamIds.map((id) => teamName.get(id)).filter(Boolean).sort((a, b) => a!.localeCompare(b!, 'ro'))[0] ?? '\uffff';
+    return data.players
+      .filter((p) =>
+        (teamFilter === 'all' || p.teamIds.includes(Number(teamFilter)))
+        && matchesQuery(query, `${p.firstName} ${p.lastName}`, `${p.lastName} ${p.firstName}`, p.phone, p.accountPhone, p.guardianName, p.guardianPhone, p.guardian2Name, p.guardian2Phone, p.number != null ? `#${p.number}` : null))
+      .sort((a, b) => teamOf(a).localeCompare(teamOf(b), 'ro') || `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, 'ro'));
+  }, [data, teamFilter, query, teamName]);
 
   useEffect(() => {
     setVisibleCount(PAGE);

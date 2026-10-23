@@ -25,7 +25,12 @@ export interface Team {
     coachDisabled?: boolean;
     isActive: boolean;
     playerCount: number;
+    /** Expired + missing; kept for older code. Prefer the two counts below. */
     staleMedicalChecks: number;
+    /** Had a date, now past. */
+    expiredMedicalChecks?: number;
+    /** Never entered. */
+    missingMedicalChecks?: number;
     createdAt: string;
     updatedAt: string;
 }

@@ -2,10 +2,9 @@ import React from 'react';
 import { View, Text, Pressable, ActivityIndicator } from '@/src/web/reactNative';
 import { RefreshCw, Users, AlertTriangle, Check, Pencil, Calendar, Trash2, ArrowRight } from 'lucide-react';
 import type { Team } from '../../services/teamsApi';
-import { GENDER_LABELS, LEVEL_LABELS, formatRelativeDate, isFrbTeam } from './teamDisplay';
+import { GENDER_LABELS, LEVEL_LABELS, formatRelativeDate, isFrbTeam, teamClearance } from './teamDisplay';
 import ThemedCheckbox from './ThemedCheckbox';
 import { TeamAvatar } from '../l12/L12Visuals';
-import { plural } from '../../utils/plural';
 
 function Chip({ label, bg, fg, icon }: { label: string; bg: string; fg: string; icon?: React.ReactNode }) {
     return (
@@ -53,7 +52,8 @@ export default function TeamCard({
     onDelete: () => void;
 }) {
     const frb = isFrbTeam(team);
-    const stale = team.staleMedicalChecks > 0;
+    const clearance = teamClearance(team);
+    const stale = clearance.total > 0;
     const coachInitials = team.coachName
         ? team.coachName.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()
         : null;
@@ -116,7 +116,7 @@ export default function TeamCard({
                 >
                     {stale ? <AlertTriangle size={11} color="var(--c-warning-fg)" /> : <Check size={11} color="var(--c-success-fg)" />}
                     <Text className="text-[11px] font-semibold" style={{ color: stale ? 'var(--c-warning-fg)' : 'var(--c-success-fg)' }}>
-                        {stale ? plural(team.staleMedicalChecks, 'viză expirată', 'vize expirate') : 'Vize la zi'}
+                        {clearance.label ?? 'Vize la zi'}
                     </Text>
                 </View>
             </View>

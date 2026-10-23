@@ -32,6 +32,26 @@ export const MEDICAL_META: Record<MedicalStatus, { label: string; bg: string; fg
     missing: { label: 'Fără viză', bg: 'var(--c-surface-3)', fg: 'var(--c-muted)' },
 };
 
+/**
+ * "1 viză expirată · 4 fără viză": a missing clearance is not an expired one.
+ * Teams used to show both as "5 vize expirate" while Acasă said 1. Null when
+ * every player has a valid clearance.
+ */
+export function clearanceSummary(expired: number, missing: number) {
+    const parts = [
+        expired > 0 ? plural(expired, 'viză expirată', 'vize expirate') : null,
+        missing > 0 ? `${missing.toLocaleString('ro-RO')} fără viză` : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join(' · ') : null;
+}
+
+/** Counts from a team row; older API responses only had the combined number. */
+export function teamClearance(team: { expiredMedicalChecks?: number; missingMedicalChecks?: number; staleMedicalChecks: number }) {
+    const expired = team.expiredMedicalChecks ?? team.staleMedicalChecks;
+    const missing = team.missingMedicalChecks ?? 0;
+    return { expired, missing, total: expired + missing, label: clearanceSummary(expired, missing) };
+}
+
 export function formatDate(iso: string | null | undefined) {
     if (!iso) return '—';
     const date = parseApiDate(iso);
