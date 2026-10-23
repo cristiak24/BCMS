@@ -1,5 +1,9 @@
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import { View, Text } from '@/src/web/reactNative';
+import { usePathname } from '@/src/web/expoRouter';
+
+/** Stat tiles drop the glass effect when there is no artwork behind them. */
+const PlainHeader = createContext(false);
 
 function CourtLines() {
     return (
@@ -21,7 +25,16 @@ function CourtLines() {
     );
 }
 
-/** Friendly page header: soft tint circle + court lines, display-font title, actions, optional stat tiles below. */
+/**
+ * Page header. `hero`: soft tint circle + court lines in a card, display-font
+ * title, actions, optional stat tiles below. `plain`: the same title, actions
+ * and tiles straight on the page, no card or artwork.
+ *
+ * Admin work pages are plain (decided 2026-10-22: the hero belongs to Acasă
+ * only, and admin Acasă has its own). Coach and player/parent pages keep the
+ * hero until they get their own review — so the default follows the route,
+ * which also covers screens shared between roles (Contacte, Documente).
+ */
 export default function PageHero({
     eyebrow,
     title,
@@ -30,6 +43,7 @@ export default function PageHero({
     leading,
     children,
     className,
+    variant,
 }: {
     eyebrow: string;
     title: string;
@@ -38,7 +52,38 @@ export default function PageHero({
     leading?: ReactNode;
     children?: ReactNode;
     className?: string;
+    variant?: 'hero' | 'plain';
 }) {
+    const pathname = usePathname();
+    const plain = (variant ?? (pathname.startsWith('/admin/') ? 'plain' : 'hero')) === 'plain';
+
+    const heading = (
+        <View className="flex-col md:flex-row md:items-center md:justify-between gap-3.5">
+            <View className="flex-row items-center gap-3.5 min-w-0 flex-1">
+                {leading}
+                <View className="min-w-0 flex-1">
+                    <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{eyebrow}</Text>
+                    <Text accessibilityRole="header" aria-level={1} className="f-display text-[22px] md:text-[26px] font-extrabold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.035em' } as any}>
+                        {title}
+                    </Text>
+                    {subtitle ? <Text className="text-[13px] mt-1" style={{ color: 'var(--c-muted)' }}>{subtitle}</Text> : null}
+                </View>
+            </View>
+            {actions ? <View className="flex-row flex-wrap items-center gap-2">{actions}</View> : null}
+        </View>
+    );
+
+    if (plain) {
+        return (
+            <PlainHeader.Provider value>
+                <View className={`ui-rise gap-3.5 pt-1 md:pt-2 ${className ?? 'mb-5'}`}>
+                    {heading}
+                    {children}
+                </View>
+            </PlainHeader.Provider>
+        );
+    }
+
     return (
         <View
             className={`ui-rise relative overflow-hidden rounded-[16px] border ${className ?? 'mb-4'}`}
@@ -51,26 +96,14 @@ export default function PageHero({
             />
             <CourtLines />
             <View className="relative gap-3.5 p-4 md:p-5">
-                <View className="flex-col md:flex-row md:items-center md:justify-between gap-3.5">
-                    <View className="flex-row items-center gap-3.5 min-w-0 flex-1">
-                        {leading}
-                        <View className="min-w-0 flex-1">
-                            <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{eyebrow}</Text>
-                            <Text accessibilityRole="header" aria-level={1} className="f-display text-[22px] md:text-[26px] font-extrabold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.035em' } as any}>
-                                {title}
-                            </Text>
-                            {subtitle ? <Text className="text-[13px] mt-1" style={{ color: 'var(--c-muted)' }}>{subtitle}</Text> : null}
-                        </View>
-                    </View>
-                    {actions ? <View className="flex-row flex-wrap items-center gap-2">{actions}</View> : null}
-                </View>
+                {heading}
                 {children}
             </View>
         </View>
     );
 }
 
-/** Small translucent stat tile for use inside PageHero. */
+/** Stat tile for PageHero: translucent over the hero artwork, a plain card in a plain header. */
 export function GlassStat({
     value,
     suffix,
@@ -91,8 +124,14 @@ export function GlassStat({
     danger?: boolean;
     bar?: number;
 }) {
+    const plain = useContext(PlainHeader);
     return (
-        <View className={`glass rounded-[12px] ${shortLabel ? 'px-2.5 lg:px-3' : 'px-3'} py-2.5 min-w-0`} style={{ boxShadow: 'var(--e-sm)' } as any}>
+        <View
+            className={`${plain ? 'border' : 'glass'} rounded-[12px] ${shortLabel ? 'px-2.5 lg:px-3' : 'px-3'} py-2.5 min-w-0`}
+            style={(plain
+                ? { backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' }
+                : { boxShadow: 'var(--e-sm)' }) as any}
+        >
             <View className="flex-row items-baseline gap-1">
                 <View className="w-[6px] h-[6px] rounded-full shrink-0 self-center" style={{ backgroundColor: dot }} />
                 <Text className="f-display t-num text-[19px] font-extrabold leading-none" style={{ color: danger ? 'var(--c-danger-fg)' : 'var(--c-ink-strong)' }} numberOfLines={1}>{value}</Text>
