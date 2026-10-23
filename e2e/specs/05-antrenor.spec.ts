@@ -35,7 +35,7 @@ test('the team\'s coach sees the session and marks attendance', async ({ page })
 
   const mateiRow = page.getByText('Matei Popescu', { exact: true })
     .locator('xpath=ancestor::*[.//*[@aria-label="Prezent: Matei Popescu"]][1]');
-  await expect(mateiRow).toContainText('Nemarcat');
+  await expect(mateiRow).toContainText('Fără marcaj');
   const saved = page.waitForResponse((r) => r.url().includes(`/events/${eventId}/attendance`) && r.request().method() === 'POST');
   await page.getByRole('radio', { name: 'Prezent: Matei Popescu' }).click();
   expect((await saved).status()).toBe(200);
@@ -48,7 +48,7 @@ test('the team\'s coach sees the session and marks attendance', async ({ page })
   await page.reload();
   await page.getByRole('button', { name: new RegExp(`^${TITLE}`) }).click();
   await expect(mateiRow).toBeVisible();
-  await expect(mateiRow).not.toContainText('Nemarcat');
+  await expect(mateiRow).not.toContainText('Fără marcaj');
 });
 
 test('the coach of another team does not see it', async ({ page }) => {

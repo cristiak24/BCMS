@@ -61,7 +61,7 @@ export function attendanceStatusTone(status?: string | null) {
   if (normalized === 'medical' || normalized === 'excused') {
     return { label: 'Motivat', bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', icon: 'medical-services' as const };
   }
-  return { label: 'Nemarcat', bg: 'var(--c-surface-3)', fg: 'var(--c-muted)', icon: 'radio-button-unchecked' as const };
+  return { label: 'Fără marcaj', bg: 'var(--c-surface-3)', fg: 'var(--c-muted)', icon: 'radio-button-unchecked' as const };
 }
 
 export function isPresentStatus(status?: string | null) {

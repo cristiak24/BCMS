@@ -23,7 +23,6 @@ import { attendanceMarkMeta, type AttendanceMark } from '../../utils/attendanceS
 import { isAttendanceOpen } from '../../utils/attendanceWindow';
 import { defaultSession, splitSessions } from '../../utils/attendanceSessions';
 import { coachCanChangeEvent } from '../../utils/coachEventScope';
-import { plural } from '../../utils/plural';
 
 /**
  * "Prezență" — pick a session on the left, mark the squad on the right.
@@ -385,7 +384,7 @@ export default function CoachAttendanceScreen() {
               size={56}
               stroke={6}
               color={markedPercent === 100 ? 'var(--c-success)' : 'var(--c-brand-fg)'}
-              label={`${markedCount} din ${players.length} marcați`}
+              label={`Prezență marcată: ${markedCount} din ${players.length}`}
             >
               {markedPercent === 100 ? (
                 <MaterialIcons name="check" size={20} color="var(--c-success-fg)" />
@@ -400,7 +399,7 @@ export default function CoachAttendanceScreen() {
                 <Button
                   variant="primary"
                   icon="check-circle"
-                  label={`Restul prezenți (${unmarkedCount})`}
+                  label={`Prezență pentru rest (${unmarkedCount})`}
                   loading={bulkSaving}
                   onPress={() => setBulkConfirmOpen(true)}
                 />
@@ -418,8 +417,8 @@ export default function CoachAttendanceScreen() {
           }
         >
           <View className="grid grid-cols-3 gap-2 ui-stagger">
-            <GlassStat dot="var(--c-brand-fg)" label="Marcați" value={`${markedCount}/${players.length}`} hint="din lot" />
-            <GlassStat dot="var(--c-success)" label="Prezenți" value={presentCount} hint="jucători" />
+            <GlassStat dot="var(--c-brand-fg)" label="Marcaj" value={`${markedCount}/${players.length}`} hint="din lot" />
+            <GlassStat dot="var(--c-success)" label="Prezențe" value={presentCount} hint="din lot" />
             <GlassStat
               dot={presentRate == null ? 'var(--c-faint)' : attendanceRateColor(presentRate)}
               label="Rată"
@@ -557,10 +556,10 @@ export default function CoachAttendanceScreen() {
       <ConfirmDialog
         visible={bulkConfirmOpen}
         icon="check-circle"
-        title="Marchează restul prezenți"
-        message={`${plural(unmarkedIds.length, 'jucător nemarcat va fi trecut', 'jucători nemarcați vor fi trecuți')} ca prezenți. Cei deja marcați nu se schimbă.`}
+        title="Marchezi prezența pentru rest?"
+        message={`Cine nu are încă marcaj (${unmarkedIds.length}) primește „Prezent”. Marcajele existente nu se schimbă.`}
         confirmLabel="Confirmă"
-        cancelLabel="Anulează"
+        cancelLabel="Renunță"
         loading={bulkSaving}
         onConfirm={markRemainingPresent}
         onCancel={() => setBulkConfirmOpen(false)}

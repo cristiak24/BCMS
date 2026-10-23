@@ -9,8 +9,8 @@ import { plural } from '../../utils/plural';
 /**
  * Presentational pieces of the L12 home: match "tickets", lineup pips, team
  * avatars and the welcome panel. Colour is limited to the match-kind accent on
- * the date block and the green of a ready lineup; surfaces stay neutral and the
- * `.glass` layer is used only on small panels that sit over the hero artwork.
+ * the date block and the green of a ready lineup; surfaces stay neutral (no
+ * glass and no hero artwork since the admin work pages went plain).
  */
 
 // ── Match kinds ──────────────────────────────────────────────
@@ -275,29 +275,9 @@ export function DayHeading({ label, count }: { label: string; count: number }) {
 
 // ── Welcome panel ────────────────────────────────────────────
 
-function CourtLines() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 320 200"
-      width="320"
-      height="200"
-      style={{ position: 'absolute', right: -50, bottom: -70, pointerEvents: 'none', opacity: 0.6 }}
-    >
-      <g fill="none" stroke="var(--c-border)" strokeWidth="1.5">
-        <rect x="10" y="10" width="300" height="240" rx="2" />
-        <rect x="110" y="10" width="100" height="110" />
-        <circle cx="160" cy="120" r="40" />
-        <path d="M40 10v50a120 120 0 0 0 240 0V10" />
-        <circle cx="160" cy="34" r="8" />
-      </g>
-    </svg>
-  );
-}
-
 function StatTile({ value, label, tone }: { value: string | number; label: string; tone: string }) {
   return (
-    <View className="glass flex-1 min-w-0 rounded-[12px] px-3 py-2">
+    <View className="flex-1 min-w-0 rounded-[12px] border px-3 py-2" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
       <View className="flex-row items-center gap-1.5">
         <View className="w-[3px] h-3 rounded-full" style={{ backgroundColor: tone }} />
         <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
@@ -335,13 +315,8 @@ export function L12Hero({
 
   return (
     <View className="ui-rise relative overflow-hidden rounded-[16px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
-      <View
-        pointerEvents="none"
-        className="absolute rounded-full"
-        style={{ width: 280, height: 280, right: -60, top: -110, backgroundColor: 'var(--c-surface-tint)', opacity: 0.85 }}
-      />
-      <CourtLines />
-
+      {/* No tint circle or court lines: like the other admin work pages (hero only on Acasă), the
+          card is plain and keeps its content — the counts and the next match without a list. */}
       <View className="relative flex-col lg:flex-row lg:items-center gap-3.5 p-3.5 sm:p-4 md:p-5">
         <View className="flex-1 min-w-0 gap-3">
           <View>
@@ -360,7 +335,7 @@ export function L12Hero({
         </View>
 
         {next ? (
-          <View className="glass rounded-[14px] p-3 gap-2.5 lg:w-[300px]" style={{ boxShadow: 'var(--e-md)' } as any}>
+          <View className="rounded-[14px] border p-3 gap-2.5 lg:w-[300px]" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
             <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{unset > 0 ? 'Următorul meci fără listă' : 'Următorul meci'}</Text>
             <View className="gap-1.5">
               {[next.home, next.away].filter((side): side is string => Boolean(side)).map((side) => (

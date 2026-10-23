@@ -190,8 +190,9 @@ function timeLabel(iso: string) {
 }
 
 function Segmented<T extends string>({ value, onChange, options }: { value: T; onChange: (next: T) => void; options: { key: T; label: string; count?: number }[] }) {
+  // Solid track like the Finanțe / Acces tabs; glass belonged over the old hero artwork.
   return (
-    <View className="glass p-[3px] rounded-[12px] flex-row self-start">
+    <View className="p-[3px] rounded-[12px] flex-row self-start" style={{ backgroundColor: 'var(--c-surface-3)' }}>
       {options.map((option) => {
         const active = option.key === value;
         return (
