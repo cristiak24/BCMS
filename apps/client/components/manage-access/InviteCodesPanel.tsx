@@ -1,19 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import { Pressable, Text, TextInput, View } from '@/src/web/reactNative';
+import { Pressable, Text, View } from '@/src/web/reactNative';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { SkeletonList } from '../ui/Skeleton';
-import RoleSelector, { AccessButton, AccessCard, FieldLabel, OptionChip, ROLE_LABELS, TeamPicker, type TeamOption } from './RoleSelector';
+import { ROLE_LABELS } from './RoleSelector';
 import { manageAccessApi } from '../../services/manageAccessApi';
-import { familyRequestsApi } from '../../services/familyRequestsApi';
-import type { InviteCodeItem, InviteCodeStatus, InviteRole } from '../../types/manageAccess';
-
-const VALIDITY_OPTIONS: { label: string; hours: number }[] = [
-    { label: '1 zi', hours: 24 },
-    { label: '3 zile', hours: 72 },
-    { label: '7 zile', hours: 24 * 7 },
-    { label: '30 de zile', hours: 24 * 30 },
-];
+import type { InviteCodeItem, InviteCodeStatus } from '../../types/manageAccess';
 
 const STATUS_META: Record<InviteCodeStatus, { label: string; fg: string; bg: string }> = {
     active: { label: 'Activ', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)' },
@@ -21,11 +13,6 @@ const STATUS_META: Record<InviteCodeStatus, { label: string; fg: string; bg: str
     exhausted: { label: 'Epuizat', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)' },
     revoked: { label: 'Revocat', fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)' },
 };
-
-// A parent code is one per family (two parents); the other roles share a code across a group.
-function defaultUses(role: InviteRole) {
-    return role === 'parent' ? '2' : '25';
-}
 
 function formatExpiry(iso: string) {
     return new Date(iso).toLocaleString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -42,33 +29,31 @@ async function copyText(value: string) {
 
 type Props = {
     onNotify?: (toast: { variant: 'success' | 'error'; message: string }) => void;
+    /** Bumped by the page after „Invită” generates a code, so the list reloads. */
+    reloadKey?: number;
 };
 
 /**
- * Short club join codes. The form is one compact card (role, validity, max
- * accounts); below it only the codes that still work are listed. Expired,
- * used-up and revoked codes fold into a "Istoric" toggle — they were most of
- * the list and all of the visual noise.
+ * The club's join codes: only the ones that still work, with copy and revoke.
+ * Expired, used-up and revoked codes fold into a "Istoric" toggle — they were
+ * most of the list and all of the visual noise. New codes come from „Invită”
+ * (InviteFlow), which used to be a generator form on this tab.
  */
-export default function InviteCodesPanel({ onNotify }: Props) {
-    const [role, setRole] = useState<InviteRole>('player');
-    const [teams, setTeams] = useState<TeamOption[]>([]);
-    const [teamId, setTeamId] = useState<number | null>(null);
-    const [validityHours, setValidityHours] = useState(24 * 7);
-    const [maxUsesInput, setMaxUsesInput] = useState(defaultUses('player'));
-    const [maxUsesEdited, setMaxUsesEdited] = useState(false);
+export default function InviteCodesPanel({ onNotify, reloadKey = 0 }: Props) {
     const [codes, setCodes] = useState<InviteCodeItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [copiedId, setCopiedId] = useState<number | null>(null);
     const [freshId, setFreshId] = useState<number | null>(null);
     const [showHistory, setShowHistory] = useState(false);
     const [pendingRevoke, setPendingRevoke] = useState<InviteCodeItem | null>(null);
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (highlightNewest: boolean) => {
         try {
-            setCodes(await manageAccessApi.listInviteCodes());
+            setError(null);
+            const list = await manageAccessApi.listInviteCodes();
+            setCodes(list);
+            if (highlightNewest && list[0]) setFreshId(list[0].id);
         } catch (loadError) {
             setError(loadError instanceof Error ? loadError.message : 'Nu am putut încărca codurile.');
         } finally {
@@ -77,38 +62,11 @@ export default function InviteCodesPanel({ onNotify }: Props) {
     }, []);
 
     useEffect(() => {
-        void load();
-    }, [load]);
-
-    useEffect(() => {
-        void familyRequestsApi.teamCodes()
-            .then((rows) => setTeams(rows.map(({ id, name }) => ({ id, name }))))
-            .catch(() => setTeams([]));
-    }, []);
+        void load(reloadKey > 0);
+    }, [load, reloadKey]);
 
     const activeCodes = useMemo(() => codes.filter((item) => item.status === 'active'), [codes]);
     const pastCodes = useMemo(() => codes.filter((item) => item.status !== 'active'), [codes]);
-
-    const handleCreate = async () => {
-        const maxUses = Number(maxUsesInput);
-        if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 500) {
-            setError('Numărul maxim de conturi trebuie să fie între 1 și 500.');
-            return;
-        }
-
-        setCreating(true);
-        setError(null);
-        try {
-            const created = await manageAccessApi.createInviteCode({ role, teamId: role === 'parent' ? teamId : null, expiresInHours: validityHours, maxUses });
-            setCodes((current) => [created, ...current]);
-            setFreshId(created.id);
-            onNotify?.({ variant: 'success', message: `Cod nou pentru ${ROLE_LABELS[created.role].toLowerCase()}: ${created.code}` });
-        } catch (createError) {
-            setError(createError instanceof Error ? createError.message : 'Nu am putut genera codul.');
-        } finally {
-            setCreating(false);
-        }
-    };
 
     const handleRevoke = async (item: InviteCodeItem) => {
         try {
@@ -202,82 +160,8 @@ export default function InviteCodesPanel({ onNotify }: Props) {
     };
 
     return (
-        // Desktop: generator on the left at form width, codes fill the rest of
-        // the page in a grid. Phones stack them.
-        <View className="flex-col lg:flex-row lg:items-start gap-4 lg:gap-6">
-            <View className="w-full lg:w-[420px] lg:shrink-0">
-                <AccessCard>
-                    <View className="gap-4">
-                        <View>
-                            <FieldLabel>Pentru</FieldLabel>
-                            <RoleSelector
-                                selectedRole={role}
-                                onSelectRole={(next) => {
-                                    setRole(next);
-                                    if (next !== 'parent') setTeamId(null);
-                                    if (!maxUsesEdited) setMaxUsesInput(defaultUses(next));
-                                }}
-                            />
-                        </View>
-
-                        {role === 'parent' ? <TeamPicker teams={teams} selectedTeamId={teamId} onSelect={setTeamId} /> : null}
-
-                        {role === 'coach' ? (
-                            <Text className="text-[12.5px] font-medium leading-5" style={{ color: 'var(--c-muted)' }}>
-                                Antrenorii care folosesc codul intră în „Cereri". Contul se activează după ce îl aprobi.
-                            </Text>
-                        ) : null}
-                        {role === 'parent' ? (
-                            <Text className="text-[12.5px] font-medium leading-5" style={{ color: 'var(--c-muted)' }}>
-                                Un cod per familie (implicit 2 conturi): cel de-al doilea părinte îl folosește pe același și, dacă declară un copil deja înscris, îl legi la aprobare.
-                            </Text>
-                        ) : null}
-
-                        <View className="flex-col sm:flex-row gap-4">
-                            <View className="sm:flex-1">
-                                <FieldLabel>Valabil</FieldLabel>
-                                <View className="flex-row flex-wrap gap-1.5">
-                                    {VALIDITY_OPTIONS.map((option) => (
-                                        <OptionChip
-                                            key={option.hours}
-                                            label={option.label}
-                                            active={option.hours === validityHours}
-                                            onPress={() => setValidityHours(option.hours)}
-                                        />
-                                    ))}
-                                </View>
-                            </View>
-                            <View>
-                                <FieldLabel hint="1–500">Max. conturi</FieldLabel>
-                                <TextInput
-                                    value={maxUsesInput}
-                                    onChangeText={(value: string) => {
-                                        setMaxUsesEdited(true);
-                                        setMaxUsesInput(value.replace(/[^0-9]/g, '').slice(0, 3));
-                                    }}
-                                    keyboardType="number-pad"
-                                    accessibilityLabel="Număr maxim de conturi"
-                                    className="w-full sm:w-28 h-8 rounded-[9px] border px-3 text-[13px] font-semibold outline-none t-num"
-                                    style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}
-                                />
-                            </View>
-                        </View>
-
-                        <AccessButton
-                            label="Generează cod"
-                            icon="confirmation-number"
-                            loading={creating}
-                            onPress={() => void handleCreate()}
-                        />
-
-                        {error ? (
-                            <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text>
-                        ) : null}
-                    </View>
-                </AccessCard>
-            </View>
-
-            <View className="flex-1 min-w-0">
+        <View>
+            <View className="w-full min-w-0">
                 <View className="flex-row items-center justify-between mb-2 px-0.5">
                     <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>
                         Coduri active{activeCodes.length ? ` · ${activeCodes.length}` : ''}
@@ -301,7 +185,7 @@ export default function InviteCodesPanel({ onNotify }: Props) {
                     <SkeletonList count={2} />
                 ) : activeCodes.length === 0 ? (
                     <View className="rounded-[12px] border border-dashed px-4 py-5 items-center" style={{ borderColor: 'var(--c-border)' } as any}>
-                        <Text className="text-[13px]" style={{ color: 'var(--c-muted)' }}>Niciun cod activ. Generează unul mai sus.</Text>
+                        <Text className="text-[13px]" style={{ color: error ? 'var(--c-danger-fg)' : 'var(--c-muted)' }}>{error ?? 'Niciun cod activ. Generează unul din „Invită”.'}</Text>
                     </View>
                 ) : (
                     <View className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-2 ui-stagger">{activeCodes.map(renderCode)}</View>

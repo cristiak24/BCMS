@@ -1,4 +1,5 @@
 import InviteLinkFallbackDialog from '../../components/manage-access/InviteLinkFallbackDialog';
+import InviteFlow from '../../components/manage-access/InviteFlow';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -118,6 +119,7 @@ export default function ManageAccountsScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState<(typeof FILTERS)[number]>('all');
     const [busyId, setBusyId] = useState<string | number | null>(null);
+    const [inviteOpen, setInviteOpen] = useState(false);
     const [inviteFallback, setInviteFallback] = useState<{ email: string; inviteUrl: string; emailError?: string | null } | null>(null);
     const [pending, setPending] = useState<PendingAction | null>(null);
     const [sortKey, setSortKey] = useState<SortKey>('created');
@@ -593,7 +595,7 @@ export default function ManageAccountsScreen() {
                             <>
                                 <Button icon="refresh" label="Reîncarcă" iconOnlyOnMobile loading={refreshing} disabled={loading} onPress={() => void loadAccounts('refresh')} className="hidden sm:flex" />
                                 <Button icon="verified-user" label="Acces & invitații" iconOnlyOnMobile onPress={() => router.push('/admin/manage-access')} />
-                                <Button icon="person-add-alt-1" label="Cont nou" variant="primary" onPress={() => router.push('/admin/create-account')} />
+                                <Button icon="person-add-alt-1" label="Invită" variant="primary" onPress={() => setInviteOpen(true)} />
                             </>
                         )}
                     >
@@ -799,6 +801,14 @@ export default function ManageAccountsScreen() {
             />
 
             <InviteLinkFallbackDialog invite={inviteFallback} onClose={() => setInviteFallback(null)} />
+            <InviteFlow
+                visible={inviteOpen}
+                onClose={() => setInviteOpen(false)}
+                onCreated={(kind) => {
+                    // An email invitation shows up here as a pending account.
+                    if (kind === 'email') void loadAccounts('refresh');
+                }}
+            />
             <ToastHost toasts={toasts} onDismiss={dismissToast} />
         </View>
     );

@@ -2,10 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isClubAdmin } from '../utils/authSession';
 import { useSession } from '../context/AuthContext';
 import { manageAccessApi } from '../services/manageAccessApi';
-import { familyRequestsApi } from '../services/familyRequestsApi';
-import type { TeamOption } from '../components/manage-access/RoleSelector';
-import type { AccessRequestItem, InviteLinkItem, InviteRole } from '../types/manageAccess';
-import { DEFAULT_REFRESH_INTERVAL_MINUTES, isInviteExpired } from '../utils/manageAccess';
+import type { AccessRequestItem } from '../types/manageAccess';
 
 type RequestAction = 'approve' | 'deny' | null;
 
@@ -21,14 +18,6 @@ export function useManageAccess() {
     const [requestsError, setRequestsError] = useState<string | null>(null);
     const [requestAction, setRequestAction] = useState<{ id: number; type: RequestAction } | null>(null);
 
-    const [selectedRole, setSelectedRoleState] = useState<InviteRole>('player');
-    const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
-    const [teams, setTeams] = useState<TeamOption[]>([]);
-    const [refreshIntervalMinutes, setRefreshIntervalMinutes] = useState(DEFAULT_REFRESH_INTERVAL_MINUTES);
-    const [inviteLink, setInviteLink] = useState<InviteLinkItem | null>(null);
-    const [inviteLoading, setInviteLoading] = useState(true);
-    const [inviteError, setInviteError] = useState<string | null>(null);
-    const [regenerating, setRegenerating] = useState(false);
     const isMountedRef = useRef(true);
 
     useEffect(() => {
@@ -56,7 +45,6 @@ export function useManageAccess() {
             setAuthError('Autentifică-te din nou pentru a gestiona accesul.');
             setVerifiedIsAdmin(false);
             setRequestsLoading(false);
-            setInviteLoading(false);
             return;
         }
 
@@ -65,7 +53,6 @@ export function useManageAccess() {
         if (!sessionCanAdmin) {
             setAuthError('Doar administratorii clubului pot gestiona accesul.');
             setRequestsLoading(false);
-            setInviteLoading(false);
         }
     }, [initializing, session, sessionCanAdmin]);
 
@@ -87,33 +74,7 @@ export function useManageAccess() {
         }
     }, []);
 
-    // Teams only matter for parent and player links, so a coach/accountant
-    // selection always means no team.
-    const setSelectedRole = useCallback((role: InviteRole) => {
-        setSelectedRoleState(role);
-        if (role !== 'parent' && role !== 'player') setSelectedTeamId(null);
-    }, []);
-
-    const loadInviteLink = useCallback(async (role: InviteRole, teamId: number | null) => {
-        setInviteLoading(true);
-        setInviteError(null);
-
-        try {
-            const activeLink = await manageAccessApi.getActiveInviteLink(role, teamId);
-            setInviteLink(activeLink);
-            if (activeLink) {
-                setRefreshIntervalMinutes(activeLink.refreshIntervalMinutes);
-            }
-        } catch (error) {
-            setInviteError(error instanceof Error ? error.message : 'Nu am putut încărca linkul de invitație.');
-            setInviteLink(null);
-        } finally {
-            setInviteLoading(false);
-        }
-    }, []);
-
-    // Access requests don't depend on the selected role — load them once the
-    // session resolves, not on every role switch.
+    // Load the requests once the session resolves.
     useEffect(() => {
         if (!hasResolvedSession || !isAdmin) {
             setRequestsLoading(false);
@@ -122,64 +83,6 @@ export function useManageAccess() {
 
         void loadRequests();
     }, [hasResolvedSession, isAdmin, loadRequests]);
-
-    // The active invite link is role-scoped, so (re)load it whenever the selected
-    // role changes. This is the single source of the invite-link fetch — callers
-    // just call setSelectedRole and let this effect do the load (no duplicate).
-    useEffect(() => {
-        if (!hasResolvedSession || !isAdmin) {
-            setInviteLoading(false);
-            return;
-        }
-
-        void loadInviteLink(selectedRole, selectedTeamId);
-    }, [hasResolvedSession, isAdmin, loadInviteLink, selectedRole, selectedTeamId]);
-
-    useEffect(() => {
-        if (!hasResolvedSession || !isAdmin) return;
-        void familyRequestsApi.teamCodes()
-            .then((rows) => setTeams(rows.map(({ id, name }) => ({ id, name }))))
-            .catch(() => setTeams([]));
-    }, [hasResolvedSession, isAdmin]);
-
-    const regenerateInviteLink = useCallback(async (role: InviteRole, interval = refreshIntervalMinutes): Promise<boolean> => {
-        setRegenerating(true);
-        setInviteError(null);
-
-        try {
-            // generate returns the freshly created active link, so a follow-up
-            // getActiveInviteLink call would just repeat the same fetch.
-            const nextLink = await manageAccessApi.generateInviteLink(role, interval, role === 'parent' || role === 'player' ? selectedTeamId : null);
-            setInviteLink(nextLink);
-            setRefreshIntervalMinutes(nextLink.refreshIntervalMinutes);
-            return true;
-        } catch (error) {
-            setInviteError(error instanceof Error ? error.message : 'Nu am putut genera linkul de invitație.');
-            return false;
-        } finally {
-            setRegenerating(false);
-            setInviteLoading(false);
-        }
-    }, [refreshIntervalMinutes, selectedTeamId]);
-
-    useEffect(() => {
-        if (!inviteLink || !isAdmin) {
-            return;
-        }
-
-        const msUntilRefresh = new Date(inviteLink.expiresAt).getTime() - Date.now();
-
-        if (msUntilRefresh <= 0) {
-            setInviteLink(null);
-            return;
-        }
-
-        const timer = setTimeout(() => {
-            setInviteLink(null);
-        }, msUntilRefresh + 250);
-
-        return () => clearTimeout(timer);
-    }, [inviteLink, isAdmin]);
 
     const approveRequest = useCallback(async (id: number): Promise<boolean> => {
         setRequestAction({ id, type: 'approve' });
@@ -231,25 +134,11 @@ export function useManageAccess() {
         pendingCount,
         requestsLoading,
         requestsError,
-        inviteLink,
-        inviteLoading,
-        inviteError,
-        regenerating,
-        selectedRole,
-        selectedTeamId,
-        teams,
-        refreshIntervalMinutes,
         requestAction,
-        setSelectedRole,
-        setSelectedTeamId,
-        setRefreshIntervalMinutes,
         refreshAccessState: resolveAccessState,
         loadRequests,
-        loadInviteLink,
         approveRequest,
         denyRequest,
-        regenerateInviteLink,
-        isCurrentInviteExpired: inviteLink ? isInviteExpired(inviteLink.expiresAt) : false,
         authError,
     };
 }

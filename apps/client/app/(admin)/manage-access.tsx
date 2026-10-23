@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import { useRouter } from '@/src/web/expoRouter';
+import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import PageHero from '../../components/admin/PageHero';
 import PageContainer from '../../components/ui/PageContainer';
 import FilterChips from '../../components/ui/FilterChips';
-import InviteLinkGenerator from '../../components/manage-access/InviteLinkGenerator';
 import InviteCodesPanel from '../../components/manage-access/InviteCodesPanel';
+import InviteFlow from '../../components/manage-access/InviteFlow';
 import FamilyRequestsPanel from '../../components/family/FamilyRequestsPanel';
 import PendingAccessRequestList from '../../components/manage-access/PendingAccessRequestList';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -24,12 +24,11 @@ const STATUS_FILTERS: { key: AccessRequestStatus | 'all'; label: string }[] = [
     { key: 'all', label: 'Toate' },
 ];
 
-type AccessTab = 'requests' | 'link' | 'codes';
+type AccessTab = 'requests' | 'codes';
 
 const TABS: { key: AccessTab; label: string; icon: string; blurb?: string }[] = [
     { key: 'requests', label: 'Cereri', icon: 'how-to-reg' },
-    { key: 'link', label: 'Link', icon: 'link', blurb: 'Un link de înscriere pentru un singur rol, valabil o perioadă scurtă.' },
-    { key: 'codes', label: 'Coduri', icon: 'confirmation-number', blurb: 'Un cod scurt pentru un grup. Se introduce la „Creează cont” și intră direct în club.' },
+    { key: 'codes', label: 'Coduri', icon: 'confirmation-number', blurb: 'Codurile de grup care încă funcționează. Unul nou îl generezi din „Invită”.' },
 ];
 
 const TAB_STORAGE_KEY = 'bcms.access-tab';
@@ -37,7 +36,7 @@ const TAB_STORAGE_KEY = 'bcms.access-tab';
 function readStoredTab(): AccessTab {
     try {
         const stored = localStorage.getItem(TAB_STORAGE_KEY);
-        if (stored === 'requests' || stored === 'link' || stored === 'codes') return stored;
+        if (stored === 'requests' || stored === 'codes') return stored;
     } catch {
         // storage blocked — fall back to the default tab
     }
@@ -48,11 +47,16 @@ function readStoredTab(): AccessTab {
  * The page used to stack everything at once — link generator, code generator
  * (each with its own three big role cards), then the request list — so on a
  * phone the requests that actually need action sat ~2,000px down. Now it is
- * three tabs, one job each, with the pending count on the "Cereri" tab.
+ * two tabs (Cereri with the pending count, Coduri), and every way to invite
+ * someone — email, group code, team code, role link — sits behind „Invită”.
+ * `?invita=1` (the old Cont nou route) opens it on arrival.
  */
 
 export default function ManageAccessScreen() {
     const router = useRouter();
+    const { invita } = useLocalSearchParams<{ invita?: string }>();
+    const [inviteOpen, setInviteOpen] = useState(invita === '1');
+    const [codesReload, setCodesReload] = useState(0);
     const { searchValue, setSearchPlaceholder, setSearchValue, setHeaderActions, setMobileFab } = useHeader();
     const { toasts, showToast, dismissToast } = useToasts();
     const [tab, setTabState] = useState<AccessTab>(readStoredTab);
@@ -71,22 +75,10 @@ export default function ManageAccessScreen() {
         pendingCount,
         requestsLoading,
         requestsError,
-        inviteLink,
-        inviteLoading,
-        inviteError,
-        regenerating,
-        selectedRole,
-        selectedTeamId,
-        teams,
-        refreshIntervalMinutes,
         requestAction,
-        setSelectedRole,
-        setSelectedTeamId,
-        setRefreshIntervalMinutes,
         loadRequests,
         approveRequest,
         denyRequest,
-        regenerateInviteLink,
         authError,
     } = useManageAccess();
 
@@ -142,12 +134,9 @@ export default function ManageAccessScreen() {
         all: requests.length,
     }), [requests]);
 
-    const handleGenerateInviteLink = (minutes: number) => {
-        void regenerateInviteLink(selectedRole, minutes).then((ok) => {
-            if (ok) {
-                showToast({ variant: 'success', message: `Link nou pentru ${ROLE_LABELS[selectedRole].toLowerCase()} generat.` });
-            }
-        });
+    const closeInvite = () => {
+        setInviteOpen(false);
+        if (invita) router.replace('/admin/manage-access');
     };
 
     const handleApprove = (id: number) => {
@@ -208,7 +197,7 @@ export default function ManageAccessScreen() {
                         actions={(
                             <>
                                 <HeaderButton icon="groups" label="Conturi" onPress={() => router.push('/admin/manage-accounts')} />
-                                <HeaderButton icon="person-add-alt-1" label="Cont nou" primary onPress={() => router.push('/admin/create-account')} />
+                                <HeaderButton icon="person-add-alt-1" label="Invită" primary onPress={() => setInviteOpen(true)} />
                             </>
                         )}
                     >
@@ -248,7 +237,7 @@ export default function ManageAccessScreen() {
                         <Text className="t-meta mb-3 px-0.5" style={{ color: 'var(--c-muted)' }}>{activeTab.blurb}</Text>
                     ) : null}
 
-                    <View key={tab} className={`ui-rise mt-2 ${tab === 'link' ? 'w-full max-w-[640px]' : 'w-full'}`}>
+                    <View key={tab} className="ui-rise mt-2 w-full">
                         {tab === 'requests' ? (
                             <View className="gap-3">
                                 <FamilyRequestsPanel onNotify={showToast} onCountChange={setFamilyCount} />
@@ -291,25 +280,8 @@ export default function ManageAccessScreen() {
                                     onRetry={() => void loadRequests()}
                                 />
                             </View>
-                        ) : tab === 'link' ? (
-                            <InviteLinkGenerator
-                                inviteLink={inviteLink}
-                                loading={inviteLoading}
-                                regenerating={regenerating}
-                                error={inviteError}
-                                selectedRole={selectedRole}
-                                teams={teams}
-                                selectedTeamId={selectedTeamId}
-                                onTeamChange={setSelectedTeamId}
-                                refreshIntervalMinutes={refreshIntervalMinutes}
-                                onRoleChange={setSelectedRole}
-                                onRefreshIntervalChange={setRefreshIntervalMinutes}
-                                onGenerate={handleGenerateInviteLink}
-                                onCopied={() => showToast({ variant: 'success', message: 'Link copiat.' })}
-                                onInvalidMinutes={(message) => showToast({ variant: 'error', message })}
-                            />
                         ) : (
-                            <InviteCodesPanel onNotify={showToast} />
+                            <InviteCodesPanel onNotify={showToast} reloadKey={codesReload} />
                         )}
                     </View>
                 </PageContainer>
@@ -331,25 +303,33 @@ export default function ManageAccessScreen() {
                 onCancel={() => setPendingDeny(null)}
             />
 
+            <InviteFlow
+                visible={inviteOpen}
+                onClose={closeInvite}
+                onCreated={(kind) => {
+                    if (kind === 'group-code') setCodesReload((value) => value + 1);
+                }}
+            />
+
             <ToastHost toasts={toasts} onDismiss={dismissToast} />
         </View>
     );
 }
 
-/** Header action: icon-only on phones (the title needs the row), labelled from sm. */
+/** Header action: icon-only on phones (the title needs the row), labelled from sm. The primary („Invită”) keeps its label. */
 function HeaderButton({ icon, label, onPress, primary }: { icon: string; label: string; onPress: () => void; primary?: boolean }) {
     return (
         <Pressable
             onPress={onPress}
             accessibilityRole="button"
             accessibilityLabel={label}
-            className="ui-press h-10 w-10 sm:w-auto sm:px-3.5 rounded-[10px] border flex-row items-center justify-center gap-1.5"
+            className={`ui-press h-10 ${primary ? 'px-3.5' : 'w-10 sm:w-auto sm:px-3.5'} rounded-[10px] border flex-row items-center justify-center gap-1.5`}
             style={primary
                 ? { backgroundColor: 'var(--c-brand-surface)', borderColor: 'transparent' } as any
                 : { backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
         >
             <MaterialIcons name={icon} size={18} color={primary ? 'var(--c-on-brand)' : 'var(--c-ink-soft)'} />
-            <Text className="hidden sm:flex text-[13px] font-bold" style={{ color: primary ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>
+            <Text className={`${primary ? '' : 'hidden sm:flex '}text-[13px] font-bold`} style={{ color: primary ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>
                 {label}
             </Text>
         </Pressable>
