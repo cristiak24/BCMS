@@ -6,6 +6,7 @@ import { L12_MAX_PLAYERS, L12_STAFF_ROLES, type L12Lineup, type L12Player, type 
 import { medicalStatus } from '../myclub/teamDisplay';
 import { TeamAvatar } from './L12Visuals';
 import { plural } from '../../utils/plural';
+import Button from '../ui/Button';
 import { defaultU22 } from '../../utils/l12Export';
 
 /**
@@ -138,7 +139,7 @@ export function Input({
       onBlur={onBlur}
       keyboardType={numeric ? 'number-pad' : undefined}
       maxLength={maxLength}
-      className={`h-9 rounded-[9px] border px-2.5 text-[13.5px] font-medium outline-none min-w-0 w-full ${numeric ? 't-num text-center font-bold' : ''} ${className ?? ''}`}
+      className={`h-9 [@media(pointer:coarse)]:h-10 rounded-[9px] border px-2.5 text-[13.5px] font-medium outline-none min-w-0 w-full ${numeric ? 't-num text-center font-bold' : ''} ${className ?? ''}`}
       style={{
         backgroundColor: invalid ? 'var(--c-danger-bg)' : 'var(--c-surface-2)',
         borderColor: invalid ? 'var(--c-danger)' : 'var(--c-border)',
@@ -665,17 +666,17 @@ export default function L12Editor({
                 </View>
                 <View className="flex-1 min-w-0">
                   <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>
-                    {count === 0 ? 'Hai să alegem jucătorii' : `${plural(emptySlots, 'loc liber', 'locuri libere')}`}
+                    {count === 0 ? 'Niciun jucător pe listă' : `${plural(emptySlots, 'loc liber', 'locuri libere')}`}
                   </Text>
                   <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
                     {count === 0 ? 'Apasă pe cei din lot sau lasă „Completează automat” să o facă.' : 'Adaugă din lotul echipei.'}
                   </Text>
                 </View>
                 {!rosterLoading && roster.some((p) => !chosen.has(p.id)) ? (
-                  <Pressable onPress={autoFill} accessibilityRole="button" className="ui-press h-9 px-3 rounded-[10px] flex-row items-center gap-1.5 shrink-0" style={{ backgroundColor: 'var(--c-brand-surface)' }}>
-                    <MaterialIcons name="auto-awesome" size={15} color="var(--c-on-brand)" />
-                    <Text className="text-[12.5px] font-semibold hidden sm:flex" style={{ color: 'var(--c-on-brand)' }}>Completează</Text>
-                  </Pressable>
+                  // The Button primitive keeps its name on a phone; the hand-built one went
+                  // icon-only below 640px with nothing for a screen reader to read.
+                  <Button size="sm" variant="primary" icon="auto-awesome" label="Completează" iconOnlyOnMobile accessibilityLabel="Completează automat" onPress={autoFill} />
+
                 ) : null}
               </View>
             </View>

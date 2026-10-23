@@ -383,7 +383,7 @@ export default function ClubDetailScreen() {
             icon="insights"
             label="Activi luna asta"
             value={club.activeThisMonth}
-            hint={`${formatNumber(club.active30d)} în ultimele 30 zile`}
+            hint={`${formatNumber(club.active30d)} în ultimele 30 de zile`}
             footer={<View className="mt-2"><DeltaPill value={deltaPercent(club.activeThisMonth, lastMonth)} /></View>}
           />
           <StatCard

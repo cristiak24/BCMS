@@ -12,7 +12,7 @@ const VALIDITY_OPTIONS: { label: string; hours: number }[] = [
     { label: '1 zi', hours: 24 },
     { label: '3 zile', hours: 72 },
     { label: '7 zile', hours: 24 * 7 },
-    { label: '30 zile', hours: 24 * 30 },
+    { label: '30 de zile', hours: 24 * 30 },
 ];
 
 const STATUS_META: Record<InviteCodeStatus, { label: string; fg: string; bg: string }> = {

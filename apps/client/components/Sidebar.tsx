@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { View, Text } from '@/src/web/reactNative';
 import { NavLink, useLocation } from 'react-router-dom';
 import { MaterialIcons, FontAwesome5 } from '@/src/web/expoVectorIcons';
@@ -8,28 +9,35 @@ import { useResponsive } from '../hooks/useResponsive';
 
 export type AdminMenuIconName = keyof typeof MaterialIcons.glyphMap;
 
-export const ADMIN_MENU_ITEMS: { label: string; icon: AdminMenuIconName; href: string; superadminOnly?: boolean; badge?: number }[] = [
-    { label: 'Acasă', icon: 'grid-view', href: '/admin/dashboard' },
+export type MenuGroup = 'Club' | 'Oameni' | 'Activitate' | 'Bani' | 'Conformitate';
+
+/**
+ * Grouped: 13–15 flat items were one undifferentiated column (and the same
+ * 12 tiles in the phone menu). Order follows the groups; the heading shows
+ * where the group changes.
+ */
+export const ADMIN_MENU_ITEMS: { label: string; icon: AdminMenuIconName; href: string; superadminOnly?: boolean; badge?: number; group?: MenuGroup }[] = [
+    { label: 'Acasă', icon: 'grid-view', href: '/admin/dashboard', group: 'Club' },
     // One distinct glyph per entry: three shields (club, access, compliance)
     // and one silhouette for both Conturi and Lot read as the same item.
-    { label: 'Clubul meu', icon: 'domain', href: '/admin/my-club-admin' },
-    { label: 'Acces & invitații', icon: 'vpn-key', href: '/admin/manage-access' },
-    { label: 'Conturi', icon: 'manage-accounts', href: '/admin/manage-accounts' },
-    { label: 'Lot', icon: 'groups', href: '/admin/roster' },
-    { label: 'Program', icon: 'calendar-today', href: '/admin/schedule' },
-    { label: 'L12', icon: 'assignment', href: '/admin/l12' },
-    { label: 'Documente', icon: 'folder', href: '/admin/documents' },
+    { label: 'Clubul meu', icon: 'domain', href: '/admin/my-club-admin', group: 'Club' },
+    { label: 'Documente', icon: 'folder', href: '/admin/documents', group: 'Club' },
+    { label: 'Lot', icon: 'groups', href: '/admin/roster', group: 'Oameni' },
     // "Contacte", not "Agendă": Program has an "Agendă" view (the event list).
-    { label: 'Contacte', icon: 'contacts', href: '/admin/contacts' },
-    { label: 'Admin club nou', icon: 'person-add', href: '/admin/create-club-admin', superadminOnly: true },
-    { label: 'Finanțe', icon: 'payments', href: '/admin/finance' },
+    { label: 'Contacte', icon: 'contacts', href: '/admin/contacts', group: 'Oameni' },
+    { label: 'Acces & invitații', icon: 'vpn-key', href: '/admin/manage-access', group: 'Oameni' },
+    { label: 'Conturi', icon: 'manage-accounts', href: '/admin/manage-accounts', group: 'Oameni' },
+    { label: 'Admin club nou', icon: 'person-add', href: '/admin/create-club-admin', superadminOnly: true, group: 'Oameni' },
+    { label: 'Utilizatori', icon: 'person-search', href: '/admin/users', superadminOnly: true, group: 'Oameni' },
+    { label: 'Program', icon: 'calendar-today', href: '/admin/schedule', group: 'Activitate' },
+    { label: 'L12', icon: 'assignment', href: '/admin/l12', group: 'Activitate' },
+    { label: 'Finanțe', icon: 'payments', href: '/admin/finance', group: 'Bani' },
     // Compliance and Users were reachable only by typing the URL: with no menu
     // entry the header title also fell back to the first item ("Dashboard").
-    { label: 'Conformitate', icon: 'medical-services', href: '/admin/compliance' },
-    { label: 'Jurnal', icon: 'history', href: '/admin/audit-log' },
+    { label: 'Conformitate', icon: 'medical-services', href: '/admin/compliance', group: 'Conformitate' },
     // GDPR requests have a 30-day legal deadline; they were reachable only from a notification.
-    { label: 'Date personale', icon: 'security', href: '/admin/privacy' },
-    { label: 'Utilizatori', icon: 'person-search', href: '/admin/users', superadminOnly: true },
+    { label: 'Date personale', icon: 'security', href: '/admin/privacy', group: 'Conformitate' },
+    { label: 'Jurnal', icon: 'history', href: '/admin/audit-log', group: 'Conformitate' },
 ];
 
 type SidebarProps = {
@@ -80,15 +88,16 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarP
 
             {/* Navigation Links */}
             <View role="navigation" aria-label="Meniu principal" className="flex-1 py-1 px-2.5 gap-1 relative">
-                {items.map((item) => {
-                    if (item.superadminOnly && !isSuperadmin(session)) {
-                        return null;
-                    }
-
+                {items.filter((item) => !item.superadminOnly || isSuperadmin(session)).map((item, index, shown) => {
                     const cleanHref = item.href;
+                    const groupStart = item.group && item.group !== shown[index - 1]?.group;
                     const isActive = normalizedPathname.startsWith(cleanHref) || (cleanHref === '/admin/dashboard' && normalizedPathname === '/admin');
                     return (
-                        <View key={item.href} className="relative">
+                        <Fragment key={item.href}>
+                        {groupStart ? (
+                            <Text className={`t-eyebrow px-3 pb-1 ${index ? 'pt-3' : 'pt-1'}`} style={{ color: 'var(--c-faint)' }}>{item.group}</Text>
+                        ) : null}
+                        <View className="relative">
                             <NavLink
                                 to={item.href}
                                 aria-current={isActive ? 'page' : undefined}
@@ -122,6 +131,7 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarP
                                 <View className="absolute -left-2.5 top-2.5 bottom-2.5 w-1 rounded-r-full" style={{ backgroundColor: 'var(--c-brand-surface)' }} />
                             )}
                         </View>
+                        </Fragment>
                     );
                 })}
             </View>

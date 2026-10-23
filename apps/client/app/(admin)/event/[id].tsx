@@ -361,6 +361,18 @@ export default function EventDetailScreen() {
             </View>
           ) : null}
 
+          {/* Phones: the main action right under the header; it was the last card of the page. */}
+          {event.teamId && !cancelled ? (
+            <View className="lg:hidden mb-4">
+              <ActionButton
+                icon="fact-check"
+                label={isUpcoming || !canMark ? 'Lista de prezență' : 'Marchează prezența'}
+                tone="brand"
+                onPress={() => router.push(`/admin/attendance/${event.id}` as any)}
+              />
+            </View>
+          ) : null}
+
           <View className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <View className="gap-4 min-w-0">
               <Card title="Când">
@@ -384,7 +396,7 @@ export default function EventDetailScreen() {
 
               <Card title="Notă pentru jucători">
                 <Text className="t-meta mb-2.5" style={{ color: 'var(--c-muted)' }}>
-                  Vizibilă tuturor jucătorilor de pe acest eveniment — feedback, puncte de focus sau un shoutout.
+                  Vizibilă tuturor jucătorilor de pe acest eveniment: ce a mers bine și la ce lucrați data viitoare.
                 </Text>
                 <TextInput
                   value={noteDraft}
@@ -464,12 +476,14 @@ export default function EventDetailScreen() {
               <Card title="Acțiuni">
                 <View className="gap-2.5">
                   {event.teamId && !cancelled ? (
-                    <ActionButton
-                      icon="fact-check"
-                      label={isUpcoming || !canMark ? 'Lista de prezență' : 'Marchează prezența'}
-                      tone="brand"
-                      onPress={() => router.push(`/admin/attendance/${event.id}` as any)}
-                    />
+                    <View className="hidden lg:flex">
+                      <ActionButton
+                        icon="fact-check"
+                        label={isUpcoming || !canMark ? 'Lista de prezență' : 'Marchează prezența'}
+                        tone="brand"
+                        onPress={() => router.push(`/admin/attendance/${event.id}` as any)}
+                      />
+                    </View>
                   ) : null}
                   {isUpcoming && !cancelled ? (
                     <ActionButton icon="event" label="Adaugă în calendar (.ics)" onPress={exportIcs} />

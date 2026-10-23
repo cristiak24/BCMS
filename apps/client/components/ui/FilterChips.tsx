@@ -53,7 +53,7 @@ export default function FilterChips<T extends string>({
             accessibilityRole="button"
             accessibilityLabel={option.label}
             accessibilityState={{ selected: active }}
-            className={`flex-row items-center gap-1.5 h-8 ${option.dot ? 'px-2.5' : 'px-3'} rounded-[9px] justify-center border shrink-0`}
+            className={`flex-row items-center gap-1.5 h-8 [@media(pointer:coarse)]:h-10 ${option.dot ? 'px-2.5' : 'px-3'} rounded-[9px] justify-center border shrink-0`}
             style={
               active
                 ? ({ backgroundColor: 'var(--c-brand-surface)', borderColor: 'transparent' } as any)

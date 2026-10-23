@@ -37,7 +37,8 @@ type TopTab = 'Monthly' | 'Attendance' | 'Grade';
 type ScheduleView = 'month' | 'week' | 'agenda';
 
 const TOP_TAB_LABELS: Record<TopTab, string> = {
-  Monthly: 'Lunar',
+  // „Calendar”, not „Lunar”: it sat 80px from the „Lună” view, meaning something else.
+  Monthly: 'Calendar',
   Attendance: 'Prezență',
   Grade: 'Notare',
 };
@@ -521,7 +522,8 @@ export default function ScheduleScreen() {
           onPress={() => setActiveTab(tab)}
           accessibilityRole={'tab' as any}
           accessibilityState={{ selected: activeTab === tab }}
-          className="px-2.5 h-8 rounded-[8px] justify-center"
+          // Height only on touch: with min-width too, "Calendar · Prezență · Notare" no longer fit next to the view icons at 375px.
+          className="px-2 sm:px-2.5 h-8 [@media(pointer:coarse)]:h-10 rounded-[8px] justify-center"
           style={activeTab === tab ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
         >
           <Text

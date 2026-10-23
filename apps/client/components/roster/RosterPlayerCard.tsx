@@ -82,7 +82,7 @@ export default function RosterPlayerCard({
         onPress={onEdit}
         accessibilityRole="button"
         accessibilityLabel={`Acțiuni pentru ${fullName}`}
-        className="h-10 w-8 -mr-1.5 items-center justify-center rounded-[9px] shrink-0"
+        className="tap-40 h-10 w-8 -mr-1.5 items-center justify-center rounded-[9px] shrink-0"
       >
         <MoreHorizontal color="var(--c-muted)" size={18} />
       </Pressable>

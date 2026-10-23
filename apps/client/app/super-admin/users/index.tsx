@@ -38,8 +38,8 @@ const PAGE_SIZE = 30;
 const ACTIVITY_OPTIONS: { key: Activity; label: string }[] = [
   { key: 'any', label: 'Orice activitate' },
   { key: 'week', label: 'Activi în ultimele 7 zile' },
-  { key: 'month', label: 'Activi în ultimele 30 zile' },
-  { key: 'idle', label: 'Inactivi de peste 30 zile' },
+  { key: 'month', label: 'Activi în ultimele 30 de zile' },
+  { key: 'idle', label: 'Inactivi de peste 30 de zile' },
   { key: 'never', label: 'Nu au intrat niciodată' },
 ];
 

@@ -41,10 +41,9 @@ export default function SelectField<T extends string>({
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
         aria-label={label}
-        className={iconPad == null ? 'pl-3 lg:pl-[34px]' : undefined}
+        className={`h-9 [@media(pointer:coarse)]:h-10 ${iconPad == null ? 'pl-3 lg:pl-[34px]' : ''}`}
         style={{
           width: '100%',
-          height: 36,
           borderRadius: 10,
           border: '1px solid var(--c-border)',
           backgroundColor: 'var(--c-surface)',

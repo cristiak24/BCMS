@@ -155,7 +155,7 @@ function PlayerCard({
             accessibilityRole="button"
             accessibilityState={{ expanded: family }}
             accessibilityLabel={`Părinții cu cont ai lui ${name}`}
-            className="ui-press w-9 h-9 rounded-[10px] border items-center justify-center shrink-0"
+            className="tap-40 ui-press w-9 h-9 rounded-[10px] border items-center justify-center shrink-0"
             style={{ borderColor: family ? 'var(--c-brand-fg)' : 'var(--c-border)', backgroundColor: family ? 'var(--c-surface-tint)' : 'var(--c-surface-2)' } as any}
           >
             <MaterialIcons name="family-restroom" size={15} color={family ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)'} />
@@ -166,7 +166,7 @@ function PlayerCard({
             onPress={() => { setDraft(player); setEditing(true); }}
             accessibilityRole="button"
             accessibilityLabel={`Editează contactele pentru ${name}`}
-            className="ui-press w-9 h-9 rounded-[10px] border items-center justify-center shrink-0"
+            className="tap-40 ui-press w-9 h-9 rounded-[10px] border items-center justify-center shrink-0"
             style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
           >
             <MaterialIcons name="edit" size={15} color="var(--c-ink-soft)" />
@@ -325,7 +325,7 @@ export default function ContactsScreen() {
             eyebrow="Contacte"
             title="Contactele clubului"
             subtitle={isStaffView || !data
-              ? 'Telefoanele jucătorilor, părinților și ale staff-ului — la un tap distanță.'
+              ? 'Telefoanele jucătorilor, părinților și ale staff-ului, la o atingere distanță.'
               : 'Antrenorii și administratorii clubului.'}
           >
             {data?.mode === 'staff' ? (

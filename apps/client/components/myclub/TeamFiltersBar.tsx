@@ -225,7 +225,7 @@ export default function TeamFiltersBar({
                     <Pressable
                         onPress={() => onViewChange('grid')}
                         accessibilityLabel="Vizualizare grid"
-                        className="w-9 h-9 items-center justify-center"
+                        className="w-9 h-9 [@media(pointer:coarse)]:w-10 [@media(pointer:coarse)]:h-10 items-center justify-center"
                         style={{ backgroundColor: view === 'grid' ? 'var(--c-brand-surface)' : 'var(--c-surface)' }}
                     >
                         <LayoutGrid size={14} color={view === 'grid' ? 'var(--c-on-brand)' : 'var(--c-muted)'} />
@@ -233,7 +233,7 @@ export default function TeamFiltersBar({
                     <Pressable
                         onPress={() => onViewChange('table')}
                         accessibilityLabel="Vizualizare tabel"
-                        className="w-9 h-9 items-center justify-center border-l"
+                        className="w-9 h-9 [@media(pointer:coarse)]:w-10 [@media(pointer:coarse)]:h-10 items-center justify-center border-l"
                         style={{ backgroundColor: view === 'table' ? 'var(--c-brand-surface)' : 'var(--c-surface)', borderColor: 'var(--c-border)' }}
                     >
                         <Table2 size={14} color={view === 'table' ? 'var(--c-on-brand)' : 'var(--c-muted)'} />

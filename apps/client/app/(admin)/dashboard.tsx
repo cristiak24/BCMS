@@ -355,8 +355,10 @@ function WeekStrip({ events, selected, onSelect }: { events: CalendarEvent[]; se
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     return Array.from({ length: 7 }, (_, i) => {
-      const day = new Date(start.getTime() + i * DAY);
-      const next = day.getTime() + DAY;
+      // Calendar days, not 24h steps: across the clock change (last Sunday of
+      // October / March) `+ i * DAY` landed on the same date twice and skipped one.
+      const day = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      const next = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i + 1).getTime();
       return {
         key: day.toDateString(),
         weekday: day.toLocaleDateString('ro-RO', { weekday: 'short' }).replace('.', ''),
@@ -447,7 +449,7 @@ export default function Dashboard() {
   const loadDashboard = useCallback(() => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
-    const end = new Date(start.getTime() + 8 * DAY);
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 8);
 
     setSummaryFailed(false);
     dashboardApi.getSummary().then(setSummary).catch(() => setSummaryFailed(true));
@@ -497,7 +499,9 @@ export default function Dashboard() {
     if (summary?.expiredVisasCount) {
       items.push({ key: 'visas', icon: 'medical-services', tone: 'danger', title: `${plural(summary.expiredVisasCount, 'viză medicală expirată', 'vize medicale expirate')}`, detail: 'Sportivii nu pot juca până la reînnoire', href: '/admin/compliance' });
     }
-    const soon = summary?.expiringItems?.filter((i) => !i.expired && i.urgent).length ?? 0;
+    // Visas only: expiringItems also carries the monthly fee („COTIZAȚIE LUNARĂ”), which
+    // showed up here as "1 viză expiră în 7 zile" with no clearance due that week.
+    const soon = summary?.expiringItems?.filter((i) => i.type === 'VIZĂ MEDICALĂ' && !i.expired && i.urgent).length ?? 0;
     if (soon > 0) {
       items.push({ key: 'soon', icon: 'schedule', tone: 'warning', title: `${plural(soon, 'viză expiră', 'vize expiră')} în 7 zile`, href: '/admin/compliance' });
     }

@@ -16,7 +16,7 @@ export default function RosterCheckbox({ checked, indeterminate, onToggle, size 
 
   // A 32px touch target around the drawn box (the box alone was 20px, 12 of
   // them per Lot page); the negative margin keeps the row's layout unchanged.
-  const hit = Math.max(size, 32);
+  const hit = Math.max(size, 40); // ≥40px to touch; the negative margin keeps the layout
   return (
     <Pressable
       onPress={(event: any) => {

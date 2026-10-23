@@ -526,7 +526,7 @@ export default function FinancialSettingsPage() {
                                 <Pressable
                                     key={tab}
                                     onPress={() => setActiveTab(tab)}
-                                    className="rounded-[8px] px-3.5 h-8 justify-center"
+                                    className="tap-40 rounded-[8px] px-3.5 h-8 justify-center"
                                     style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
                                 >
                                     <Text className="text-[12px] font-semibold" style={{ color: active ? 'var(--c-ink)' : 'var(--c-muted)' }}>{TAB_LABELS[tab] ?? tab}</Text>

@@ -294,7 +294,7 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                         placeholder="Caută jucător sau echipă"
                         placeholderTextColor="var(--c-faint)"
                         accessibilityLabel="Caută jucător sau echipă"
-                        className="flex-1 text-[13px]"
+                        className="flex-1 self-stretch text-[13px]"
                         style={{ color: 'var(--c-ink)' }}
                     />
                 </View>
@@ -328,11 +328,13 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                                 {/* Phone: the reason („2 taxe restante · din …”) gets the full width under name and
                                     amount, where it used to be cut. md+: it sits under the name, the amount spans both rows. */}
                                 <View className="flex-1 min-w-0 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-start">
-                                    <Text className="col-start-1 row-start-1 min-w-0 text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+                                    <Text className="col-span-2 md:col-span-1 col-start-1 row-start-1 min-w-0 text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
                                         {balance.playerName}{balance.status === 'inactive' ? ` (${playerStatusLabel(balance.status).toLowerCase()})` : ''}
                                     </Text>
                                     {/* The amount to chase leads: what is past due, not the total that includes fees not yet due. */}
-                                    <View className="col-start-2 row-start-1 md:row-span-2 items-end md:self-center">
+                                    {/* Phones: under the name, so the "Încasează" button and the amount stack no
+                                        longer squeeze the name to "L…". md+: right column, spanning both rows. */}
+                                    <View className="col-span-2 row-start-2 flex-row flex-wrap items-baseline gap-x-1.5 md:col-span-1 md:col-start-2 md:row-start-1 md:row-span-2 md:flex-col md:items-end md:self-center">
                                         <Text className="t-num text-[14px] font-bold" style={{ color: late ? 'var(--c-danger-fg)' : 'var(--c-ink)' }}>
                                             {money(late ? balance.overdue : balance.outstanding, currency)}
                                         </Text>
@@ -342,12 +344,12 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                                             </Text>
                                         ) : null}
                                     </View>
-                                    <Text className="col-span-2 md:col-span-1 row-start-2 t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
+                                    <Text className="col-span-2 md:col-span-1 row-start-3 md:row-start-2 t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
                                         {[balance.teamName, rowMeta(balance, currency)].filter(Boolean).join(' · ')}
                                     </Text>
                                 </View>
                                 {balance.outstanding > 0 ? (
-                                    <Button size="sm" variant="primary" icon="payments" label="Încasează" iconOnlyOnMobile accessibilityLabel={`Încasează de la ${balance.playerName}`} onPress={() => openPayment(balance)} />
+                                    <Button size="sm" variant="primary" icon="payments" label="Încasează" accessibilityLabel={`Încasează de la ${balance.playerName}`} onPress={() => openPayment(balance)} />
                                 ) : null}
                             </View>
                         );

@@ -91,7 +91,7 @@ export default function MatchDetailScreen() {
       setDetail(data);
     } catch (err) {
       console.error('Match detail load error:', err);
-      setError(err instanceof Error ? err.message : 'Fișa meciului nu a putut fi încărcată.');
+      setError(err instanceof Error ? err.message : 'Fișa FRB nu a putut fi încărcată.');
     } finally {
       setLoading(false);
     }
@@ -135,7 +135,7 @@ export default function MatchDetailScreen() {
       <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
         <PageContainer>
           <View className="max-w-[920px] w-full self-center">
-            <Text className="sr-only" accessibilityRole="header" aria-level={1}>Fișa meciului</Text>
+            <Text className="sr-only" accessibilityRole="header" aria-level={1}>Fișa FRB</Text>
             {backButton}
             {notPublished ? (
               <View className="rounded-[16px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}>
@@ -147,7 +147,7 @@ export default function MatchDetailScreen() {
               </View>
             ) : (
               <ErrorState
-                title="Fișa meciului nu s-a încărcat"
+                title="Fișa FRB nu s-a încărcat"
                 message={error ?? 'FRB nu a răspuns. Încearcă din nou peste câteva momente.'}
                 actionLabel="Reîncearcă"
                 onAction={loadData}

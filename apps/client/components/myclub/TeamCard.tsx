@@ -22,7 +22,7 @@ function IconAction({ label, onPress, disabled, danger, children }: { label: str
             onPress={onPress}
             disabled={disabled}
             accessibilityLabel={label}
-            className={`ui-press w-8 h-8 rounded-[9px] items-center justify-center ${danger ? 'hover:bg-[var(--c-danger-bg)]' : 'hover:bg-[var(--c-surface-3)]'}`}
+            className={`ui-press w-8 h-8 [@media(pointer:coarse)]:w-10 [@media(pointer:coarse)]:h-10 rounded-[9px] items-center justify-center ${danger ? 'hover:bg-[var(--c-danger-bg)]' : 'hover:bg-[var(--c-surface-3)]'}`}
         >
             {children}
         </Pressable>
@@ -86,7 +86,7 @@ export default function TeamCard({
 
             <View className="flex-row flex-wrap gap-1.5 mt-3">
                 <Chip
-                    label={frb ? 'FRB' : 'Local'}
+                    label={frb ? 'FRB' : 'Manual'}
                     bg={frb ? 'var(--c-danger-bg)' : 'var(--c-success-bg)'}
                     fg={frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)'}
                     icon={frb ? <RefreshCw size={9} color="var(--c-danger-fg)" /> : undefined}

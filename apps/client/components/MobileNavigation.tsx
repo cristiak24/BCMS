@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -16,6 +17,7 @@ type MenuItem = {
   label: string;
   icon: AdminMenuIconName;
   badge?: number;
+  group?: string;
 };
 
 type MobileBottomNavigationProps = {
@@ -127,11 +129,15 @@ export function MobileNavigationSheet({
             {/* Two-column tiles: every destination visible at once instead of a
                 long list to scroll. */}
             <View className="grid grid-cols-2 gap-2 pb-2">
-              {items.map((item) => {
+              {items.map((item, index) => {
                 const active = activeHref === item.href;
+                const groupStart = item.group && item.group !== items[index - 1]?.group;
                 return (
+                  <Fragment key={item.href}>
+                  {groupStart ? (
+                    <Text className={`col-span-2 t-eyebrow px-1 ${index ? 'pt-2' : ''}`} style={{ color: 'var(--c-faint)' }}>{item.group}</Text>
+                  ) : null}
                   <Pressable
-                    key={item.href}
                     onPress={() => {
                       onClose();
                       navigate(item.href);
@@ -160,6 +166,7 @@ export function MobileNavigationSheet({
                     </Text>
                     {item.badge ? <MenuBadge count={item.badge} /> : null}
                   </Pressable>
+                  </Fragment>
                 );
               })}
             </View>

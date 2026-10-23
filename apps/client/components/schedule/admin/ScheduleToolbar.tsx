@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from '@/src/web/reactNative';
 import {
   ChevronLeft, ChevronRight, LayoutGrid, List, CalendarDays, Download, RotateCw,
-  SlidersHorizontal, X, Search,
+  SlidersHorizontal, X, Search, MoreHorizontal,
 } from 'lucide-react';
+import ActionSheet from '../../ui/ActionSheet';
 import { EVENT_TYPE_META } from '../scheduleShared';
 import type { EventType } from '../scheduleShared';
 import { plural } from '../../../utils/plural';
@@ -57,7 +58,7 @@ function IconButton({
       onPress={onPress}
       disabled={disabled}
       accessibilityLabel={label}
-      className={`relative ${compact ? 'w-8 h-8 rounded-[9px]' : 'w-9 h-9 rounded-[10px]'} items-center justify-center border shrink-0 ${
+      className={`tap-40 relative ${compact ? 'w-8 h-8 rounded-[9px]' : 'w-9 h-9 rounded-[10px]'} items-center justify-center border shrink-0 ${
         active
           ? 'bg-[var(--c-surface-tint)] border-[var(--c-brand-border)]'
           : 'bg-[var(--c-surface)] border-[var(--c-border)]'
@@ -103,7 +104,7 @@ export function ScheduleViewSwitcher({
             accessibilityLabel={label}
             accessibilityRole={'tab' as any}
             accessibilityState={{ selected: active }}
-            className={`flex-row items-center gap-1.5 ${iconOnly ? 'h-8 w-9' : 'h-[28px] px-2.5'} rounded-[8px] justify-center`}
+            className={`flex-row items-center gap-1.5 ${iconOnly ? 'h-8 w-9 [@media(pointer:coarse)]:h-10' : 'h-[28px] px-2.5 [@media(pointer:coarse)]:h-10'} rounded-[8px] justify-center`}
             style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
           >
             <Icon size={iconOnly ? 15 : 14} color={active ? 'var(--c-brand-fg)' : 'var(--c-muted)'} />
@@ -170,6 +171,7 @@ export function ScheduleToolbar({
   searchValue: string;
   onClearSearch: () => void;
 }) {
+  const [moreOpen, setMoreOpen] = useState(false);
   const monthTitle = periodTitle ?? `${monthLabel.charAt(0).toUpperCase()}${monthLabel.slice(1)} ${year}`;
   const prevLabel = periodUnit === 'week' ? 'Săptămâna anterioară' : 'Luna anterioară';
   const nextLabel = periodUnit === 'week' ? 'Săptămâna următoare' : 'Luna următoare';
@@ -217,7 +219,7 @@ export function ScheduleToolbar({
     <View className="flex-row items-center gap-1.5">
       <TouchableOpacity
         onPress={() => onFilterTypeChange(null)}
-        className={`h-8 px-3 rounded-[9px] justify-center border ${
+        className={`tap-40 h-8 px-3 rounded-[9px] justify-center border ${
           filterType === null
             ? 'border-transparent'
             : 'border-[var(--c-border)] bg-[var(--c-surface)]'
@@ -240,7 +242,7 @@ export function ScheduleToolbar({
           <TouchableOpacity
             key={type}
             onPress={() => onFilterTypeChange(active ? null : type)}
-            className={`flex-row items-center gap-1.5 h-8 px-2.5 rounded-[9px] border ${
+            className={`tap-40 flex-row items-center gap-1.5 h-8 px-2.5 rounded-[9px] border ${
               active ? 'border-transparent' : 'border-[var(--c-border)] bg-[var(--c-surface)]'
             }`}
             style={active ? { backgroundColor: meta.solid } : undefined}
@@ -337,11 +339,22 @@ export function ScheduleToolbar({
     const countLabel = `${plural(eventCount, 'eveniment', 'evenimente')}`;
     return (
       <View>
+        {/* Export and FRB sync had no way in on a phone: the mobile row only drew the filter button. */}
+        <ActionSheet
+          visible={moreOpen}
+          title="Mai multe"
+          subtitle={monthTitle}
+          actions={[
+            { key: 'export', label: 'Exportă luna (.ics)', icon: 'file-download', hint: 'Pentru calendarul din telefon', onPress: () => { setMoreOpen(false); onExport(); } },
+            { key: 'sync', label: syncing ? 'Se sincronizează…' : 'Sincronizează meciurile FRB', icon: 'refresh', onPress: () => { setMoreOpen(false); if (!syncing) onSync(); } },
+          ]}
+          onClose={() => setMoreOpen(false)}
+        />
         <View className="flex-row items-center gap-2">
           <TouchableOpacity
             onPress={() => onNavigateMonth(-1)}
             accessibilityLabel={prevLabel}
-            className="ui-press w-9 h-9 rounded-[10px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
+            className="ui-press w-10 h-10 rounded-[10px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
           >
             <ChevronLeft size={17} color="var(--c-ink-soft)" />
           </TouchableOpacity>
@@ -352,9 +365,16 @@ export function ScheduleToolbar({
           <TouchableOpacity
             onPress={() => onNavigateMonth(1)}
             accessibilityLabel={nextLabel}
-            className="ui-press w-9 h-9 rounded-[10px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
+            className="ui-press w-10 h-10 rounded-[10px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
           >
             <ChevronRight size={17} color="var(--c-ink-soft)" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setMoreOpen(true)}
+            accessibilityLabel="Mai multe: export și sincronizare FRB"
+            className="ui-press w-10 h-10 rounded-[10px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
+          >
+            <MoreHorizontal size={17} color="var(--c-ink-soft)" />
           </TouchableOpacity>
         </View>
 

@@ -15,7 +15,7 @@ export function StatusChip({ set, label }: { set: boolean; label?: string }) {
   return (
     <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1 self-start" style={{ backgroundColor: set ? 'var(--c-success-bg)' : 'var(--c-surface-3)' }}>
       <MaterialIcons name={set ? 'check-circle' : 'radio-button-unchecked'} size={13} color={set ? 'var(--c-success-fg)' : 'var(--c-muted)'} />
-      <Text className="text-[12px] font-bold" style={{ color: set ? 'var(--c-success-fg)' : 'var(--c-muted)' }}>{label ?? (set ? 'Setat' : 'Nesetat')}</Text>
+      <Text className="text-[12px] font-bold" style={{ color: set ? 'var(--c-success-fg)' : 'var(--c-muted)' }}>{label ?? (set ? 'Cu listă' : 'Fără listă')}</Text>
     </View>
   );
 }
@@ -55,10 +55,10 @@ export function L12MatchLink({ eventId, onOpen }: { eventId: number; onOpen: (pa
       <View className="flex-1 min-w-0">
         <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-ink)' }}>L12 — lista oficială</Text>
         <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
-          {state === 'loading' ? 'Se verifică…' : state === 'set' ? `${plural(count, 'jucător', 'jucători')} pe foaie · export PDF / Word` : 'Nesetat — pornește din L12-ul constant'}
+          {state === 'loading' ? 'Se verifică…' : state === 'set' ? `${plural(count, 'jucător', 'jucători')} pe foaie · export PDF / Word` : 'Fără listă — pornește din L12-ul constant'}
         </Text>
       </View>
-      {state === 'loading' ? <ActivityIndicator size="small" color="var(--c-faint)" /> : <StatusChip set={state === 'set'} label={state === 'set' ? `${count}/12` : 'Nesetat'} />}
+      {state === 'loading' ? <ActivityIndicator size="small" color="var(--c-faint)" /> : <StatusChip set={state === 'set'} label={state === 'set' ? `${count}/12` : 'Fără listă'} />}
       <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
     </Pressable>
   );

@@ -59,7 +59,7 @@ function StatusBadge({ status }: { status: MedicalStatus }) {
 
 function Checkbox({ checked, onPress, label }: { checked: boolean; onPress: () => void; label: string }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="checkbox" accessibilityState={{ checked }} accessibilityLabel={label} className="w-8 h-8 items-center justify-center shrink-0">
+    <Pressable onPress={onPress} accessibilityRole="checkbox" accessibilityState={{ checked }} accessibilityLabel={label} className="w-8 h-8 [@media(pointer:coarse)]:w-10 [@media(pointer:coarse)]:h-10 items-center justify-center shrink-0">
       <View
         className="w-[18px] h-[18px] rounded-[5px] border items-center justify-center"
         style={checked
@@ -207,7 +207,7 @@ export default function ComplianceScreen() {
             {players && !error ? (
               <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
                 <GlassStat dot="var(--c-success)" value={metrics.valid} label="Valabile" hint={`${metrics.securePercent}% din lot`} />
-                <GlassStat dot="var(--c-warning)" value={metrics.dueSoon} label="Expiră în 30 zile" hint="De reînnoit curând" />
+                <GlassStat dot="var(--c-warning)" value={metrics.dueSoon} label="Expiră în 30 de zile" hint="De reînnoit curând" />
                 <GlassStat dot="var(--c-danger)" danger={metrics.expired > 0} value={metrics.expired} label="Expirate" hint="Nu pot juca" />
                 <GlassStat dot="var(--c-muted)" value={metrics.missing} label="Fără viză" hint="Nicio dată înregistrată" />
               </View>
@@ -311,14 +311,10 @@ export default function ComplianceScreen() {
                             <View className="hidden md:flex w-[108px] items-end">
                               <Button size="sm" icon="event" label={status === 'valid' ? 'Modifică' : 'Actualizează'} onPress={() => openEditor([player.id])} />
                             </View>
-                            <Pressable
-                              onPress={() => openEditor([player.id])}
-                              accessibilityRole="button"
-                              accessibilityLabel={`Actualizează viza pentru ${player.firstName} ${player.lastName}`}
-                              className="md:hidden ui-press w-8 h-8 rounded-[9px] items-center justify-center shrink-0"
-                            >
-                              <MaterialIcons name="event" size={18} color="var(--c-brand-fg)" />
-                            </Pressable>
+                            {/* A labelled action, not a bare calendar glyph that read as "programează". */}
+                            <View className="md:hidden shrink-0">
+                              <Button size="sm" icon="event" label="Viză" accessibilityLabel={`Actualizează viza pentru ${player.firstName} ${player.lastName}`} onPress={() => openEditor([player.id])} />
+                            </View>
                           </View>
                         );
                       })}

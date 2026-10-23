@@ -241,8 +241,8 @@ export function L12HomeScreen() {
 
   const statusOptions = useMemo(() => [
     { key: 'all' as const, label: 'Toate' },
-    { key: 'unset' as const, label: 'Nesetate', count: kindScopedMatches.filter((m) => !m.hasLineup).length },
-    { key: 'set' as const, label: 'Setate', count: kindScopedMatches.filter((m) => m.hasLineup).length },
+    { key: 'unset' as const, label: 'Fără listă', count: kindScopedMatches.filter((m) => !m.hasLineup).length },
+    { key: 'set' as const, label: 'Cu listă', count: kindScopedMatches.filter((m) => m.hasLineup).length },
   ], [kindScopedMatches]);
 
   const filteredMatches = useMemo(() => {
@@ -676,7 +676,7 @@ export function L12MatchScreen() {
       <View className="mb-5 gap-4">
         <View className="flex-row items-center gap-2">
           <Button size="sm" icon="chevron-left" label="L12" onPress={() => router.back(base)} />
-          <StatusChip set={Boolean(saved)} label={saved ? 'Setat pentru meci' : 'Nesetat'} />
+          <StatusChip set={Boolean(saved)} label={saved ? 'Salvată pentru meci' : 'Fără listă'} />
         </View>
 
         <View className="ui-rise relative overflow-hidden rounded-[16px] border p-3.5 md:p-4 gap-3" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
@@ -783,7 +783,7 @@ export function L12MatchScreen() {
         icon={confirm === 'reset' ? 'delete-outline' : confirm === 'saveTemplate' ? 'bookmark' : 'restore'}
         title={confirm === 'reset' ? 'Ștergi L12-ul acestui meci?' : confirm === 'saveTemplate' ? 'Salvezi ca L12 constant?' : 'Încarci L12-ul constant?'}
         message={confirm === 'reset'
-          ? 'Meciul revine la „Nesetat”. L12-ul constant al echipei rămâne neschimbat.'
+          ? 'Meciul revine la „Fără listă”. L12-ul constant al echipei rămâne neschimbat.'
           : confirm === 'saveTemplate'
             ? `Foaia de acum devine formula de bază pentru meciurile următoare ale echipei ${team.name}.`
             : 'Jucătorii și staff-ul de pe foaie vor fi înlocuiți cu cei din L12-ul constant.'}
@@ -924,7 +924,7 @@ export function L12TemplateScreen() {
       <View className="mb-5 gap-4">
         <View className="flex-row items-center gap-2">
           <Button size="sm" icon="chevron-left" label="L12" onPress={() => router.back(base)} />
-          <StatusChip set={Boolean(saved)} label={saved ? 'Salvat' : 'Nesetat'} />
+          <StatusChip set={Boolean(saved)} label={saved ? 'Salvat' : 'Nesalvat'} />
         </View>
 
         <View className="ui-rise relative overflow-hidden rounded-[16px] border p-3.5 md:p-4" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>

@@ -375,6 +375,12 @@
    .f-display is the friendlier heading/numeral face; body copy stays Inter.
    .glass is a translucent panel for small surfaces that sit over artwork —
    never an ancestor of a position:fixed child (backdrop-filter traps them). */
+/* ≥40px to touch, only on touch screens: icon buttons stay 32–36px with a
+   mouse. Expands the control itself (min-size), not an invisible overlay. */
+@media (pointer: coarse) {
+  .tap-40 { min-width: 40px; min-height: 40px; }
+}
+
 .f-display {
   font-family: "Plus Jakarta Sans Variable", "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif;
 }

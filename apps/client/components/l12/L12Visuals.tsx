@@ -126,7 +126,7 @@ export function LineupStatus({ set, count, align = 'end' }: { set: boolean; coun
   }
   return (
     <View className="flex-row items-center gap-1 rounded-full pl-2.5 pr-2 h-7 self-start" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-      <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Setează lotul</Text>
+      <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Completează lista</Text>
       <View className="home-arrow"><MaterialIcons name="arrow-forward" size={13} color="var(--c-brand-fg)" /></View>
     </View>
   );
@@ -321,11 +321,12 @@ export function L12Hero({
   onOpenNext: (eventId: number) => void;
 }) {
   const upcoming = unset + ready;
-  const title = unset > 0 ? 'Hai să pregătim loturile' : upcoming > 0 ? 'Totul e pregătit' : 'Niciun meci în program';
+  // Neutral, like the rest of the app (it was „Hai să pregătim loturile” / „Succes pe teren!”).
+  const title = unset > 0 ? 'Meciuri fără listă L12' : upcoming > 0 ? 'Toate listele sunt gata' : 'Niciun meci în program';
   const subtitle = unset > 0
-    ? `${plural(unset, 'meci așteaptă', 'meciuri așteaptă')} lista L12. Alege unul și completeaz-o în câteva atingeri.`
+    ? `${plural(unset, 'meci nu are', 'meciuri nu au')} încă lista L12. Alege unul ca s-o completezi.`
     : upcoming > 0
-      ? `Toate cele ${plural(upcoming, 'meci viitor are', 'meciuri viitoare au')} lista gata. Succes pe teren!`
+      ? `Toate cele ${plural(upcoming, 'meci viitor are', 'meciuri viitoare au')} lista L12 gata.`
       : 'Când apar meciuri în Program, lista lor se pregătește de aici.';
 
   return (
@@ -374,7 +375,7 @@ export function L12Hero({
             <Button
               variant={next.match.hasLineup ? 'secondary' : 'primary'}
               icon={next.match.hasLineup ? 'assignment' : 'edit'}
-              label={next.match.hasLineup ? 'Vezi lista' : 'Completează lotul'}
+              label={next.match.hasLineup ? 'Vezi lista' : 'Completează lista'}
               onPress={() => onOpenNext(next.match.eventId)}
             />
           </View>

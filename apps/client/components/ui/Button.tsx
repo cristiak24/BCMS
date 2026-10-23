@@ -42,9 +42,10 @@ export default function Button({
 }) {
   const colors = VARIANTS[variant];
   const inactive = Boolean(disabled || loading);
-  const height = size === 'sm' ? 'h-8' : 'h-10';
+  // Touch screens: 40px minimum (32px sm controls were the most common miss at 375px).
+  const height = size === 'sm' ? 'h-8 [@media(pointer:coarse)]:h-10' : 'h-10';
   const pad = iconOnlyOnMobile && icon
-    ? (size === 'sm' ? 'w-8 sm:w-auto sm:px-2.5' : 'w-10 sm:w-auto sm:px-3.5')
+    ? (size === 'sm' ? 'w-8 [@media(pointer:coarse)]:w-10 sm:w-auto sm:px-2.5' : 'w-10 sm:w-auto sm:px-3.5')
     : (size === 'sm' ? 'px-2.5' : 'px-3.5');
 
   return (

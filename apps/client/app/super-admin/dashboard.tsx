@@ -163,7 +163,7 @@ export default function SuperAdminDashboard() {
             hint={`${formatNumber(data.totals.activeAccounts)} active · ${formatNumber(data.totals.disabledAccounts)} oprite`}
             footer={(
               <Text className="t-meta mt-2" style={{ color: 'var(--c-success-fg)' }} numberOfLines={1}>
-                +{formatNumber(data.newAccounts.last30d)} noi în 30 zile
+                +{formatNumber(data.newAccounts.last30d)} noi în 30 de zile
               </Text>
             )}
           />

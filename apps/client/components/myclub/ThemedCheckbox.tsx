@@ -14,7 +14,7 @@ export default function ThemedCheckbox({
     size?: number;
 }) {
     // 32px touch target around the drawn box; layout unchanged (negative margin).
-    const hit = Math.max(size, 32);
+    const hit = Math.max(size, 40); // ≥40px to touch; the negative margin keeps the layout
     return (
         <Pressable
             onPress={(event: any) => {

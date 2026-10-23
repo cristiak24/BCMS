@@ -122,8 +122,10 @@ function WeekStrip({ events }: { events: CalendarEvent[] }) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return Array.from({ length: 7 }, (_, index) => {
-      const day = new Date(today.getTime() + index * 86400000);
-      const next = day.getTime() + 86400000;
+      // Calendar days, not 24h steps: across the clock change `+ index * 86400000`
+      // landed on the same date twice and skipped one.
+      const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() + index);
+      const next = new Date(today.getFullYear(), today.getMonth(), today.getDate() + index + 1).getTime();
       const dayEvents = events.filter((event) => {
         const time = getEventTimestamp(event);
         return time >= day.getTime() && time < next;

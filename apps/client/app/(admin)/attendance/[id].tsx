@@ -347,7 +347,7 @@ export default function AttendanceScreen() {
           <View className="mb-3 self-start">{backButton}</View>
 
           <PageHero
-            eyebrow="Notare prezență"
+            eyebrow="Prezență"
             title={event.title}
             subtitle={roster.length > 0 ? `${marked} din ${counts.all} marcați${counts.unmarked ? ` · ${counts.unmarked} încă nemarcați` : ' · toți jucătorii sunt marcați'}` : undefined}
             leading={roster.length > 0 ? (

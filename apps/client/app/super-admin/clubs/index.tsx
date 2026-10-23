@@ -113,7 +113,7 @@ export default function ClubsScreen() {
 
   const exportCsv = () => {
     downloadCsv(`cluburi-${month || 'bcms'}.csv`, [
-      ['Club', 'Conturi', 'Active', 'Dezactivate', 'Administratori', 'Antrenori', 'Jucători', 'Părinți', 'Echipe', 'Jucători în lot', `Activi ${month}`, 'Activi 30 zile', 'Preț/utilizator', 'De facturat', 'Ultima activitate', 'Creat'],
+      ['Club', 'Conturi', 'Active', 'Dezactivate', 'Administratori', 'Antrenori', 'Jucători', 'Părinți', 'Echipe', 'Jucători în lot', `Activi ${month}`, 'Activi în 30 de zile', 'Preț/utilizator', 'De facturat', 'Ultima activitate', 'Creat'],
       ...visible.map((club) => [
         club.name, club.accounts.total, club.accounts.active, club.accounts.disabled, club.roles.admin, club.roles.coach,
         club.roles.player, club.roles.parent, club.teams, club.rosterPlayers, club.activeThisMonth, club.active30d,
@@ -144,7 +144,7 @@ export default function ClubsScreen() {
             options={[
               { key: 'all', label: 'Toate', count: counts.all },
               { key: 'noAdmin', label: 'Fără administrator', count: counts.noAdmin, dot: 'var(--c-danger)' },
-              { key: 'dormant', label: 'Inactive 30 zile', count: counts.dormant, dot: 'var(--c-warning)' },
+              { key: 'dormant', label: 'Inactive de 30 de zile', count: counts.dormant, dot: 'var(--c-warning)' },
               { key: 'unpriced', label: 'Fără preț', count: counts.unpriced, dot: 'var(--c-faint)' },
             ]}
           />

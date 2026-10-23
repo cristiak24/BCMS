@@ -660,7 +660,7 @@ export default function ManageAccountsScreen() {
                                             accessibilityRole="checkbox"
                                             accessibilityState={{ checked: allSelectableSelected }}
                                             accessibilityLabel="Selectează toate"
-                                            className="w-8 h-8 items-center justify-center"
+                                            className="tap-40 w-8 h-8 items-center justify-center"
                                         >
                                             <MaterialIcons name={allSelectableSelected ? 'check-box' : 'check-box-outline-blank'} size={19} color={allSelectableSelected ? 'var(--c-brand-fg)' : 'var(--c-border-strong)'} />
                                         </Pressable>
@@ -700,7 +700,7 @@ export default function ManageAccountsScreen() {
                                                         accessibilityRole="checkbox"
                                                         accessibilityState={{ checked: isSelected }}
                                                         accessibilityLabel={`Selectează ${account.name}`}
-                                                        className="w-8 h-8 items-center justify-center shrink-0"
+                                                        className="tap-40 w-8 h-8 items-center justify-center shrink-0"
                                                     >
                                                         <MaterialIcons name={isSelected ? 'check-box' : 'check-box-outline-blank'} size={19} color={isSelected ? 'var(--c-brand-fg)' : 'var(--c-border-strong)'} />
                                                     </Pressable>
@@ -752,7 +752,7 @@ export default function ManageAccountsScreen() {
                                                             onPress={() => setMenuFor(account)}
                                                             accessibilityRole="button"
                                                             accessibilityLabel={`Acțiuni pentru ${account.name}`}
-                                                            className="ui-press w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[var(--c-surface-3)]"
+                                                            className="tap-40 ui-press w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[var(--c-surface-3)]"
                                                         >
                                                             <MaterialIcons name="more-horiz" size={20} color="var(--c-muted)" />
                                                         </Pressable>

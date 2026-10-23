@@ -340,7 +340,7 @@ export default function MyClubAdmin() {
                         <View className="flex-row items-center justify-between gap-3 mb-3">
                             <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>{filteredTeams.length} din {plural(teams.length, 'echipă', 'echipe')}</Text>
                             {filteredTeams.length > 0 && (
-                                <Pressable onPress={toggleSelectAll} className="flex-row items-center gap-2 px-1 py-1">
+                                <Pressable onPress={toggleSelectAll} className="tap-40 flex-row items-center gap-2 px-1 py-1">
                                     <ThemedCheckbox checked={allFilteredSelected} onToggle={toggleSelectAll} ariaLabel={selectAllLabel} size={17} />
                                     <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{selectAllLabel}</Text>
                                 </Pressable>

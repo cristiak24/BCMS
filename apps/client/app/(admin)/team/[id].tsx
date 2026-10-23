@@ -2,11 +2,12 @@ import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput, Alert } from '@/src/web/reactNative';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import {
-    ArrowLeft, Users, UserPlus, Copy, Check, Pencil, Calendar, ClipboardCheck,
-    Search, X, UserMinus, Shield, ListOrdered, History,
-    CalendarClock, ShieldCheck, Receipt, BarChart3,
+    ArrowLeft, Users, UserPlus, Copy, Check, Pencil, Search, X, UserMinus, Shield, ListOrdered, History,
+    CalendarClock, BarChart3,
 } from 'lucide-react';
 import TeamSeasonTable from '../../../components/stats/TeamSeasonTable';
+import Button from '../../../components/ui/Button';
+import ActionSheet, { type SheetAction } from '../../../components/ui/ActionSheet';
 import { DenseAvatar, DenseHeader, DenseHeading, DenseList, DenseRow } from '../../../components/ui/DenseList';
 import { teamsApi, Team, Player, Coach, TeamStats, TeamPlayerStat } from '../../../services/teamsApi';
 import {
@@ -46,6 +47,7 @@ export default function TeamDetailsScreen() {
     const [loading, setLoading] = useState(true);
 
     const [tab, setTab] = useState<TabKey>('roster');
+    const [teamActionsOpen, setTeamActionsOpen] = useState(false);
     const [rosterQuery, setRosterQuery] = useState('');
     const [showAdd, setShowAdd] = useState(false);
     const [showBulk, setShowBulk] = useState(false);
@@ -177,6 +179,13 @@ export default function TeamDetailsScreen() {
     }
 
     const frb = isFrbTeam(team);
+    // Secondary team actions: inline from md, in the „Mai multe” sheet on phones.
+    const teamActions: SheetAction[] = [
+        { key: 'schedule', label: 'Program', icon: 'event', onPress: () => router.push(`/admin/schedule?teamId=${team.id}` as any) },
+        { key: 'attendance', label: 'Prezență', icon: 'fact-check', onPress: () => router.push(`/admin/schedule?teamId=${team.id}&tab=attendance` as any) },
+        { key: 'visa', label: 'Vize medicale', icon: 'verified-user', onPress: () => setMedicalVisaOpen(true) },
+        { key: 'payments', label: 'Raport plăți', icon: 'receipt-long', onPress: () => setPaymentsReportOpen(true) },
+    ];
     const accentColor = frb ? 'var(--c-danger)' : 'var(--c-success)';
     const crestTint = frb ? 'var(--c-danger-bg)' : 'var(--c-success-bg)';
     // The shared 30-day rate (utils/attendanceRate.ts), same as Dashboard and Lot.
@@ -205,33 +214,18 @@ export default function TeamDetailsScreen() {
                             <ArrowLeft size={16} color="var(--c-ink)" />
                             <Text className="hidden lg:flex text-[12px] font-semibold" style={{ color: 'var(--c-ink)' }}>Clubul meu</Text>
                         </Pressable>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            className="flex-1 -mr-4 lg:mr-0 lg:flex-none"
-                            contentContainerStyle={{ paddingRight: 16, gap: 8, flexGrow: 0 }}
-                        >
-                            <Pressable onPress={() => router.push(`/admin/schedule?teamId=${team.id}` as any)} className="flex-row items-center gap-1.5 h-9 px-3 rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
-                                <Calendar size={14} color="var(--c-brand-fg)" />
-                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Program</Text>
-                            </Pressable>
-                            <Pressable onPress={() => router.push(`/admin/schedule?teamId=${team.id}&tab=attendance` as any)} className="flex-row items-center gap-1.5 h-9 px-3 rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
-                                <ClipboardCheck size={14} color="var(--c-brand-fg)" />
-                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Prezență</Text>
-                            </Pressable>
-                            <Pressable onPress={() => setMedicalVisaOpen(true)} className="flex-row items-center gap-1.5 h-9 px-3 rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
-                                <ShieldCheck size={14} color="var(--c-success-fg)" />
-                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Vize medicale</Text>
-                            </Pressable>
-                            <Pressable onPress={() => setPaymentsReportOpen(true)} className="flex-row items-center gap-1.5 h-9 px-3 rounded-[10px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
-                                <Receipt size={14} color="var(--c-brand-fg)" />
-                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Raport plăți</Text>
-                            </Pressable>
-                            <Pressable onPress={() => setEditOpen(true)} className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-[10px]" style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)' } as any}>
-                                <Pencil size={14} color="var(--c-on-brand)" />
-                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-on-brand)' }}>Editează</Text>
-                            </Pressable>
-                        </ScrollView>
+                        {/* Phones: one primary + „Mai multe”. Five buttons in a sideways strip
+                            ran off the edge („Raport plăți” was never visible). */}
+                        <View className="flex-1 md:hidden flex-row justify-end gap-2">
+                            <Button icon="more-horiz" label="Mai multe" onPress={() => setTeamActionsOpen(true)} />
+                            <Button icon="edit" label="Editează" variant="primary" onPress={() => setEditOpen(true)} />
+                        </View>
+                        <View className="hidden md:flex flex-1 flex-row flex-wrap justify-end gap-2">
+                            {teamActions.map((action) => (
+                                <Button key={action.key} icon={action.icon} label={action.label} onPress={action.onPress} />
+                            ))}
+                            <Button icon="edit" label="Editează" variant="primary" onPress={() => setEditOpen(true)} />
+                        </View>
                     </View>
 
                     <PageHero
@@ -249,7 +243,7 @@ export default function TeamDetailsScreen() {
                                     <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Cod invitație</Text>
                                     <Text className="f-display t-num text-[16px] md:text-[18px] font-extrabold tracking-[2px] leading-tight" style={{ color: 'var(--c-brand-fg)' }}>{team.inviteCode}</Text>
                                 </View>
-                                <Pressable onPress={handleCopyInvite} className="ui-press w-8 h-8 md:w-9 md:h-9 rounded-[10px] items-center justify-center border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any} accessibilityLabel="Copiază codul">
+                                <Pressable onPress={handleCopyInvite} className="tap-40 ui-press w-8 h-8 md:w-9 md:h-9 rounded-[10px] items-center justify-center border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any} accessibilityLabel="Copiază codul">
                                     {copied ? <Check size={16} color="var(--c-success-fg)" /> : <Copy size={15} color="var(--c-brand-fg)" />}
                                 </Pressable>
                             </View>
@@ -257,7 +251,7 @@ export default function TeamDetailsScreen() {
                     >
                         <View className="flex-row flex-wrap items-center gap-1.5">
                             <View className="flex-row items-center gap-1 px-2 py-1 rounded-full" style={{ backgroundColor: crestTint }}>
-                                <Text className="text-[11px] font-semibold" style={{ color: frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}>{frb ? 'Sincronizat FRB' : 'Administrat local'}</Text>
+                                <Text className="text-[11px] font-semibold" style={{ color: frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}>{frb ? 'Sincronizat FRB' : 'Manual'}</Text>
                             </View>
                             {team.gender && (
                                 <View className="px-2 py-1 rounded-full" style={{ backgroundColor: team.gender === 'M' ? 'var(--c-surface-tint)' : 'var(--c-danger-bg)' }}>
@@ -326,7 +320,14 @@ export default function TeamDetailsScreen() {
                     ) : null}
 
                     {/* Tabs */}
-                    <View className="flex-row flex-wrap p-1 rounded-[14px] border self-start mb-4 gap-1" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
+                    {/* One row that scrolls on a phone; wrapping left „Statistici” alone on a second line. */}
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        className="mb-4 -mx-4 px-4 md:mx-0 md:px-0"
+                        contentContainerStyle={{ flexGrow: 0 }}
+                    >
+                    <View accessibilityRole={'tablist' as any} className="flex-row p-1 rounded-[14px] border gap-1" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
                         <TabButton active={tab === 'roster'} onPress={() => setTab('roster')} icon={<Users size={14} color={tab === 'roster' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label={`Lot (${players.length})`} />
                         <TabButton active={tab === 'events'} onPress={() => setTab('events')} icon={<CalendarClock size={14} color={tab === 'events' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label="Evenimente" />
                         <TabButton active={tab === 'history'} onPress={() => setTab('history')} icon={<History size={14} color={tab === 'history' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label="Istoric" />
@@ -335,6 +336,7 @@ export default function TeamDetailsScreen() {
                             <TabButton active={tab === 'frb'} onPress={() => setTab('frb')} icon={<ListOrdered size={14} color={tab === 'frb' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label="Competiție FRB" />
                         )}
                     </View>
+                    </ScrollView>
 
                     {tab === 'events' ? (
                         <TeamEventsPanel teamId={team.id} scope="upcoming" />
@@ -425,6 +427,14 @@ export default function TeamDetailsScreen() {
                 />
             )}
 
+            <ActionSheet
+                visible={teamActionsOpen}
+                title="Mai multe"
+                subtitle={team.name}
+                actions={teamActions.map((action) => ({ ...action, onPress: () => { setTeamActionsOpen(false); action.onPress(); } }))}
+                onClose={() => setTeamActionsOpen(false)}
+            />
+
             <TeamMedicalVisaModal
                 visible={medicalVisaOpen}
                 teamId={teamId}
@@ -477,9 +487,14 @@ export default function TeamDetailsScreen() {
 
 function TabButton({ active, onPress, icon, label }: { active: boolean; onPress: () => void; icon: React.ReactNode; label: string }) {
     return (
-        <Pressable onPress={onPress} className={`flex-row items-center gap-1.5 px-4 py-2.5 rounded-[11px] ${active ? 'bg-[var(--c-brand-surface)]' : ''}`}>
+        <Pressable
+            onPress={onPress}
+            accessibilityRole={'tab' as any}
+            accessibilityState={{ selected: active }}
+            className={`flex-row items-center gap-1.5 px-4 min-h-10 rounded-[11px] shrink-0 ${active ? 'bg-[var(--c-brand-surface)]' : ''}`}
+        >
             {icon}
-            <Text className={`text-[12.5px] font-black ${active ? 'text-[color:var(--c-on-brand)]' : 'text-[color:var(--c-faint)]'}`}>{label}</Text>
+            <Text className={`text-[12.5px] font-semibold whitespace-nowrap ${active ? 'text-[color:var(--c-on-brand)]' : 'text-[color:var(--c-muted)]'}`}>{label}</Text>
         </Pressable>
     );
 }
@@ -509,10 +524,10 @@ function PaymentPill({ status }: { status: 'paid' | 'due' | 'pending' | 'none' }
 function RowActions({ removing, onOpen, onRemove }: { removing: boolean; onOpen: () => void; onRemove: () => void }) {
     return (
         <View className="flex-row items-center gap-0.5 flex-none">
-            <Pressable onPress={onOpen} className="w-9 h-9 rounded-[9px] items-center justify-center hover:bg-[var(--c-surface-3)]" accessibilityLabel="Detalii jucător">
+            <Pressable onPress={onOpen} className="tap-40 w-9 h-9 rounded-[9px] items-center justify-center hover:bg-[var(--c-surface-3)]" accessibilityLabel="Detalii jucător">
                 <Pencil size={14} color="var(--c-muted)" />
             </Pressable>
-            <Pressable onPress={onRemove} disabled={removing} className="w-9 h-9 rounded-[9px] items-center justify-center hover:bg-[var(--c-danger-bg)]" accessibilityLabel="Scoate din echipă">
+            <Pressable onPress={onRemove} disabled={removing} className="tap-40 w-9 h-9 rounded-[9px] items-center justify-center hover:bg-[var(--c-danger-bg)]" accessibilityLabel="Scoate din echipă">
                 {removing ? <ActivityIndicator size="small" color="var(--c-danger)" /> : <UserMinus size={15} color="var(--c-danger)" />}
             </Pressable>
         </View>
