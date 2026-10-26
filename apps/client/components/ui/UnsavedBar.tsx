@@ -27,7 +27,7 @@ export default function UnsavedBar({
 }) {
   return (
     <View
-      className="fixed left-0 right-0 lg:bottom-6 px-3 lg:px-6 items-stretch lg:items-end z-30 bottom-[calc(96px+env(safe-area-inset-bottom,0px))]"
+      className="unsaved-bar fixed left-0 right-0 lg:bottom-6 px-3 lg:px-6 items-stretch lg:items-end z-30 bottom-[calc(96px+env(safe-area-inset-bottom,0px))]"
       style={{ pointerEvents: 'none' } as any}
     >
       <View

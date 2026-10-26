@@ -377,6 +377,13 @@
    never an ancestor of a position:fixed child (backdrop-filter traps them). */
 /* ≥40px to touch, only on touch screens: icon buttons stay 32–36px with a
    mouse. Expands the control itself (min-size), not an invisible overlay. */
+/* While the fixed „Modificări nesalvate” bar is up, a focused field scrolls
+   clear of it instead of hiding behind it (on phones it sits above the
+   bottom bar). */
+:root:has(.unsaved-bar), :root:has(.unsaved-bar) main { scroll-padding-bottom: 184px; }
+@media (min-width: 1024px) {
+  :root:has(.unsaved-bar), :root:has(.unsaved-bar) main { scroll-padding-bottom: 112px; }
+}
 @media (pointer: coarse) {
   .tap-40 { min-width: 40px; min-height: 40px; }
 }

@@ -1,11 +1,12 @@
 import { formatPaymentWhen } from '../../../utils/paymentDate';
 import { parseApiDate } from '@/utils/dates';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, Modal, Platform } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import * as DocumentPicker from '@/src/web/documentPicker';
 import { financeApi, FinancialSettings, FinancialDocument, StripeAdminConfig, AdminRecentPayment, type FinanceSummary } from '../../../services/financeApi';
-import BalancesCard from '../../../components/finance/BalancesCard';
+import BalancesCard, { type RecordedPayment } from '../../../components/finance/BalancesCard';
+import { ToastHost, useToasts } from '../../../components/ui/Toast';
 import FeeExtrasCard from '../../../components/finance/FeeExtrasCard';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import StripeConnectCard from '../../../components/finance/StripeConnectCard';
@@ -212,6 +213,14 @@ export default function FinancialSettingsPage() {
     const [savingDueDay, setSavingDueDay] = useState(false);
     const [stripeConfig, setStripeConfig] = useState<StripeAdminConfig | null>(null);
     const [recentPayments, setRecentPayments] = useState<AdminRecentPayment[]>([]);
+    const { toasts, showToast, dismissToast } = useToasts();
+    // The „Încasat … · Anulează” toast of each payment, closed once that payment is reversed.
+    const recordToasts = useRef(new Map<string, number>());
+    // Bumped after a storno so Restanțe și solduri reloads too.
+    const [balancesReload, setBalancesReload] = useState(0);
+    const [pendingReverse, setPendingReverse] = useState<AdminRecentPayment | null>(null);
+    const [reverseReason, setReverseReason] = useState('');
+    const [reversing, setReversing] = useState(false);
     const [loadingStripeConfig, setLoadingStripeConfig] = useState(false);
     const [showStripeDetails, setShowStripeDetails] = useState(false);
     const [loadingRecentPayments, setLoadingRecentPayments] = useState(false);
@@ -266,6 +275,60 @@ export default function FinancialSettingsPage() {
     }, [loadDocuments]);
 
     useEffect(() => { loadData(); }, [loadData]);
+
+    const reloadRecentPayments = useCallback(async () => {
+        try {
+            setRecentPayments(await financeApi.getAdminRecentPayments(12));
+        } catch (error) {
+            console.error('Failed to load recent payments:', error);
+        }
+    }, []);
+
+    /** Storno (or the „Anulează” right after recording): reload everything the payment touched. */
+    const reversePayment = useCallback(async (paymentId: number | string, reason: string, done: string) => {
+        try {
+            await financeApi.reverseManualPayment(paymentId, reason);
+            const recordToast = recordToasts.current.get(String(paymentId));
+            if (recordToast != null) {
+                dismissToast(recordToast);
+                recordToasts.current.delete(String(paymentId));
+            }
+            showToast({ variant: 'success', message: done });
+            setBalancesReload((value) => value + 1);
+            void loadSummary();
+            void reloadRecentPayments();
+            return true;
+        } catch (error) {
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Nu am putut storna plata.' });
+            return false;
+        }
+    }, [showToast, dismissToast, reloadRecentPayments, loadSummary]);
+
+    // A desk payment used to close the dialog without a word and leave „Plăți
+    // recente” stale. Now: who paid how much, „Anulează” while the server's
+    // undo window lasts, and the list refreshed.
+    const handlePaymentRecorded = (recorded: RecordedPayment) => {
+        void loadSummary();
+        void reloadRecentPayments();
+        const canUndo = recorded.paymentId != null && recorded.undoWindowMs > 0;
+        const toastId = showToast({
+            variant: 'success',
+            message: `Încasat ${formatCurrency(recorded.amount, recorded.currency)} de la ${recorded.playerName}.`,
+            duration: canUndo ? recorded.undoWindowMs : 4000,
+            action: canUndo
+                ? { label: 'Anulează', onPress: () => void reversePayment(recorded.paymentId!, 'Anulată imediat după înregistrare', 'Plata a fost anulată.') }
+                : undefined,
+        });
+        if (recorded.paymentId != null) recordToasts.current.set(String(recorded.paymentId), toastId);
+    };
+
+    const submitReverse = async () => {
+        if (!pendingReverse) return;
+        setReversing(true);
+        const ok = await reversePayment(pendingReverse.id, reverseReason.trim(), `Plata de ${formatCurrency(pendingReverse.amount, pendingReverse.currency)} de la ${pendingReverse.playerName} a fost stornată.`);
+        setReversing(false);
+        if (ok) setPendingReverse(null);
+    };
 
     const loadFinanceMeta = useCallback(async () => {
         if (hasLoadedFinanceMeta) {
@@ -651,7 +714,7 @@ export default function FinancialSettingsPage() {
             {activeTab === 'Finances' && (
                 <View className="mb-20">
 
-                    <BalancesCard onPaymentRecorded={() => void loadSummary()} />
+                    <BalancesCard onPaymentRecorded={handlePaymentRecorded} reloadKey={balancesReload} />
 
                     {/* ── Documents register (with its upload actions) + recent payments ── */}
                     <View className="grid grid-cols-1 xl:grid-cols-5 gap-5 items-start">
@@ -799,9 +862,12 @@ export default function FinancialSettingsPage() {
                                     {recentPayments.map((payment, index) => {
                                         const status = payment.status.toLowerCase();
                                         const paid = ['paid', 'processed', 'succeeded', 'success'].includes(status);
+                                        const reversed = status === 'reversed';
                                         const failed = ['failed', 'canceled', 'cancelled', 'refunded'].includes(status);
-                                        const label = paid ? 'Plătit' : failed ? (status === 'refunded' ? 'Rambursat' : 'Eșuat') : 'În așteptare';
-                                        const tone = paid ? 'var(--c-success-fg)' : failed ? 'var(--c-danger-fg)' : 'var(--c-warning-fg)';
+                                        const label = reversed ? 'Stornată' : paid ? 'Plătit' : failed ? (status === 'refunded' ? 'Rambursat' : 'Eșuat') : 'În așteptare';
+                                        const tone = reversed ? 'var(--c-muted)' : paid ? 'var(--c-success-fg)' : failed ? 'var(--c-danger-fg)' : 'var(--c-warning-fg)';
+                                        // Card payments are refunded through Stripe; only desk payments are reversed here.
+                                        const canReverse = paid && payment.provider !== 'stripe';
                                         return (
                                             <View key={payment.id} className="flex-row items-center gap-3 py-2.5" style={index > 0 ? ({ borderTopWidth: 1, borderTopColor: 'var(--c-border)' } as any) : undefined}>
                                                 <View className="flex-1 min-w-0">
@@ -811,9 +877,20 @@ export default function FinancialSettingsPage() {
                                                     </Text>
                                                 </View>
                                                 <View className="items-end shrink-0">
-                                                    <Text className="t-num text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>{formatCurrency(payment.amount, payment.currency)}</Text>
+                                                    <Text className="t-num text-[14px] font-bold" style={{ color: reversed ? 'var(--c-muted)' : 'var(--c-ink)', textDecorationLine: reversed ? 'line-through' : 'none' } as any}>{formatCurrency(payment.amount, payment.currency)}</Text>
                                                     <Text className="text-[11.5px] font-semibold" style={{ color: tone }}>{label}</Text>
                                                 </View>
+                                                {canReverse ? (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        icon="undo"
+                                                        label="Stornează"
+                                                        iconOnlyOnMobile
+                                                        accessibilityLabel={`Stornează plata de ${formatCurrency(payment.amount, payment.currency)} de la ${payment.playerName}`}
+                                                        onPress={() => { setReverseReason(''); setPendingReverse(payment); }}
+                                                    />
+                                                ) : null}
                                             </View>
                                         );
                                     })}
@@ -949,6 +1026,30 @@ export default function FinancialSettingsPage() {
                 />
             </ConfirmDialog>
 
+            <ConfirmDialog
+                visible={pendingReverse != null}
+                destructive
+                icon="undo"
+                title={pendingReverse ? `Stornezi plata de ${formatCurrency(pendingReverse.amount, pendingReverse.currency)} de la ${pendingReverse.playerName}?` : ''}
+                message="Plata rămâne în istoric, marcată „Stornată”, iar taxele pe care le acoperea redevin de plată. Stornarea ajunge în jurnal."
+                confirmLabel="Stornează"
+                loading={reversing}
+                onConfirm={() => void submitReverse()}
+                onCancel={() => { if (!reversing) setPendingReverse(null); }}
+            >
+                <TextInput
+                    value={reverseReason}
+                    onChangeText={setReverseReason}
+                    placeholder="Motiv (opțional), ex. sumă greșită"
+                    placeholderTextColor={dash.faint}
+                    accessibilityLabel="Motivul stornării"
+                    maxLength={300}
+                    className="h-10 rounded-[10px] px-3 border text-[13px]"
+                    style={{ borderColor: 'var(--c-border-strong, var(--c-border))', color: 'var(--c-ink)', backgroundColor: 'var(--c-surface-2, var(--c-surface))' } as any}
+                />
+            </ConfirmDialog>
+
+            <ToastHost toasts={toasts} onDismiss={dismissToast} />
         </ScrollView>
     );
 }

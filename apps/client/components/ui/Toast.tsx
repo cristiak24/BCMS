@@ -53,7 +53,7 @@ function ToastItem({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: num
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
-        announce(toast.action ? `${toast.message}. ${toast.action.label}.` : toast.message, toast.variant === 'error' ? 'assertive' : 'polite');
+        announce(toast.action ? `${toast.message.replace(/[.!]$/, '')}. ${toast.action.label}.` : toast.message, toast.variant === 'error' ? 'assertive' : 'polite');
         // Announced once, when the toast appears.
     }, [toast.id]);
 
@@ -69,7 +69,10 @@ function ToastItem({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: num
     return (
         <View
             className="flex-row items-center gap-3 rounded-[14px] px-4 py-3 shadow-[0_10px_30px_rgba(16,24,40,0.14)] border"
-            style={{ backgroundColor: meta.bg, borderColor: meta.border, minWidth: 280, maxWidth: 420 }}
+            // The host is pointerEvents="box-none", which the web shim maps to
+            // `pointer-events: none` — inherited, so „Anulează” and × could not be
+            // clicked at all. The toast itself takes taps again.
+            style={{ backgroundColor: meta.bg, borderColor: meta.border, minWidth: 280, maxWidth: 420, pointerEvents: 'auto' } as any}
         >
             <Icon size={18} color={meta.fg} />
             <Text className="flex-1 text-[13px] font-bold" style={{ color: meta.fg }}>{toast.message}</Text>
@@ -79,13 +82,14 @@ function ToastItem({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: num
                         toast.action?.onPress();
                         onDismiss(toast.id);
                     }}
-                    className="px-3 py-1.5 rounded-full"
+                    accessibilityRole="button"
+                    className="tap-40 px-3 py-1.5 rounded-full items-center justify-center"
                     style={{ backgroundColor: meta.fg }}
                 >
                     <Text className="text-white text-[12px] font-black">{toast.action.label}</Text>
                 </Pressable>
             )}
-            <Pressable onPress={() => onDismiss(toast.id)} accessibilityLabel="Închide notificarea" className="w-6 h-6 items-center justify-center rounded-full">
+            <Pressable onPress={() => onDismiss(toast.id)} accessibilityLabel="Închide notificarea" className="tap-40 w-6 h-6 items-center justify-center rounded-full">
                 <X size={14} color={meta.fg} />
             </Pressable>
         </View>
@@ -103,7 +107,8 @@ function ToastItem({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: num
 export function ToastHost({ toasts, onDismiss }: { toasts: ToastData[]; onDismiss: (id: number) => void }) {
     return (
         <View
-            className="fixed left-1/2 bottom-6 z-[100] flex-col gap-2.5 items-center"
+            // Phones: above the bottom bar (like UnsavedBar), or the bar takes the tap meant for „Anulează”.
+            className="fixed left-1/2 bottom-[calc(96px+env(safe-area-inset-bottom,0px))] lg:bottom-6 z-[100] flex-col gap-2.5 items-center"
             style={{ transform: 'translateX(-50%)' as any }}
             pointerEvents="box-none"
         >

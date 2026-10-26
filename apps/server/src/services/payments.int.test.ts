@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { clubs, events, financialSettings, notifications, playerPayments, players, playersToTeams, teams, users } from '../db/schema';
 import { closeDb, createSchema } from '../test/pgliteDb';
-import { applyCheckoutSession, feeIdMetadata, previewManualPayment, recordManualPayment } from './payments';
+import { applyCheckoutSession, feeIdMetadata, PaymentReversalError, previewManualPayment, recordManualPayment, reverseManualPayment } from './payments';
 import { clubBalances } from './clubFinance';
 import { monthKey } from '../lib/paymentLedger';
 import { clubMonth } from '../lib/clubTime';
@@ -260,6 +260,41 @@ test('paying a club request voids it instead of counting it twice', async () => 
     const [after] = await db.select().from(playerPayments).where(eq(playerPayments.id, request.id));
     assert.equal(after.status, 'void');
     assert.equal((await balanceOf(player.id)).fees.some((fee) => fee.id === `payment:${request.id}`), false);
+});
+
+test('a reversed desk payment keeps its row and its fees are owed again', async () => {
+    const player = await newPlayer('Sorin');
+    const { payment } = await desk(player.id, 150, [`monthly:${thisMonth}`]);
+    assert.equal((await balanceOf(player.id)).outstanding, 0);
+
+    const { payment: reversed } = await reverseManualPayment(payment.id);
+    assert.equal(reversed.status, 'reversed');
+    const [row] = await db.select().from(playerPayments).where(eq(playerPayments.id, payment.id));
+    assert.ok(row, 'storno keeps the row');
+    assert.equal(feeOf(await balanceOf(player.id), `monthly:${thisMonth}`)?.amount, 150);
+
+    // Twice is refused, not a second storno.
+    await assert.rejects(() => reverseManualPayment(payment.id), (error: unknown) => error instanceof PaymentReversalError && error.status === 409);
+});
+
+test('reversing the payment of a club request opens the request again', async () => {
+    const player = await newPlayer('Tudora');
+    const [request] = await db.insert(playerPayments).values({
+        playerId: player.id, amount: 60, month: current.month, year: current.year, status: 'pending', description: 'Echipament',
+    }).returning();
+    const { payment } = await desk(player.id, 60, [`payment:${request.id}`]);
+    assert.equal((await db.select().from(playerPayments).where(eq(playerPayments.id, request.id)))[0].status, 'void');
+
+    const { reopenedRequests } = await reverseManualPayment(payment.id);
+    assert.deepEqual(reopenedRequests, [request.id]);
+    assert.equal((await db.select().from(playerPayments).where(eq(playerPayments.id, request.id)))[0].status, 'pending');
+    assert.ok((await balanceOf(player.id)).fees.some((fee) => fee.id === `payment:${request.id}`));
+});
+
+test('a card payment is not reversed at the desk', async () => {
+    const player = await newPlayer('Vlad');
+    const { payment } = await applyCheckoutSession(paidSession(player.id, [`monthly:${thisMonth}`], 150), 'paid');
+    await assert.rejects(() => reverseManualPayment(payment!.id), (error: unknown) => error instanceof PaymentReversalError && error.status === 400);
 });
 
 test('an inactive player is not billed new months', async () => {

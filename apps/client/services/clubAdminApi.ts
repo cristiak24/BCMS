@@ -13,6 +13,8 @@ export type ClubAdminAccount = {
     createdAt?: string | null;
     lastLoginAt?: string | null;
     source?: 'user' | 'invite';
+    /** Invitations only: whether the last email went out (null = older invitation, assumed sent). */
+    emailSent?: boolean | null;
 };
 
 export type AuditLogEntry = {

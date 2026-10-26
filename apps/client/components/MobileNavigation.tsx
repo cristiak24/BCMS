@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { guardNavigation } from '../utils/leaveGuard';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { theme } from '../constants/designSystem';
 import { MenuBadge, type AdminMenuIconName } from './Sidebar';
@@ -140,7 +141,7 @@ export function MobileNavigationSheet({
                   <Pressable
                     onPress={() => {
                       onClose();
-                      navigate(item.href);
+                      guardNavigation(() => navigate(item.href));
                     }}
                     accessibilityRole="button"
                     accessibilityState={{ selected: active }}

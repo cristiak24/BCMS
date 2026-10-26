@@ -9,7 +9,7 @@ import { db } from '../db';
 import { playerPayments as pgPlayerPayments, players as pgPlayers } from '../db/schema';
 import { clubMonth } from '../lib/clubTime';
 import { planPayment } from '../lib/feeSchedule';
-import { isOutstandingStatus, parseFeeIds, serializeFeeIds } from '../lib/paymentLedger';
+import { isOutstandingStatus, isPaidStatus, isReversedStatus, parseFeeIds, serializeFeeIds } from '../lib/paymentLedger';
 import { roundMoney } from '../lib/money';
 import { playerFees, type DbExecutor } from './clubFinance';
 
@@ -235,5 +235,56 @@ export async function recordManualPayment(input: ManualPaymentTarget & {
             .returning();
         await voidSettledRequests(input.playerId, plan.settledIds, tx);
         return { payment, feeIds: plan.tokens, plan };
+    });
+}
+
+/** Why a payment can't be reversed — the route turns it into a 4xx. */
+export class PaymentReversalError extends Error {
+    constructor(public readonly status: 400 | 404 | 409, message: string) {
+        super(message);
+    }
+}
+
+/**
+ * Storno of a desk payment. Nothing is deleted: the row stays with status
+ * „reversed”, which the ledger reads like a void (neither money in nor owed),
+ * so the fees it settled are owed again by themselves. A club request it had
+ * voided ("payment:17" settled in full) is open again. Stripe payments are not
+ * reversed here — that money went through Stripe and is refunded there.
+ */
+export async function reverseManualPayment(paymentId: number) {
+    return db.transaction(async (tx) => {
+        const [row] = await tx
+            .select()
+            .from(pgPlayerPayments)
+            .where(eq(pgPlayerPayments.id, paymentId))
+            .limit(1)
+            .for('update');
+        if (!row) throw new PaymentReversalError(404, 'Plata nu a fost găsită.');
+        if (isReversedStatus(row.status)) throw new PaymentReversalError(409, 'Plata a fost deja stornată.');
+        if (row.stripeSessionId) throw new PaymentReversalError(400, 'Plățile cu cardul se returnează din Stripe, nu de aici.');
+        if (!isPaidStatus(row.status)) throw new PaymentReversalError(400, 'Doar o plată încasată poate fi stornată.');
+
+        const [reversed] = await tx
+            .update(pgPlayerPayments)
+            .set({ status: 'reversed' })
+            .where(eq(pgPlayerPayments.id, paymentId))
+            .returning();
+
+        const reopened = parseFeeIds(row.feeIds)
+            .filter((id) => id.startsWith('payment:') && !id.includes('='))
+            .map((id) => Number(id.slice('payment:'.length)))
+            .filter((id) => Number.isInteger(id) && id > 0);
+        if (reopened.length) {
+            await tx
+                .update(pgPlayerPayments)
+                .set({ status: 'pending' })
+                .where(and(
+                    inArray(pgPlayerPayments.id, reopened),
+                    eq(pgPlayerPayments.playerId, row.playerId),
+                    eq(pgPlayerPayments.status, 'void'),
+                ));
+        }
+        return { payment: reversed, reopenedRequests: reopened };
     });
 }

@@ -59,13 +59,15 @@ const ACTION_LABELS: Record<string, string> = {
     'family_request.deny': 'Înscriere respinsă',
     'finance.document.status': 'Status document financiar',
     'finance.payment.manual': 'Plată înregistrată manual',
+    'finance.payment.reversed': 'Plată stornată',
     'finance.settings.update': 'Taxe modificate',
     'finance.stripe.account_created': 'Cont Stripe al clubului creat',
     'finance.stripe.account_updated': 'Contul Stripe al clubului s-a schimbat',
     'game.finished': 'Meci încheiat',
     'game.reopened': 'Meci redeschis',
     'invitation.accepted': 'Invitație acceptată',
-    'invitation.created': 'Invitație trimisă',
+    // Created, not „trimisă”: when the email fails the invitation still exists and the admin passes the link on.
+    'invitation.created': 'Invitație creată',
     'invitation.resent': 'Invitație retrimisă',
     'invitation.revoked': 'Invitație anulată',
     'manage_access.invite_code_created': 'Cod de invitație creat',
@@ -147,6 +149,7 @@ function detailOf(entry: AuditLogEntry) {
     if (meta.amount != null) parts.push(`${meta.amount} ${String(meta.currency ?? 'ron').toUpperCase()}`);
     if (meta.method) parts.push(METHOD_LABELS[String(meta.method)] ?? String(meta.method));
     if (meta.email) parts.push(String(meta.email));
+    if (meta.emailSent === false) parts.push('emailul nu a plecat');
     if (meta.reason) parts.push(`motiv: ${meta.reason}`);
     if (meta.changes && typeof meta.changes === 'object') {
         for (const [field, change] of Object.entries(meta.changes as Record<string, { before: unknown; after: unknown }>)) {

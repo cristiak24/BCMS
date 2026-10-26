@@ -111,22 +111,31 @@ router.get('/accounts', async (req: AuthenticatedRequest, res) => {
             const visibleInvites = inviteRows.filter((invite) => isVisiblePendingInvite(invite, userRows));
 
             // The admin-only label typed on the invite form isn't a column on
-            // `invites`; it lives in the invitation.created audit entry.
+            // `invites`; it lives in the invitation.created audit entry. So does
+            // whether the email went out (created, then every resend), so the
+            // list can say „Email netrimis” instead of „Invitație trimisă”.
             const inviteLabels = new Map<string, string>();
+            const inviteEmailSent = new Map<string, boolean>();
             if (visibleInvites.length > 0) {
                 const labelRows = await db
-                    .select({ entityId: auditLogs.entityId, metadata: auditLogs.metadata })
+                    .select({ entityId: auditLogs.entityId, action: auditLogs.action, metadata: auditLogs.metadata })
                     .from(auditLogs)
                     .where(and(
-                        eq(auditLogs.action, 'invitation.created'),
+                        inArray(auditLogs.action, ['invitation.created', 'invitation.resent']),
                         eq(auditLogs.entityType, 'invitation'),
                         inArray(auditLogs.entityId, visibleInvites.map((invite) => String(invite.id))),
-                    ));
+                    ))
+                    .orderBy(auditLogs.id);
                 for (const row of labelRows) {
                     try {
-                        const label = JSON.parse(row.metadata ?? '{}')?.fullName;
-                        if (row.entityId && typeof label === 'string' && label.trim()) {
+                        const metadata = JSON.parse(row.metadata ?? '{}');
+                        const label = metadata?.fullName;
+                        if (row.entityId && row.action === 'invitation.created' && typeof label === 'string' && label.trim()) {
                             inviteLabels.set(row.entityId, label.trim());
+                        }
+                        // Oldest first, so the last attempt wins.
+                        if (row.entityId && typeof metadata?.emailSent === 'boolean') {
+                            inviteEmailSent.set(row.entityId, metadata.emailSent);
                         }
                     } catch {
                         // Unparseable metadata — fall back to the email prefix.
@@ -146,6 +155,8 @@ router.get('/accounts', async (req: AuthenticatedRequest, res) => {
                     createdAt: invite.createdAt,
                     lastLoginAt: null,
                     source: 'invite' as const,
+                    // null: an invitation older than the field, assumed sent.
+                    emailSent: inviteEmailSent.get(String(invite.id)) ?? null,
                 }));
 
             const activeUsers = userRows.map((user) => ({

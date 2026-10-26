@@ -476,7 +476,8 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                                 className="text-[18px] font-bold tracking-tight outline-none mb-4"
                                 style={{ color: 'var(--c-ink-strong)' }}
                             >
-                                {STEPS[step - 1].title}
+                                {/* A failed email is not „Gata de trimis”: the heading says what happened. */}
+                                {step === 3 && result?.kind === 'email' && !result.emailSent ? 'Emailul nu a plecat' : STEPS[step - 1].title}
                             </h2>
 
                             {step === 1 ? (

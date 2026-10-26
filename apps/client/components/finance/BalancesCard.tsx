@@ -74,7 +74,14 @@ function rowMeta(balance: PlayerBalanceSummary, currency: string) {
     return balance.oldestDueDate ? `Scadent ${shortDate(balance.oldestDueDate)}` : 'De plată';
 }
 
-export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?: () => void }) {
+export type RecordedPayment = { paymentId: number | null; amount: number; playerName: string; currency: string; undoWindowMs: number };
+
+/**
+ * `onPaymentRecorded` gets what the page needs for its confirmation (and the
+ * „Anulează” it offers); `reloadKey` is bumped by the page after a storno so
+ * the balances follow.
+ */
+export default function BalancesCard({ onPaymentRecorded, reloadKey = 0 }: { onPaymentRecorded?: (payment: RecordedPayment) => void; reloadKey?: number }) {
     const [balances, setBalances] = useState<PlayerBalanceSummary[]>([]);
     const [currency, setCurrency] = useState('ron');
     const [loading, setLoading] = useState(true);
@@ -147,7 +154,7 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
         }
     }, []);
 
-    useEffect(() => { void load(); }, [load]);
+    useEffect(() => { void load(); }, [load, reloadKey]);
 
     const counts = useMemo(() => ({
         overdue: balances.filter((b) => b.state === 'overdue').length,
@@ -177,7 +184,9 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
             const chosen = preset.length ? preset : fees;
             setTargetFees(fees);
             setSelectedFees(new Set(chosen.map((fee) => fee.id)));
-            setAmount(String(chosen.reduce((sum, fee) => sum + fee.amount, 0)));
+            // Only into an empty field: on a slow connection the fees arrive after
+            // the admin typed a sum, which used to be replaced without a word.
+            setAmount((current) => (current.trim() ? current : String(chosen.reduce((sum, fee) => sum + fee.amount, 0))));
         } catch (err) {
             if (targetIdRef.current === playerId) setFeesError(err instanceof Error ? err.message : 'Nu am putut încărca taxele jucătorului.');
         }
@@ -233,7 +242,7 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
         setSaving(true);
         setFormError(null);
         try {
-            await financeApi.createManualPayment({
+            const result = await financeApi.createManualPayment({
                 playerId: target.playerId,
                 amount: parsedAmount,
                 feeIds: Array.from(selectedFees),
@@ -241,9 +250,16 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                 date,
                 description: description.trim() || undefined,
             });
+            const playerName = target.playerName;
             setTarget(null);
             await load();
-            onPaymentRecorded?.();
+            onPaymentRecorded?.({
+                paymentId: result.payment?.id ?? null,
+                amount: parsedAmount,
+                playerName,
+                currency,
+                undoWindowMs: result.undoWindowMs ?? 0,
+            });
         } catch (err) {
             setFormError(err instanceof Error ? err.message : 'Nu am putut înregistra plata.');
         } finally {
@@ -367,7 +383,8 @@ export default function BalancesCard({ onPaymentRecorded }: { onPaymentRecorded?
                 visible={target != null}
                 title={target ? `Încasare · ${target.playerName}` : ''}
                 message="Bifează taxele pe care le acoperă plata. Suma se completează din ele și se împarte de la cea mai veche; o sumă mai mică le achită parțial."
-                confirmLabel="Înregistrează plata"
+                // The amount on the button: the last look before it is booked.
+                confirmLabel={validAmount ? `Înregistrează ${money(parsedAmount, currency)}` : 'Înregistrează plata'}
                 loading={saving}
                 confirmDisabled={!canSave}
                 icon="payments"
@@ -521,10 +538,11 @@ function AllocationPreview({ allocation, loading, visible, noneSelected, currenc
                         );
                     })}
                     {allocation.credit > 0 ? (
-                        <View className="flex-row items-start gap-2">
-                            <MaterialIcons name="account-balance-wallet" size={15} color="var(--c-brand-fg)" />
-                            <Text className="flex-1 text-[12px]" style={{ color: 'var(--c-ink-soft)' }}>
-                                Avans {money(allocation.credit, currency)}: depășește tot ce e de plată și acoperă automat următoarele taxe.
+                        // A warning, not a note: 900 typed for 90 used to become an advance without a word.
+                        <View className="flex-row items-start gap-2 rounded-[8px] px-2 py-1.5" style={{ backgroundColor: 'var(--c-warning-bg)' }}>
+                            <MaterialIcons name="error-outline" size={15} color="var(--c-warning-fg)" />
+                            <Text className="flex-1 text-[12px]" style={{ color: 'var(--c-warning-fg)' }}>
+                                Suma depășește tot ce e de plată cu {money(allocation.credit, currency)}. Verifică suma: diferența rămâne avans și acoperă următoarele taxe.
                             </Text>
                         </View>
                     ) : null}

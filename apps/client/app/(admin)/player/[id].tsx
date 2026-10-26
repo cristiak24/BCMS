@@ -10,7 +10,7 @@ import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import Button from '../../../components/ui/Button';
 import UnsavedBar from '../../../components/ui/UnsavedBar';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
-import { useUnloadGuard } from '../../../hooks/useUnloadGuard';
+import { useLeaveGuard } from '../../../hooks/useLeaveGuard';
 import SelectField from '../../../components/ui/SelectField';
 import { FormField } from '../../../components/ui/FormField';
 import { Skeleton } from '../../../components/ui/Skeleton';
@@ -123,16 +123,18 @@ export default function PlayerProfile() {
   }, [player, firstName, lastName, email, number, birthYear, status, medicalExpiry]);
 
   // Save lived only in the hero: on a phone the clearance date is ~1.500px
-  // below it, and „Înapoi” dropped the edit without a word.
-  useUnloadGuard(dirty);
-  const [leaveOpen, setLeaveOpen] = useState(false);
-  const requestBack = () => (dirty ? setLeaveOpen(true) : handleGoBack());
+  // below it, and „Înapoi” dropped the edit without a word. The guard now
+  // covers every way out (Înapoi, the sidebar, the bottom bar, a link), not
+  // only closing the tab.
+  const leaveGuard = useLeaveGuard(dirty);
+  const requestBack = () => handleGoBack();
 
   const numberError = number && !/^\d{1,2}$/.test(number) ? 'Un număr între 0 și 99.' : null;
   const yearError = birthYear && !/^(19|20)\d{2}$/.test(birthYear) ? 'An de forma 2010.' : null;
 
-  const handleSave = async () => {
-    if (!player || numberError || yearError) return;
+  /** True when the profile was saved (the leave dialog then carries on). */
+  const handleSave = async (): Promise<boolean> => {
+    if (!player || numberError || yearError) return false;
     setSaving(true);
     try {
       const payload: Partial<Player> = {
@@ -149,6 +151,7 @@ export default function PlayerProfile() {
       setPlayer(next);
       hydrate(next);
       showToast({ variant: 'success', message: 'Profilul a fost salvat.' });
+      return true;
     } catch (err) {
       // Nothing was saved: the form (and the header built from it) goes back
       // to the stored values instead of showing a number that isn't real.
@@ -159,6 +162,7 @@ export default function PlayerProfile() {
           ? err.message
           : 'Nu am putut salva modificările. Am revenit la datele salvate.',
       });
+      return false;
     } finally {
       setSaving(false);
     }
@@ -219,15 +223,10 @@ export default function PlayerProfile() {
                 <Text className="f-display text-[20px] md:text-[22px] font-extrabold" style={{ color: 'var(--c-brand-fg)' }}>{initials}</Text>
               </View>
             )}
-            actions={(
-              <Button
-                icon="check"
-                label={saving ? 'Se salvează…' : dirty ? 'Salvează' : 'Salvat'}
-                variant={dirty ? 'primary' : 'secondary'}
-                disabled={!dirty || !!numberError || !!yearError}
-                loading={saving}
-                onPress={handleSave}
-              />
+            // While there are changes the bar at the bottom carries „Salvează”:
+            // one save button on screen, not two.
+            actions={dirty ? undefined : (
+              <Button icon="check" label="Salvat" variant="secondary" disabled />
             )}
           >
             <View className="flex-row flex-wrap gap-1.5">
@@ -380,15 +379,25 @@ export default function PlayerProfile() {
         />
       ) : null}
       <ConfirmDialog
-        visible={leaveOpen}
-        destructive
-        title="Pleci fără să salvezi?"
-        message={`Modificările din profilul lui ${`${firstName} ${lastName}`.trim() || 'jucătorului'} se pierd.`}
-        confirmLabel="Pleacă fără salvare"
+        visible={leaveGuard.pending}
+        icon="save"
+        title="Salvezi modificările?"
+        message={`Ai modificări nesalvate în profilul ${`${firstName} ${lastName}`.trim() || 'jucătorului'}. Dacă pleci fără să le salvezi, se pierd.`}
+        confirmLabel="Salvează și pleacă"
         cancelLabel="Rămân pe pagină"
-        onConfirm={() => { setLeaveOpen(false); handleGoBack(); }}
-        onCancel={() => setLeaveOpen(false)}
-      />
+        loading={saving}
+        confirmDisabled={!!numberError || !!yearError}
+        onConfirm={() => { void handleSave().then((saved) => { if (saved) leaveGuard.leave(); }); }}
+        onCancel={leaveGuard.stay}
+      >
+        <Button
+          variant="danger"
+          label="Pleacă fără salvare"
+          disabled={saving}
+          onPress={() => { if (player) hydrate(player); leaveGuard.leave(); }}
+          className="self-start"
+        />
+      </ConfirmDialog>
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </View>
   );

@@ -40,7 +40,7 @@ import { isValidBillingMonth, type ComputedFee } from '../lib/feeSchedule';
 import { compareBalances, summarizeBalance } from '../lib/balanceSummary';
 import { clubBalances, clubPlayers, collectedInRange, getClubFeeSettings, playerFees } from '../services/clubFinance';
 import { notifyPaymentRecorded } from '../lib/notifications';
-import { applyCheckoutSession, feeIdMetadata, previewManualPayment, recordManualPayment } from '../services/payments';
+import { applyCheckoutSession, feeIdMetadata, PaymentReversalError, previewManualPayment, recordManualPayment, reverseManualPayment } from '../services/payments';
 
 const router = Router();
 
@@ -186,6 +186,20 @@ type PlayerPaymentFee = {
 type CurrentPlayer = {
     data: PlayerDoc;
 };
+
+/** How long „Anulează” stays on the desk after recording a payment. */
+const PAYMENT_UNDO_WINDOW_MS = 10_000;
+
+/** The „plată înregistrată” notification, held back for the undo window. */
+function notifyUnlessReversed(paymentId: number, playerId: number, amount: number, label: string) {
+    setTimeout(() => {
+        void (async () => {
+            const [row] = await db.select({ status: pgPlayerPayments.status }).from(pgPlayerPayments).where(eq(pgPlayerPayments.id, paymentId)).limit(1);
+            if (!row || !isPaidStatus(row.status)) return;
+            await notifyPaymentRecorded(playerId, amount, label);
+        })().catch((error) => console.error('[finance] payment notification failed:', error));
+    }, PAYMENT_UNDO_WINDOW_MS + 2_000).unref?.();
+}
 
 type AdminRecentPayment = {
     id: string;
@@ -725,7 +739,9 @@ async function buildAdminRecentPayments(clubId: number | null, limit = 12, teamI
             seenPayments.add(dedupeKey);
             return true;
         })
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        // A desk payment's date has no time of day, so same-day payments tie:
+        // the newest row first, or the one just recorded could fall off the list.
+        .sort((a, b) => (new Date(b.date).getTime() - new Date(a.date).getTime()) || (Number(b.id) - Number(a.id)))
         .slice(0, limit);
 }
 
@@ -1619,8 +1635,10 @@ router.post('/admin/manual-payment', async (req, res) => {
             feeIds: body.feeIds,
             paidByUserId: (req as AuthenticatedRequest).user?.id ?? null,
         });
-        res.json({ success: true, payment: inserted, allocation: plan });
-        notifyPaymentRecorded(playerId, amount, description).catch((error) => console.error('[finance] payment notification failed:', error));
+        res.json({ success: true, payment: inserted, allocation: plan, undoWindowMs: PAYMENT_UNDO_WINDOW_MS });
+        // The family hears about it once the „Anulează” window has passed, and
+        // not at all if the desk undid it in the meantime.
+        if (inserted?.id) notifyUnlessReversed(inserted.id, playerId, amount, description);
         await recordFinanceAudit({
             action: 'finance.payment.manual',
             entityType: 'player_payment',
@@ -1640,6 +1658,62 @@ router.post('/admin/manual-payment', async (req, res) => {
         });
     } catch (error) {
         handleRouteError(res, error, '[POST /api/finance/admin/manual-payment]');
+    }
+});
+
+/**
+ * Storno of a desk payment (services/payments.ts reverseManualPayment): the
+ * row stays as „reversed” and its fees are owed again. Also what „Anulează”
+ * calls right after recording. Optional { reason } goes into the audit log.
+ */
+router.post('/admin/payments/:id/reverse', async (req, res) => {
+    try {
+        const clubId = await resolveAdminFinanceClubId(req, res);
+        if (clubId === null && res.headersSent) {
+            return;
+        }
+
+        const paymentId = Number(req.params.id);
+        if (!Number.isInteger(paymentId) || paymentId <= 0) {
+            res.status(400).json({ error: 'Plata selectată este invalidă.' });
+            return;
+        }
+        const [row] = await db.select().from(pgPlayerPayments).where(eq(pgPlayerPayments.id, paymentId)).limit(1);
+        const player = row ? await getPlayerByNumericId(row.playerId) : null;
+        // Same club check as recording: an id from the client must not reach another club's books.
+        if (!row || !player || (clubId !== null && await getPlayerClubId(player) !== clubId)) {
+            res.status(404).json({ error: 'Plata nu a fost găsită.' });
+            return;
+        }
+
+        const reason = typeof (req.body as { reason?: unknown })?.reason === 'string'
+            ? String((req.body as { reason: string }).reason).trim().slice(0, 300)
+            : '';
+        const { payment, reopenedRequests } = await reverseManualPayment(paymentId);
+        res.json({ success: true, payment });
+        await recordFinanceAudit({
+            action: 'finance.payment.reversed',
+            entityType: 'player_payment',
+            entityId: paymentId,
+            clubId,
+            metadata: {
+                playerId: row.playerId,
+                amount: roundMoney(Number(row.amount)),
+                currency: DEFAULT_PAYMENT_CURRENCY,
+                method: row.method,
+                description: row.description,
+                feeIds: parseFeeIds(row.feeIds),
+                reopenedRequests,
+                reason: reason || null,
+            },
+            ...financeAuditActor(req),
+        });
+    } catch (error) {
+        if (error instanceof PaymentReversalError) {
+            res.status(error.status).json({ error: error.message });
+            return;
+        }
+        handleRouteError(res, error, '[POST /api/finance/admin/payments/:id/reverse]');
     }
 });
 

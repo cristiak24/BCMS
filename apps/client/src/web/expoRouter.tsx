@@ -9,6 +9,7 @@ import {
   useParams,
   useSearchParams,
 } from 'react-router-dom';
+import { guardNavigation } from '../../utils/leaveGuard';
 
 function normalizeHref(href: any): To {
   if (typeof href === 'string') {
@@ -44,16 +45,18 @@ export function useRouter() {
       // Back with a fallback: with no in-app history, go to `fallback`
       // (default "/", which redirects to the role's home) instead of doing
       // nothing.
-      const back = (fallback: any = '/') => {
+      // Every move first asks the page's leave guard (utils/leaveGuard), so
+      // unsaved edits aren't dropped by an in-app navigation.
+      const back = (fallback: any = '/') => guardNavigation(() => {
         if (canGoBackInApp()) navigate(-1);
         else navigate(normalizeHref(fallback), { replace: true });
-      };
+      });
       return {
-        push: (href: any) => navigate(normalizeHref(href)),
-        replace: (href: any) => navigate(normalizeHref(href), { replace: true }),
+        push: (href: any) => guardNavigation(() => navigate(normalizeHref(href))),
+        replace: (href: any) => guardNavigation(() => navigate(normalizeHref(href), { replace: true })),
         back,
         canGoBack: canGoBackInApp,
-        navigate: (href: any) => navigate(normalizeHref(href)),
+        navigate: (href: any) => guardNavigation(() => navigate(normalizeHref(href))),
         dismiss: () => back(),
       };
     },

@@ -47,8 +47,12 @@ test('a partial payment pays only its amount and the player stays in arrears', a
   await dialog.getByLabel('Suma încasată').fill('50');
   // The preview splits 50 RON onto the oldest fee only, partially.
   await expect(dialog).toContainText(/parțial/i);
-  await dialog.getByText('Înregistrează plata', { exact: true }).click();
+  // The button carries the amount: the last look before it is booked.
+  await dialog.getByText(/^Înregistrează 50,00\sRON$/).click();
   await expect(dialog).toBeHidden();
+  // A confirmation names who paid how much, with a short undo.
+  await expect(page.getByText(/^Încasat 50,00\sRON de la Luca Marin\.$/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Anulează' })).toBeVisible();
 
   const after = (await balances()).find((b) => b.playerId === players.luca)!;
   expect(after.outstanding).toBe(before.outstanding - 50);

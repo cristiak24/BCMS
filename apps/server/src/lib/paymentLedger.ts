@@ -19,8 +19,10 @@ import { roundMoney } from './money';
 
 const PAID_STATUSES = new Set(['paid', 'processed', 'succeeded', 'success']);
 const FAILED_STATUSES = new Set(['failed', 'error', 'rejected']);
-// A request row replaced by a later payment: neither money in nor money owed.
-const VOID_STATUSES = new Set(['void', 'cancelled', 'canceled', 'refunded']);
+// A request row replaced by a later payment, or a desk payment the club
+// reversed (storno, services/payments.ts reverseManualPayment): neither money
+// in nor money owed. The row stays for the history.
+const VOID_STATUSES = new Set(['void', 'cancelled', 'canceled', 'refunded', 'reversed']);
 
 export function normalizePaymentStatus(status?: string | null) {
     return String(status ?? '').trim().toLowerCase();
@@ -28,6 +30,10 @@ export function normalizePaymentStatus(status?: string | null) {
 
 export function isPaidStatus(status?: string | null) {
     return PAID_STATUSES.has(normalizePaymentStatus(status));
+}
+
+export function isReversedStatus(status?: string | null) {
+    return normalizePaymentStatus(status) === 'reversed';
 }
 
 export function isFailedStatus(status?: string | null) {

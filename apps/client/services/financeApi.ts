@@ -283,10 +283,19 @@ export const financeApi = {
         });
     },
 
-    async createManualPayment(payload: { playerId: number; amount: number; description?: string; method?: string; date?: string; feeIds?: string[] }): Promise<{ success: boolean }> {
-        return apiFetch<{ success: boolean }>('/finance/admin/manual-payment', {
+    /** `undoWindowMs`: how long the desk may still undo it (an older server omits it). */
+    async createManualPayment(payload: { playerId: number; amount: number; description?: string; method?: string; date?: string; feeIds?: string[] }): Promise<{ success: boolean; payment?: { id: number; amount: number }; undoWindowMs?: number }> {
+        return apiFetch<{ success: boolean; payment?: { id: number; amount: number }; undoWindowMs?: number }>('/finance/admin/manual-payment', {
             method: 'POST',
             body: JSON.stringify({ method: 'cash', ...payload }),
+        });
+    },
+
+    /** Storno of a desk payment: the row stays as „reversed”, its fees are owed again. */
+    async reverseManualPayment(paymentId: number | string, reason?: string): Promise<{ success: boolean }> {
+        return apiFetch<{ success: boolean }>(`/finance/admin/payments/${paymentId}/reverse`, {
+            method: 'POST',
+            body: JSON.stringify(reason ? { reason } : {}),
         });
     },
 

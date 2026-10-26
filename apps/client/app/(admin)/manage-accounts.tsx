@@ -94,6 +94,8 @@ function initialsOf(name: string, email: string) {
 
 type StatusVisual = { dot: string; fg: string; label: string };
 function statusVisual(account: ClubAdminAccount): StatusVisual {
+    // The email can fail (the invitation still exists, the link is passed on by hand): say so.
+    if (account.source === 'invite' && account.emailSent === false) return { dot: 'var(--c-danger)', fg: 'var(--c-danger-fg)', label: 'Email netrimis' };
     if (account.source === 'invite') return { dot: 'var(--c-warning)', fg: 'var(--c-warning-fg)', label: 'Invitație trimisă' };
     if (account.status === 'inactive') return { dot: 'var(--c-danger)', fg: 'var(--c-danger-fg)', label: 'Dezactivat' };
     if (account.status === 'pending_registration') return { dot: 'var(--c-sky)', fg: 'var(--c-sky-fg)', label: 'Înregistrare în curs' };
@@ -555,7 +557,15 @@ export default function ManageAccountsScreen() {
                 actions.push({ key: option.role, label: option.label, icon: option.icon, onPress: () => setPending({ kind: 'role', account, role: option.role }) });
             });
         }
-        if (isInvite) actions.push({ key: 'resend', label: 'Retrimite invitația', icon: 'send', onPress: () => setPending({ kind: 'resend', account }) });
+        if (isInvite) {
+            actions.push({
+                key: 'resend',
+                label: account.emailSent === false ? 'Retrimite sau ia linkul' : 'Retrimite invitația',
+                hint: account.emailSent === false ? 'Emailul nu a plecat. Dacă nu pleacă nici acum, primești linkul de copiat.' : undefined,
+                icon: 'send',
+                onPress: () => setPending({ kind: 'resend', account }),
+            });
+        }
         if (!isInvite && !isPrivileged && isInactive) actions.push({ key: 'reactivate', label: 'Reactivează', icon: 'restart-alt', onPress: () => setPending({ kind: 'reactivate', account }) });
         if (!isPrivileged && !isInactive) {
             actions.push(isInvite
