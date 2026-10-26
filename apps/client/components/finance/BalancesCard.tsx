@@ -389,6 +389,8 @@ export default function BalancesCard({ onPaymentRecorded, reloadKey = 0 }: { onP
                 confirmDisabled={!canSave}
                 icon="payments"
                 role="dialog"
+                // Phones: a bottom sheet with the name on top and the button always in reach.
+                sheetOnPhone
                 onConfirm={() => void savePayment()}
                 onCancel={() => { if (!saving) setTarget(null); }}
             >

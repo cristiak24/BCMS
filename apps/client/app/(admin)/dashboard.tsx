@@ -310,15 +310,35 @@ function HeaderChip({ icon, label, tone }: { icon: string; label: string; tone?:
   );
 }
 
+/**
+ * A section whose request failed and that has nothing remembered to show: says
+ * so, with a retry — never an empty list or „Totul la zi”, which read as an
+ * all-clear the page never checked.
+ */
+function LoadFailed({ title, message, onRetry }: { title: string; message: string; onRetry: () => void }) {
+  return (
+    <View className="flex-row items-center gap-3 px-4 md:px-5 pb-4" accessibilityRole="alert">
+      <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-warning-bg)' }}>
+        <MaterialIcons name="cloud-off" size={18} color="var(--c-warning-fg)" />
+      </View>
+      <View className="flex-1 min-w-0">
+        <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
+        <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{message}</Text>
+      </View>
+      <Button size="sm" icon="refresh" label="Reîncearcă" onPress={onRetry} />
+    </View>
+  );
+}
+
 /** Header aside: the very next event, with a live dot and a countdown. */
-function NextEventPanel({ event, onPress }: { event: CalendarEvent | null | undefined; onPress: (id: CalendarEvent['id']) => void }) {
+function NextEventPanel({ event, failed, onPress }: { event: CalendarEvent | null | undefined; failed?: boolean; onPress: (id: CalendarEvent['id']) => void }) {
   const panel = { boxShadow: 'var(--e-md)' } as any;
   if (!event) {
     return (
       <View className="glass rounded-[14px] px-4 py-3.5 md:w-[300px]" style={panel}>
         <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Următorul eveniment</Text>
         <Text className="text-[14px] font-medium mt-2" style={{ color: 'var(--c-ink-soft)' }}>
-          {event === undefined ? 'Se încarcă…' : 'Nimic programat în 7 zile.'}
+          {failed ? 'Programul nu s-a încărcat.' : event === undefined ? 'Se încarcă…' : 'Nimic programat în 7 zile.'}
         </Text>
       </View>
     );
@@ -419,7 +439,8 @@ export default function Dashboard() {
   // app paints last time's figures at once while the requests below refresh them.
   const [summary, setSummary] = useCachedState<DashboardSummary | null>('admin-home.summary', null);
   const [summaryFailed, setSummaryFailed] = useState(false);
-  const [events, setEvents, , eventsFallback] = useCachedState<CalendarEvent[] | null>('admin-home.events', null);
+  const [events, setEvents] = useCachedState<CalendarEvent[] | null>('admin-home.events', null);
+  const [eventsFailed, setEventsFailed] = useState(false);
   const [l12, setL12] = useCachedState<L12Overview | null>('admin-home.l12', null);
   const [pendingRequests, setPendingRequests] = useCachedState('admin-home.requests', 0);
   const [results, setResults, , resultsFallback] = useCachedState<RecentResult[] | null>('admin-home.results', null);
@@ -460,10 +481,13 @@ export default function Dashboard() {
     const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 8);
 
     setSummaryFailed(false);
+    setEventsFailed(false);
     dashboardApi.getSummary().then(setSummary).catch(() => setSummaryFailed(true));
+    // A failure keeps last time's events if there are any; with none it shows
+    // an error, not „Nimic programat” (an empty week the page never loaded).
     eventsApi.getEvents({ start: start.toISOString(), end: end.toISOString() })
       .then((rows) => setEvents(rows.filter((e) => e.status !== 'cancelled')))
-      .catch(() => eventsFallback([]));
+      .catch(() => setEventsFailed(true));
     // Staff/accountant roles get 403 on these — the home just leaves them out.
     l12Api.overview().then(setL12).catch(() => setL12(null));
     Promise.allSettled([manageAccessApi.listRequests(), familyRequestsApi.list()]).then(([access, family]) => {
@@ -472,7 +496,7 @@ export default function Dashboard() {
       setPendingRequests(a + f);
     });
     loadResults();
-  }, [loadResults, setSummary, setEvents, eventsFallback, setL12, setPendingRequests]);
+  }, [loadResults, setSummary, setEvents, setL12, setPendingRequests]);
 
   // Refetches on mount AND when the app/tab resumes after a while in the
   // background — otherwise a phone left backgrounded for a day reopens to
@@ -547,6 +571,9 @@ export default function Dashboard() {
   const role = String(session?.role ?? '').toLowerCase();
   const canSeeFinance = role === 'admin' || role === 'superadmin' || role === 'accountant';
   const loadingSummary = !summary && !summaryFailed;
+  // Failed with nothing remembered: the checks behind „Necesită atenție” never ran.
+  const summaryUnavailable = !summary && summaryFailed;
+  const eventsUnavailable = !events && eventsFailed;
   const attendanceDelta = summary?.attendanceChangePoints;
   const attendanceRate = summary?.attendanceRate == null ? null : Math.round(summary.attendanceRate);
   const attendanceTone: Tone = attendanceRate == null ? 'sky' : attendanceRate >= 75 ? 'success' : attendanceRate >= 60 ? 'warning' : 'danger';
@@ -556,15 +583,22 @@ export default function Dashboard() {
   const attentionCard = (
     <SectionCard
       title="Necesită atenție"
-      subtitle={loadingSummary ? 'Se verifică…' : attention.length ? `${plural(attention.length, 'lucru de rezolvat', 'lucruri de rezolvat')}` : 'Totul la zi'}
+      subtitle={loadingSummary ? 'Se verifică…' : summaryUnavailable ? 'Nu am putut verifica tot' : attention.length ? `${plural(attention.length, 'lucru de rezolvat', 'lucruri de rezolvat')}` : 'Totul la zi'}
       icon="notifications-active"
-      tone={attention.some((a) => a.tone === 'danger') ? 'danger' : attention.length ? 'warning' : 'success'}
+      tone={attention.some((a) => a.tone === 'danger') ? 'danger' : attention.length || summaryUnavailable ? 'warning' : 'success'}
     >
+      {summaryUnavailable ? (
+        <LoadFailed
+          title="Nu am putut verifica"
+          message="Vizele, restanțele și cererile nu s-au încărcat."
+          onRetry={loadDashboard}
+        />
+      ) : null}
       {loadingSummary ? (
         <View className="px-4 md:px-5 pb-4 gap-2">
           {[0, 1].map((i) => <Skeleton key={i} className="h-[56px] w-full rounded-[14px]" />)}
         </View>
-      ) : attention.length === 0 ? (
+      ) : attention.length === 0 ? (summaryUnavailable ? null : (
         <View className="flex-row items-center gap-3 px-4 md:px-5 pb-4">
           <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-success-bg)' }}>
             <MaterialIcons name="check" size={18} color="var(--c-success-fg)" />
@@ -574,7 +608,7 @@ export default function Dashboard() {
             <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Nimic urgent azi.</Text>
           </View>
         </View>
-      ) : (
+      )) : (
         // One list with dividers, flush under the card header (it was a bordered card per row).
         <View className="-mt-3 ui-stagger">
           {attention.map((item, index) => {
@@ -630,12 +664,17 @@ export default function Dashboard() {
                       {session?.clubName ?? 'Clubul tău'}
                     </Text>
                     <View className="flex-row flex-wrap gap-1.5 mt-3">
-                      <HeaderChip icon="event" label={weekEvents ? `${plural(weekEvents.length, 'eveniment', 'evenimente')} în 7 zile` : 'Se încarcă…'} />
+                      {eventsUnavailable
+                        ? <HeaderChip icon="cloud-off" tone="warning" label="Programul nu s-a încărcat" />
+                        : <HeaderChip icon="event" label={weekEvents ? `${plural(weekEvents.length, 'eveniment', 'evenimente')} în 7 zile` : 'Se încarcă…'} />}
                       {matchesThisWeek ? <HeaderChip icon="sports-basketball" label={`${plural(matchesThisWeek, 'meci', 'meciuri')}`} /> : null}
+                      {/* A count from a partial check would read as the whole picture. */}
                       {!loadingSummary ? (
-                        attention.length
-                          ? <HeaderChip icon="warning-amber" tone="warning" label={`${attention.length} de rezolvat`} />
-                          : <HeaderChip icon="verified" tone="success" label="Totul la zi" />
+                        summaryUnavailable
+                          ? <HeaderChip icon="cloud-off" tone="warning" label="Nu am putut verifica" />
+                          : attention.length
+                            ? <HeaderChip icon="warning-amber" tone="warning" label={`${attention.length} de rezolvat`} />
+                            : <HeaderChip icon="verified" tone="success" label="Totul la zi" />
                       ) : null}
                     </View>
                     <View className="flex-row flex-wrap gap-2 mt-3">
@@ -643,7 +682,7 @@ export default function Dashboard() {
                       <Button icon="groups" label="Lot" onPress={() => go('/admin/roster')} className="hidden sm:flex" />
                     </View>
                   </View>
-                  <NextEventPanel event={nextEvent} onPress={(id) => go(`/admin/event/${id}`)} />
+                  <NextEventPanel event={nextEvent} failed={eventsUnavailable} onPress={(id) => go(`/admin/event/${id}`)} />
                 </View>
               </View>
 
@@ -726,7 +765,9 @@ export default function Dashboard() {
                     action={{ label: 'Program', onPress: () => go('/admin/schedule') }}
                   >
                     {weekEvents ? <WeekStrip events={weekEvents} selected={selectedDay} onSelect={setSelectedDay} /> : null}
-                    {!upcoming ? (
+                    {eventsUnavailable ? (
+                      <LoadFailed title="Programul nu s-a încărcat" message="Antrenamentele și meciurile din 7 zile nu sunt afișate." onRetry={loadDashboard} />
+                    ) : !upcoming ? (
                       <View className="px-4 md:px-5 pb-4 gap-2">
                         {[0, 1, 2].map((i) => <Skeleton key={i} className="h-[60px] w-full rounded-[14px]" />)}
                       </View>

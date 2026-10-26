@@ -1664,7 +1664,8 @@ router.post('/admin/manual-payment', async (req, res) => {
 /**
  * Storno of a desk payment (services/payments.ts reverseManualPayment): the
  * row stays as „reversed” and its fees are owed again. Also what „Anulează”
- * calls right after recording. Optional { reason } goes into the audit log.
+ * calls right after recording. { reason } is required and goes into the audit
+ * log („Anulează” sends its own).
  */
 router.post('/admin/payments/:id/reverse', async (req, res) => {
     try {
@@ -1689,6 +1690,10 @@ router.post('/admin/payments/:id/reverse', async (req, res) => {
         const reason = typeof (req.body as { reason?: unknown })?.reason === 'string'
             ? String((req.body as { reason: string }).reason).trim().slice(0, 300)
             : '';
+        if (!reason) {
+            res.status(400).json({ error: 'Scrie motivul stornării.' });
+            return;
+        }
         const { payment, reopenedRequests } = await reverseManualPayment(paymentId);
         res.json({ success: true, payment });
         await recordFinanceAudit({

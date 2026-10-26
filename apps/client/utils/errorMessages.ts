@@ -31,3 +31,15 @@ export function userFacingMessage(message: string | null | undefined, status: nu
   if (ENGLISH_HINT.test(text)) return messageForStatus(status);
   return text;
 }
+
+/**
+ * For a screen whose data didn't load: a 4xx keeps its sentence (already passed
+ * through userFacingMessage), the network failure keeps its own, and a 5xx or a
+ * broken reply becomes the plain server sentence — never the server's or the
+ * browser's own text („boom: connection reset”, „Unexpected token <”).
+ */
+export function loadFailureMessage(error: unknown) {
+  const status = typeof (error as { status?: unknown })?.status === 'number' ? (error as { status: number }).status : null;
+  if (status !== null && status < 500 && error instanceof Error) return error.message;
+  return messageForStatus(500);
+}

@@ -29,6 +29,7 @@ import { DayScheduleModal } from '../../components/schedule/admin/DayScheduleMod
 import { FilterModal } from '../../components/schedule/admin/FilterModal';
 import PageHero from '../../components/admin/PageHero';
 import Button from '../../components/ui/Button';
+import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import TeamMedicalVisaModal from '../../components/schedule/admin/TeamMedicalVisaModal';
 import TeamPaymentsReportModal from '../../components/schedule/admin/TeamPaymentsReportModal';
 import { plural } from '../../utils/plural';
@@ -93,7 +94,7 @@ export default function ScheduleScreen() {
   const [showCancelled, setShowCancelled] = useState(false);
 
   const filters = useMemo(() => ({ type: filterType, coachId: filterCoachId, teamId: filterTeamId }), [filterType, filterCoachId, filterTeamId]);
-  const { events, teams, coaches, refetch } = useAdminScheduleData(currentDate, filters);
+  const { events, teams, coaches, error: loadError, refetch } = useAdminScheduleData(currentDate, filters);
 
   // ── HeaderContext integration ─────────────────────────────────────
   const { setSearchPlaceholder, setHeaderActions, setMobileFab, searchValue, setSearchValue } = useHeader();
@@ -385,7 +386,7 @@ export default function ScheduleScreen() {
           <ScheduleToolbar
             monthLabel={monthName}
             year={viewYear}
-            eventCount={scheduleView === 'week' ? weekCount : visibleEvents.length}
+            eventCount={scheduleView === 'week' ? weekCount : loadError ? null : visibleEvents.length}
             onNavigateMonth={navigatePeriod}
             onToday={goToToday}
             periodTitle={scheduleView === 'week' ? weekTitle : undefined}
@@ -440,6 +441,23 @@ export default function ScheduleScreen() {
             onQuickAdd={canManage ? handleQuickAdd : undefined}
             isMobile={isMobile}
           />
+        ) : loadError ? (
+          // Not an empty month: the month never loaded (it used to show
+          // „Nicio activitate” as if the club had nothing on).
+          <View
+            className="flex-row flex-wrap items-center gap-3 rounded-[14px] border px-4 py-4"
+            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
+            accessibilityRole="alert"
+          >
+            <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-warning-bg)' }}>
+              <MaterialIcons name="cloud-off" size={18} color="var(--c-warning-fg)" />
+            </View>
+            <View className="flex-1 min-w-[200px]">
+              <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>Programul nu s-a încărcat</Text>
+              <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{loadError}</Text>
+            </View>
+            <Button size="sm" icon="refresh" label="Reîncearcă" onPress={refetch} />
+          </View>
         ) : scheduleView === 'agenda' ? (
           <ScheduleAgendaList
             events={visibleEvents}

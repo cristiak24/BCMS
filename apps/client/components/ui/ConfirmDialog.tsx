@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from '@/src/web/reactNative';
+import { Modal, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import ModalBackdrop from './ModalBackdrop';
+import Button from './Button';
 
 type IconName = string;
 
@@ -31,6 +32,12 @@ type ConfirmDialogProps = {
      * shouldn't announce as an alert.
      */
     role?: 'alertdialog' | 'dialog';
+    /**
+     * Phones: a bottom sheet (the title fixed at the top, the body scrolling,
+     * the buttons fixed at the bottom) instead of a centred card. For forms
+     * that can be taller than a phone screen — recording a payment.
+     */
+    sheetOnPhone?: boolean;
     onConfirm: () => void;
     onCancel: () => void;
 };
@@ -58,10 +65,12 @@ export default function ConfirmDialog({
     children,
     confirmDisabled = false,
     role = 'alertdialog',
+    sheetOnPhone = false,
     onConfirm,
     onCancel,
 }: ConfirmDialogProps) {
     const cardRef = useRef<HTMLDivElement | null>(null);
+    const footerRef = useRef<HTMLDivElement | null>(null);
     const previouslyFocused = useRef<HTMLElement | null>(null);
     const [typed, setTyped] = useState('');
 
@@ -85,11 +94,15 @@ export default function ConfirmDialog({
                 ) ?? [],
             ).filter((el) => !el.hasAttribute('disabled'));
 
-        // Focus the primary action once the portal has mounted — or the
-        // confirmation field, when the action is gated on typing a phrase.
+        // Once the portal has mounted: the first field when there is one (the
+        // amount, a reason, the typed phrase); otherwise the primary action —
+        // except on a destructive dialog, which starts on „Renunță” so Enter
+        // can't delete by accident.
         const focusTimer = window.setTimeout(() => {
             const items = focusables();
-            (items.find((el) => el.tagName === 'INPUT') ?? items.at(-1))?.focus();
+            const field = items.find((el) => el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+            const cancel = footerRef.current?.querySelector<HTMLElement>('button');
+            (field ?? (destructive ? cancel : items.at(-1)))?.focus();
         }, 0);
 
         const onKeyDown = (event: KeyboardEvent) => {
@@ -125,7 +138,7 @@ export default function ConfirmDialog({
             document.body.style.overflow = overflow;
             previouslyFocused.current?.focus?.();
         };
-    }, [visible, loading, onCancel]);
+    }, [visible, loading, onCancel, destructive]);
 
     if (!visible) {
         return null;
@@ -137,103 +150,94 @@ export default function ConfirmDialog({
 
     return (
         <Modal visible onRequestClose={loading ? undefined : onCancel}>
-            {/* Backdrop */}
             <ModalBackdrop
                 onDismiss={loading ? undefined : onCancel}
-                style={{
-                    flex: 1,
-                    backgroundColor: 'rgba(2, 8, 23, 0.62)',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 20,
-                }}
+                className={sheetOnPhone ? 'items-stretch justify-end sm:items-center sm:justify-center sm:p-5' : 'items-center justify-center p-5'}
+                style={{ backgroundColor: 'rgba(2, 8, 23, 0.62)' }}
             >
-                {/* Card: a click inside doesn't reach the backdrop's own target check */}
+                {/* Never taller than the screen: the header and the buttons stay in
+                    view and the body scrolls (a payment with four fees ran ~940px
+                    on a 812px phone, with the name and the button cut off). */}
                 <div
                     ref={cardRef}
                     role={role}
                     aria-modal="true"
                     aria-label={title}
                     aria-describedby={message ? 'confirm-dialog-message' : undefined}
-                    className="w-full max-w-[440px] rounded-3xl p-6"
+                    className={`flex flex-col w-full ${sheetOnPhone
+                        ? 'max-h-[92dvh] rounded-t-[20px] sm:max-w-[440px] sm:max-h-[calc(100dvh-40px)] sm:rounded-[18px] pb-[env(safe-area-inset-bottom)]'
+                        : 'max-w-[440px] max-h-[calc(100dvh-40px)] rounded-[18px]'}`}
                     style={{
                         backgroundColor: 'var(--c-surface)',
                         border: '1px solid var(--c-border)',
-                        boxShadow: '0 28px 70px rgba(2, 8, 23, 0.35)',
+                        boxShadow: 'var(--e-lg)',
                     }}
                 >
-                    <View className="flex-row items-start gap-4">
+                    <View className="flex-row items-center gap-4 px-6 pt-6 pb-3 shrink-0">
                         <View
-                            className="h-12 w-12 rounded-2xl items-center justify-center"
+                            className="h-12 w-12 rounded-[14px] items-center justify-center shrink-0"
                             style={{ backgroundColor: accentSoft }}
                         >
                             <MaterialIcons name={resolvedIcon as never} size={26} color={accent} />
                         </View>
-                        <View className="flex-1">
-                            <Text className="text-lg font-black" style={{ color: 'var(--c-ink)' }}>{title}</Text>
-                            {message ? (
-                                <Text
-                                    nativeID="confirm-dialog-message"
-                                    className="mt-2 leading-5"
-                                    style={{ color: 'var(--c-muted)' }}
-                                >
-                                    {message}
+                        <Text accessibilityRole="header" className="flex-1 min-w-0 text-[18px] font-bold leading-snug" style={{ color: 'var(--c-ink)' }}>{title}</Text>
+                    </View>
+
+                    <View className="min-h-0 flex-1 overflow-y-auto px-6 pb-1">
+                        {/* One non-shrinking block: flex children of the scroller would
+                            squeeze (and overlap) instead of scrolling. */}
+                        <View className="shrink-0">
+                        {message ? (
+                            <Text
+                                nativeID="confirm-dialog-message"
+                                className="leading-5"
+                                style={{ color: 'var(--c-muted)' }}
+                            >
+                                {message}
+                            </Text>
+                        ) : null}
+
+                        {children ? <View className={message ? 'mt-5' : ''}>{children}</View> : null}
+
+                        {requireTypedConfirmation ? (
+                            <View className="mt-5 gap-1.5">
+                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>
+                                    Scrie <Text className="font-bold" style={{ color: 'var(--c-ink)' }}>{requireTypedConfirmation}</Text> ca să confirmi
                                 </Text>
-                            ) : null}
+                                <TextInput
+                                    value={typed}
+                                    onChangeText={setTyped}
+                                    autoCapitalize="characters"
+                                    autoCorrect={false}
+                                    accessibilityLabel={`Scrie ${requireTypedConfirmation} ca să confirmi`}
+                                    onSubmitEditing={() => { if (!confirmBlocked && !loading) onConfirm(); }}
+                                    className="rounded-[10px] border px-3.5 h-11 text-[14px]"
+                                    style={{ backgroundColor: 'var(--c-surface-2)', borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}
+                                />
+                            </View>
+                        ) : null}
                         </View>
                     </View>
 
-                    {children ? <View className="mt-5">{children}</View> : null}
-
-                    {requireTypedConfirmation ? (
-                        <View className="mt-5 gap-1.5">
-                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>
-                                Scrie <Text className="font-bold" style={{ color: 'var(--c-ink)' }}>{requireTypedConfirmation}</Text> ca să confirmi
-                            </Text>
-                            <TextInput
-                                value={typed}
-                                onChangeText={setTyped}
-                                autoCapitalize="characters"
-                                autoCorrect={false}
-                                accessibilityLabel={`Scrie ${requireTypedConfirmation} ca să confirmi`}
-                                onSubmitEditing={() => { if (!confirmBlocked && !loading) onConfirm(); }}
-                                className="rounded-[10px] border px-3.5 h-11 text-[14px]"
-                                style={{ backgroundColor: 'var(--c-surface-2)', borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}
-                            />
-                        </View>
-                    ) : null}
-
-                    <View className="mt-6 flex-row justify-end gap-3">
-                        <Pressable
+                    {/* The system's buttons: the destructive one is danger-fg on danger-bg
+                        (6:1 light, 8.7:1 dark); white on --c-danger was 3.8:1 / 2.8:1. */}
+                    <div ref={footerRef} className="flex flex-row justify-end gap-3 px-6 pt-4 pb-6 shrink-0">
+                        <Button
+                            label={cancelLabel}
                             onPress={onCancel}
                             disabled={loading}
-                            accessibilityRole="button"
-                            className="rounded-2xl border px-5 py-3 min-h-[44px] items-center justify-center"
-                            style={{
-                                borderColor: 'var(--c-border-strong)',
-                                backgroundColor: 'var(--c-surface)',
-                                opacity: loading ? 0.6 : 1,
-                            }}
-                        >
-                            <Text className="font-bold" style={{ color: 'var(--c-ink-soft)' }}>{cancelLabel}</Text>
-                        </Pressable>
-                        <Pressable
+                        />
+                        <Button
+                            variant={destructive ? 'danger' : 'primary'}
+                            label={confirmLabel}
                             onPress={onConfirm}
-                            disabled={loading || confirmBlocked}
-                            accessibilityRole="button"
-                            className="rounded-2xl px-5 py-3 min-h-[44px] min-w-[120px] items-center justify-center"
-                            style={{
-                                backgroundColor: destructive ? 'var(--c-danger)' : 'var(--c-brand-surface)',
-                                opacity: loading ? 0.7 : confirmBlocked ? 0.45 : 1,
-                            }}
-                        >
-                            {loading ? (
-                                <ActivityIndicator size="small" color="var(--c-surface)" />
-                            ) : (
-                                <Text className="font-bold" style={{ color: 'var(--c-on-brand)' }}>{confirmLabel}</Text>
-                            )}
-                        </Pressable>
-                    </View>
+                            loading={loading}
+                            disabled={confirmBlocked}
+                            // The phone sheet's confirm takes the rest of the row, so
+                            // „Înregistrează 340,00 RON” is never cut to „Înregistrează …”.
+                            className={sheetOnPhone ? 'flex-1 sm:flex-none' : ''}
+                        />
+                    </div>
                 </div>
             </ModalBackdrop>
         </Modal>

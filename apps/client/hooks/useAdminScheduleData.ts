@@ -3,6 +3,7 @@ import { useFocusEffect } from '@/src/web/reactNavigationNative';
 import { eventsApi, CalendarEvent } from '../services/eventsApi';
 import { teamsApi, Team } from '../services/teamsApi';
 import { apiFetch } from '../services/apiClient';
+import { loadFailureMessage } from '../utils/errorMessages';
 
 export type CoachUser = { id: number; name: string; role: string };
 
@@ -47,7 +48,7 @@ export function useAdminScheduleData(currentDate: Date, filters: ScheduleFilters
       setTeams(teamsData);
     } catch (err) {
       console.error('Fetch schedule error:', err);
-      setError(err instanceof Error ? err.message : 'Nu am putut încărca programul.');
+      setError(loadFailureMessage(err));
     } finally {
       setLoading(false);
     }

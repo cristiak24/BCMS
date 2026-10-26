@@ -65,6 +65,12 @@ const defaultUses = (who: Who) => (who === 'parent' ? '2' : '25');
 
 const withTeam = (who: Who) => who === 'parent' || who === 'player';
 
+// Which methods take the chosen team along: the server keeps a team on a group
+// code only for parents, and an email invitation never carries one.
+const carriesTeam = (how: How | 'link', who: Who) => how === 'team-code' || how === 'link' || (how === 'group-code' && who === 'parent');
+
+const teamDroppedNote = (teamName: string) => `Nu ține de echipa ${teamName}: adaugă contul în echipă după ce se creează.`;
+
 const formatExpiry = formatDateTime;
 
 function signupLink(token: string) {
@@ -72,7 +78,12 @@ function signupLink(token: string) {
 }
 
 /** What gets copied, what the share sheet sends, and what happens on the other side. */
-function describe(result: Result, who: Who) {
+function describe(result: Result, who: Who, droppedTeam: string | null) {
+    const details = describeResult(result, who);
+    return droppedTeam ? { ...details, next: `${details.next} ${teamDroppedNote(droppedTeam)}` } : details;
+}
+
+function describeResult(result: Result, who: Who) {
     switch (result.kind) {
         case 'team-code': {
             const code = formatTeamCode(result.team.code);
@@ -200,15 +211,17 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                 ? { key: 'team-code', label: `Folosește codul echipei ${team.name}`, hint: `${formatTeamCode(team.code)} · nu expiră. Cererile le aprobi tu sau antrenorul echipei.`, icon: 'vpn-key' }
                 : { key: 'team-code', label: `Codul echipei ${team.name}`, hint: 'Înscrierile cu codul echipei sunt oprite. Le pornești din Cereri › Codurile echipelor.', icon: 'vpn-key', disabled: true });
         }
+        // A team chosen in step 1 that this method won't carry: said here, not discovered later.
+        const dropped = (key: How) => (team && !carriesTeam(key, who) ? ` ${teamDroppedNote(team.name)}` : '');
         list.push({
             key: 'group-code',
             label: 'Cod nou de trimis în grup',
-            hint: who === 'parent'
+            hint: (who === 'parent'
                 ? 'Un cod per familie (2 conturi). Intră direct în club.'
-                : 'Un cod pentru un grup (până la 25 de conturi). Intră direct în club.',
+                : 'Un cod pentru un grup (până la 25 de conturi). Intră direct în club.') + dropped('group-code'),
             icon: 'confirmation-number',
         });
-        list.push(email);
+        list.push({ ...email, hint: email.hint + dropped('email') });
         return list;
     })();
 
@@ -315,7 +328,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
         }
     };
 
-    const details = result ? describe(result, who) : null;
+    const details = result ? describe(result, who, team && !carriesTeam(result.kind, who) ? team.name : null) : null;
     const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
     const copy = async () => {
@@ -388,7 +401,8 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
     if (!visible) return null;
 
     const summary: Record<Step, string | null> = {
-        1: step > 1 ? `${WHO_LABEL[who]}${team ? ` · ${team.name}` : ''}` : null,
+        // The team only when the chosen method keeps it (not on an email or a player's group code).
+        1: step > 1 ? `${WHO_LABEL[who]}${team && carriesTeam(result?.kind ?? how, who) ? ` · ${team.name}` : ''}` : null,
         2: step > 2 ? (result?.kind === 'link' ? 'Link de înscriere' : methods.find((item) => item.key === how)?.label ?? null) : null,
         3: null,
     };
@@ -416,7 +430,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                     aria-modal="true"
                     aria-labelledby="invite-flow-title"
                     className="ui-rise flex flex-col w-full h-[100dvh] sm:h-auto sm:max-h-[min(720px,calc(100dvh-48px))] sm:max-w-[760px] sm:rounded-[18px] sm:border overflow-hidden"
-                    style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: '0 28px 70px rgba(2, 8, 23, 0.35)' }}
+                    style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-lg)' }}
                 >
                     {/* Header */}
                     <View className="flex-row items-center gap-3 px-4 sm:px-5 h-14 border-b shrink-0 pt-[env(safe-area-inset-top)]" style={{ borderColor: 'var(--c-border)' }}>
@@ -508,7 +522,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                                                 </View>
                                                 <Text className="text-[12px] font-medium mt-1.5" style={{ color: 'var(--c-faint)' }}>
                                                     {teamId == null
-                                                        ? 'Fără echipă, cel invitat rămâne neîncadrat până îl adaugi tu într-o echipă.'
+                                                        ? 'Fără echipă, contul nu intră în nicio echipă până îl adaugi tu într-una.'
                                                         : 'Cu echipa aleasă poți trimite direct codul echipei.'}
                                                 </Text>
                                             </View>

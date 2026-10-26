@@ -31,6 +31,7 @@ import {
 } from '../../components/roster/rosterHelpers';
 import { ATTENDANCE_PERIOD_LABEL, formatAttendanceRate } from '../../utils/attendanceRate';
 import { plural } from '../../utils/plural';
+import { loadFailureMessage } from '../../utils/errorMessages';
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 100];
 const DEFAULT_PAGE_SIZE = 12;
@@ -130,7 +131,7 @@ export default function RosterScreen() {
     } catch (fetchError: any) {
       if (request !== pageRequest.current) return;
       console.error('Fetch roster page error:', fetchError);
-      setError(fetchError?.message || 'Nu am putut încărca datele lotului.');
+      setError(loadFailureMessage(fetchError));
     } finally {
       if (request === pageRequest.current) setPageLoading(false);
     }
@@ -143,7 +144,7 @@ export default function RosterScreen() {
       setTeams(allTeams);
     } catch (fetchError: any) {
       console.error('Fetch roster summary error:', fetchError);
-      setError(fetchError?.message || 'Nu am putut încărca datele lotului.');
+      setError(loadFailureMessage(fetchError));
       setSummary(null);
     }
   }, []);

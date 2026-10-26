@@ -1034,15 +1034,20 @@ export default function FinancialSettingsPage() {
                 message="Plata rămâne în istoric, marcată „Stornată”, iar taxele pe care le acoperea redevin de plată. Stornarea ajunge în jurnal."
                 confirmLabel="Stornează"
                 loading={reversing}
+                // The reason is required: the journal must say why money left the books.
+                confirmDisabled={!reverseReason.trim()}
                 onConfirm={() => void submitReverse()}
                 onCancel={() => { if (!reversing) setPendingReverse(null); }}
             >
+                <Text className="text-[12px] font-semibold mb-1.5" style={{ color: 'var(--c-muted)' }}>Motivul stornării</Text>
                 <TextInput
                     value={reverseReason}
                     onChangeText={setReverseReason}
-                    placeholder="Motiv (opțional), ex. sumă greșită"
+                    placeholder="ex. sumă greșită, plată dublă"
                     placeholderTextColor={dash.faint}
-                    accessibilityLabel="Motivul stornării"
+                    accessibilityLabel="Motivul stornării (obligatoriu)"
+                    aria-required
+                    onSubmitEditing={() => { if (reverseReason.trim() && !reversing) void submitReverse(); }}
                     maxLength={300}
                     className="h-10 rounded-[10px] px-3 border text-[13px]"
                     style={{ borderColor: 'var(--c-border-strong, var(--c-border))', color: 'var(--c-ink)', backgroundColor: 'var(--c-surface-2, var(--c-surface))' } as any}

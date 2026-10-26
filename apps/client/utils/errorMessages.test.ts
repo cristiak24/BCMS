@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { messageForStatus, userFacingMessage } from './errorMessages';
+import { loadFailureMessage, messageForStatus, userFacingMessage } from './errorMessages';
 
 test('server English becomes Romanian for its status', () => {
   assert.equal(userFacingMessage('Event not found', 404), messageForStatus(404));
@@ -20,4 +20,12 @@ test('Romanian server messages pass through, even without diacritics', () => {
 test('an empty body gets the sentence for its status', () => {
   assert.equal(userFacingMessage('', 429), messageForStatus(429));
   assert.equal(userFacingMessage(null, 503), messageForStatus(503));
+});
+
+test('a failed load hides the server\'s own text for a 5xx or a broken reply', () => {
+  const apiError = (message: string, status: number) => Object.assign(new Error(message), { status });
+  assert.equal(loadFailureMessage(apiError('boom: connection reset', 500)), messageForStatus(500));
+  assert.equal(loadFailureMessage(new SyntaxError('Unexpected token <')), messageForStatus(500));
+  assert.equal(loadFailureMessage(apiError('Nu ai acces la această acțiune.', 403)), 'Nu ai acces la această acțiune.');
+  assert.equal(loadFailureMessage(apiError('Nu ne putem conecta la server.', 0)), 'Nu ne putem conecta la server.');
 });

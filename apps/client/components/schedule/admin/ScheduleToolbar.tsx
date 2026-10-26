@@ -152,7 +152,8 @@ export function ScheduleToolbar({
   periodUnit?: 'month' | 'week';
   monthLabel: string;
   year: number;
-  eventCount: number;
+  /** null: the period didn't load — no count rather than „0 evenimente”. */
+  eventCount: number | null;
   onNavigateMonth: (delta: number) => void;
   onToday: () => void;
   view: ScheduleView;
@@ -336,7 +337,7 @@ export function ScheduleToolbar({
     // Two rows: the period stepper, then filters. The view switcher sits on
     // the page's tab row (Lunar / Prezență / Notare) and the advanced-filter
     // button leads the chip row, so neither needs a row of its own.
-    const countLabel = `${plural(eventCount, 'eveniment', 'evenimente')}`;
+    const countLabel = eventCount == null ? '' : `${plural(eventCount, 'eveniment', 'evenimente')}`;
     return (
       <View>
         {/* Export and FRB sync had no way in on a phone: the mobile row only drew the filter button. */}
@@ -417,7 +418,7 @@ export function ScheduleToolbar({
       <View className="flex-row items-center gap-3">
         {monthNav}
         <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>
-          {plural(eventCount, 'eveniment', 'evenimente')}
+          {eventCount == null ? '' : plural(eventCount, 'eveniment', 'evenimente')}
         </Text>
         <View className="ml-auto flex-row items-center gap-2">
           {viewSwitcher}
