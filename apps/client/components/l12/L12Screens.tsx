@@ -1,6 +1,7 @@
 import { formatDate as formatDisplayDate, parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
+import ModalBackdrop from '../ui/ModalBackdrop';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { l12Api, type L12Event, type L12Lineup, type L12Overview, type L12OverviewMatch, type L12Team } from '../../services/l12Api';
@@ -99,9 +100,8 @@ function FiltersSheet({ visible, onClose, onReset, children }: { visible: boolea
   if (!visible) return null;
   return (
     <Modal visible transparent onRequestClose={onClose}>
-      <Pressable accessibilityLabel="Închide filtrele" onPress={onClose} className="flex-1 justify-end" style={{ backgroundColor: 'rgba(2, 8, 23, 0.55)' }}>
-        <Pressable
-          onPress={(event: any) => event.stopPropagation()}
+      <ModalBackdrop onDismiss={onClose} className="flex-1 justify-end" style={{ backgroundColor: 'rgba(2, 8, 23, 0.55)' }}>
+        <View
           accessibilityRole={'dialog' as any}
           accessibilityLabel="Filtre"
           className="ui-rise w-full rounded-t-[20px] border overflow-hidden pb-[env(safe-area-inset-bottom)]"
@@ -115,8 +115,8 @@ function FiltersSheet({ visible, onClose, onReset, children }: { visible: boolea
           <View className="px-4 pb-4">
             <Button variant="primary" label="Gata" onPress={onClose} className="w-full" />
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </ModalBackdrop>
     </Modal>
   );
 }
@@ -127,7 +127,7 @@ function BackButton({ label, onPress }: { label: string; onPress: () => void }) 
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Înapoi la ${label}`}
-      className="ui-press self-start h-9 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5"
+      className="ui-press self-start h-9 [@media(pointer:coarse)]:h-10 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
     >
       <MaterialIcons name="chevron-left" size={18} color="var(--c-ink-soft)" />

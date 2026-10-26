@@ -10,6 +10,7 @@ import AppHeader from '../../components/AppHeader';
 import { InstallBanner } from '../../components/pwa/InstallApp';
 import { MobileBottomNavigation, MobileNavigationSheet } from '../../components/MobileNavigation';
 import { privacyRequestsApi } from '../../services/privacyApi';
+import { navSectionPath } from '../../utils/navSection';
 
 // Pages that read the header search (useHeader().searchValue). Everywhere else
 // the field is hidden: on Acasă, Echipă, Jucător, Cont nou, Jurnal… typing in it
@@ -151,7 +152,9 @@ function AdminLayoutContent() {
     );
 
     const isDashboard = pathname.includes('dashboard') || pathname === '/admin';
-    const normalizedAdminPath = getAdminPath(pathname);
+    // Menus mark the section a detail page belongs to (Jucător → Lot, Eveniment → Program).
+    const sectionPath = navSectionPath(pathname);
+    const normalizedAdminPath = getAdminPath(sectionPath);
     const primaryMobileMatches = mobileNavItems.map((item) => item.match);
     const moreIsActive = availableMenuItems.some((item) => {
         const section = item.href.split('/').filter(Boolean).pop() ?? '';
@@ -222,7 +225,7 @@ function AdminLayoutContent() {
                 <div className="lg:hidden">
                     <MobileBottomNavigation
                         items={mobileNavItems}
-                        pathname={pathname}
+                        pathname={sectionPath}
                         isDashboard={isDashboard}
                         moreIsActive={moreIsActive}
                         bottomInset={0}
@@ -232,7 +235,7 @@ function AdminLayoutContent() {
                     <MobileNavigationSheet
                         visible={mobileMenuOpen}
                         items={availableMenuItems}
-                        activeHref={activeAdminItem.href}
+                        activeHref={getActiveAdminItem(sectionPath, menuItems).href}
                         onClose={() => setMobileMenuOpen(false)}
                         bottomInset={0}
                     />

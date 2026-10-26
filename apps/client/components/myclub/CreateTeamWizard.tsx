@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, TextInput, ActivityIndicator, Modal, ScrollView } from '@/src/web/reactNative';
+import ModalBackdrop from '../ui/ModalBackdrop';
 import { RefreshCw, Plus, X, Check, Search } from 'lucide-react';
 import { basketballApi } from '../../services/basketballApi';
 import { teamsApi, Team, Coach, TeamGender, TeamLevel, Player } from '../../services/teamsApi';
@@ -177,11 +178,10 @@ export default function CreateTeamWizard({
 
     return (
         <Modal visible transparent animationType={isMobile ? 'slide' : 'fade'} onRequestClose={onClose}>
-        <Pressable className={`flex-1 bg-[#0E2041]/40 ${isMobile ? 'justify-end' : 'items-center justify-center px-4'}`} onPress={creating ? undefined : onClose}>
-            <Pressable
+        <ModalBackdrop className={`flex-1 bg-[#0E2041]/40 ${isMobile ? 'justify-end' : 'items-center justify-center px-4'}`} onDismiss={creating ? undefined : onClose} >
+            <View
                 className={`bg-white w-full shadow-2xl overflow-hidden flex-col ${isMobile ? 'rounded-t-[24px]' : 'rounded-[20px] max-w-[600px]'}`}
                 style={{ maxHeight: isMobile ? '94%' : '90%' } as any}
-                onPress={(event: any) => event.stopPropagation?.()}
             >
                 <View className="flex-row items-center justify-between px-6 pt-6 pb-1">
                     <Text className="text-[18px] font-black text-[#0E2041]">Creează echipă</Text>
@@ -443,8 +443,8 @@ export default function CreateTeamWizard({
                         )}
                     </Pressable>
                 </View>
-            </Pressable>
-        </Pressable>
+            </View>
+        </ModalBackdrop>
         </Modal>
     );
 }

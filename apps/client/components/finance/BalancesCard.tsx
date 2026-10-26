@@ -388,6 +388,7 @@ export default function BalancesCard({ onPaymentRecorded, reloadKey = 0 }: { onP
                 loading={saving}
                 confirmDisabled={!canSave}
                 icon="payments"
+                role="dialog"
                 onConfirm={() => void savePayment()}
                 onCancel={() => { if (!saving) setTarget(null); }}
             >
@@ -411,9 +412,9 @@ export default function BalancesCard({ onPaymentRecorded, reloadKey = 0 }: { onP
                                     <Pressable
                                         key={fee.id}
                                         onPress={() => toggleFee(fee)}
-                                        // The web shim renders Pressable as role=button: a toggle
-                                        // button announces its state through aria-pressed.
-                                        {...({ 'aria-pressed': checked } as any)}
+                                        // Ticking a fee is a checkbox, not a toggle button.
+                                        accessibilityRole={'checkbox' as any}
+                                        accessibilityState={{ checked }}
                                         accessibilityLabel={`${fee.label}, ${money(fee.amount, currency)}`}
                                         // shrink-0: inside the scrolling list a row must keep its height, or its two lines overlap.
                                         className={`flex-row items-center gap-2.5 px-3 py-2 shrink-0 ${index ? 'border-t' : ''}`}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
+import ModalBackdrop from './ModalBackdrop';
 
 type IconName = string;
 
@@ -24,6 +25,12 @@ type ConfirmDialogProps = {
     children?: ReactNode;
     /** Disables confirm without a spinner (e.g. a required field is empty). */
     confirmDisabled?: boolean;
+    /**
+     * `alertdialog` (default) for a question that interrupts; `dialog` for a
+     * form the person fills in (recording a payment), which a screen reader
+     * shouldn't announce as an alert.
+     */
+    role?: 'alertdialog' | 'dialog';
     onConfirm: () => void;
     onCancel: () => void;
 };
@@ -50,6 +57,7 @@ export default function ConfirmDialog({
     requireTypedConfirmation,
     children,
     confirmDisabled = false,
+    role = 'alertdialog',
     onConfirm,
     onCancel,
 }: ConfirmDialogProps) {
@@ -130,9 +138,8 @@ export default function ConfirmDialog({
     return (
         <Modal visible onRequestClose={loading ? undefined : onCancel}>
             {/* Backdrop */}
-            <Pressable
-                accessibilityLabel="Închide dialogul"
-                onPress={loading ? undefined : onCancel}
+            <ModalBackdrop
+                onDismiss={loading ? undefined : onCancel}
                 style={{
                     flex: 1,
                     backgroundColor: 'rgba(2, 8, 23, 0.62)',
@@ -141,14 +148,13 @@ export default function ConfirmDialog({
                     padding: 20,
                 }}
             >
-                {/* Card — stopPropagation so taps inside don't dismiss */}
+                {/* Card: a click inside doesn't reach the backdrop's own target check */}
                 <div
                     ref={cardRef}
-                    role="alertdialog"
+                    role={role}
                     aria-modal="true"
                     aria-label={title}
                     aria-describedby={message ? 'confirm-dialog-message' : undefined}
-                    onClick={(event) => event.stopPropagation()}
                     className="w-full max-w-[440px] rounded-3xl p-6"
                     style={{
                         backgroundColor: 'var(--c-surface)',
@@ -229,7 +235,7 @@ export default function ConfirmDialog({
                         </Pressable>
                     </View>
                 </div>
-            </Pressable>
+            </ModalBackdrop>
         </Modal>
     );
 }

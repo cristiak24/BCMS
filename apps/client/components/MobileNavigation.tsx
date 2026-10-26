@@ -145,6 +145,7 @@ export function MobileNavigationSheet({
                     }}
                     accessibilityRole="button"
                     accessibilityState={{ selected: active }}
+                    {...({ 'aria-current': active ? 'page' : undefined } as any)}
                     accessibilityLabel={item.label}
                     className="ui-press min-h-[64px] rounded-[14px] px-3 py-3 flex-row items-center gap-2.5 border text-left"
                     style={{

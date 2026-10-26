@@ -222,7 +222,7 @@ function TeamCodes({ codes, onRotate, onToggle, onNotify }: { codes: TeamJoinCod
                 </Text>
                 <View className="flex-row items-center gap-2">
                   {accepting ? (
-                    <Pressable onPress={() => share(team)} accessibilityRole="button" accessibilityLabel={`Trimite codul echipei ${team.name}`} className="ui-press h-8 px-2.5 rounded-[9px] flex-row items-center gap-1" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+                    <Pressable onPress={() => share(team)} accessibilityRole="button" accessibilityLabel={`Trimite codul echipei ${team.name}`} className="ui-press h-8 [@media(pointer:coarse)]:h-10 px-2.5 rounded-[9px] flex-row items-center gap-1" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
                       <MaterialIcons name="share" size={14} color="var(--c-brand-fg)" />
                       <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Trimite</Text>
                     </Pressable>
@@ -232,7 +232,7 @@ function TeamCodes({ codes, onRotate, onToggle, onNotify }: { codes: TeamJoinCod
                     onValueChange={(value: boolean) => onToggle(team, value)}
                     accessibilityLabel={`Înscrieri cu codul echipei ${team.name}`}
                   />
-                  <Pressable onPress={() => onRotate(team)} accessibilityRole="button" accessibilityLabel={`Schimbă codul echipei ${team.name}`} className="ui-press w-8 h-8 rounded-[9px] items-center justify-center">
+                  <Pressable onPress={() => onRotate(team)} accessibilityRole="button" accessibilityLabel={`Schimbă codul echipei ${team.name}`} className="ui-press tap-40 w-8 h-8 rounded-[9px] items-center justify-center">
                     <MaterialIcons name="refresh" size={16} color="var(--c-faint)" />
                   </Pressable>
                 </View>

@@ -1,6 +1,7 @@
 import { parseApiDate } from '@/utils/dates';
 import { useEffect, useState, type ReactNode } from 'react';
 import { View, Text, Modal, Pressable, ActivityIndicator } from '@/src/web/reactNative';
+import ModalBackdrop from '../../ui/ModalBackdrop';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { CalendarEvent, eventsApi } from '../../../services/eventsApi';
 import { useSession } from '../../../context/AuthContext';
@@ -130,13 +131,12 @@ export function PlayerEventDetailModal({
 
   return (
     <Modal visible={event !== null} transparent animationType={isMobile ? 'slide' : 'fade'} onRequestClose={onClose}>
-      <Pressable
+      <ModalBackdrop
         className={`flex-1 ${isMobile ? 'justify-end' : 'items-center justify-center p-5'}`}
         style={{ backgroundColor: 'rgba(10,15,28,0.55)' }}
-        onPress={onClose}
+        onDismiss={onClose}
       >
-        <Pressable
-          onPress={(e: any) => e.stopPropagation()}
+        <View
           className={`w-full overflow-hidden border flex-col ${isMobile ? 'rounded-t-[20px]' : 'rounded-[18px]'}`}
           style={{
             backgroundColor: 'var(--c-surface)',
@@ -299,8 +299,8 @@ export function PlayerEventDetailModal({
               ) : null}
             </>
           ) : null}
-        </Pressable>
-      </Pressable>
+        </View>
+      </ModalBackdrop>
     </Modal>
   );
 }

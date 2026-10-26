@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Share, SquarePlus, EllipsisVertical, Compass } from 'lucide-react';
 import { Modal, Pressable, Text, View } from '@/src/web/reactNative';
+import ModalBackdrop from '../ui/ModalBackdrop';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import {
     dismissInstallBanner, useInstallApp, wasInstallBannerDismissed,
@@ -60,9 +61,8 @@ export function InstallInstructionsSheet({ visible, onClose }: { visible: boolea
 
     return (
         <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-            <Pressable className="ui-backdrop flex-1 justify-end lg:justify-center lg:items-center" style={{ backgroundColor: 'rgba(10,15,28,0.5)' }} onPress={onClose}>
-                <Pressable
-                    onPress={(event: any) => event?.stopPropagation?.()}
+            <ModalBackdrop className="ui-backdrop flex-1 justify-end lg:justify-center lg:items-center" style={{ backgroundColor: 'rgba(10,15,28,0.5)' }} onDismiss={onClose} >
+                <View
                     className="ui-sheet w-full lg:max-w-[440px] rounded-t-[22px] lg:rounded-[20px] px-5 pt-3 border"
                     style={{
                         backgroundColor: 'var(--c-surface)',
@@ -110,8 +110,8 @@ export function InstallInstructionsSheet({ visible, onClose }: { visible: boolea
                             </View>
                         ))}
                     </View>
-                </Pressable>
-            </Pressable>
+                </View>
+            </ModalBackdrop>
         </Modal>
     );
 }

@@ -2,6 +2,7 @@ import { formatPaymentWhen } from '../../../utils/paymentDate';
 import { parseApiDate } from '@/utils/dates';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, Modal, Platform } from '@/src/web/reactNative';
+import ModalBackdrop from '../../../components/ui/ModalBackdrop';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import * as DocumentPicker from '@/src/web/documentPicker';
 import { financeApi, FinancialSettings, FinancialDocument, StripeAdminConfig, AdminRecentPayment, type FinanceSummary } from '../../../services/financeApi';
@@ -174,19 +175,18 @@ function ModalShell({ visible, onClose, children, maxWidth = 420 }: {
 }) {
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-            <Pressable
+            <ModalBackdrop
                 className="flex-1 items-center justify-center p-4"
                 style={{ backgroundColor: 'rgba(10,15,28,0.5)' }}
-                onPress={onClose}
+                onDismiss={onClose}
             >
-                <Pressable
+                <View
                     className="w-full rounded-[16px] p-5 border dash-fade-in"
                     style={{ maxWidth, maxHeight: '90vh', overflowY: 'auto', backgroundColor: dash.surface, borderColor: dash.hairline, ...dash.shadow.lift } as any}
-                    onPress={(event: any) => event.stopPropagation()}
                 >
                     {children}
-                </Pressable>
-            </Pressable>
+                </View>
+            </ModalBackdrop>
         </Modal>
     );
 }

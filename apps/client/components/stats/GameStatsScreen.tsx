@@ -99,7 +99,7 @@ export default function GameStatsScreen() {
 
   const header = data ? (
     <View className="mb-4 gap-2">
-      <Pressable onPress={() => router.back()} accessibilityRole="button" className="ui-press self-start h-9 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
+      <Pressable onPress={() => router.back()} accessibilityRole="button" className="ui-press self-start h-9 [@media(pointer:coarse)]:h-10 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
         <MaterialIcons name="chevron-left" size={18} color="var(--c-ink-soft)" />
         <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Înapoi</Text>
       </Pressable>

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Modal, Pressable, Text, View } from '@/src/web/reactNative';
+import ModalBackdrop from './ModalBackdrop';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 
 /**
@@ -42,14 +43,12 @@ export default function ActionSheet({
 
   return (
     <Modal visible transparent onRequestClose={onClose}>
-      <Pressable
-        accessibilityLabel="Închide meniul"
-        onPress={onClose}
+      <ModalBackdrop
+        onDismiss={onClose}
         className="flex-1 justify-end sm:justify-center items-center sm:p-6"
         style={{ backgroundColor: 'rgba(2, 8, 23, 0.55)' }}
       >
-        <Pressable
-          onPress={(e: any) => e.stopPropagation()}
+        <View
           accessibilityRole={'menu' as any}
           className="ui-rise w-full sm:max-w-[360px] rounded-t-[20px] sm:rounded-[18px] border overflow-hidden pb-[env(safe-area-inset-bottom)]"
           style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: '0 28px 70px rgba(2, 8, 23, 0.35)' } as any}
@@ -87,8 +86,8 @@ export default function ActionSheet({
               <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Închide</Text>
             </Pressable>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </ModalBackdrop>
     </Modal>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, Text, View } from '@/src/web/reactNative';
+import ModalBackdrop from '../ui/ModalBackdrop';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { familyApi } from '../../services/familyApi';
 import { birthYearRange, ignoredBirthYears, parseRosterLines, type RosterOrder } from '../../utils/rosterParse';
@@ -56,16 +57,14 @@ export default function BulkAddPlayersDialog({
 
   return (
     <Modal visible onRequestClose={saving ? undefined : onClose}>
-      <Pressable
-        accessibilityLabel="Închide"
-        onPress={saving ? undefined : onClose}
+      <ModalBackdrop
+        onDismiss={saving ? undefined : onClose}
         style={{ flex: 1, backgroundColor: 'rgba(2, 8, 23, 0.62)', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       >
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Adaugă jucători din listă"
-          onClick={(event) => event.stopPropagation()}
           className="w-full max-w-[560px] max-h-[90vh] overflow-y-auto rounded-3xl p-5"
           style={{ backgroundColor: 'var(--c-surface)', border: '1px solid var(--c-border)', boxShadow: '0 28px 70px rgba(2, 8, 23, 0.35)' }}
         >
@@ -166,7 +165,7 @@ export default function BulkAddPlayersDialog({
             </Pressable>
           </View>
         </div>
-      </Pressable>
+      </ModalBackdrop>
     </Modal>
   );
 }

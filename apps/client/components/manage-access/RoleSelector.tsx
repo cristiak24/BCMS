@@ -77,7 +77,7 @@ export function OptionChip({ label, active, onPress }: { label: string; active: 
             onPress={onPress}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
-            className="ui-press h-8 px-3 rounded-[9px] border items-center justify-center shrink-0"
+            className="ui-press h-8 [@media(pointer:coarse)]:h-10 px-3 rounded-[9px] border items-center justify-center shrink-0"
             style={active
                 ? { backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' } as any
                 : { backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}

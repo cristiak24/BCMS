@@ -93,7 +93,7 @@ function Card({ title, meta, actions, children, padded = true }: { title: string
   return (
     <View className="rounded-[14px] border overflow-hidden" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
       <View className="flex-row items-center gap-2 px-3.5 md:px-4 pt-3 pb-2.5 min-w-0">
-        <Text className="f-display text-[14.5px] font-bold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
+        <Text accessibilityRole="header" className="f-display text-[14.5px] font-bold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
         {meta}
         <View className="flex-1" />
         {actions}
@@ -538,7 +538,7 @@ export default function L12Editor({
       title="Lotul echipei"
       meta={rosterLoading ? undefined : <Text className="t-num text-[13px] font-semibold" style={{ color: 'var(--c-faint)' }}>{available.length}</Text>}
       actions={!rosterLoading && !full && roster.some((p) => !chosen.has(p.id)) ? (
-        <Pressable onPress={autoFill} accessibilityRole="button" className="ui-press h-8 px-2.5 rounded-[9px] flex-row items-center gap-1" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+        <Pressable onPress={autoFill} accessibilityRole="button" className="ui-press h-8 [@media(pointer:coarse)]:h-10 px-2.5 rounded-[9px] flex-row items-center gap-1" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
           <MaterialIcons name="auto-awesome" size={14} color="var(--c-brand-fg)" />
           <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Completează automat</Text>
         </Pressable>

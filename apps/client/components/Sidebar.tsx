@@ -1,11 +1,12 @@
 import { Fragment } from 'react';
 import { View, Text } from '@/src/web/reactNative';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { MaterialIcons, FontAwesome5 } from '@/src/web/expoVectorIcons';
 import { isSuperadmin } from '../utils/authSession';
 import { useSession } from '../context/AuthContext';
 import { theme } from '../constants/designSystem';
 import { useResponsive } from '../hooks/useResponsive';
+import { navSectionPath } from '../utils/navSection';
 
 export type AdminMenuIconName = keyof typeof MaterialIcons.glyphMap;
 
@@ -59,7 +60,8 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarP
     const { pathname } = useLocation();
     const { session } = useSession();
     const { width } = useResponsive();
-    const normalizedPathname = pathname || '/admin/dashboard';
+    // A detail page (Echipă, Jucător, Eveniment…) lights up its section.
+    const normalizedPathname = navSectionPath(pathname || '/admin/dashboard');
 
     if (width < 1024) {
         return null;
@@ -98,7 +100,9 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarP
                             <Text className={`t-eyebrow px-3 pb-1 ${index ? 'pt-3' : 'pt-1'}`} style={{ color: 'var(--c-faint)' }}>{item.group}</Text>
                         ) : null}
                         <View className="relative">
-                            <NavLink
+                            {/* Link, not NavLink: NavLink sets aria-current from its own URL match
+                                and ignored ours, so detail pages (Echipă → Clubul meu) marked nothing. */}
+                            <Link
                                 to={item.href}
                                 aria-current={isActive ? 'page' : undefined}
                                 className="block no-underline"
@@ -126,7 +130,7 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarP
                                     </Text>
                                     {item.badge ? <MenuBadge count={item.badge} /> : null}
                                 </View>
-                            </NavLink>
+                            </Link>
                             {isActive && (
                                 <View className="absolute -left-2.5 top-2.5 bottom-2.5 w-1 rounded-r-full" style={{ backgroundColor: 'var(--c-brand-surface)' }} />
                             )}

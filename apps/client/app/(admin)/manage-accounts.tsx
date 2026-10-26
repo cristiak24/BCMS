@@ -77,8 +77,9 @@ const PAGE_SIZE = 20;
 // accountant) was decoration — the role is written next to it anyway.
 const NEUTRAL_ROLE = { tint: 'var(--c-surface-3)', fg: 'var(--c-ink-soft)' };
 const ROLE_VISUAL: Record<string, { tint: string; fg: string }> = {
-    admin: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-strong)' },
-    superadmin: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-strong)' },
+    // brand-fg, not brand-strong: on the tint in dark it was 3.3:1.
+    admin: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-fg)' },
+    superadmin: { tint: 'var(--c-surface-tint)', fg: 'var(--c-brand-fg)' },
 };
 
 function roleVisual(role: string) {
@@ -689,6 +690,7 @@ export default function ManageAccountsScreen() {
                                         const isSelected = selectedIds.has(account.id);
                                         const rv = roleVisual(account.role);
                                         const sv = statusVisual(account);
+                                        const RowMain: any = isInvite ? View : Pressable;
                                         const actions = sheetActions(account);
                                         const lastSeen = isInvite
                                             ? `Invitat ${formatRelativeDate(account.createdAt)}`
@@ -717,11 +719,14 @@ export default function ManageAccountsScreen() {
                                                     </Pressable>
                                                 ) : <View className="w-8 shrink-0" />}
 
-                                                <Pressable
-                                                    onPress={() => router.push(`/admin/users/${account.id}`)}
-                                                    disabled={isInvite}
-                                                    accessibilityRole={isInvite ? undefined : 'button'}
-                                                    accessibilityLabel={isInvite ? undefined : `Deschide profilul lui ${account.name || account.email}`}
+                                                {/* An invitation has no profile to open: a plain row, not a disabled
+                                                    button (the browser dimmed its email and status to ~3:1). */}
+                                                <RowMain
+                                                    {...(isInvite ? {} : {
+                                                        onPress: () => router.push(`/admin/users/${account.id}`),
+                                                        accessibilityRole: 'button',
+                                                        accessibilityLabel: `Deschide profilul lui ${account.name || account.email}`,
+                                                    })}
                                                     className="flex-1 md:flex-[2.2] min-w-0 flex-row items-center gap-3 pl-1 md:pl-2"
                                                 >
                                                     <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: isInvite ? 'var(--c-warning-bg)' : rv.tint }}>
@@ -740,7 +745,7 @@ export default function ManageAccountsScreen() {
                                                             </Text>
                                                         </View>
                                                     </View>
-                                                </Pressable>
+                                                </RowMain>
 
                                                 <View className="hidden md:flex flex-1 min-w-0">
                                                     <View className="self-start rounded-full px-2.5 py-1" style={{ backgroundColor: rv.tint }}>

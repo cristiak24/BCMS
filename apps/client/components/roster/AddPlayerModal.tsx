@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, Text, TextInput, View } from '@/src/web/reactNative';
+import ModalBackdrop from '../ui/ModalBackdrop';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { Plus, Search, X } from 'lucide-react';
 import { Player, Team, teamsApi } from '../../services/teamsApi';
@@ -218,13 +219,12 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <Pressable
+      <ModalBackdrop
         className="ui-backdrop flex-1 items-center justify-end lg:justify-center lg:p-6"
         style={{ backgroundColor: 'rgba(10,15,28,0.55)' }}
-        onPress={close}
+        onDismiss={close}
       >
-        <Pressable
-          onPress={(event: any) => event.stopPropagation()}
+        <View
           className="ui-sheet w-full lg:max-w-[760px] rounded-t-[20px] lg:rounded-[18px] border flex-col overflow-hidden"
           style={{
             backgroundColor: 'var(--c-surface)',
@@ -493,8 +493,8 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
               )}
             </View>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </ModalBackdrop>
     </Modal>
   );
 }

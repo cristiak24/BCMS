@@ -341,6 +341,12 @@ export default function TeamDetailsScreen() {
                     </View>
                     </ScrollView>
 
+                    {/* A heading for the open tab: the page exposed only its h1, so heading
+                        navigation skipped straight past the roster, events and stats. */}
+                    <Text className="sr-only" accessibilityRole="header">
+                        {tab === 'events' ? 'Evenimente' : tab === 'history' ? 'Istoric' : tab === 'stats' ? 'Statistici' : tab === 'frb' ? 'Competiție FRB' : 'Lotul echipei'}
+                    </Text>
+
                     {tab === 'events' ? (
                         <TeamEventsPanel teamId={team.id} scope="upcoming" />
                     ) : tab === 'history' ? (

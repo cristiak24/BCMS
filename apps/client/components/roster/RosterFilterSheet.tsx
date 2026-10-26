@@ -1,5 +1,6 @@
 import React from 'react';
 import { FlatList, Modal, Pressable, Text, View } from '@/src/web/reactNative';
+import ModalBackdrop from '../ui/ModalBackdrop';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { dash } from '../dashboard/dashboardTheme';
 import { plural } from '../../utils/plural';
@@ -27,15 +28,14 @@ export default function RosterFilterSheet({
 }: RosterFilterSheetProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
+      <ModalBackdrop
         className="flex-1 items-center justify-center p-4"
         style={{ backgroundColor: 'rgba(2, 8, 23, 0.55)' }}
-        onPress={onClose}
+        onDismiss={onClose}
       >
-        <Pressable
+        <View
           className="rounded-[18px] w-full max-w-[360px] max-h-[70vh] border dash-fade-in overflow-hidden flex-col"
           style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: '0 28px 70px rgba(2, 8, 23, 0.35)' } as any}
-          onPress={(event: any) => event.stopPropagation()}
         >
           <View
             className="flex-row items-center justify-between px-5 pt-5 pb-4"
@@ -105,8 +105,8 @@ export default function RosterFilterSheet({
               );
             }}
           />
-        </Pressable>
-      </Pressable>
+        </View>
+      </ModalBackdrop>
     </Modal>
   );
 }

@@ -108,7 +108,7 @@ export default function MatchDetailScreen() {
       onPress={goBack}
       accessibilityRole="button"
       accessibilityLabel="Înapoi"
-      className="ui-press self-start h-9 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5 mb-4"
+      className="ui-press self-start h-9 [@media(pointer:coarse)]:h-10 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5 mb-4"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
     >
       <MaterialIcons name="chevron-left" size={18} color="var(--c-ink-soft)" />

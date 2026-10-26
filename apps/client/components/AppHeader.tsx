@@ -1,4 +1,5 @@
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Text, TextInput, View } from '@/src/web/reactNative';
+import ModalBackdrop from './ui/ModalBackdrop';
 import { useRouter } from '@/src/web/expoRouter';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import type { ReactNode } from 'react';
@@ -354,9 +355,8 @@ function ProfileActionsMenu({
 }) {
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable className="flex-1 bg-black/10" onPress={onClose}>
-        <Pressable
-          onPress={(event) => event.stopPropagation()}
+      <ModalBackdrop className="flex-1 bg-black/10" onDismiss={onClose} >
+        <View
           className="absolute rounded-[24px] bg-white border border-[#DDE7F5] overflow-hidden"
           style={[
             theme.shadow.card,
@@ -414,8 +414,8 @@ function ProfileActionsMenu({
               </Text>
             </Pressable>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </ModalBackdrop>
     </Modal>
   );
 }
@@ -443,9 +443,8 @@ function NotificationsPanel({
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable className="flex-1 bg-black/10" onPress={onClose}>
-        <Pressable
-          onPress={(event) => event.stopPropagation()}
+      <ModalBackdrop className="flex-1 bg-black/10" onDismiss={onClose} >
+        <View
           className="absolute rounded-[24px] border overflow-hidden"
           style={[
             theme.shadow.card,
@@ -507,8 +506,8 @@ function NotificationsPanel({
               </View>
             )}
           </ScrollView>
-        </Pressable>
-      </Pressable>
+        </View>
+      </ModalBackdrop>
     </Modal>
   );
 }

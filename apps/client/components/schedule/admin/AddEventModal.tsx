@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Switch, Text, View, type ScrollViewHandle } from '@/src/web/reactNative';
+import ModalBackdrop from '../../ui/ModalBackdrop';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { Team } from '../../../services/teamsApi';
 import type { CalendarEvent } from '../../../services/eventsApi';
@@ -163,13 +164,12 @@ export function AddEventModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <Pressable
+      <ModalBackdrop
         className="ui-backdrop flex-1 items-center justify-end lg:justify-center lg:p-6"
         style={{ backgroundColor: 'rgba(10,15,28,0.55)' }}
-        onPress={close}
+        onDismiss={close}
       >
-        <Pressable
-          onPress={(event: any) => event.stopPropagation()}
+        <View
           className="ui-sheet w-full lg:max-w-[620px] rounded-t-[20px] lg:rounded-[18px] border flex-col overflow-hidden"
           style={{
             backgroundColor: 'var(--c-surface)',
@@ -529,8 +529,8 @@ export function AddEventModal({
               </Text>
             </Pressable>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </ModalBackdrop>
     </Modal>
   );
 }

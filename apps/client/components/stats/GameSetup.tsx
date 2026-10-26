@@ -22,7 +22,7 @@ function Card({ title, hint, children }: { title: string; hint?: string; childre
   return (
     <View className="rounded-[16px] border p-4 gap-3" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
       <View>
-        <Text className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
+        <Text accessibilityRole="header" className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
         {hint ? <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>{hint}</Text> : null}
       </View>
       {children}
@@ -249,7 +249,7 @@ export default function GameSetup({
             const active = (keeper ?? myUserId) === person.id;
             return (
               <Pressable key={person.id} onPress={() => setKeeper(person.id === myUserId ? null : person.id)} accessibilityRole="button" accessibilityState={{ selected: active }}
-                className="h-9 px-3 rounded-[10px] border items-center justify-center"
+                className="h-9 [@media(pointer:coarse)]:h-10 px-3 rounded-[10px] border items-center justify-center"
                 style={{ borderColor: active ? 'transparent' : 'var(--c-border)', backgroundColor: active ? 'var(--c-brand-surface)' : 'var(--c-surface)' } as any}>
                 <Text className="text-[13px] font-semibold" style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>
                   {person.name}{person.role === 'parent' ? ' (părinte)' : person.role === 'staff' ? ' (staff)' : ''}

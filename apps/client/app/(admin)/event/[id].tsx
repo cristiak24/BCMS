@@ -72,7 +72,7 @@ function Card({ title, children, trailing }: { title: string; children: ReactNod
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
       <View className="flex-row items-center justify-between gap-3 mb-3.5">
-        <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{title}</Text>
+        <Text accessibilityRole="header" className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{title}</Text>
         {trailing}
       </View>
       {children}

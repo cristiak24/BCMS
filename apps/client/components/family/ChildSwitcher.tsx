@@ -1,6 +1,7 @@
 import { toCalendarDay } from '@/utils/dates';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from '@/src/web/reactNative';
+import ModalBackdrop from '../ui/ModalBackdrop';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { familyApi, type FamilyChild, type FamilyPendingRequest } from '../../services/familyApi';
 import { loadFamily } from './useActiveChild';
@@ -83,16 +84,14 @@ function AddChildDialog({ visible, onClose, onSent }: { visible: boolean; onClos
 
   return (
     <Modal visible onRequestClose={sending ? undefined : onClose}>
-      <Pressable
-        accessibilityLabel="Închide"
-        onPress={sending ? undefined : onClose}
+      <ModalBackdrop
+        onDismiss={sending ? undefined : onClose}
         style={{ flex: 1, backgroundColor: 'rgba(2, 8, 23, 0.62)', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       >
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Adaugă un copil"
-          onClick={(event) => event.stopPropagation()}
           className="w-full max-w-[440px] rounded-3xl p-5"
           style={{ backgroundColor: 'var(--c-surface)', border: '1px solid var(--c-border)', boxShadow: '0 28px 70px rgba(2, 8, 23, 0.35)' }}
         >
@@ -127,7 +126,7 @@ function AddChildDialog({ visible, onClose, onSent }: { visible: boolean; onClos
             </Pressable>
           </View>
         </div>
-      </Pressable>
+      </ModalBackdrop>
     </Modal>
   );
 }

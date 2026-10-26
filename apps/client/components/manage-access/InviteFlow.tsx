@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from '@/src/web/reactNative';
+import ModalBackdrop from '../ui/ModalBackdrop';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import Button from '../ui/Button';
 import { FormField } from '../ui/FormField';
@@ -404,9 +405,8 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
 
     return (
         <Modal visible transparent onRequestClose={busy ? undefined : onClose}>
-            <Pressable
-                accessibilityLabel="Închide invitația"
-                onPress={busy ? undefined : onClose}
+            <ModalBackdrop
+                onDismiss={busy ? undefined : onClose}
                 className="flex-1 items-stretch sm:items-center justify-center sm:p-6"
                 style={{ backgroundColor: 'rgba(2, 8, 23, 0.55)' }}
             >
@@ -415,7 +415,6 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="invite-flow-title"
-                    onClick={(event) => event.stopPropagation()}
                     className="ui-rise flex flex-col w-full h-[100dvh] sm:h-auto sm:max-h-[min(720px,calc(100dvh-48px))] sm:max-w-[760px] sm:rounded-[18px] sm:border overflow-hidden"
                     style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: '0 28px 70px rgba(2, 8, 23, 0.35)' }}
                 >
@@ -706,7 +705,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                         />
                     </View>
                 </div>
-            </Pressable>
+            </ModalBackdrop>
         </Modal>
     );
 }

@@ -478,6 +478,9 @@ export default function AttendanceScreen() {
                 }}
               />
             ) : (
+              <>
+              {/* A heading for the list the page is about (it exposed only its h1). */}
+              <Text className="sr-only" accessibilityRole="header">Prezența jucătorilor</Text>
               <DenseList label="Prezența jucătorilor">
                 {visibleRows.map((row) => (
                   <AttendanceRow
@@ -493,6 +496,7 @@ export default function AttendanceScreen() {
                   />
                 ))}
               </DenseList>
+              </>
             )}
           </View>
         </PageContainer>
