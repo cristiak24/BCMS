@@ -39,7 +39,7 @@ export function teamCodeCandidates(raw: string) {
 
 type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
-/** Accepts YYYY-MM-DD or DD.MM.YYYY; returns YYYY-MM-DD. Ages 3–30. */
+/** Accepts YYYY-MM-DD or DD.MM.YYYY; returns YYYY-MM-DD. Ages 3–100: seniors play too, this only catches typos. */
 export function parseBirthDate(value: unknown, now = new Date()): Result<string> {
     const text = String(value ?? '').trim();
     let y: number; let m: number; let d: number;
@@ -56,7 +56,7 @@ export function parseBirthDate(value: unknown, now = new Date()): Result<string>
         return { ok: false, error: 'Data nașterii nu e validă.' };
     }
     const age = now.getUTCFullYear() - y;
-    if (age < 3 || age > 30) return { ok: false, error: 'Data nașterii nu pare corectă.' };
+    if (age < 3 || age > 100) return { ok: false, error: 'Data nașterii nu pare corectă.' };
     return { ok: true, value: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` };
 }
 
@@ -133,7 +133,7 @@ export function parseParentChildren(body: unknown, now = new Date()): Result<Chi
         const text = String(child.birthYear ?? '').trim();
         const year = /^\d{4}$/.test(text) ? Number(text) : NaN;
         const age = now.getUTCFullYear() - year;
-        if (!Number.isInteger(year) || age < 3 || age > 30) return { ok: false, error: `${firstName}: anul nașterii nu pare corect.` };
+        if (!Number.isInteger(year) || age < 3 || age > 100) return { ok: false, error: `${firstName}: anul nașterii nu pare corect.` };
         children.push({ firstName, lastName, birthDate: `${year}-01-01`, yearOnly: true });
     }
     return { ok: true, value: children };

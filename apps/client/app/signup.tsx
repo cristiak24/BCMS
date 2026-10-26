@@ -64,6 +64,15 @@ function ageOn(birthDate: string, today = new Date()) {
     return age;
 }
 
+/** Same range as the server (familyJoin.parseBirthDate): a full date, age 3–100. */
+function isPlausibleBirthDate(value: string, today = new Date()) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const age = ageOn(value, today);
+    const year = Number(value.slice(0, 4));
+    const yearAge = today.getFullYear() - year;
+    return age != null && yearAge >= 3 && yearAge <= 100;
+}
+
 /** Same rule as the server (lib/contacts.ts normalizePhone). */
 function isValidPhone(value: string) {
     const text = value.trim();
@@ -197,12 +206,20 @@ export default function Signup() {
                 : 'Completează numele, prenumele și data nașterii pentru fiecare copil.');
             return;
         }
-        if (isParentInvite && children.some((child) => !/^\d{4}$/.test(child.birthDate) || Number(child.birthDate) > currentYear || Number(child.birthDate) < currentYear - 30)) {
+        if (collectsChildren && !isParentInvite && children.some((child) => !isPlausibleBirthDate(child.birthDate))) {
+            setError('Data nașterii copilului nu pare corectă.');
+            return;
+        }
+        if (isParentInvite && children.some((child) => !/^\d{4}$/.test(child.birthDate) || Number(child.birthDate) > currentYear || Number(child.birthDate) < currentYear - 100)) {
             setError('Anul nașterii trebuie să fie format din 4 cifre (ex. 2015).');
             return;
         }
         if (isTeamCode && joinAs === 'player' && !birthDate) {
             setError('Completează data nașterii.');
+            return;
+        }
+        if (isTeamCode && joinAs === 'player' && !isPlausibleBirthDate(birthDate)) {
+            setError('Data nașterii nu pare corectă.');
             return;
         }
         if (isTeamCode && joinAs === 'player') {

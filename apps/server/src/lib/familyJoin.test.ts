@@ -85,7 +85,7 @@ test('parent code/link children: name + birth year, optional for older clients',
 
     assert.equal(parseParentChildren({ children: [] }, NOW).ok, false);
     assert.equal(parseParentChildren({ children: [{ firstName: 'Matei', lastName: '', birthYear: 2015 }] }, NOW).ok, false);
-    assert.equal(parseParentChildren({ children: [{ firstName: 'Matei', lastName: 'P', birthYear: 1990 }] }, NOW).ok, false);
+    assert.equal(parseParentChildren({ children: [{ firstName: 'Matei', lastName: 'P', birthYear: 1900 }] }, NOW).ok, false);
     assert.equal(parseParentChildren({ children: [{ firstName: 'Matei', lastName: 'P', birthYear: 2026 }] }, NOW).ok, false);
     assert.equal(parseParentChildren({ children: Array.from({ length: 6 }, () => ({ firstName: 'A', lastName: 'B', birthYear: 2015 })) }, NOW).ok, false);
 });
