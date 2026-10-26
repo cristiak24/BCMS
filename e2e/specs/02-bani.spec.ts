@@ -41,8 +41,9 @@ test('a partial payment pays only its amount and the player stays in arrears', a
 
   const dialog = page.locator('.rn-modal').last();
   await expect(dialog).toContainText('Încasare · Luca Marin');
-  // The oldest overdue month (fee + levy, 170 RON) is preselected.
-  await expect(dialog.getByLabel('Suma încasată')).toHaveValue('170');
+  // Everything overdue is preselected (one month, 170 RON, until the next
+  // month's due day passes; two after), so the total follows the calendar.
+  await expect(dialog.getByLabel('Suma încasată')).toHaveValue(String(before.overdue));
   await dialog.getByLabel('Suma încasată').fill('50');
   // The preview splits 50 RON onto the oldest fee only, partially.
   await expect(dialog).toContainText(/parțial/i);
