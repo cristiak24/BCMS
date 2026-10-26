@@ -12,28 +12,19 @@ import { plural } from '../../utils/plural';
  * paging. Shared by the club admin's Jurnal and the superadmin console.
  */
 
-type Category =
-    | 'all' | 'event.' | 'attendance.' | 'game.' | 'document.' | 'player.' | 'team.' | 'finance.'
-    | 'club_admin.' | 'user.' | 'manage_access.' | 'invitation.' | 'auth.' | 'family.' | 'family_request.' | 'privacy.' | 'club.';
+// Families of actions: 17 single prefixes (Invitații / Acces și cereri /
+// Înregistrări / Conturi / Utilizatori overlapped) became 6 an admin can
+// tell apart. Each sends its prefixes comma-separated to the server.
+type Category = 'all' | 'schedule' | 'squad' | 'money' | 'access' | 'documents' | 'clubs';
 
-const CATEGORY_OPTIONS: { key: Category; label: string }[] = [
-    { key: 'all', label: 'Toate acțiunile' },
-    { key: 'event.', label: 'Evenimente' },
-    { key: 'attendance.', label: 'Prezență' },
-    { key: 'game.', label: 'Meciuri' },
-    { key: 'document.', label: 'Documente' },
-    { key: 'player.', label: 'Jucători' },
-    { key: 'team.', label: 'Coduri de echipă' },
-    { key: 'finance.', label: 'Finanțe' },
-    { key: 'club_admin.', label: 'Conturi' },
-    { key: 'user.', label: 'Utilizatori' },
-    { key: 'manage_access.', label: 'Acces și cereri' },
-    { key: 'invitation.', label: 'Invitații' },
-    { key: 'auth.', label: 'Înregistrări' },
-    { key: 'family.', label: 'Familii' },
-    { key: 'family_request.', label: 'Înscrieri cu codul echipei' },
-    { key: 'privacy.', label: 'Confidențialitate' },
-    { key: 'club.', label: 'Cluburi' },
+const CATEGORY_OPTIONS: { key: Category; label: string; prefixes: string[]; platformOnly?: boolean }[] = [
+    { key: 'all', label: 'Toate acțiunile', prefixes: [] },
+    { key: 'schedule', label: 'Program, prezență și meciuri', prefixes: ['event.', 'attendance.', 'game.'] },
+    { key: 'squad', label: 'Lot, echipe și familii', prefixes: ['player.', 'team.', 'family.', 'family_request.'] },
+    { key: 'money', label: 'Bani', prefixes: ['finance.'] },
+    { key: 'access', label: 'Conturi, invitații și cereri', prefixes: ['club_admin.', 'user.', 'manage_access.', 'invitation.', 'auth.'] },
+    { key: 'documents', label: 'Documente și date personale', prefixes: ['document.', 'privacy.'] },
+    { key: 'clubs', label: 'Cluburi', prefixes: ['club.'], platformOnly: true },
 ];
 
 const ACTION_LABELS: Record<string, string> = {
@@ -97,7 +88,7 @@ const ACTION_LABELS: Record<string, string> = {
 export const auditActionLabel = (action: string) => ACTION_LABELS[action] ?? action;
 
 const ROLE_LABELS: Record<string, string> = {
-    superadmin: 'superadmin', admin: 'admin', coach: 'antrenor', player: 'jucător', parent: 'părinte', accountant: 'contabil', staff: 'staff',
+    superadmin: 'administrator platformă', admin: 'administrator', coach: 'antrenor', player: 'jucător', parent: 'părinte', accountant: 'contabil', staff: 'personal',
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -122,7 +113,16 @@ const ENTITY_LABELS: Record<string, string> = {
     player_payment: 'plata', financial_settings: 'setări taxe', financial_document: 'documentul', user: 'contul', player: 'jucătorul',
     invitation: 'invitația', club: 'clubul', team: 'echipa', access_request: 'cererea',
     event: 'evenimentul', club_document: 'documentul', family_join_request: 'cererea de înscriere',
+    club_invite_code: 'codul de invitație', invite_link: 'linkul de invitație',
 };
+
+/** „plata #15 · Radu Stan”, „jucătorul Radu Stan”: who the entry is about, by name when the server knows it. */
+function subjectOf(entry: AuditLogEntry) {
+    const label = ENTITY_LABELS[entry.entityType] ?? entry.entityType.replace(/_/g, ' ');
+    if (entry.entityType === 'player' && entry.subjectName) return `${label} ${entry.subjectName}`;
+    const base = entry.entityId ? `${label} #${entry.entityId}` : label;
+    return entry.subjectName ? `${base} · ${entry.subjectName}` : base;
+}
 
 function formatWhen(value: string) {
     const date = parseApiDate(value);
@@ -164,7 +164,8 @@ function detailOf(entry: AuditLogEntry) {
     return parts.join(' · ');
 }
 
-export default function AuditLogList({ load }: { load: (filters: AuditLogFilters) => Promise<AuditLogPage> }) {
+/** `platform`: the superadmin console, which also sees the „Cluburi” family. */
+export default function AuditLogList({ load, platform = false }: { load: (filters: AuditLogFilters) => Promise<AuditLogPage>; platform?: boolean }) {
     const [category, setCategory] = useState<Category>('all');
     const [page, setPage] = useState(1);
     const [data, setData] = useState<AuditLogPage | null>(null);
@@ -175,7 +176,8 @@ export default function AuditLogList({ load }: { load: (filters: AuditLogFilters
         setLoading(true);
         setError(null);
         try {
-            setData(await load({ page, category: category === 'all' ? null : category }));
+            const prefixes = CATEGORY_OPTIONS.find((option) => option.key === category)?.prefixes ?? [];
+            setData(await load({ page, category: prefixes.length ? prefixes.join(',') : null }));
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Nu am putut încărca jurnalul.');
         } finally {
@@ -194,7 +196,7 @@ export default function AuditLogList({ load }: { load: (filters: AuditLogFilters
                     label="Categorie"
                     value={category}
                     onChange={(next) => { setCategory(next); setPage(1); }}
-                    options={CATEGORY_OPTIONS}
+                    options={CATEGORY_OPTIONS.filter((option) => platform || !option.platformOnly)}
                     className="w-full sm:w-[240px]"
                 />
                 {data ? <Text className="t-meta sm:ml-auto" style={{ color: 'var(--c-muted)' }}>{plural(data.total, 'înregistrare', 'înregistrări')}</Text> : null}
@@ -253,7 +255,7 @@ export function AuditEntries({ logs }: { logs: AuditLogEntry[] }) {
                         <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
                             {[
                                 entry.actorName ? `${entry.actorName}${entry.actorRole ? ` (${ROLE_LABELS[entry.actorRole] ?? entry.actorRole})` : ''}` : 'Sistem / cont șters',
-                                entry.entityId ? `${ENTITY_LABELS[entry.entityType] ?? entry.entityType} #${entry.entityId}` : ENTITY_LABELS[entry.entityType] ?? entry.entityType,
+                                subjectOf(entry),
                                 detail || null,
                             ].filter(Boolean).join(' · ')}
                         </Text>

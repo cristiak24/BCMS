@@ -11,7 +11,7 @@ export default function AuditLogsScreen() {
         title="Jurnal"
         subtitle="Acțiunile importante din toate cluburile: cluburi, conturi, roluri, invitații, taxe, plăți și documente."
       />
-      <AuditLogList load={superAdminApi.listAuditLogs} />
+      <AuditLogList load={superAdminApi.listAuditLogs} platform />
     </PageContainer>
   );
 }

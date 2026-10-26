@@ -19,6 +19,7 @@ import { useSession } from '../../../context/AuthContext';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { canManageEvents, canMarkAttendance } from '../../../utils/eventPermissions';
 import { plural } from '../../../utils/plural';
+import { isNotFound } from '../../../services/apiClient';
 
 /** Roles the server lets change an event (ensureTeamAccess); others only read it. */
 
@@ -141,6 +142,8 @@ export default function EventDetailScreen() {
   const [playerCount, setPlayerCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Gone (404 or a bad id): the page offers „Înapoi”, retrying can't help.
+  const [missing, setMissing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
@@ -163,13 +166,14 @@ export default function EventDetailScreen() {
   const loadData = useCallback(async () => {
     const eventId = Number(id);
     if (!Number.isInteger(eventId) || eventId <= 0) {
-      setError('Evenimentul nu există.');
+      setMissing(true);
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
       setError(null);
+      setMissing(false);
       const eventData = await eventsApi.getEventById(eventId);
       setEvent(eventData);
       setNoteDraft(eventData.coachNote ?? '');
@@ -185,6 +189,7 @@ export default function EventDetailScreen() {
       setPlayerCount(players ? players.length : null);
     } catch (err) {
       console.error('Event detail load error:', err);
+      setMissing(isNotFound(err));
       setError(err instanceof Error ? err.message : 'Evenimentul nu a putut fi încărcat.');
     } finally {
       setLoading(false);
@@ -262,12 +267,21 @@ export default function EventDetailScreen() {
         <PageContainer>
           <View className="max-w-[920px] w-full self-center">
             {backButton}
-            <ErrorState
-              title="Evenimentul nu a putut fi afișat"
-              message={error ?? 'Evenimentul nu există sau a fost șters.'}
-              actionLabel="Reîncearcă"
-              onAction={loadData}
-            />
+            {missing ? (
+              <ErrorState
+                title="Evenimentul nu mai există"
+                message="A fost șters sau linkul nu mai e valid."
+                actionLabel="Înapoi la Program"
+                onAction={goBack}
+              />
+            ) : (
+              <ErrorState
+                title="Evenimentul nu a putut fi afișat"
+                message={error ?? 'Nu am putut încărca evenimentul.'}
+                actionLabel="Reîncearcă"
+                onAction={loadData}
+              />
+            )}
           </View>
         </PageContainer>
       </ScrollView>

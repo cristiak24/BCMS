@@ -25,6 +25,7 @@ import { downloadL12Word, printL12, type L12DocumentInput } from './l12Document'
 import { StatusChip, useL12Base } from './L12MatchLink';
 import { DayHeading, KIND_META, L12Hero, MatchTicket, TeamAvatar, TeamTile, isOwnSide, matchKind, type HeroNext, type MatchKind } from './L12Visuals';
 import { plural } from '../../utils/plural';
+import { isNotFound } from '../../services/apiClient';
 
 /**
  * L12 area, shared by admins (/admin/l12…) and coaches (/coach/l12…):
@@ -576,6 +577,7 @@ export function L12MatchScreen() {
   const [saved, setSaved] = useState<L12Lineup | null>(null);
   const [draft, setDraft] = useState<L12Lineup>(EMPTY_LINEUP);
   const [error, setError] = useState<string | null>(null);
+  const [missing, setMissing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirm, setConfirm] = useState<'template' | 'reset' | 'saveTemplate' | null>(null);
@@ -595,13 +597,14 @@ export function L12MatchScreen() {
 
   const load = useCallback(async () => {
     if (!Number.isInteger(eventId) || eventId <= 0) {
-      setError('Meciul nu există.');
+      setMissing(true);
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
       setError(null);
+      setMissing(false);
       const data = await l12Api.getForEvent(eventId);
       setEvent(data.event);
       setTeam(data.team);
@@ -611,6 +614,7 @@ export function L12MatchScreen() {
       setSaved(data.lineup);
       setSeeded(false);
     } catch (err) {
+      setMissing(isNotFound(err));
       setError(err instanceof Error ? err.message : 'Nu am putut încărca L12.');
     } finally {
       setLoading(false);
@@ -719,7 +723,11 @@ export function L12MatchScreen() {
       <PageShell>
         <View className="gap-4">
           <BackButton label="L12" onPress={() => router.back(base)} />
-          <ErrorState title="L12 nu poate fi afișat" message={error ?? 'Meciul nu există.'} actionLabel="Reîncearcă" onAction={load} />
+          {missing ? (
+            <ErrorState title="Meciul nu mai există" message="A fost șters din Program sau linkul nu mai e valid." actionLabel="Înapoi la L12" onAction={() => router.back(base)} />
+          ) : (
+            <ErrorState title="L12 nu poate fi afișat" message={error ?? 'Nu am putut încărca L12.'} actionLabel="Reîncearcă" onAction={load} />
+          )}
         </View>
       </PageShell>
     );
@@ -904,6 +912,7 @@ export function L12TemplateScreen() {
   const [saved, setSaved] = useState<L12Lineup | null>(null);
   const [draft, setDraft] = useState<L12Lineup>(EMPTY_LINEUP);
   const [error, setError] = useState<string | null>(null);
+  const [missing, setMissing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { roster, loading: rosterLoading } = useRoster(team?.id ?? null);
@@ -913,18 +922,20 @@ export function L12TemplateScreen() {
 
   const load = useCallback(async () => {
     if (!Number.isInteger(teamId) || teamId <= 0) {
-      setError('Echipa nu există.');
+      setMissing(true);
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
       setError(null);
+      setMissing(false);
       const data = await l12Api.getTemplate(teamId);
       setTeam(data.team);
       setSaved(data.template);
       setSeeded(false);
     } catch (err) {
+      setMissing(isNotFound(err));
       setError(err instanceof Error ? err.message : 'Nu am putut încărca L12-ul constant.');
     } finally {
       setLoading(false);
@@ -973,7 +984,11 @@ export function L12TemplateScreen() {
       <PageShell>
         <View className="gap-4">
           <BackButton label="L12" onPress={() => router.back(base)} />
-          <ErrorState title="L12 nu poate fi afișat" message={error ?? 'Echipa nu există.'} actionLabel="Reîncearcă" onAction={load} />
+          {missing ? (
+            <ErrorState title="Echipa nu mai există" message="A fost ștearsă sau linkul nu mai e valid." actionLabel="Înapoi la L12" onAction={() => router.back(base)} />
+          ) : (
+            <ErrorState title="L12 nu poate fi afișat" message={error ?? 'Nu am putut încărca L12-ul constant.'} actionLabel="Reîncearcă" onAction={load} />
+          )}
         </View>
       </PageShell>
     );

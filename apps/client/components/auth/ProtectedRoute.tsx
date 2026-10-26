@@ -15,7 +15,7 @@ export default function ProtectedRoute({ children, roles }: ProtectedRouteProps)
   const { initializing, session, signOut } = useSession();
 
   if (initializing) {
-    return <LoadingScreen message="Preparing your workspace..." color="var(--c-brand-fg)" />;
+    return <LoadingScreen message="Se pregătește clubul…" color="var(--c-brand-fg)" />;
   }
 
   if (!session) {

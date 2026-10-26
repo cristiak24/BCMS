@@ -117,7 +117,7 @@ export function ErrorState({ title, message, onRetry }: { title: string; message
   );
 }
 
-export function LoadingState({ message = 'Loading...', compact = false }: LoadingStateProps) {
+export function LoadingState({ message = 'Se încarcă…', compact = false }: LoadingStateProps) {
   return (
     <View className={`items-center justify-center dash-fade-in ${compact ? 'py-6' : 'py-12'}`}>
       <View

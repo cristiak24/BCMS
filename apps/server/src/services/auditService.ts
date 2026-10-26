@@ -1,6 +1,6 @@
-import { and, count, desc, eq, like, or, sql, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, like, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db';
-import { auditLogs, users } from '../db/schema';
+import { auditLogs, players, users } from '../db/schema';
 import type { AuthenticatedRequest } from '../middleware/auth';
 
 export type AuditLogInput = {
@@ -110,7 +110,10 @@ export type AuditLogQuery = {
   clubId: number | null;
   page?: number;
   pageSize?: number;
-  /** Action prefix, e.g. "finance." or "club_admin.". */
+  /**
+   * Action prefix, e.g. "finance." — or several, comma-separated, for a
+   * family of actions in the Jurnal filter ("event.,attendance.,game.").
+   */
   category?: string | null;
   actorUserId?: number | null;
   /** One entity's history, e.g. { entityType: 'player', entityId: '42' }. */
@@ -126,7 +129,9 @@ export async function listAuditLogs(query: AuditLogQuery) {
   const page = Math.max(1, Math.trunc(query.page ?? 1));
   const conditions: SQL[] = [];
   if (query.clubId != null) conditions.push(eq(auditLogs.clubId, query.clubId));
-  if (query.category && /^[a-z_.]{1,40}$/.test(query.category)) conditions.push(like(auditLogs.action, `${query.category}%`));
+  const prefixes = String(query.category ?? '').split(',').map((part) => part.trim()).filter((part) => /^[a-z_.]{1,40}$/.test(part)).slice(0, 12);
+  if (prefixes.length === 1) conditions.push(like(auditLogs.action, `${prefixes[0]}%`));
+  else if (prefixes.length > 1) conditions.push(or(...prefixes.map((prefix) => like(auditLogs.action, `${prefix}%`)))!);
   if (query.actorUserId != null) conditions.push(eq(auditLogs.actorUserId, query.actorUserId));
   if (query.entityType) conditions.push(eq(auditLogs.entityType, query.entityType));
   if (query.entityId) conditions.push(eq(auditLogs.entityId, query.entityId));
@@ -155,18 +160,45 @@ export async function listAuditLogs(query: AuditLogQuery) {
     db.select({ total: count() }).from(auditLogs).where(where),
   ]);
 
+  const parsed = rows.map((row) => {
+    let metadata: unknown = null;
+    try {
+      metadata = row.metadata ? JSON.parse(row.metadata) : null;
+    } catch {
+      metadata = row.metadata;
+    }
+    return { ...row, metadata };
+  });
+
+  // Who an entry is about, by name: „plata #15 · Radu Stan” instead of a bare
+  // id. Payments carry the player in their metadata; player entries are the
+  // player. One query for the page; a deleted player just has no name.
+  const subjectId = (row: (typeof parsed)[number]) => {
+    const fromMeta = Number((row.metadata as { playerId?: unknown } | null)?.playerId);
+    if (Number.isInteger(fromMeta) && fromMeta > 0) return fromMeta;
+    const fromEntity = row.entityType === 'player' ? Number(row.entityId) : NaN;
+    return Number.isInteger(fromEntity) && fromEntity > 0 ? fromEntity : null;
+  };
+  const ids = Array.from(new Set(parsed.map(subjectId).filter((id): id is number => id != null)));
+  const names = new Map<number, string>();
+  if (ids.length) {
+    const found = await db
+      .select({ id: players.id, name: players.name, firstName: players.firstName, lastName: players.lastName })
+      .from(players)
+      .where(inArray(players.id, ids));
+    for (const player of found) {
+      const name = [player.firstName, player.lastName].filter(Boolean).join(' ').trim() || player.name?.trim();
+      if (name) names.set(player.id, name);
+    }
+  }
+
   return {
     page,
     pageSize,
     total: Number(total),
-    logs: rows.map((row) => {
-      let metadata: unknown = null;
-      try {
-        metadata = row.metadata ? JSON.parse(row.metadata) : null;
-      } catch {
-        metadata = row.metadata;
-      }
-      return { ...row, metadata };
+    logs: parsed.map((row) => {
+      const id = subjectId(row);
+      return { ...row, subjectName: id != null ? names.get(id) ?? null : null };
     }),
   };
 }

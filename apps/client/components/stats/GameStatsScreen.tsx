@@ -17,6 +17,7 @@ import BoxScoreView from './BoxScoreView';
 import GameSetup from './GameSetup';
 import Scorer from './Scorer';
 import { clearScorerCache } from './useScorer';
+import { isNotFound } from '../../services/apiClient';
 
 /**
  * /admin/stats/:id, /coach/stats/:id, /stats/:id (a delegated parent).
@@ -37,6 +38,8 @@ export default function GameStatsScreen() {
   const { session } = useSession();
   const [data, setData] = useState<GamePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Gone (404 or a bad id): „Înapoi”, not „Reîncearcă”.
+  const [missing, setMissing] = useState(false);
   const [editingSetup, setEditingSetup] = useState(false);
   // Opening the scorer more than a day before the match needs a yes first.
   const [earlyStartOk, setEarlyStartOk] = useState(false);
@@ -47,15 +50,17 @@ export default function GameStatsScreen() {
   const load = useCallback(async () => {
     try {
       setError(null);
+      setMissing(false);
       setData(await gamesApi.get(eventId));
     } catch (err) {
+      setMissing(isNotFound(err));
       setError(err instanceof Error ? err.message : 'Nu am putut încărca meciul.');
     }
   }, [eventId]);
 
   useEffect(() => {
     if (Number.isInteger(eventId) && eventId > 0) void load();
-    else setError('Meciul nu există.');
+    else { setMissing(true); setError('Meciul nu există.'); }
   }, [eventId, load]);
 
   const finishedBox = useMemo(() => (data?.game ? computeBoxScore(data.events, data.game.starters, data.game.periodSec) : null), [data]);
@@ -108,7 +113,9 @@ export default function GameStatsScreen() {
 
   let body: React.ReactNode;
   if (error) {
-    body = <ErrorState title="Nu am putut deschide meciul" message={error} actionLabel="Reîncearcă" onAction={load} />;
+    body = missing
+      ? <ErrorState title="Meciul nu mai există" message="A fost șters din Program sau linkul nu mai e valid." actionLabel="Înapoi" onAction={() => router.back()} />
+      : <ErrorState title="Nu am putut deschide meciul" message={error} actionLabel="Reîncearcă" onAction={load} />;
   } else if (!data) {
     body = (
       <View className="gap-3" accessibilityRole="progressbar" accessibilityLabel="Se încarcă meciul">

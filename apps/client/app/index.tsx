@@ -25,7 +25,7 @@ export default function Landing() {
   }, [router, session]);
 
   if (session) {
-    return <LoadingScreen message="Opening BCMS..." backgroundColor="var(--c-surface)" color="var(--c-blue)" />;
+    return <LoadingScreen message="Se deschide BCMS…" backgroundColor="var(--c-surface)" color="var(--c-blue)" />;
   }
 
   return <Welcome />;

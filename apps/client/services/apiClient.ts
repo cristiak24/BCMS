@@ -1,4 +1,5 @@
 import { buildApiUrl, buildServerUrl } from '../config/serverUrl';
+import { messageForStatus, userFacingMessage } from '../utils/errorMessages';
 import { isNetworkError, NETWORK_ERROR_MESSAGE, retryOnNetworkError } from '../utils/networkRetry';
 
 type ApiResponseType = 'json' | 'text' | 'blob' | 'void';
@@ -55,24 +56,27 @@ export class ApiError extends Error {
   }
 }
 
-async function buildError(response: Response) {
-  const fallbackMessage = `Request failed with status ${response.status}`;
+/** The thing asked for doesn't exist (any more): a page offers „Înapoi”, not „Reîncearcă”. */
+export function isNotFound(error: unknown) {
+  return error instanceof ApiError && error.status === 404;
+}
 
+async function buildError(response: Response) {
   try {
     const payload = await readJsonLike<unknown>(response);
     if (typeof payload === 'string' && payload.trim()) {
-      return new ApiError(payload, response.status);
+      return new ApiError(userFacingMessage(payload, response.status), response.status);
     }
 
     const payloadMessage = readMessageFromPayload(payload);
     if (payloadMessage) {
-      return new ApiError(payloadMessage, response.status, payload);
+      return new ApiError(userFacingMessage(payloadMessage, response.status), response.status, payload);
     }
   } catch {
-    return new ApiError(fallbackMessage, response.status);
+    return new ApiError(messageForStatus(response.status), response.status);
   }
 
-  return new ApiError(fallbackMessage, response.status);
+  return new ApiError(messageForStatus(response.status), response.status);
 }
 
 type UnauthorizedHandler = (status: 401 | 403) => void;

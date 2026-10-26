@@ -4,7 +4,7 @@ import { ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { teamsApi, type Player } from '../../../services/teamsApi';
-import { ApiError } from '../../../services/apiClient';
+import { ApiError, isNotFound } from '../../../services/apiClient';
 import PageContainer from '../../../components/ui/PageContainer';
 import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import Button from '../../../components/ui/Button';
@@ -53,6 +53,8 @@ export default function PlayerProfile() {
   const { toasts, showToast, dismissToast } = useToasts();
   const [player, setPlayer] = useState<Player | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Gone (404): the page offers „Înapoi la Lot”, retrying can't help.
+  const [missing, setMissing] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [firstName, setFirstName] = useState('');
@@ -80,11 +82,13 @@ export default function PlayerProfile() {
     if (!id) return;
     try {
       setLoadError(null);
+      setMissing(false);
       const data = await teamsApi.getPlayerById(parseInt(id as string, 10));
       setPlayer(data);
       hydrate(data);
-    } catch {
-      setLoadError('Nu am putut încărca jucătorul.');
+    } catch (err) {
+      setMissing(isNotFound(err));
+      setLoadError(err instanceof Error ? err.message : 'Nu am putut încărca jucătorul.');
     }
     // History is secondary: an older server (404) or an error just hides it.
     teamsApi.getPlayerHistory(parseInt(id as string, 10))
@@ -171,7 +175,11 @@ export default function PlayerProfile() {
   if (loadError) {
     return (
       <View className="flex-1 items-center justify-center p-6" style={{ backgroundColor: 'var(--c-bg)' }}>
-        <ErrorState title="Jucător negăsit" message={loadError} actionLabel="Încearcă din nou" onAction={fetchPlayer} />
+        {missing ? (
+          <ErrorState title="Jucătorul nu mai există" message="A fost șters din club sau linkul nu mai e valid." actionLabel="Înapoi la Lot" onAction={() => router.replace('/admin/roster' as any)} />
+        ) : (
+          <ErrorState title="Nu am putut încărca jucătorul" message={loadError} actionLabel="Încearcă din nou" onAction={fetchPlayer} />
+        )}
       </View>
     );
   }

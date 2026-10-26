@@ -28,6 +28,8 @@ export type AuditLogEntry = {
     clubId: number | null;
     metadata: unknown;
     createdAt: string;
+    /** The player the entry is about, by name (payments, player changes); null when unknown. */
+    subjectName?: string | null;
 };
 
 export type AuditLogPage = { page: number; pageSize: number; total: number; logs: AuditLogEntry[] };

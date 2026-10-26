@@ -26,6 +26,7 @@ import { canMarkAttendance } from '../../../utils/eventPermissions';
 import { useSession } from '../../../context/AuthContext';
 import { plural } from '../../../utils/plural';
 import { DenseList, DenseRow } from '../../../components/ui/DenseList';
+import { isNotFound } from '../../../services/apiClient';
 
 /**
  * Admin "Notare prezență" for one event.
@@ -80,6 +81,8 @@ export default function AttendanceScreen() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Gone (404 or a bad id): the page offers „Înapoi”, retrying can't help.
+  const [missing, setMissing] = useState(false);
   const [event, setEvent] = useState<CalendarEvent | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
   const [roster, setRoster] = useState<RosterEntry[]>([]);
@@ -107,13 +110,14 @@ export default function AttendanceScreen() {
   const loadData = useCallback(async () => {
     const eventId = Number(id);
     if (!Number.isInteger(eventId) || eventId <= 0) {
-      setError('Evenimentul nu există.');
+      setMissing(true);
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
       setError(null);
+      setMissing(false);
       const eventDetails = await eventsApi.getEventById(eventId);
       setEvent(eventDetails);
 
@@ -147,6 +151,7 @@ export default function AttendanceScreen() {
       }
     } catch (err) {
       console.error('Failed to load attendance screen data', err);
+      setMissing(isNotFound(err));
       setError(err instanceof Error ? err.message : 'Prezența nu a putut fi încărcată.');
     } finally {
       setLoading(false);
@@ -316,12 +321,21 @@ export default function AttendanceScreen() {
         <PageContainer>
           <View className="gap-4">
             {backButton}
-            <ErrorState
-              title="Prezența nu a putut fi afișată"
-              message={error ?? 'Evenimentul nu există sau a fost șters.'}
-              actionLabel="Reîncearcă"
-              onAction={loadData}
-            />
+            {missing ? (
+              <ErrorState
+                title="Evenimentul nu mai există"
+                message="A fost șters sau linkul nu mai e valid, așa că nu are prezență de marcat."
+                actionLabel="Înapoi la Program"
+                onAction={goBack}
+              />
+            ) : (
+              <ErrorState
+                title="Prezența nu a putut fi afișată"
+                message={error ?? 'Nu am putut încărca prezența.'}
+                actionLabel="Reîncearcă"
+                onAction={loadData}
+              />
+            )}
           </View>
         </PageContainer>
       </ScrollView>
