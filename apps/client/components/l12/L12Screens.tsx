@@ -104,6 +104,7 @@ function FiltersSheet({ visible, onClose, onReset, children }: { visible: boolea
         <View
           accessibilityRole={'dialog' as any}
           accessibilityLabel="Filtre"
+          aria-modal="true"
           className="ui-rise w-full rounded-t-[20px] border overflow-hidden pb-[env(safe-area-inset-bottom)]"
           style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: '0 28px 70px rgba(2, 8, 23, 0.35)' } as any}
         >
@@ -774,7 +775,6 @@ export function L12MatchScreen() {
         </View>
 
         <View className="ui-rise relative overflow-hidden rounded-[16px] border p-3.5 md:p-4 gap-3" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
-          <View pointerEvents="none" className="absolute rounded-full" style={{ width: 220, height: 220, right: -50, top: -100, backgroundColor: 'var(--c-surface-tint)', opacity: 0.8 }} />
           <View className="relative flex-col lg:flex-row lg:items-start gap-3">
             <View className="flex-1 min-w-0">
               {/* The visible title is a pair of team badges; readers get one page title. */}
@@ -1029,7 +1029,6 @@ export function L12TemplateScreen() {
         </View>
 
         <View className="ui-rise relative overflow-hidden rounded-[16px] border p-3.5 md:p-4" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
-          <View pointerEvents="none" className="absolute rounded-full" style={{ width: 220, height: 220, right: -50, top: -100, backgroundColor: 'var(--c-surface-tint)', opacity: 0.8 }} />
           <View className="relative flex-col lg:flex-row lg:items-start gap-3">
             <View className="flex-1 min-w-0">
               <Text className="sr-only" accessibilityRole="header" aria-level={1}>{`L12 constant · ${team.name}`}</Text>

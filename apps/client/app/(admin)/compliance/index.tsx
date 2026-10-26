@@ -94,7 +94,7 @@ export default function ComplianceScreen() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setSearchPlaceholder('Caută sportiv…');
+    setSearchPlaceholder('Caută jucător…');
     setHeaderActions(null);
     setMobileFab(null);
     return () => {
@@ -176,7 +176,7 @@ export default function ComplianceScreen() {
       if (!iso) return;
       await Promise.all(editing.map((id) => teamsApi.updatePlayer(id, { medicalCheckExpiry: iso })));
       setPlayers((prev) => prev?.map((p) => (editing.includes(p.id) ? { ...p, medicalCheckExpiry: iso } : p)) ?? prev);
-      showToast({ message: editing.length === 1 ? 'Viza a fost actualizată.' : `Vizele a ${plural(editing.length, 'sportiv', 'sportivi')} au fost actualizate.`, variant: 'success' });
+      showToast({ message: editing.length === 1 ? 'Viza a fost actualizată.' : `Vizele a ${plural(editing.length, 'jucător', 'jucători')} au fost actualizate.`, variant: 'success' });
       setSelected((prev) => prev.filter((id) => !editing.includes(id)));
       setEditing(null);
     } catch {
@@ -203,7 +203,7 @@ export default function ComplianceScreen() {
     <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
       <ScrollView className="flex-1" contentContainerClassName="pb-36" showsVerticalScrollIndicator={false}>
         <PageContainer>
-          <PageHero eyebrow="Conformitate" title="Vizele medicale" subtitle="Vizele medicale ale sportivilor din club.">
+          <PageHero eyebrow="Conformitate" title="Vizele medicale" subtitle="Vizele medicale ale jucătorilor din club.">
             {players && !error ? (
               <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
                 <GlassStat dot="var(--c-success)" value={metrics.valid} label="Valabile" hint={`${metrics.securePercent}% din lot`} />
@@ -246,15 +246,15 @@ export default function ComplianceScreen() {
                   <EmptyState
                     compact
                     icon={statusFilter === 'attention' ? 'verified' : 'search-off'}
-                    title={statusFilter === 'attention' ? 'Toate vizele sunt la zi' : 'Niciun sportiv'}
-                    message={statusFilter === 'attention' ? 'Niciun sportiv nu are viza expirată, pe terminate sau lipsă.' : 'Încearcă alt filtru sau altă căutare.'}
+                    title={statusFilter === 'attention' ? 'Toate vizele sunt la zi' : 'Niciun jucător'}
+                    message={statusFilter === 'attention' ? 'Niciun jucător nu are viza expirată, pe terminate sau lipsă.' : 'Încearcă alt filtru sau altă căutare.'}
                   />
                 ) : (
                   <>
                     <View className="rounded-[14px] border overflow-hidden" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
                       <View className="hidden md:flex flex-row items-center px-3 py-2 border-b" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}>
                         <Checkbox checked={allOnPageSelected} onPress={togglePage} label="Selectează pagina" />
-                        <Text className="t-eyebrow flex-[2] pl-2" style={{ color: 'var(--c-faint)' }}>Sportiv</Text>
+                        <Text className="t-eyebrow flex-[2] pl-2" style={{ color: 'var(--c-faint)' }}>Jucător</Text>
                         <Text className="t-eyebrow flex-[1.4]" style={{ color: 'var(--c-faint)' }}>Echipă</Text>
                         <Text className="t-eyebrow flex-1" style={{ color: 'var(--c-faint)' }}>Stare</Text>
                         <Text className="t-eyebrow flex-[1.2]" style={{ color: 'var(--c-faint)' }}>Expiră</Text>
@@ -319,7 +319,7 @@ export default function ComplianceScreen() {
                         );
                       })}
                     </View>
-                    <Pagination page={page} totalPages={totalPages} onPageChange={setPage} rangeStart={rangeStart} rangeEnd={rangeEnd} total={total} itemNoun="sportivi" pageSize={pageSize} onPageSizeChange={setPageSize} />
+                    <Pagination page={page} totalPages={totalPages} onPageChange={setPage} rangeStart={rangeStart} rangeEnd={rangeEnd} total={total} itemNoun="jucători" pageSize={pageSize} onPageSizeChange={setPageSize} />
                   </>
                 )}
               </View>
@@ -333,7 +333,7 @@ export default function ComplianceScreen() {
         title="Actualizează viza medicală"
         message={editingNames.length === 1
           ? `Noua dată de expirare pentru ${editingNames[0]}.`
-          : `Aceeași dată de expirare pentru ${plural(editingNames.length, 'sportiv', 'sportivi')}.`}
+          : `Aceeași dată de expirare pentru ${plural(editingNames.length, 'jucător', 'jucători')}.`}
         icon="event-available"
         confirmLabel="Salvează"
         loading={saving}

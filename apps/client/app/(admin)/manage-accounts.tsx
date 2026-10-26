@@ -638,7 +638,7 @@ export default function ManageAccountsScreen() {
                         {selectedAccounts.length > 0 ? (
                             <View className="flex-col sm:flex-row sm:items-center gap-2 rounded-[12px] px-3.5 py-2.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
                                 <Text className="text-[13px] font-semibold sm:mr-auto" style={{ color: 'var(--c-brand-fg)' }}>
-                                    {plural(selectedAccounts.length, 'cont selectat', 'conturi selectate')}
+                                    {`${selectedAccounts.length.toLocaleString('ro-RO')} în selecție`}
                                 </Text>
                                 <View className="flex-row flex-wrap items-center gap-1.5">
                                     {(['coach', 'player', 'parent'] as ClubAdminAccountRole[]).map((role) => (
@@ -646,7 +646,7 @@ export default function ManageAccountsScreen() {
                                     ))}
                                     <Button size="sm" label="Reactivează" disabled={bulkBusy} onPress={() => setPending({ kind: 'bulk', action: 'reactivate', ids: bulkIds })} />
                                     <Button size="sm" variant="danger" label="Dezactivează" disabled={bulkBusy} onPress={() => setPending({ kind: 'bulk', action: 'deactivate', ids: bulkIds })} />
-                                    <Button size="sm" variant="ghost" label="Renunță" onPress={clearSelection} />
+                                    <Button size="sm" variant="ghost" label="Deselectează" onPress={clearSelection} />
                                 </View>
                             </View>
                         ) : null}

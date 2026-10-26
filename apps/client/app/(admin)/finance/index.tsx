@@ -714,7 +714,7 @@ export default function FinancialSettingsPage() {
             {activeTab === 'Finances' && (
                 <View className="mb-20">
 
-                    <BalancesCard onPaymentRecorded={handlePaymentRecorded} reloadKey={balancesReload} />
+                    <BalancesCard onPaymentRecorded={handlePaymentRecorded} onNotify={showToast} reloadKey={balancesReload} />
 
                     {/* ── Documents register (with its upload actions) + recent payments ── */}
                     <View className="grid grid-cols-1 xl:grid-cols-5 gap-5 items-start">

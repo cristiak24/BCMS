@@ -2,6 +2,23 @@ import React from 'react';
 import { Pressable, View } from '@/src/web/reactNative';
 import { Check } from 'lucide-react';
 
+/** The drawn box alone, for a control that is itself the checkbox (a labelled row). */
+export function CheckboxBox({ checked, size = 20 }: { checked: boolean; size?: number }) {
+    return (
+        <View
+            className="items-center justify-center rounded-[7px] border-2 transition-colors shrink-0"
+            style={{
+                width: size,
+                height: size,
+                backgroundColor: checked ? 'var(--c-brand-surface)' : 'var(--c-surface)',
+                borderColor: checked ? 'var(--c-brand-surface)' : 'var(--c-border-strong)',
+            } as any}
+        >
+            {checked && <Check size={Math.round(size * 0.62)} color="var(--c-on-brand)" strokeWidth={3.5} />}
+        </View>
+    );
+}
+
 export default function ThemedCheckbox({
     checked,
     onToggle,

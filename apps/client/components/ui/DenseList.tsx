@@ -19,7 +19,7 @@ export function DenseList({
   className,
 }: {
   children: ReactNode;
-  /** Accessible name of the list, e.g. "Sportivi". */
+  /** Accessible name of the list, e.g. "Jucători". */
   label?: string;
   /** Column titles; outside the separated rows, so hiding it on phones leaves no double line. */
   header?: ReactNode;

@@ -3,6 +3,7 @@ import { Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import Button from '../ui/Button';
 import { DenseRow } from '../ui/DenseList';
+import PageHero, { GlassStat } from '../admin/PageHero';
 import type { L12OverviewMatch } from '../../services/l12Api';
 import { plural } from '../../utils/plural';
 
@@ -275,18 +276,6 @@ export function DayHeading({ label, count }: { label: string; count: number }) {
 
 // ── Welcome panel ────────────────────────────────────────────
 
-function StatTile({ value, label, tone }: { value: string | number; label: string; tone: string }) {
-  return (
-    <View className="flex-1 min-w-0 rounded-[12px] border px-3 py-2" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
-      <View className="flex-row items-center gap-1.5">
-        <View className="w-[3px] h-3 rounded-full" style={{ backgroundColor: tone }} />
-        <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
-      </View>
-      <Text className="f-display t-num text-[20px] font-extrabold leading-none mt-1.5" style={{ color: 'var(--c-ink-strong)' }}>{value}</Text>
-    </View>
-  );
-}
-
 export type HeroNext = { match: L12OverviewMatch; home: string; away: string | null };
 
 export function L12Hero({
@@ -313,37 +302,25 @@ export function L12Hero({
       ? `Toate cele ${plural(upcoming, 'meci viitor are', 'meciuri viitoare au')} lista L12 gata.`
       : 'Când apar meciuri în Program, lista lor se pregătește de aici.';
 
+  // The plain page header every admin work page opens on (the hero is Acasă's
+  // alone); the next match without a list stays one actionable row below it.
   return (
-    <View className="ui-rise relative overflow-hidden rounded-[16px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
-      {/* No tint circle or court lines: like the other admin work pages (hero only on Acasă), the
-          card is plain and keeps its content — the counts and the next match without a list. */}
-      <View className="relative flex-col lg:flex-row lg:items-center gap-3.5 p-3.5 sm:p-4 md:p-5">
-        <View className="flex-1 min-w-0 gap-3">
-          <View>
-            <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Liste de joc · L12</Text>
-            <Text accessibilityRole="header" aria-level={1} className="f-display text-[20px] md:text-[24px] font-extrabold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any}>
-              {title}
-            </Text>
-            <Text className="text-[13px] mt-1 max-w-[520px]" style={{ color: 'var(--c-muted)' }}>{subtitle}</Text>
-          </View>
+    <PageHero eyebrow="Liste de joc · L12" title={title} subtitle={subtitle} className="mb-0">
+      <View className="grid grid-cols-3 gap-2">
+        <GlassStat value={unset} label="Fără L12" dot="var(--c-warning)" />
+        <GlassStat value={ready} label="Gata" dot="var(--c-success)" />
+        <GlassStat value={`${teamsSet}/${teamsTotal}`} label="L12 constant" shortLabel="Constant" hint="echipe cu lista setată" dot="var(--c-brand-fg)" />
+      </View>
 
-          <View className="flex-row gap-2">
-            <StatTile value={unset} label="Fără L12" tone="var(--c-warning)" />
-            <StatTile value={ready} label="Gata" tone="var(--c-success)" />
-            <StatTile value={`${teamsSet}/${teamsTotal}`} label="Loturi" tone="var(--c-brand-fg)" />
-          </View>
-        </View>
-
-        {next ? (
-          <View className="rounded-[14px] border p-3 gap-2.5 lg:w-[300px]" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
+      {next ? (
+        <View className="flex-col sm:flex-row sm:items-center gap-3 rounded-[14px] border px-3.5 py-3" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
+          <View className="flex-1 min-w-0 gap-1">
             <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{unset > 0 ? 'Următorul meci fără listă' : 'Următorul meci'}</Text>
-            <View className="gap-1.5">
-              {[next.home, next.away].filter((side): side is string => Boolean(side)).map((side) => (
-                <View key={side} className="flex-row items-center gap-2 min-w-0">
-                  <TeamAvatar name={side} mine={isOwnSide(side, next.match.teamName)} />
-                  <Text className="f-display text-[15px] font-semibold flex-1 min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{side}</Text>
-                </View>
-              ))}
+            <View className="flex-row items-center gap-2 min-w-0">
+              <TeamAvatar name={next.home} mine={isOwnSide(next.home, next.match.teamName)} />
+              <Text className="f-display text-[15px] font-semibold shrink min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+                {next.away ? `${next.home} – ${next.away}` : next.home}
+              </Text>
             </View>
             <View className="flex-row items-center gap-1.5">
               <MaterialIcons name="event" size={14} color="var(--c-faint)" />
@@ -351,15 +328,15 @@ export function L12Hero({
                 {parseApiDate(next.match.startTime).toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })} · {timeOf(next.match.startTime)}
               </Text>
             </View>
-            <Button
-              variant={next.match.hasLineup ? 'secondary' : 'primary'}
-              icon={next.match.hasLineup ? 'assignment' : 'edit'}
-              label={next.match.hasLineup ? 'Vezi lista' : 'Completează lista'}
-              onPress={() => onOpenNext(next.match.eventId)}
-            />
           </View>
-        ) : null}
-      </View>
-    </View>
+          <Button
+            variant={next.match.hasLineup ? 'secondary' : 'primary'}
+            icon={next.match.hasLineup ? 'assignment' : 'edit'}
+            label={next.match.hasLineup ? 'Vezi lista' : 'Completează lista'}
+            onPress={() => onOpenNext(next.match.eventId)}
+          />
+        </View>
+      ) : null}
+    </PageHero>
   );
 }

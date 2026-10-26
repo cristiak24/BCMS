@@ -48,8 +48,12 @@ export default function ActionSheet({
         className="flex-1 justify-end sm:justify-center items-center sm:p-6"
         style={{ backgroundColor: 'rgba(2, 8, 23, 0.55)' }}
       >
+        {/* A named dialog holding a named menu; „Închide” sits outside the menu
+            (a menu holds only menu items). */}
         <View
-          accessibilityRole={'menu' as any}
+          accessibilityRole={'dialog' as any}
+          accessibilityLabel={title}
+          aria-modal="true"
           className="ui-rise w-full sm:max-w-[360px] rounded-t-[20px] sm:rounded-[18px] border overflow-hidden pb-[env(safe-area-inset-bottom)]"
           style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: '0 28px 70px rgba(2, 8, 23, 0.35)' } as any}
         >
@@ -57,7 +61,7 @@ export default function ActionSheet({
             <Text className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{title}</Text>
             {subtitle ? <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{subtitle}</Text> : null}
           </View>
-          <View className="py-1.5">
+          <View className="py-1.5" accessibilityRole={'menu' as any} accessibilityLabel={title}>
             {actions.map((action) => {
               const fg = action.tone === 'danger' ? 'var(--c-danger-fg)' : 'var(--c-ink)';
               return (

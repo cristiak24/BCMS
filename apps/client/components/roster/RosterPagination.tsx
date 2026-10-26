@@ -49,7 +49,7 @@ export default function RosterPagination({
     <View style={styles.container}>
       <View style={styles.summaryRow}>
         <Text style={styles.summary}>
-          Sportivii {start}-{end} din {totalItems}
+          Jucătorii {start}-{end} din {totalItems}
         </Text>
 
         {pageSizeOptions && onPageSizeChange ? (

@@ -124,7 +124,16 @@ function PlayerCard({
   const name = `${player.firstName} ${player.lastName}`.trim();
   const ownPhone = player.phone || player.accountPhone;
   const accounts = player.guardianAccounts ?? [];
-  const hasAny = Boolean(ownPhone || player.guardianPhone || player.guardian2Phone || accounts.length);
+  // Every line the row could show; the ones without a number fold into one
+  // quiet „Fără număr: …” (a „Fără număr” per line made a wall of them).
+  const lines: { key: string; label: string; name?: string | null; phone: string | null; hint?: string }[] = [
+    { key: 'own', label: 'Jucător', phone: ownPhone ?? null, hint: !player.phone && player.accountPhone ? 'din profil' : undefined },
+    ...accounts.map((account) => ({ key: `account-${account.userId}`, label: 'Părinte', name: account.name, phone: account.phone ?? null, hint: 'cont' })),
+    ...(player.guardianPhone || player.guardianName ? [{ key: 'g1', label: 'Părinte 1', name: player.guardianName, phone: player.guardianPhone ?? null }] : []),
+    ...(player.guardian2Phone || player.guardian2Name ? [{ key: 'g2', label: 'Părinte 2', name: player.guardian2Name, phone: player.guardian2Phone ?? null }] : []),
+  ];
+  const withPhone = lines.filter((line) => line.phone);
+  const missing = lines.filter((line) => !line.phone).map((line) => (line.name ? `${line.label} (${line.name})` : line.label));
   const invalid = ![draft.phone, draft.guardianPhone, draft.guardian2Phone].every(isValidPhone);
 
   const save = async () => {
@@ -201,15 +210,15 @@ function PlayerCard({
             </Pressable>
           </View>
         </View>
-      ) : hasAny ? (
+      ) : withPhone.length ? (
         // Under the name, not behind a separator: these are the row's details.
-        <View className="gap-2.5 pl-12 md:flex-row md:flex-wrap md:gap-x-8">
-          <PhoneLine label="Jucător" phone={ownPhone} hint={!player.phone && player.accountPhone ? 'din profil' : undefined} />
-          {accounts.map((account) => (
-            <PhoneLine key={account.userId} label="Părinte" name={account.name} phone={account.phone} hint="cont" />
-          ))}
-          {player.guardianPhone || player.guardianName ? <PhoneLine label="Părinte 1" name={player.guardianName} phone={player.guardianPhone} /> : null}
-          {player.guardian2Phone || player.guardian2Name ? <PhoneLine label="Părinte 2" name={player.guardian2Name} phone={player.guardian2Phone} /> : null}
+        <View className="gap-2.5 pl-12">
+          <View className="gap-2.5 md:flex-row md:flex-wrap md:gap-x-8">
+            {withPhone.map((line) => <PhoneLine key={line.key} label={line.label} name={line.name} phone={line.phone} hint={line.hint} />)}
+          </View>
+          {missing.length ? (
+            <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>Fără număr: {missing.join(', ')}</Text>
+          ) : null}
         </View>
       ) : (
         // Quiet: an indigo „Adaugă numere” on every row without a number spent

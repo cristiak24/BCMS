@@ -79,6 +79,8 @@ export function MobileBottomNavigation({
           // Starts with the visible text (WCAG 2.5.3): „Toate secțiunile” alone
           // could not be reached by saying "Mai mult".
           accessibilityLabel="Mai mult: toate secțiunile"
+          // A page reached through „Mai mult” (Conturi, Jurnal…) marks it, as the sheet marks the page.
+          {...({ 'aria-current': moreIsActive ? 'page' : undefined } as any)}
         >
           <View className="items-center justify-center rounded-[18px] px-2 py-2 min-h-[52px] w-full" style={{ backgroundColor: moreIsActive ? 'var(--c-surface-tint)' : 'transparent' }}>
             <MaterialIcons name="apps" size={20} color={moreIsActive ? theme.colors.royal : theme.colors.faint} />

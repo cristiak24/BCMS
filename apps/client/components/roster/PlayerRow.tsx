@@ -35,7 +35,7 @@ export default function PlayerRow({
   onPress,
   onEdit,
 }: PlayerRowProps) {
-  const fullName = `${player.firstName || 'Necunoscut'} ${player.lastName || 'Sportiv'}`.trim();
+  const fullName = `${player.firstName || 'Necunoscut'} ${player.lastName || 'Jucător'}`.trim();
   const subtitle = `${player.number ? `#${player.number}` : 'Fără tricou'} • ${getTeamLabel(player)}`;
   const initials = `${player.firstName?.[0] || 'P'}${player.lastName?.[0] || ''}`.toUpperCase();
 
@@ -50,10 +50,15 @@ export default function PlayerRow({
 
   // A table row, not a floating card: the list used to be eight separate
   // 22px-radius cards with "ROL" / "SĂPTĂMÂNAL" captions over every value.
+  // The row itself is not a button (that put the checkbox and „Acțiuni” inside
+  // one): the name is the link, and a click anywhere else on the row opens the
+  // player too, for the mouse.
   return (
-    <Pressable
-      onPress={onPress}
-      className="hover:bg-[var(--c-surface-2)]"
+    <View
+      onClick={(event: any) => {
+        if (!(event.target as HTMLElement).closest('button, a, [role="button"], [role="checkbox"], [role="link"]')) onPress();
+      }}
+      className="cursor-pointer hover:bg-[var(--c-surface-2)]"
       style={[styles.row, selected && { backgroundColor: 'var(--c-surface-tint)' }] as any}
     >
       <View style={styles.mainRow}>
@@ -61,7 +66,7 @@ export default function PlayerRow({
           <RosterCheckbox checked={selected} onToggle={onToggleSelect} accessibilityLabel={`Selectează ${fullName}`} />
         </View>
 
-        <View style={styles.playerCell}>
+        <Pressable onPress={onPress} accessibilityRole="link" className="text-left rounded-[8px]" style={styles.playerCell}>
           <View style={styles.avatar}>
             {player.avatarUrl ? (
               <Image source={{ uri: player.avatarUrl }} style={styles.avatarImage} />
@@ -76,7 +81,7 @@ export default function PlayerRow({
             </View>
             <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
           </View>
-        </View>
+        </Pressable>
 
         <View style={styles.medicalCell}>
           <View style={[styles.paymentPill, { backgroundColor: medicalMeta.bg }] as any}>
@@ -119,7 +124,7 @@ export default function PlayerRow({
           </Pressable>
         </View>
       </View>
-    </Pressable>
+    </View>
   );
 }
 

@@ -413,9 +413,10 @@ export default function AttendanceScreen() {
             </View>
             {roster.length > 0 ? (
               <View className="grid grid-cols-3 gap-2 max-w-[520px] ui-stagger">
-                <GlassStat value={counts.present + counts.late} label="Prezențe" dot="var(--c-success)" hint={counts.late ? plural(counts.late, 'întârziere', 'întârzieri') : undefined} />
-                <GlassStat value={counts.absent} label="Absențe" dot="var(--c-danger)" />
-                <GlassStat value={counts.medical} label="Motivate" dot="var(--c-warning)" />
+                {/* „1 Absență”, not „1 Absențe”. */}
+                <GlassStat value={counts.present + counts.late} label={counts.present + counts.late === 1 ? 'Prezență' : 'Prezențe'} dot="var(--c-success)" hint={counts.late ? plural(counts.late, 'întârziere', 'întârzieri') : undefined} />
+                <GlassStat value={counts.absent} label={counts.absent === 1 ? 'Absență' : 'Absențe'} dot="var(--c-danger)" />
+                <GlassStat value={counts.medical} label={counts.medical === 1 ? 'Motivată' : 'Motivate'} dot="var(--c-warning)" />
               </View>
             ) : null}
           </PageHero>

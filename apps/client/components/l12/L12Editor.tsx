@@ -54,7 +54,7 @@ export function validateLineup(lineup: L12Lineup): string | null {
   if (lineup.players.length > L12_MAX_PLAYERS) return `Maxim ${L12_MAX_PLAYERS} jucători.`;
   const numbers = new Map<string, string>();
   for (const player of lineup.players) {
-    if (player.shirtNumber && !/^\d{1,2}$/.test(player.shirtNumber)) return `Număr invalid la ${player.lastName} ${player.firstName}.`;
+    if (player.shirtNumber && !/^\d{1,2}$/.test(player.shirtNumber)) return `Număr invalid la ${player.firstName} ${player.lastName}.`;
     if (player.shirtNumber && numbers.has(player.shirtNumber)) {
       return `Numărul ${player.shirtNumber} apare de două ori (${numbers.get(player.shirtNumber)}, ${player.lastName}).`;
     }
@@ -243,7 +243,8 @@ function SheetRow({
   onCaptain: () => void;
   onRemove: () => void;
 }) {
-  const name = `${player.lastName ?? ''} ${player.firstName ?? ''}`.trim() || 'Jucător';
+  // First name first, as everywhere else on screen; the printed FRB sheet keeps NUME PRENUME (l12Document).
+  const name = `${player.firstName ?? ''} ${player.lastName ?? ''}`.trim() || 'Jucător';
   const slot = (
     // Row number on the paper form (rows run 4–15). It looked exactly like the
     // shirt number next to it; now it is a small, faint "rând" marker with no
@@ -485,6 +486,15 @@ export default function L12Editor({
   const passed = checks.filter((c) => c.ok).length;
   // Errors block a usable sheet; warnings only nag.
   const ready = checks.filter((c) => c.severity === 'error').every((c) => c.ok);
+  // Nothing picked yet: a to-do list, not a page of red errors the sheet hasn't earned.
+  const pristine = count === 0;
+  const pill = pristine
+    ? { bg: 'var(--c-surface-3)', fg: 'var(--c-ink-soft)', label: 'De completat' }
+    : !ready
+      ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', label: 'Incompletă' }
+      : passed === checks.length
+        ? { bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', label: 'Gata de joc' }
+        : { bg: 'var(--c-surface-tint)', fg: 'var(--c-brand-fg)', label: 'Se poate printa' };
 
   // `compact` (phones): only what is still open, no counters.
   const renderChecklist = (compact: boolean) => (
@@ -492,23 +502,21 @@ export default function L12Editor({
       title="Verificare foaie"
       meta={<Text className="t-num text-[13px] font-semibold" style={{ color: 'var(--c-faint)' }}>{passed}/{checks.length}</Text>}
       actions={(
-        <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: ready ? (passed === checks.length ? 'var(--c-success-bg)' : 'var(--c-surface-tint)') : 'var(--c-danger-bg)' }}>
-          <Text className="text-[11.5px] font-semibold" style={{ color: ready ? (passed === checks.length ? 'var(--c-success-fg)' : 'var(--c-brand-fg)') : 'var(--c-danger-fg)' }}>
-            {!ready ? 'Incompletă' : passed === checks.length ? 'Gata de joc' : 'Se poate printa'}
-          </Text>
+        <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: pill.bg }}>
+          <Text className="text-[11.5px] font-semibold" style={{ color: pill.fg }}>{pill.label}</Text>
         </View>
       )}
     >
       <View className="h-1.5 rounded-full overflow-hidden mb-3" style={{ backgroundColor: 'var(--c-surface-3)' }}>
-        <View className="h-full rounded-full" style={{ width: `${(passed / checks.length) * 100}%`, backgroundColor: ready ? 'var(--c-success)' : 'var(--c-warning)', transition: 'width .25s ease' } as any} />
+        <View className="h-full rounded-full" style={{ width: `${(passed / checks.length) * 100}%`, backgroundColor: pristine ? 'var(--c-brand-fg)' : ready ? 'var(--c-success)' : 'var(--c-warning)', transition: 'width .25s ease' } as any} />
       </View>
       <View className="gap-2">
         {(compact ? checks.filter((c) => !c.ok) : checks).map((check) => (
           <View key={check.key} className="flex-row items-start gap-2.5">
             <MaterialIcons
-              name={check.ok ? 'check-circle' : check.severity === 'error' ? 'error-outline' : 'warning-amber'}
+              name={check.ok ? 'check-circle' : pristine ? 'radio-button-unchecked' : check.severity === 'error' ? 'error-outline' : 'warning-amber'}
               size={17}
-              color={check.ok ? 'var(--c-success-fg)' : check.severity === 'error' ? 'var(--c-danger-fg)' : 'var(--c-warning-fg)'}
+              color={check.ok ? 'var(--c-success-fg)' : pristine ? 'var(--c-faint)' : check.severity === 'error' ? 'var(--c-danger-fg)' : 'var(--c-warning-fg)'}
             />
             <View className="flex-1 min-w-0">
               <Text className="text-[13px] font-semibold" style={{ color: check.ok ? 'var(--c-ink-soft)' : 'var(--c-ink)' }} numberOfLines={1}>{check.label}</Text>
@@ -583,7 +591,7 @@ export default function L12Editor({
                   <Text className="f-display t-num text-[12px] font-bold" style={{ color: 'var(--c-ink-soft)' }}>{player.number ?? '—'}</Text>
                 </View>
                 <View className="flex-1 min-w-0">
-                  <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{player.lastName} {player.firstName}</Text>
+                  <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{player.firstName} {player.lastName}</Text>
                   {note ? <Text className="t-meta" style={{ color: noteTone }} numberOfLines={1}>{note}</Text> : null}
                 </View>
                 <View className="w-7 h-7 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>

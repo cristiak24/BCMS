@@ -57,11 +57,11 @@ export default function RosterTableHeader({
           checked={allSelected}
           indeterminate={!allSelected && someSelected}
           onToggle={onToggleSelectAll}
-          accessibilityLabel="Selectează toți sportivii de pe pagină"
+          accessibilityLabel="Selectează toți jucătorii de pe pagină"
         />
       </View>
       <View style={styles.playerCell}>
-        <SortableLabel label="Sportiv" column="name" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+        <SortableLabel label="Jucător" column="name" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </View>
       {/* Viza medicală instead of "Poziție" (never filled in anywhere) and
           "Categorie" (it repeated the team shown under the name). */}

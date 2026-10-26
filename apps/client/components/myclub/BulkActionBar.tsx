@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, Pressable, ActivityIndicator } from '@/src/web/reactNative';
 import { X, Archive, ArchiveRestore, UserCog, Download, RefreshCw } from 'lucide-react';
 import type { Coach } from '../../services/teamsApi';
-import { plural } from '../../utils/plural';
 
 export default function BulkActionBar({
     count,
@@ -30,9 +29,9 @@ export default function BulkActionBar({
     return (
         <View className="ui-rise flex-col sm:flex-row sm:items-center gap-2.5 border rounded-[14px] px-3.5 py-2.5 mb-4" style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' } as any}>
             <View className="flex-row items-center gap-2 flex-none">
-                <Text className="f-display text-[13px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{plural(count, 'echipă selectată', 'echipe selectate')}</Text>
+                <Text className="f-display text-[13px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{`${count.toLocaleString('ro-RO')} în selecție`}</Text>
                 {busy && <ActivityIndicator size="small" color="var(--c-brand-fg)" />}
-                <Pressable onPress={onClear} className="sm:hidden ml-auto w-7 h-7 rounded-full items-center justify-center hover:bg-[var(--c-surface)]">
+                <Pressable onPress={onClear} accessibilityRole="button" accessibilityLabel="Deselectează" className="tap-40 sm:hidden ml-auto w-7 h-7 rounded-full items-center justify-center hover:bg-[var(--c-surface)]">
                     <X size={15} color="var(--c-brand-fg)" />
                 </Pressable>
             </View>

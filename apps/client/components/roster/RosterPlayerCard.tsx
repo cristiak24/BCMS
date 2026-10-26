@@ -41,7 +41,7 @@ export default function RosterPlayerCard({
   onPress,
   onEdit,
 }: RosterPlayerCardProps) {
-  const fullName = `${player.firstName || 'Necunoscut'} ${player.lastName || 'Sportiv'}`.trim();
+  const fullName = `${player.firstName || 'Necunoscut'} ${player.lastName || 'Jucător'}`.trim();
   const teamLabel = player.teamName || player.teamNames?.[0] || 'Fără echipă';
   const initials = `${player.firstName?.[0] || 'P'}${player.lastName?.[0] || ''}`.toUpperCase();
   const payTone = paymentPaid

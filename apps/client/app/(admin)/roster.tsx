@@ -205,7 +205,7 @@ export default function RosterScreen() {
     if (!selectedPlayer) return;
 
     Alert.alert(
-      'Elimină sportivul',
+      'Elimină jucătorul',
       `Elimini pe ${selectedPlayer.firstName} ${selectedPlayer.lastName} din lotul activ?`,
       [
         { text: 'Renunță', style: 'cancel' },
@@ -221,7 +221,7 @@ export default function RosterScreen() {
               await fetchRosterData();
             } catch (removeError: any) {
               console.error('Remove player error:', removeError);
-              Alert.alert('Eroare', removeError?.message || 'Sportivul nu a putut fi eliminat din lot.');
+              Alert.alert('Eroare', removeError?.message || 'Jucătorul nu a putut fi eliminat din lot.');
             } finally {
               setPlayerActionBusy(false);
             }
@@ -242,7 +242,7 @@ export default function RosterScreen() {
       await fetchRosterData();
     } catch (restoreError: any) {
       console.error('Restore player error:', restoreError);
-      Alert.alert('Eroare', restoreError?.message || 'Sportivul nu a putut fi restaurat la echipă.');
+      Alert.alert('Eroare', restoreError?.message || 'Jucătorul nu a putut fi restaurat la echipă.');
     } finally {
       setPlayerActionBusy(false);
     }
@@ -322,7 +322,7 @@ export default function RosterScreen() {
     () => [
       { label: 'Activ', value: 'active' },
       { label: 'Inactiv', value: 'inactive' },
-      { label: 'Toți sportivii', value: 'all' },
+      { label: 'Toți jucătorii', value: 'all' },
     ],
     []
   );
@@ -410,7 +410,7 @@ export default function RosterScreen() {
 
     Alert.alert(
       'Elimini selecția din lot?',
-      `Elimini ${plural(selectedIds.size, 'sportiv', 'sportivi')} din lotul activ?`,
+      `Elimini ${plural(selectedIds.size, 'jucător', 'jucători')} din lotul activ?`,
       [
         { text: 'Renunță', style: 'cancel' },
         {
@@ -428,7 +428,7 @@ export default function RosterScreen() {
                 const reason = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')?.reason;
                 Alert.alert(
                   'Eliminare parțială',
-                  `${done} din ${plural(results.length, 'sportiv', 'sportivi')} ${done === 1 ? 'a fost eliminat' : 'au fost eliminați'}. ${failed} nu au putut fi eliminați${reason instanceof Error && reason.message ? `: ${reason.message}` : '.'}`,
+                  `Am eliminat ${done} din ${plural(results.length, 'jucător', 'jucători')}. Pentru ${failed} eliminarea nu a mers${reason instanceof Error && reason.message ? `: ${reason.message}` : '.'}`,
                 );
               }
             } finally {
@@ -550,7 +550,7 @@ export default function RosterScreen() {
         <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
           <GlassStat dot="var(--c-brand-fg)" value={formatAttendanceRate(attendanceValue)} label="Prezență" hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()} />
           <GlassStat dot="var(--c-success)" value={`${rosterReadiness}%`} label="Fără restanțe" bar={rosterReadiness} />
-          <GlassStat dot="var(--c-muted)" value={rosterTotal} label="Sportivi în lot" />
+          <GlassStat dot="var(--c-muted)" value={rosterTotal} label="Jucători în lot" />
           <GlassStat dot={pendingPayments > 0 ? 'var(--c-danger)' : 'var(--c-success)'} danger={pendingPayments > 0} value={pendingPayments} label="Cu restanțe" />
         </View>
       </PageHero>
@@ -559,10 +559,10 @@ export default function RosterScreen() {
         <View className={`mb-4 ${isMobile ? 'gap-3' : 'flex-row items-center justify-between'}`}>
           <View>
             <Text accessibilityRole="header" className="f-display text-[17px] font-bold" style={{ color: dash.ink, letterSpacing: '-0.015em' } as any}>
-              Sportivi
+              Jucători
             </Text>
             <Text className="mt-0.5 text-[13px]" style={{ color: dash.muted }}>
-              Afișezi {paginatedPlayers.length} din {plural(filteredTotal, 'sportiv', 'sportivi')}
+              Afișezi {paginatedPlayers.length} din {plural(filteredTotal, 'jucător', 'jucători')}
               {filteredTotal !== rosterTotal ? ` (lot total: ${rosterTotal})` : ''}
             </Text>
           </View>
@@ -610,9 +610,9 @@ export default function RosterScreen() {
         {isMobile ? (
           <View className="gap-3" style={{ opacity: pageLoading ? 0.6 : 1, transition: 'opacity 120ms' } as any} aria-busy={pageLoading}>
             {rosterTotal === 0 ? (
-              <EmptyState title="Niciun sportiv în lot" message="Adaugă primul sportiv pentru a începe gestionarea prezenței și a plăților." icon="groups" />
+              <EmptyState title="Niciun jucător în lot" message="Adaugă primul jucător pentru a începe gestionarea prezenței și a plăților." icon="groups" />
             ) : paginatedPlayers.length ? (
-              <DenseList label="Sportivi">
+              <DenseList label="Jucători">
               {paginatedPlayers.map((item) => {
                 const categoryLabel = getCategoryLabel(item);
                 const attendanceRate = typeof item.attendanceRate === 'number' ? getAttendanceRate(item) : null;
@@ -638,7 +638,7 @@ export default function RosterScreen() {
               </DenseList>
             ) : (
               <EmptyState
-                title={hasActiveFilters ? 'Niciun sportiv nu corespunde filtrelor curente.' : 'Niciun sportiv găsit.'}
+                title={hasActiveFilters ? 'Niciun jucător nu corespunde filtrelor curente.' : 'Niciun jucător găsit.'}
                 message="Încearcă alt nume, număr de tricou, echipă, status de plată sau interval de prezență."
                 icon="groups"
               />
@@ -662,7 +662,7 @@ export default function RosterScreen() {
               />
               <View style={styles.rowsWrap}>
                 {rosterTotal === 0 ? (
-                  <EmptyState title="Niciun sportiv în lot" message="Adaugă primul sportiv pentru a începe gestionarea prezenței și a plăților." icon="groups" />
+                  <EmptyState title="Niciun jucător în lot" message="Adaugă primul jucător pentru a începe gestionarea prezenței și a plăților." icon="groups" />
                 ) : paginatedPlayers.length ? (
                   paginatedPlayers.map((item) => {
                     const attendanceRate = typeof item.attendanceRate === 'number' ? getAttendanceRate(item) : null;
@@ -687,7 +687,7 @@ export default function RosterScreen() {
                   })
                 ) : (
                   <EmptyState
-                    title={hasActiveFilters ? 'Niciun sportiv nu corespunde filtrelor curente.' : 'Niciun sportiv găsit.'}
+                    title={hasActiveFilters ? 'Niciun jucător nu corespunde filtrelor curente.' : 'Niciun jucător găsit.'}
                     message="Încearcă alt nume, număr de tricou, echipă, status de plată sau interval de prezență."
                     icon="groups"
                   />

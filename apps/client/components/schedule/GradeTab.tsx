@@ -236,9 +236,9 @@ export function GradeTab() {
         {selectable && selectedIds.size > 0 ? (
           <View className="flex-row items-center gap-3 rounded-[12px] px-3.5 py-2.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
             <Text className="flex-1 text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
-              {plural(selectedIds.size, 'eveniment selectat', 'evenimente selectate')}
+              {`${selectedIds.size.toLocaleString('ro-RO')} în selecție`}
             </Text>
-            <Button size="sm" variant="ghost" label="Renunță" onPress={() => setSelectedIds(new Set())} />
+            <Button size="sm" variant="ghost" label="Deselectează" onPress={() => setSelectedIds(new Set())} />
             <Button size="sm" variant="primary" icon="done-all" label="Marchează ca notate" loading={bulkBusy} onPress={() => setConfirmBulk(true)} />
           </View>
         ) : null}

@@ -155,7 +155,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
 
   const addPlayerToRoster = async (player: Player) => {
     if (!selectedTeamId) {
-      setError('Alege o echipă înainte de a adăuga un sportiv în lot.');
+      setError('Alege o echipă înainte de a adăuga un jucător în lot.');
       return;
     }
 
@@ -168,7 +168,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
       onClose();
     } catch (addError: any) {
       console.error('Add player to roster error:', addError);
-      setError(addError?.message || 'Acest sportiv nu a putut fi adăugat la echipa selectată.');
+      setError(addError?.message || 'Acest jucător nu a putut fi adăugat la echipa selectată.');
     } finally {
       setAdding(null);
     }
@@ -184,7 +184,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
   const createPlayer = async () => {
     if (!draft || creating) return;
     if (!selectedTeamId) {
-      setError('Alege o echipă înainte de a crea un sportiv.');
+      setError('Alege o echipă înainte de a crea un jucător.');
       return;
     }
     const firstName = draft.firstName.trim();
@@ -209,7 +209,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
       onClose();
     } catch (createError: any) {
       console.error('Create player error:', createError);
-      setError(createError?.message || 'Nu am putut crea sportivul.');
+      setError(createError?.message || 'Nu am putut crea jucătorul.');
     } finally {
       setCreating(false);
     }
@@ -241,7 +241,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
             <View className="flex-row items-center justify-between gap-3">
               <View className="flex-1 min-w-0">
                 <Text className="text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>Adaugă jucător</Text>
-                <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Alege echipa, caută sportivul și adaugă-l în lot.</Text>
+                <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Alege echipa, caută jucătorul și adaugă-l în lot.</Text>
               </View>
               <Pressable
                 onPress={close}
@@ -305,14 +305,14 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
               {!teams.length ? (
                 <View className="rounded-[12px] px-3 py-2.5" style={{ backgroundColor: 'var(--c-surface-2)' }}>
                   <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-muted)' }}>
-                    Nu există echipe disponibile. Creează mai întâi o echipă pentru a adăuga sportivi.
+                    Nu există echipe disponibile. Creează mai întâi o echipă pentru a adăuga jucători.
                   </Text>
                 </View>
               ) : null}
             </View>
 
             <View className={`flex-1 ${isMobile ? 'px-5 pt-4' : 'p-5'}`} style={{ overflow: 'hidden' }}>
-              <SectionLabel>Caută sportiv</SectionLabel>
+              <SectionLabel>Caută jucător</SectionLabel>
               <View
                 className="mt-2 h-11 flex-row items-center rounded-[11px] border px-3"
                 style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' }}
@@ -347,7 +347,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                 <ScrollView className="flex-1 mt-3" contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
                   <View className="rounded-[14px] border p-4 gap-3.5" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}>
                     <View>
-                      <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>Sportiv nou</Text>
+                      <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>Jucător nou</Text>
                       <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
                         {selectedTeam ? `Intră în lotul echipei ${selectedTeam.name}.` : 'Alege echipa destinație.'}
                       </Text>
@@ -414,7 +414,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                           {item.firstName} {item.lastName}
                         </Text>
                         <Text className="mt-[2px] text-[12px] font-medium" style={{ color: 'var(--c-faint)' }} numberOfLines={1}>
-                          #{item.number || '--'} • {item.position || 'Sportiv'} • {item.email || 'Fără email'}
+                          #{item.number || '--'} • {item.position || 'Jucător'} • {item.email || 'Fără email'}
                         </Text>
                       </View>
                       <View
@@ -432,7 +432,7 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                       <View className="flex-1 items-center justify-center rounded-[14px] p-6" style={{ minHeight: 220, backgroundColor: 'var(--c-surface-2)' }}>
                         <ActivityIndicator size="small" color="var(--c-brand-fg)" />
                         <Text className="mt-2.5 text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>
-                          {isBrowseMode ? 'Se încarcă sportivii...' : 'Se caută sportivi...'}
+                          {isBrowseMode ? 'Se încarcă jucătorii...' : 'Se caută jucători...'}
                         </Text>
                       </View>
                     );
@@ -442,10 +442,10 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                     return (
                       <View className="flex-1 items-center justify-center rounded-[14px] p-6" style={{ minHeight: 220, backgroundColor: 'var(--c-surface-2)' }}>
                         <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>
-                          Niciun sportiv găsit.
+                          Niciun jucător găsit.
                         </Text>
                         <Text className="mt-1.5 text-center text-[12.5px] font-medium leading-5" style={{ color: 'var(--c-muted)' }}>
-                          Încearcă alt nume, email sau număr de tricou, ori creează sportivul.
+                          Încearcă alt nume, email sau număr de tricou, ori creează jucătorul.
                         </Text>
                         <View className="mt-4">
                           <Button
@@ -465,10 +465,10 @@ export default function AddPlayerModal({ visible, teams, initialTeamId, onClose,
                         <Search size={19} color="var(--c-brand-fg)" />
                       </View>
                       <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>
-                        Niciun sportiv disponibil
+                        Niciun jucător disponibil
                       </Text>
                       <Text className="mt-1.5 text-center text-[12.5px] font-medium leading-5" style={{ color: 'var(--c-muted)' }}>
-                        Sportivii din club vor apărea aici, sau caută după nume, email ori tricou.
+                        Jucătorii din club vor apărea aici, sau caută după nume, email ori tricou.
                       </Text>
                     </View>
                   );

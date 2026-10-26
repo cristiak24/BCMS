@@ -165,8 +165,12 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
     const [errors, setErrors] = useState<{ label?: string; email?: string; maxUses?: string }>({});
     const [teams, setTeams] = useState<TeamJoinCode[] | null>(null);
     const [busy, setBusy] = useState(false);
+    const [linkBusy, setLinkBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<Result | null>(null);
+    // The choices `result` was made from: Back from step 3 and Continue again
+    // with nothing changed reopens it instead of creating a second code.
+    const [resultFor, setResultFor] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
 
     const reset = useCallback(() => {
@@ -181,6 +185,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
         setErrors({});
         setError(null);
         setResult(null);
+        setResultFor(null);
         setCopied(false);
     }, []);
 
@@ -243,14 +248,22 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
         goToStep(2);
     };
 
+    const choiceKey = (kind: Result['kind']) => JSON.stringify([kind, who, teamId, validityHours, maxUses, label.trim(), email.trim().toLowerCase()]);
+    const reopenable = result != null && resultFor === choiceKey(how);
+
     const finish = (next: Result) => {
         setResult(next);
+        setResultFor(choiceKey(next.kind));
         setCopied(false);
         goToStep(3);
         onCreated?.(next.kind);
     };
 
     const submit = async () => {
+        if (reopenable) {
+            goToStep(3);
+            return;
+        }
         if (how === 'team-code') {
             if (team && teamCodeOpen) finish({ kind: 'team-code', team });
             return;
@@ -313,6 +326,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
     const openRoleLink = async () => {
         if (who === 'accountant') return;
         setBusy(true);
+        setLinkBusy(true);
         setError(null);
         try {
             const scopedTeam = withTeam(who) ? teamId : null;
@@ -325,6 +339,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
             setError(linkError instanceof Error ? linkError.message : 'Nu am putut genera linkul.');
         } finally {
             setBusy(false);
+            setLinkBusy(false);
         }
     };
 
@@ -411,7 +426,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
         ? { label: 'Continuă', onPress: continueFromWho, disabled: false }
         : step === 2
             ? {
-                label: how === 'team-code' ? 'Folosește codul echipei' : how === 'group-code' ? 'Generează codul' : 'Trimite invitația',
+                label: how === 'team-code' ? 'Folosește codul echipei' : reopenable ? (how === 'group-code' ? 'Vezi codul creat' : 'Vezi invitația creată') : how === 'group-code' ? 'Generează codul' : 'Trimite invitația',
                 onPress: () => void submit(),
                 disabled: how === 'team-code' && !teamCodeOpen,
             }
@@ -613,6 +628,22 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                                             </View>
                                         </View>
                                     ) : null}
+                                    {who !== 'accountant' ? (
+                                        <View className="border-t pt-3" style={{ borderColor: 'var(--c-border)' }}>
+                                            {/* Offered here, before anything is created (it used to appear only after a code or an email). */}
+                                            <Pressable
+                                                onPress={() => void openRoleLink()}
+                                                disabled={busy}
+                                                accessibilityRole="button"
+                                                className="ui-press self-start flex-row items-center gap-1.5 min-h-10 -ml-1 px-1 rounded-[8px]"
+                                            >
+                                                {linkBusy ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="add-link" size={16} color="var(--c-brand-fg)" />}
+                                                <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
+                                                    Altă metodă: link pentru o singură persoană
+                                                </Text>
+                                            </Pressable>
+                                        </View>
+                                    ) : null}
                                 </View>
                             ) : details ? (
                                 <View className="gap-4">
@@ -668,22 +699,6 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                                             {details.next}
                                         </Text>
                                     </View>
-
-                                    {who !== 'accountant' && result?.kind !== 'link' ? (
-                                        <View className="border-t pt-3" style={{ borderColor: 'var(--c-border)' }}>
-                                            <Pressable
-                                                onPress={() => void openRoleLink()}
-                                                disabled={busy}
-                                                accessibilityRole="button"
-                                                className="ui-press self-start flex-row items-center gap-1.5 min-h-10 -ml-1 px-1 rounded-[8px]"
-                                            >
-                                                {busy ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="add-link" size={16} color="var(--c-brand-fg)" />}
-                                                <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
-                                                    Altă metodă: link pentru o singură persoană
-                                                </Text>
-                                            </Pressable>
-                                        </View>
-                                    ) : null}
                                 </View>
                             ) : null}
 
@@ -713,7 +728,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                         <Button
                             variant="primary"
                             label={primary.label}
-                            loading={busy && step === 2}
+                            loading={busy && !linkBusy && step === 2}
                             disabled={primary.disabled || busy}
                             onPress={primary.onPress}
                         />

@@ -8,6 +8,8 @@ import ConfirmDialog from '../ui/ConfirmDialog';
 import FilterChips from '../ui/FilterChips';
 import SelectField from '../ui/SelectField';
 import { financeApi, type BalanceFee, type PaymentAllocation, type PlayerBalanceSummary } from '../../services/financeApi';
+import { teamsApi } from '../../services/teamsApi';
+import type { ToastVariant } from '../ui/Toast';
 import { balancesCsvRows, downloadCsv, paymentsCsvRows } from './financeCsv';
 import { plural } from '../../utils/plural';
 import { playerStatusLabel } from '../../utils/playerStatus';
@@ -81,8 +83,16 @@ export type RecordedPayment = { paymentId: number | null; amount: number; player
  * „Anulează” it offers); `reloadKey` is bumped by the page after a storno so
  * the balances follow.
  */
-export default function BalancesCard({ onPaymentRecorded, reloadKey = 0 }: { onPaymentRecorded?: (payment: RecordedPayment) => void; reloadKey?: number }) {
+export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 0 }: {
+    onPaymentRecorded?: (payment: RecordedPayment) => void;
+    /** Where the reminder outcome is said (the page's toasts). */
+    onNotify?: (toast: { variant: ToastVariant; message: string }) => void;
+    reloadKey?: number;
+}) {
     const [balances, setBalances] = useState<PlayerBalanceSummary[]>([]);
+    // Payment reminders, as on Lot: they notify families, so only after a confirmation.
+    const [confirmReminders, setConfirmReminders] = useState(false);
+    const [sendingReminders, setSendingReminders] = useState(false);
     const [currency, setCurrency] = useState('ron');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -161,6 +171,26 @@ export default function BalancesCard({ onPaymentRecorded, reloadKey = 0 }: { onP
         owing: balances.filter((b) => b.outstanding > 0).length,
         all: balances.length,
     }), [balances]);
+
+    const sendReminders = async () => {
+        setSendingReminders(true);
+        try {
+            const result = await teamsApi.sendPaymentReminders();
+            const owing = result.players ?? result.recipients.length;
+            const skipped = result.skipped ?? 0;
+            onNotify?.(owing
+                ? {
+                    variant: 'success',
+                    message: `${plural(result.sent, 'notificare trimisă', 'notificări trimise')} pentru ${plural(owing, 'jucător cu restanțe', 'jucători cu restanțe')}.${skipped ? ` ${plural(skipped, 'cont a primit', 'conturi au primit')} deja un memento în ultimele 7 zile.` : ''}`,
+                }
+                : { variant: 'info', message: 'Nimeni nu are restanțe. Plățile care nu au ajuns la scadență nu primesc memento.' });
+            setConfirmReminders(false);
+        } catch (error) {
+            onNotify?.({ variant: 'error', message: error instanceof Error ? error.message : 'Mementourile de plată nu au putut fi trimise.' });
+        } finally {
+            setSendingReminders(false);
+        }
+    };
 
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -302,6 +332,17 @@ export default function BalancesCard({ onPaymentRecorded, reloadKey = 0 }: { onP
                         { key: 'all', label: 'Toți', count: counts.all },
                     ]}
                 />
+                {/* Reminders lived only on Lot; this is where the arrears are worked. */}
+                {counts.overdue > 0 ? (
+                    <Button
+                        size="sm"
+                        icon="notifications-active"
+                        label={`Trimite mementouri (${counts.overdue})`}
+                        loading={sendingReminders}
+                        onPress={() => setConfirmReminders(true)}
+                        className="self-start md:self-auto"
+                    />
+                ) : null}
                 <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 [@media(pointer:coarse)]:h-10 border md:ml-auto md:w-[240px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
                     <MaterialIcons name="search" size={15} color="var(--c-faint)" />
                     <TextInput
@@ -378,6 +419,17 @@ export default function BalancesCard({ onPaymentRecorded, reloadKey = 0 }: { onP
                     <Button size="sm" variant="ghost" label={`Arată încă ${Math.min(PAGE, filtered.length - visibleCount)} (din ${filtered.length})`} onPress={() => setVisibleCount((count) => count + PAGE)} />
                 </View>
             ) : null}
+
+            <ConfirmDialog
+                visible={confirmReminders}
+                title="Trimiți mementouri de plată?"
+                message={`${counts.overdue === 1 ? 'Jucătorul cu restanțe primește' : `Cei ${plural(counts.overdue, 'jucător', 'jucători')} cu restanțe primesc`}, împreună cu părinții, o notificare în aplicație. Cine a primit deja un memento în ultimele 7 zile nu îl mai primește acum.`}
+                confirmLabel="Trimite mementouri"
+                icon="notifications-active"
+                loading={sendingReminders}
+                onConfirm={() => void sendReminders()}
+                onCancel={() => { if (!sendingReminders) setConfirmReminders(false); }}
+            />
 
             <ConfirmDialog
                 visible={target != null}

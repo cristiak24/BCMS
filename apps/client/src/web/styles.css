@@ -247,6 +247,16 @@ input:-webkit-autofill:focus {
   outline-offset: 2px;
 }
 
+/* Touch: a 40px-tall hit area around the 24px track (the knob owns ::after);
+   the layout doesn't move. */
+@media (pointer: coarse) {
+  .rn-switch::before {
+    content: '';
+    position: absolute;
+    inset: -8px 0;
+  }
+}
+
 @keyframes rn-spin {
   to {
     transform: rotate(360deg);

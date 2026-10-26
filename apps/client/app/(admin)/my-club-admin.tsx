@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from '@/src/web/reactNative';
 import { useRouter } from '@/src/web/expoRouter';
 import { useSession } from '../../context/AuthContext';
@@ -14,7 +14,7 @@ import TeamCard from '../../components/myclub/TeamCard';
 import TeamTable from '../../components/myclub/TeamTable';
 import CreateTeamWizard from '../../components/myclub/CreateTeamWizard';
 import EditTeamModal from '../../components/myclub/EditTeamModal';
-import ThemedCheckbox from '../../components/myclub/ThemedCheckbox';
+import { CheckboxBox } from '../../components/myclub/ThemedCheckbox';
 import { NoTeamsEmptyState, NoResultsEmptyState } from '../../components/myclub/EmptyState';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
@@ -289,11 +289,6 @@ export default function MyClubAdmin() {
         setWizardOpen(false);
     };
 
-    const selectAllLabel = useMemo(
-        () => (allFilteredSelected ? 'Deselectează tot' : 'Selectează tot'),
-        [allFilteredSelected],
-    );
-
     return (
         <View className="flex-1 w-full mx-auto pb-20" style={{ backgroundColor: 'var(--c-bg)' }}>
             <ScrollView className="flex-1 w-full px-4 md:px-8 xl:px-12 pt-5 md:pt-7" showsVerticalScrollIndicator={false}>
@@ -339,10 +334,17 @@ export default function MyClubAdmin() {
 
                         <View className="flex-row items-center justify-between gap-3 mb-3">
                             <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>{filteredTeams.length} din {plural(teams.length, 'echipă', 'echipe')}</Text>
+                            {/* One checkbox, the whole row (it was a checkbox inside a button); the
+                                state is the tick, so the label stays „Selectează tot”. */}
                             {filteredTeams.length > 0 && (
-                                <Pressable onPress={toggleSelectAll} className="tap-40 flex-row items-center gap-2 px-1 py-1">
-                                    <ThemedCheckbox checked={allFilteredSelected} onToggle={toggleSelectAll} ariaLabel={selectAllLabel} size={17} />
-                                    <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{selectAllLabel}</Text>
+                                <Pressable
+                                    onPress={toggleSelectAll}
+                                    accessibilityRole="checkbox"
+                                    aria-checked={allFilteredSelected}
+                                    className="tap-40 flex-row items-center gap-2 px-1 py-1"
+                                >
+                                    <CheckboxBox checked={allFilteredSelected} size={17} />
+                                    <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Selectează tot</Text>
                                 </Pressable>
                             )}
                         </View>

@@ -50,7 +50,7 @@ async function openScreenAfterDeploy(page: Page) {
 
   expect(staleRequests.length, 'the screen asked for a chunk the "old" app no longer had').toBeGreaterThan(0);
   await expect(page).toHaveURL(/\/admin\/compliance$/);
-  await expect(page.getByText('Vizele medicale ale sportivilor din club.')).toBeVisible();
+  await expect(page.getByText('Vizele medicale ale jucătorilor din club.')).toBeVisible();
   expect(await page.evaluate(() => window.sessionStorage.getItem('bcms.chunk-reload-at'))).not.toBeNull();
 }
 
