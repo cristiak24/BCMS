@@ -1,7 +1,7 @@
 import { toCalendarDay } from '@/utils/dates';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertCircle, Loader2, Lock, Eye, EyeOff, Ticket, ArrowRight, Phone, Plus, X, Users, UserRound } from 'lucide-react';
+import { AlertCircle, Loader2, Lock, Eye, EyeOff, Ticket, ArrowRight, Plus, X, Users, UserRound } from 'lucide-react';
 import { authApi, type InviteDetails } from '../services/authApi';
 import { privacyApi } from '../services/privacyApi';
 import { DIGITAL_CONSENT_AGE, LEGAL_VERSION } from '../config/legal';
@@ -11,6 +11,7 @@ import { getHomeRouteForRole } from '../utils/authSession';
 import { useSession } from '../context/AuthContext';
 import { LoadingScreen } from '../components/ui/ScreenState';
 import LegalLinks from '../components/legal/LegalLinks';
+import { DEFAULT_PREFIX, PHONE_PREFIXES, formatNational, isValidNational, joinPhone, parsePhoneInput } from '../utils/phoneInput';
 import {
     AuthCard,
     AuthHeading,
@@ -64,6 +65,11 @@ function ageOn(birthDate: string, today = new Date()) {
     return age;
 }
 
+function formatDateRo(value: string) {
+    const [y, m, d] = value.split('-');
+    return y && m && d ? `${d}.${m}.${y}` : value;
+}
+
 /** Same range as the server (familyJoin.parseBirthDate): a full date, age 3–100. */
 function isPlausibleBirthDate(value: string, today = new Date()) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -71,13 +77,6 @@ function isPlausibleBirthDate(value: string, today = new Date()) {
     const year = Number(value.slice(0, 4));
     const yearAge = today.getFullYear() - year;
     return age != null && yearAge >= 3 && yearAge <= 100;
-}
-
-/** Same rule as the server (lib/contacts.ts normalizePhone). */
-function isValidPhone(value: string) {
-    const text = value.trim();
-    const digits = text.replace(/\D/g, '').length;
-    return /^\+?[0-9 ().-]{6,32}$/.test(text) && digits >= 6 && digits <= 15;
 }
 
 export default function Signup() {
@@ -95,7 +94,8 @@ export default function Signup() {
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [phone, setPhone] = useState('');
+    const [phonePrefix, setPhonePrefix] = useState(DEFAULT_PREFIX);
+    const [phoneNational, setPhoneNational] = useState('');
     // Team-code signups: who is registering, and for whom.
     const [joinAs, setJoinAs] = useState<'parent' | 'player' | null>(null);
     const [children, setChildren] = useState<ChildDraft[]>([{ ...EMPTY_CHILD }]);
@@ -192,7 +192,7 @@ export default function Signup() {
             setError('Completează prenumele, numele, emailul și parola.');
             return;
         }
-        if (!isValidPhone(phone)) {
+        if (!isValidNational(phonePrefix, phoneNational)) {
             setError('Introdu un număr de telefon valid — clubul te poate contacta pe el.');
             return;
         }
@@ -207,7 +207,7 @@ export default function Signup() {
             return;
         }
         if (collectsChildren && !isParentInvite && children.some((child) => !isPlausibleBirthDate(child.birthDate))) {
-            setError('Data nașterii copilului nu pare corectă.');
+            setError('Data nașterii unui copil nu e validă. Verifică anul și încearcă din nou.');
             return;
         }
         if (isParentInvite && children.some((child) => !/^\d{4}$/.test(child.birthDate) || Number(child.birthDate) > currentYear || Number(child.birthDate) < currentYear - 100)) {
@@ -219,7 +219,7 @@ export default function Signup() {
             return;
         }
         if (isTeamCode && joinAs === 'player' && !isPlausibleBirthDate(birthDate)) {
-            setError('Data nașterii nu pare corectă.');
+            setError(`Data nașterii introdusă (${formatDateRo(birthDate)}) nu e validă. Verifică anul și încearcă din nou.`);
             return;
         }
         if (isTeamCode && joinAs === 'player') {
@@ -243,7 +243,7 @@ export default function Signup() {
                 email: email.trim().toLowerCase(),
                 password,
                 inviteToken,
-                phone: phone.trim(),
+                phone: joinPhone(phonePrefix, phoneNational),
                 ...(isTeamCode && joinAs === 'parent'
                     ? { joinAs, children: children.map((child) => ({ firstName: child.firstName.trim(), lastName: child.lastName.trim(), birthDate: child.birthDate })) }
                     : {}),
@@ -441,16 +441,33 @@ export default function Signup() {
 
                                     <label className="block">
                                         <span className={authLabelClass}>Telefon</span>
-                                        <span className={`${authFieldClass} ${phone && !isValidPhone(phone) ? 'border-red-300' : 'border-slate-200'}`}>
-                                            <Phone size={16} className="shrink-0 text-slate-400" />
+                                        <span className={`${authFieldClass} ${phoneNational && !isValidNational(phonePrefix, phoneNational) ? 'border-red-300' : 'border-slate-200'}`}>
+                                            <select
+                                                aria-label="Prefix telefon"
+                                                className="mr-2.5 h-[34px] max-w-[84px] shrink-0 cursor-pointer rounded-md border-0 bg-transparent text-[15px] font-semibold text-[var(--c-ink-strong)] outline-none"
+                                                value={phonePrefix}
+                                                onChange={(e) => {
+                                                    setPhonePrefix(e.target.value);
+                                                    setPhoneNational(parsePhoneInput(phoneNational, e.target.value).national);
+                                                }}
+                                                disabled={submitting}
+                                            >
+                                                {PHONE_PREFIXES.map((entry) => (
+                                                    <option key={entry.prefix} value={entry.prefix}>{entry.prefix}</option>
+                                                ))}
+                                            </select>
                                             <input
-                                                className={`ml-2.5 ${authInputClass}`}
-                                                placeholder="07xx xxx xxx"
+                                                className={authInputClass}
+                                                placeholder="7xx xxx xxx"
                                                 type="tel"
                                                 inputMode="tel"
-                                                value={phone}
-                                                onChange={(e) => setPhone(e.target.value)}
-                                                autoComplete="tel"
+                                                value={formatNational(phoneNational)}
+                                                onChange={(e) => {
+                                                    const next = parsePhoneInput(e.target.value, phonePrefix);
+                                                    setPhonePrefix(next.prefix);
+                                                    setPhoneNational(next.national);
+                                                }}
+                                                autoComplete="tel-national"
                                                 disabled={submitting}
                                             />
                                         </span>
