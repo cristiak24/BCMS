@@ -7,6 +7,7 @@ import { FinanceCard, FinanceCardHeader } from './FinanceCard';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import FilterChips from '../ui/FilterChips';
 import SelectField from '../ui/SelectField';
+import ActionSheet, { type SheetAction } from '../ui/ActionSheet';
 import { financeApi, type BalanceFee, type PaymentAllocation, type PlayerBalanceSummary } from '../../services/financeApi';
 import { teamsApi } from '../../services/teamsApi';
 import type { ToastVariant } from '../ui/Toast';
@@ -42,8 +43,7 @@ function exportMonths() {
         const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
         const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         const label = new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric' }).format(date);
-        // "Octombrie 2026": the button next to it already says "Export plăți"
-        // (the "Plăți octombrie …" label was cut off on phones).
+        // "Octombrie 2026": the sheet's title already asks which month's payments.
         return { key, label: label.charAt(0).toUpperCase() + label.slice(1) };
     });
 }
@@ -116,8 +116,10 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
     const [allocation, setAllocation] = useState<PaymentAllocation | null>(null);
     const [allocating, setAllocating] = useState(false);
     const monthOptions = useMemo(exportMonths, []);
-    const [exportMonth, setExportMonth] = useState(monthOptions[0].key);
     const [exporting, setExporting] = useState(false);
+    // One „Exportă” menu instead of two buttons and a month picker in the header:
+    // first what (balances / payments), then for payments which month.
+    const [exportStep, setExportStep] = useState<'closed' | 'what' | 'month'>('closed');
     const [exportingBalances, setExportingBalances] = useState(false);
 
     // The list has totals only: the export asks for every fee once, on demand,
@@ -136,7 +138,7 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
         }
     };
 
-    const exportPayments = async () => {
+    const exportPayments = async (exportMonth: string) => {
         setExporting(true);
         try {
             const [year, month] = exportMonth.split('-').map(Number);
@@ -308,17 +310,11 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                 subtitle="Calculat la fel ca pe pagina de plăți a fiecărui jucător."
                 wideActions
                 actions={
-                    // Two groups that each stay on one line: balances (export, reload)
-                    // and payments (month + export); on phones each fills the width.
-                    <View className="flex-col lg:flex-row lg:items-center gap-2 w-full lg:w-auto">
-                        <View className="flex-row items-center gap-2">
-                            <Button size="sm" icon="file-download" label="Export solduri" className="flex-1 lg:flex-none" loading={exportingBalances} disabled={loading || !balances.length} onPress={() => void exportBalances()} />
-                            <Button size="sm" icon="refresh" label="Reîncarcă" iconOnlyOnMobile onPress={() => void load()} disabled={loading} />
-                        </View>
-                        <View className="flex-row items-center gap-2">
-                            <SelectField<string> label="Luna exportului de plăți" value={exportMonth} onChange={setExportMonth} options={monthOptions} className="flex-1 min-w-0 lg:flex-none lg:w-[170px]" />
-                            <Button size="sm" icon="file-download" label="Export plăți" loading={exporting} onPress={() => void exportPayments()} />
-                        </View>
+                    // Two controls, not four: the exports (balances, a month of payments)
+                    // live in one menu.
+                    <View className="flex-row items-center gap-2">
+                        <Button size="sm" icon="file-download" label="Exportă" loading={exporting || exportingBalances} onPress={() => setExportStep('what')} />
+                        <Button size="sm" icon="refresh" label="Reîncarcă" iconOnlyOnMobile onPress={() => void load()} disabled={loading} />
                     </View>
                 }
             />
@@ -421,6 +417,19 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                     <Button size="sm" variant="ghost" label={`Arată încă ${Math.min(PAGE, filtered.length - visibleCount)} (din ${filtered.length})`} onPress={() => setVisibleCount((count) => count + PAGE)} />
                 </View>
             ) : null}
+
+            <ActionSheet
+                visible={exportStep !== 'closed'}
+                title={exportStep === 'month' ? 'Plățile din ce lună?' : 'Exportă (CSV)'}
+                subtitle={exportStep === 'month' ? 'Toate încasările lunii alese.' : undefined}
+                onClose={() => setExportStep('closed')}
+                actions={exportStep === 'month'
+                    ? monthOptions.map((option): SheetAction => ({ key: option.key, label: option.label, icon: 'event', onPress: () => void exportPayments(option.key) }))
+                    : [
+                        ...(balances.length ? [{ key: 'balances', label: 'Solduri', icon: 'account-balance-wallet', hint: 'Jucătorii din listă, cu restanța și ce mai e de plată.', onPress: () => void exportBalances() }] : []),
+                        { key: 'payments', label: 'Plăți pe o lună', icon: 'payments', hint: 'Alegi luna la pasul următor.', keepOpen: true, onPress: () => setExportStep('month') },
+                    ]}
+            />
 
             <ConfirmDialog
                 visible={confirmReminders}

@@ -45,3 +45,11 @@ test('an amount too large for the ledger is refused up front, without SQL in the
         console.error = quiet;
     }
 });
+
+test('a desk payment without a note is described by its method, not always „Plată numerar”', async () => {
+    const out = await api.call('POST', '/api/finance/admin/manual-payment', { auth: admin, body: { playerId, amount: 50, method: 'transfer' } });
+    assert.equal(out.status, 200);
+    assert.equal(out.body.payment.description, 'Transfer bancar');
+    const cash = await api.call('POST', '/api/finance/admin/manual-payment', { auth: admin, body: { playerId, amount: 20, method: 'cash', description: 'chitanța 12' } });
+    assert.equal(cash.body.payment.description, 'chitanța 12');
+});

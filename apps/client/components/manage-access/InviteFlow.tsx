@@ -214,7 +214,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
         if (team) {
             list.push(teamCodeOpen
                 ? { key: 'team-code', label: `Folosește codul echipei ${team.name}`, hint: `${formatTeamCode(team.code)} · nu expiră. Cererile le aprobi tu sau antrenorul echipei.`, icon: 'vpn-key' }
-                : { key: 'team-code', label: `Codul echipei ${team.name}`, hint: 'Înscrierile cu codul echipei sunt oprite. Le pornești din Cereri › Codurile echipelor.', icon: 'vpn-key', disabled: true });
+                : { key: 'team-code', label: `Codul echipei ${team.name}`, hint: 'Înscrierile cu codul echipei sunt oprite. Le pornești din Coduri › Codurile echipelor.', icon: 'vpn-key', disabled: true });
         }
         // A team chosen in step 1 that this method won't carry: said here, not discovered later.
         const dropped = (key: How) => (team && !carriesTeam(key, who) ? ` ${teamDroppedNote(team.name)}` : '');

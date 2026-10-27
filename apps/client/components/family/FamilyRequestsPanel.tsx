@@ -169,8 +169,8 @@ function RequestCard({
   );
 }
 
-function TeamCodes({ codes, onRotate, onToggle, onNotify }: { codes: TeamJoinCode[]; onRotate: (team: TeamJoinCode) => void; onToggle: (team: TeamJoinCode, enabled: boolean) => void; onNotify: Notify }) {
-  const [open, setOpen] = useState(false);
+function TeamCodes({ codes, onRotate, onToggle, onNotify, defaultOpen = false }: { codes: TeamJoinCode[]; onRotate: (team: TeamJoinCode) => void; onToggle: (team: TeamJoinCode, enabled: boolean) => void; onNotify: Notify; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   if (!codes.length) return null;
 
   const share = async (team: TeamJoinCode) => {
@@ -245,7 +245,62 @@ function TeamCodes({ codes, onRotate, onToggle, onNotify }: { codes: TeamJoinCod
   );
 }
 
-export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNotify: Notify; onCountChange?: (count: number) => void }) {
+/** Change or pause the team codes on their own — Acces › Coduri, next to the group codes. */
+export function TeamCodesPanel({ onNotify }: { onNotify: Notify }) {
+  const [codes, setCodes] = useState<TeamJoinCode[] | null>(null);
+  const [pendingRotate, setPendingRotate] = useState<TeamJoinCode | null>(null);
+
+  useEffect(() => {
+    familyRequestsApi.teamCodes().then(setCodes).catch(() => setCodes([]));
+  }, []);
+
+  const rotate = async (team: TeamJoinCode) => {
+    try {
+      const updated = await familyRequestsApi.rotateCode(team.id);
+      setCodes((list) => (list ?? []).map((t) => (t.id === team.id ? updated : t)));
+      onNotify({ variant: 'success', message: `Cod nou pentru ${team.name}: ${formatTeamCode(updated.code)}.` });
+    } catch (err) {
+      onNotify({ variant: 'error', message: err instanceof Error ? err.message : 'Nu am putut schimba codul.' });
+    }
+  };
+  const toggleCode = async (team: TeamJoinCode, enabled: boolean) => {
+    setCodes((list) => (list ?? []).map((t) => (t.id === team.id ? { ...t, enabled } : t)));
+    try {
+      const updated = await familyRequestsApi.setCodeEnabled(team.id, enabled);
+      setCodes((list) => (list ?? []).map((t) => (t.id === team.id ? updated : t)));
+      onNotify({ variant: 'success', message: enabled ? `Înscrierile cu codul ${team.name} sunt deschise.` : `Înscrierile cu codul ${team.name} sunt oprite.` });
+    } catch (err) {
+      setCodes((list) => (list ?? []).map((t) => (t.id === team.id ? team : t)));
+      onNotify({ variant: 'error', message: err instanceof Error ? err.message : 'Nu am putut schimba starea codului.' });
+    }
+  };
+
+  if (!codes) return <Skeleton className="h-[60px] w-full rounded-[14px] mb-3" />;
+  return (
+    <>
+      <TeamCodes codes={codes} defaultOpen onRotate={setPendingRotate} onToggle={toggleCode} onNotify={onNotify} />
+      <ConfirmDialog
+        visible={pendingRotate != null}
+        icon="refresh"
+        title={pendingRotate ? `Schimbi codul pentru ${pendingRotate.name}?` : ''}
+        message="Codul vechi nu mai funcționează. Cererile deja trimise rămân."
+        confirmLabel="Schimbă codul"
+        cancelLabel="Renunță"
+        onConfirm={() => { const team = pendingRotate; setPendingRotate(null); if (team) void rotate(team); }}
+        onCancel={() => setPendingRotate(null)}
+      />
+    </>
+  );
+}
+
+export default function FamilyRequestsPanel({ onNotify, onCountChange, showTeamCodes = true, hideEmpty = false }: {
+  onNotify: Notify;
+  onCountChange?: (count: number) => void;
+  /** The coach's page keeps the team codes here; Acces shows them under Coduri. */
+  showTeamCodes?: boolean;
+  /** Nothing at all when there's no request (Acces shows one empty state for both queues). */
+  hideEmpty?: boolean;
+}) {
   const [requests, setRequests] = useState<FamilyJoinRequest[] | null>(null);
   const [codes, setCodes] = useState<TeamJoinCode[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -348,7 +403,7 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNot
 
   return (
     <View>
-      <TeamCodes codes={codes} onRotate={(team) => setConfirm({ kind: 'rotate', team })} onToggle={toggleCode} onNotify={onNotify} />
+      {showTeamCodes ? <TeamCodes codes={codes} onRotate={(team) => setConfirm({ kind: 'rotate', team })} onToggle={toggleCode} onNotify={onNotify} /> : null}
 
       {error ? (
         <ErrorState title="Nu am putut încărca cererile" message={error} actionLabel="Reîncearcă" onAction={load} />
@@ -358,7 +413,7 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange }: { onNot
           <Skeleton className="h-[180px] w-full rounded-[14px]" />
         </View>
       ) : requests.length === 0 ? (
-        <EmptyState
+        hideEmpty ? null : <EmptyState
           compact
           icon="family-restroom"
           title="Nicio înscriere nouă"

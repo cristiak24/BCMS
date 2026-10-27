@@ -163,7 +163,7 @@ export default function InviteCodesPanel({ onNotify, reloadKey = 0 }: Props) {
             <View className="w-full min-w-0">
                 <View className="flex-row items-center justify-between mb-2 px-0.5">
                     <Text accessibilityRole="header" className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>
-                        Coduri active{activeCodes.length ? ` · ${activeCodes.length}` : ''}
+                        Coduri de grup{activeCodes.length ? ` · ${activeCodes.length}` : ''}
                     </Text>
                     {pastCodes.length > 0 ? (
                         <Pressable
@@ -184,7 +184,7 @@ export default function InviteCodesPanel({ onNotify, reloadKey = 0 }: Props) {
                     <SkeletonList count={2} />
                 ) : activeCodes.length === 0 ? (
                     <View className="rounded-[12px] border border-dashed px-4 py-5 items-center" style={{ borderColor: 'var(--c-border)' } as any}>
-                        <Text className="text-[13px]" style={{ color: error ? 'var(--c-danger-fg)' : 'var(--c-muted)' }}>{error ?? 'Niciun cod activ. Generează unul din „Invită”.'}</Text>
+                        <Text className="text-[13px]" style={{ color: error ? 'var(--c-danger-fg)' : 'var(--c-muted)' }}>{error ?? 'Niciun cod de grup activ. Generează unul din „Invită”.'}</Text>
                     </View>
                 ) : (
                     <View className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-2 ui-stagger">{activeCodes.map(renderCode)}</View>

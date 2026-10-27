@@ -35,7 +35,23 @@ router.use(authenticate);
 const STAFF_ROLES = new Set(['admin', 'coach', 'staff', 'superadmin']);
 
 type RosterEntry = { playerId: number; number: string; firstName: string; lastName: string };
-type LineupEntry = RosterEntry & { onL12: boolean };
+type LineupEntry = RosterEntry & { onL12: boolean; visaExpired: boolean };
+
+/** The Romanian calendar day of a timestamp (visas end on a day, not an instant). */
+function bucharestDay(value: Date | string) {
+    // DB timestamps are UTC text without a zone („2026-10-22 00:00:00”): toDate reads them as UTC.
+    const date = toDate(value);
+    if (!date) return null;
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Bucharest', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+}
+
+/** Expired = its last day is before today, the rule Acasă and L12 use (client utils/medicalVisa). */
+function visaExpired(expiry: Date | string | null | undefined, now = new Date()) {
+    if (!expiry) return false;
+    const day = bucharestDay(expiry);
+    const today = bucharestDay(now);
+    return day != null && today != null && day < today;
+}
 
 function clubIdOf(req: AuthenticatedRequest) {
     return req.user?.clubId == null ? null : Number(req.user.clubId);
@@ -81,7 +97,11 @@ async function loadMatch(req: AuthenticatedRequest, res: Response) {
     return { event: row.event, team: row.team, game: game ?? null, staff, canKeep };
 }
 
-/** The team's players, numbered from the match's L12 when there is one. */
+/**
+ * Who can play this match: the players on its L12 when one is saved (the
+ * official list — the scorer used to offer the whole team), otherwise the
+ * team's active players. Numbered from the L12.
+ */
 async function lineupFor(teamId: number, eventId: number): Promise<LineupEntry[]> {
     const [direct, memberships, [lineup]] = await Promise.all([
         db.select().from(players).where(eq(players.teamId, teamId)),
@@ -96,13 +116,14 @@ async function lineupFor(teamId: number, eventId: number): Promise<LineupEntry[]
             .map((p) => [p.playerId, p.shirtNumber ?? '']),
     );
     return Array.from(byId.values())
-        .filter((p) => (p.status ?? 'active') !== 'inactive')
+        .filter((p) => (l12.size > 0 ? l12.has(p.id) : (p.status ?? 'active') !== 'inactive'))
         .map((p) => ({
             playerId: p.id,
             number: l12.get(p.id) || (p.number != null ? String(p.number) : ''),
             firstName: p.firstName ?? '',
             lastName: p.lastName ?? p.name ?? '',
             onL12: l12.has(p.id),
+            visaExpired: visaExpired(p.medicalCheckExpiry),
         }))
         // Players on the match's L12 first, then by shirt number.
         .sort((a, b) => Number(b.onL12) - Number(a.onL12) || (Number(a.number || 999) - Number(b.number || 999)));
@@ -253,6 +274,12 @@ router.put('/events/:eventId/setup', rateLimit({ bucket: 'games:setup', limit: 6
         }
         if (starters.length !== 5) {
             res.status(400).json({ error: 'Alege exact 5 jucători care încep.' });
+            return;
+        }
+        const expiredStarters = starters.map((id) => byId.get(id)!).filter((p) => p.visaExpired);
+        if (expiredStarters.length) {
+            const names = expiredStarters.map((p) => `${p.firstName} ${p.lastName}`.trim()).join(', ');
+            res.status(400).json({ error: `Cu viza expirată nu se poate începe meciul: ${names}.` });
             return;
         }
         const roster = rosterIds.map((id) => {

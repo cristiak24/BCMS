@@ -13,9 +13,10 @@ export type FinanceTone = 'brand' | 'warning' | 'sky' | 'success' | 'purple';
 // green, purple) only decorated. `tone` stays in the props for the call sites.
 const TILE = { bg: 'var(--c-surface-3)', fg: 'var(--c-muted)' };
 
-export function FinanceCard({ children, className }: { children: ReactNode; className?: string }) {
+export function FinanceCard({ children, className, nativeID }: { children: ReactNode; className?: string; nativeID?: string }) {
     return (
         <View
+            nativeID={nativeID}
             className={`w-full min-w-0 rounded-[16px] p-4 md:p-5 border dash-fade-in ${className ?? ''}`}
             style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
         >

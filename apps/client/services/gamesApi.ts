@@ -4,7 +4,8 @@ import type { GameEvent, GameMode } from '../utils/gameStats';
 /** Live match statistics — see apps/server/src/routes/games.ts. */
 
 export type GameRosterEntry = { playerId: number; number: string; firstName: string; lastName: string };
-export type LineupEntry = GameRosterEntry & { onL12: boolean };
+/** `visaExpired`: may play, may not start (server games.ts). With an L12 saved, only its players come. */
+export type LineupEntry = GameRosterEntry & { onL12: boolean; visaExpired?: boolean };
 export type OpponentEntry = { number: string; name: string };
 
 export type Game = {

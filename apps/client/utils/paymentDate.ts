@@ -28,3 +28,10 @@ export function paymentMethodLabel(provider: string | null | undefined) {
     default: return null;
   }
 }
+
+/** The server's text for a desk payment recorded without a note (apps/server finance.ts, MANUAL_PAYMENT_DEFAULT_DESCRIPTION). */
+const DEFAULT_DESK_DESCRIPTIONS = new Set(['Plată numerar', 'Transfer bancar', 'Plată card (POS)', 'Plată la club']);
+
+export function isDefaultDeskDescription(description: string) {
+  return DEFAULT_DESK_DESCRIPTIONS.has(description.trim());
+}

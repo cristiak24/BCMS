@@ -1533,6 +1533,13 @@ router.get('/admin/summary', async (req, res) => {
 });
 
 const MANUAL_PAYMENT_METHODS = new Set(['cash', 'transfer', 'card', 'other']);
+/** The description a desk payment gets without a note: it used to say „Plată numerar” for a transfer too. */
+export const MANUAL_PAYMENT_DEFAULT_DESCRIPTION: Record<string, string> = {
+    cash: 'Plată numerar',
+    transfer: 'Transfer bancar',
+    card: 'Plată card (POS)',
+    other: 'Plată la club',
+};
 
 /**
  * How a desk payment would be split over the player's fees (the same
@@ -1612,7 +1619,7 @@ router.post('/admin/manual-payment', async (req, res) => {
             : 'cash';
         const description = typeof body.description === 'string' && body.description.trim()
             ? body.description.trim().slice(0, 500)
-            : 'Plată numerar';
+            : MANUAL_PAYMENT_DEFAULT_DESCRIPTION[method] ?? 'Plată la club';
         const when = body.date ? toDate(body.date) : new Date();
         if (!when) {
             res.status(400).json({ error: 'Data plății este invalidă.' });

@@ -7,7 +7,8 @@ import PageContainer from '../../components/ui/PageContainer';
 import FilterChips from '../../components/ui/FilterChips';
 import InviteCodesPanel from '../../components/manage-access/InviteCodesPanel';
 import InviteFlow from '../../components/manage-access/InviteFlow';
-import FamilyRequestsPanel from '../../components/family/FamilyRequestsPanel';
+import FamilyRequestsPanel, { TeamCodesPanel } from '../../components/family/FamilyRequestsPanel';
+import { EmptyState } from '../../components/ui/ScreenState';
 import PendingAccessRequestList from '../../components/manage-access/PendingAccessRequestList';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
@@ -28,7 +29,7 @@ type AccessTab = 'requests' | 'codes';
 
 const TABS: { key: AccessTab; label: string; icon: string; blurb?: string }[] = [
     { key: 'requests', label: 'Cereri', icon: 'how-to-reg' },
-    { key: 'codes', label: 'Coduri', icon: 'confirmation-number', blurb: 'Codurile de grup care încă funcționează. Unul nou îl generezi din „Invită”.' },
+    { key: 'codes', label: 'Coduri', icon: 'confirmation-number', blurb: 'Codurile echipelor și codurile de grup care încă funcționează. Un cod de grup nou îl generezi din „Invită”.' },
 ];
 
 const TAB_STORAGE_KEY = 'bcms.access-tab';
@@ -61,8 +62,8 @@ export default function ManageAccessScreen() {
     const { toasts, showToast, dismissToast } = useToasts();
     const [tab, setTabState] = useState<AccessTab>(readStoredTab);
     const [pendingDeny, setPendingDeny] = useState<AccessRequestItem | null>(null);
-    // Team-code signups (parents/players) — counted into the Cereri badge.
-    const [familyCount, setFamilyCount] = useState(0);
+    // Team-code signups (parents/players) — counted into the Cereri badge; null until loaded.
+    const [familyCount, setFamilyCount] = useState<number | null>(null);
     // Default to "pending" so the list stays focused on what needs action — resolved
     // requests are still reachable via the Approved/Denied/All tabs but no longer
     // grow the working list unbounded.
@@ -133,6 +134,9 @@ export default function ManageAccessScreen() {
         denied: requests.filter((request) => request.status === 'denied').length,
         all: requests.length,
     }), [requests]);
+    // The access-request list shows when it has something pending, or when asked
+    // for history / searched; an empty pending list folds into „Nimic de aprobat”.
+    const showAccessRequests = statusCounts.pending > 0 || statusFilter !== 'pending' || Boolean(debouncedSearch.trim()) || Boolean(requestsError);
 
     const closeInvite = () => {
         setInviteOpen(false);
@@ -208,7 +212,7 @@ export default function ManageAccessScreen() {
                         >
                             {TABS.map((item) => {
                                 const active = item.key === tab;
-                                const badge = item.key === 'requests' ? pendingCount + familyCount : 0;
+                                const badge = item.key === 'requests' ? pendingCount + (familyCount ?? 0) : 0;
                                 return (
                                     <Pressable
                                         key={item.key}
@@ -240,8 +244,23 @@ export default function ManageAccessScreen() {
                     <View key={tab} className="ui-rise mt-2 w-full">
                         {tab === 'requests' ? (
                             <View className="gap-3">
-                                <FamilyRequestsPanel onNotify={showToast} onCountChange={setFamilyCount} />
+                                {/* One queue: team-code signups, then access requests, each shown only
+                                    when it has something; both empty → one „Nimic de aprobat”. */}
+                                <FamilyRequestsPanel onNotify={showToast} onCountChange={setFamilyCount} showTeamCodes={false} hideEmpty />
 
+                                {familyCount === 0 && !showAccessRequests && !requestsLoading && !requestsError ? (
+                                    <View className="rounded-[14px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}>
+                                        <EmptyState
+                                            icon="how-to-reg"
+                                            title="Nimic de aprobat"
+                                            message="Înscrierile cu codul echipei și cererile de acces apar aici."
+                                            actionLabel={statusCounts.all > 0 ? 'Vezi cererile rezolvate' : undefined}
+                                            onAction={statusCounts.all > 0 ? () => setStatusFilter('all') : undefined}
+                                        />
+                                    </View>
+                                ) : null}
+
+                                {showAccessRequests ? (<>
                                 <Text accessibilityRole="header" className="text-[14px] font-bold mt-3" style={{ color: 'var(--c-ink)' }}>Cereri de acces (link / cont)</Text>
                                 <View className="flex-row items-center gap-2">
                                     <View className="flex-1 min-w-0">
@@ -279,9 +298,13 @@ export default function ManageAccessScreen() {
                                     }}
                                     onRetry={() => void loadRequests()}
                                 />
+                                </>) : null}
                             </View>
                         ) : (
-                            <InviteCodesPanel onNotify={showToast} reloadKey={codesReload} />
+                            <View className="gap-4">
+                                <TeamCodesPanel onNotify={showToast} />
+                                <InviteCodesPanel onNotify={showToast} reloadKey={codesReload} />
+                            </View>
                         )}
                     </View>
                 </PageContainer>

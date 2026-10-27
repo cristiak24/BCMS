@@ -54,7 +54,8 @@ export default function GameSetup({
   const [roster, setRoster] = useState<number[]>(() =>
     existing?.roster.map((p) => p.playerId)
       ?? (data.lineup.some((p) => p.onL12) ? data.lineup.filter((p) => p.onL12) : data.lineup).slice(0, 15).map((p) => p.playerId));
-  const [starters, setStarters] = useState<number[]>(existing?.starters ?? []);
+  const expiredIds = new Set(data.lineup.filter((p) => p.visaExpired).map((p) => p.playerId));
+  const [starters, setStarters] = useState<number[]>((existing?.starters ?? []).filter((id) => !expiredIds.has(id)));
   const [opponentName, setOpponentName] = useState(existing?.opponentName ?? (data.event.opponent || opponentFromTitle(data.event.title, data.team.name)));
   const [trackOpponents, setTrackOpponents] = useState((existing?.opponentRoster.length ?? 0) > 0);
   const [opponents, setOpponents] = useState<OpponentEntry[]>(existing?.opponentRoster ?? []);
@@ -69,6 +70,8 @@ export default function GameSetup({
   }, [eventId]);
 
   const lineup = data.lineup;
+  // The server sends only the L12's players when the match has one saved.
+  const fromL12 = lineup.length > 0 && lineup.every((p) => p.onL12);
 
   const toggleRoster = (id: number) => {
     setRoster((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]));
@@ -76,6 +79,7 @@ export default function GameSetup({
   };
 
   const toggleStarter = (id: number) => {
+    if (expiredIds.has(id)) return;
     setStarters((list) => (list.includes(id) ? list.filter((x) => x !== id) : list.length >= 5 ? list : [...list, id]));
   };
 
@@ -91,7 +95,9 @@ export default function GameSetup({
 
   // What still blocks the start, said on the button itself. The button used to
   // be enabled at (0/5) and only then show an error above it, far from the list.
-  const blocker = roster.length < 5
+  const blocker = fromL12 && lineup.length < 5
+    ? `Lista L12 are doar ${plural(lineup.length, 'jucător', 'jucători')}: completeaz-o în L12`
+    : roster.length < 5
     ? `Bifează încă ${plural(5 - roster.length, 'jucător', 'jucători')} care joacă`
     : starters.length !== 5
       ? `Alege încă ${plural(5 - starters.length, 'titular', 'titulari')}`
@@ -163,7 +169,12 @@ export default function GameSetup({
         ) : null}
       </Card>
 
-      <Card title={`Jucători · ${roster.length}`} hint={`Bifează cine joacă și alege cei 5 titulari (${starters.length}/5).`}>
+      <Card
+        title={`Jucători · ${roster.length}`}
+        hint={fromL12
+          ? `Din lista L12 a meciului (${plural(lineup.length, 'jucător', 'jucători')}); lista se schimbă din L12. Alege cei 5 titulari (${starters.length}/5).`
+          : `Bifează cine joacă și alege cei 5 titulari (${starters.length}/5).`}
+      >
         {/* One list with dividers (it was a tinted block per player); who sits out reads quieter by colour, not opacity. */}
         <View className={lineup.length ? 'rounded-[12px] border overflow-hidden' : ''} style={{ borderColor: 'var(--c-border)' }}>
           {lineup.map((p, index) => {
@@ -176,8 +187,9 @@ export default function GameSetup({
                   <MaterialIcons name={playing ? 'check-box' : 'check-box-outline-blank'} size={18} color={playing ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
                   <Text className="t-num w-8 text-[13px] font-bold" style={{ color: 'var(--c-muted)' }}>{p.number ? `#${p.number}` : '—'}</Text>
                   <Text className="flex-1 text-[14px] font-semibold" style={{ color: playing ? 'var(--c-ink)' : 'var(--c-muted)' }} numberOfLines={1}>{p.firstName} {p.lastName}</Text>
+                  {p.visaExpired ? <Text className="text-[12px] font-semibold shrink-0" style={{ color: 'var(--c-danger-fg)' }}>Viză expirată</Text> : null}
                 </Pressable>
-                {playing ? (
+                {playing && !p.visaExpired ? (
                   <Pressable onPress={() => toggleStarter(p.playerId)} accessibilityRole="button" accessibilityState={{ selected: starter }}
                     className="h-10 px-3 rounded-[10px] border items-center justify-center"
                     style={{ borderColor: starter ? 'var(--c-success)' : 'var(--c-border)', backgroundColor: starter ? 'var(--c-success-bg)' : 'var(--c-surface)', opacity: !starter && starters.length >= 5 ? 0.5 : 1 } as any}>

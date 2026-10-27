@@ -1,4 +1,4 @@
-import { formatPaymentWhen, paymentMethodLabel } from '../../../utils/paymentDate';
+import { formatPaymentWhen, isDefaultDeskDescription, paymentMethodLabel } from '../../../utils/paymentDate';
 import { parseApiDate } from '@/utils/dates';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, Modal, Platform } from '@/src/web/reactNative';
@@ -231,6 +231,10 @@ export default function FinancialSettingsPage() {
     const [pickingFile, setPickingFile] = useState<'expense' | 'invoice' | null>(null);
     const [uploadModal, setUploadModal] = useState<UploadModalState>(EMPTY_UPLOAD_MODAL);
     const [documentFilter, setDocumentFilter] = useState<'all' | AccountingStatus>('all');
+    const openPendingDocuments = () => {
+        setDocumentFilter('pending');
+        requestAnimationFrame(() => document.getElementById('registru-documente')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    };
     const [documentSearch, setDocumentSearch] = useState('');
     // Documents shown at once: a club's whole register (120+, ~40 elements
     // each) was rendered on every visit; search and filters still cover all.
@@ -637,12 +641,22 @@ export default function FinancialSettingsPage() {
                             value={loadingSummary || !summary ? '—' : Math.round(summary.overdue).toLocaleString('ro-RO')}
                             suffix={loadingSummary || !summary ? undefined : 'RON'}
                         />
-                        <GlassStat
-                            dot="var(--c-warning)"
-                            label="De verificat"
-                            hint={loadingDocuments || documentsError ? undefined : formatCurrency(financeStats.pendingAmount)}
-                            value={loadingDocuments || documentsError ? '—' : financeStats.pendingCount}
-                        />
+                        {/* Approving an expense sat below the whole Restanțe list: the figure
+                            takes you to the register, showing what waits. */}
+                        <Pressable
+                            onPress={openPendingDocuments}
+                            disabled={loadingDocuments || !!documentsError || financeStats.pendingCount === 0}
+                            accessibilityRole="button"
+                            accessibilityLabel={`De verificat: ${financeStats.pendingCount}. Arată documentele în așteptare`}
+                            className="ui-press text-left rounded-[14px]"
+                        >
+                            <GlassStat
+                                dot="var(--c-warning)"
+                                label="De verificat"
+                                hint={loadingDocuments || documentsError ? undefined : formatCurrency(financeStats.pendingAmount)}
+                                value={loadingDocuments || documentsError ? '—' : financeStats.pendingCount}
+                            />
+                        </Pressable>
                     </View>
                 ) : null}
                 {activeTab === 'Finances' && (summaryError || settingsError) ? (
@@ -744,7 +758,7 @@ export default function FinancialSettingsPage() {
                     {/* ── Documents register (with its upload actions) + recent payments ── */}
                     <View className="grid grid-cols-1 xl:grid-cols-5 gap-5 items-start">
 
-                        <FinanceCard className="xl:col-span-3">
+                        <FinanceCard className="xl:col-span-3" nativeID="registru-documente">
                             <FinanceCardHeader
                                 icon="receipt-long"
                                 tone="warning"
@@ -1074,8 +1088,9 @@ export default function FinancialSettingsPage() {
                         <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink)' }}>
                             {[formatPaymentWhen(pendingReverse.date, pendingReverse.provider), paymentMethodLabel(pendingReverse.provider)].filter(Boolean).join(' · ')}
                         </Text>
-                        {/* „Plată numerar” is the server's default text, whatever the method: the line above says it. */}
-                        {pendingReverse.description && pendingReverse.description !== 'Plată numerar' ? (
+                        {/* A desk payment without a note carries the server's default text („Plată numerar”,
+                            „Transfer bancar”…): the line above already says it. */}
+                        {pendingReverse.description && !isDefaultDeskDescription(pendingReverse.description) ? (
                             <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>{pendingReverse.description}</Text>
                         ) : null}
                     </View>
