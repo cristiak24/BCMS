@@ -25,6 +25,9 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import { ATTENDANCE_PERIOD_LABEL } from '../../../utils/attendanceRate';
 import { plural, pluralWord } from '../../../utils/plural';
+import { ErrorState } from '../../../components/ui/ScreenState';
+import { isNotFound } from '../../../services/apiClient';
+import { loadFailureMessage } from '../../../utils/errorMessages';
 
 type TabKey = 'roster' | 'events' | 'history' | 'stats' | 'frb';
 
@@ -45,6 +48,9 @@ export default function TeamDetailsScreen() {
     const [coaches, setCoaches] = useState<Coach[]>([]);
     const [stats, setStats] = useState<TeamStats | null>(null);
     const [loading, setLoading] = useState(true);
+    // Gone (404 or a bad link) vs didn't load: one says „nu mai există”, the other offers Reîncearcă.
+    const [missing, setMissing] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     const [tab, setTab] = useState<TabKey>('roster');
     const [teamActionsOpen, setTeamActionsOpen] = useState(false);
@@ -69,6 +75,8 @@ export default function TeamDetailsScreen() {
     const loadData = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
         try {
             if (!silent) setLoading(true);
+            setLoadError(null);
+            setMissing(false);
             const [tData, pData, cData, sData] = await Promise.all([
                 teamsApi.getTeamById(teamId),
                 teamsApi.getTeamPlayers(teamId),
@@ -82,7 +90,8 @@ export default function TeamDetailsScreen() {
             setRosterVersion((v) => v + 1);
         } catch (error) {
             console.error('Error loading team details', error);
-            Alert.alert('Eroare', 'Eroare la încărcarea detaliilor echipei.');
+            setMissing(isNotFound(error));
+            setLoadError(loadFailureMessage(error));
         } finally {
             setLoading(false);
         }
@@ -90,6 +99,7 @@ export default function TeamDetailsScreen() {
 
     useEffect(() => {
         if (!isNaN(teamId)) loadData();
+        else { setMissing(true); setLoading(false); }
     }, [loadData, teamId]);
 
     const refreshStats = useCallback(async () => {
@@ -169,11 +179,13 @@ export default function TeamDetailsScreen() {
 
     if (!team) {
         return (
-            <View className="flex-1 items-center justify-center" style={{ backgroundColor: 'var(--c-bg)' } as any}>
-                <Text className="font-bold" style={{ color: 'var(--c-ink-strong)' }}>Echipa nu a fost găsită.</Text>
-                <Pressable onPress={() => router.back('/admin/my-club-admin')} className="mt-4 px-6 py-2.5 rounded-xl" style={{ backgroundColor: 'var(--c-brand-surface)' } as any}>
-                    <Text className="font-bold" style={{ color: 'var(--c-on-brand)' }}>Înapoi</Text>
-                </Pressable>
+            <View className="flex-1 items-center justify-center p-6" style={{ backgroundColor: 'var(--c-bg)' } as any}>
+                <Text className="sr-only" accessibilityRole="header" aria-level={1}>Echipă</Text>
+                {missing || !loadError ? (
+                    <ErrorState title="Echipa nu mai există" message="A fost ștearsă sau linkul nu mai e valid." actionLabel="Înapoi la Clubul meu" onAction={() => router.replace('/admin/my-club-admin' as any)} />
+                ) : (
+                    <ErrorState title="Echipa nu s-a încărcat" message={loadError} actionLabel="Reîncearcă" onAction={() => void loadData()} />
+                )}
             </View>
         );
     }

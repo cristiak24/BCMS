@@ -18,6 +18,8 @@ import { CheckboxBox } from '../../components/myclub/ThemedCheckbox';
 import { NoTeamsEmptyState, NoResultsEmptyState } from '../../components/myclub/EmptyState';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
+import { LoadError } from '../../components/ui/ScreenState';
+import { loadFailureMessage } from '../../utils/errorMessages';
 import { toCsv } from '../../utils/csv';
 import { plural } from '../../utils/plural';
 
@@ -41,6 +43,9 @@ export default function MyClubAdmin() {
     const [teams, setTeams] = useState<Team[]>([]);
     const [coaches, setCoaches] = useState<Coach[]>([]);
     const [loading, setLoading] = useState(true);
+    // A failed load is not an empty club: the onboarding („Creează prima echipă”)
+    // only shows once the server has answered with no teams.
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [view, setView] = useState<'grid' | 'table'>(() => {
         if (typeof window === 'undefined') return 'grid';
         return window.localStorage.getItem(VIEW_STORAGE_KEY) === 'table' ? 'table' : 'grid';
@@ -82,6 +87,7 @@ export default function MyClubAdmin() {
     const loadAll = async () => {
         try {
             setLoading(true);
+            setLoadError(null);
             const [teamRows, coachRows] = await Promise.all([
                 teamsApi.getTeams(),
                 teamsApi.getCoaches().catch(() => []),
@@ -90,7 +96,7 @@ export default function MyClubAdmin() {
             setCoaches(coachRows);
         } catch (e) {
             console.error('Failed to load club data', e);
-            showToast({ variant: 'error', message: 'Nu s-au putut încărca echipele. Reîncearcă.' });
+            setLoadError(loadFailureMessage(e));
         } finally {
             setLoading(false);
         }
@@ -295,6 +301,7 @@ export default function MyClubAdmin() {
 
                 <MyClubHero
                     teams={teams}
+                    loadFailed={loadError !== null && teams.length === 0}
                     clubName={session?.clubName}
                     onImport={() => openWizard('frb')}
                     onCreate={() => openWizard()}
@@ -302,6 +309,8 @@ export default function MyClubAdmin() {
 
                 {loading ? (
                     <MyClubSkeleton />
+                ) : loadError && teams.length === 0 ? (
+                    <LoadError title="Echipele nu s-au încărcat" message={loadError} onRetry={() => void loadAll()} />
                 ) : teams.length === 0 ? (
                     <NoTeamsEmptyState onImport={() => openWizard('frb')} onCreate={() => openWizard()} />
                 ) : (

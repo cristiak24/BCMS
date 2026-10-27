@@ -437,15 +437,13 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                 visible={target != null}
                 title={target ? `Încasare · ${target.playerName}` : ''}
                 message="Bifează taxele pe care le acoperă plata. Suma se completează din ele și se împarte de la cea mai veche; o sumă mai mică le achită parțial."
-                // The amount on the button: the last look before it is booked — and
-                // the advance it leaves, in a warning tone (a mistyped digit used
-                // to read as success, the warning sitting below the button).
-                confirmLabel={!validAmount
-                    ? 'Înregistrează plata'
-                    : advance > 0
-                        ? `Înregistrează ${money(parsedAmount, currency)} · ${money(advance, currency)} avans`
-                        : `Înregistrează ${money(parsedAmount, currency)}`}
+                // The amount on the button: the last look before it is booked. The
+                // advance it leaves sits on its own line right above, in a warning
+                // tone with the button (on the button, a long label pushed
+                // „Renunță” out of the card).
+                confirmLabel={validAmount ? `Înregistrează ${money(parsedAmount, currency)}` : 'Înregistrează plata'}
                 confirmVariant={validAmount && advance > 0 ? 'warning' : undefined}
+                footerNote={validAmount && advance > 0 ? `Rămân ${money(advance, currency)} avans. Verifică suma.` : undefined}
                 loading={saving}
                 confirmDisabled={!canSave}
                 icon="payments"

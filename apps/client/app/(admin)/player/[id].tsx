@@ -56,6 +56,8 @@ export default function PlayerProfile() {
   // Gone (404): the page offers „Înapoi la Lot”, retrying can't help.
   const [missing, setMissing] = useState(false);
   const [saving, setSaving] = useState(false);
+  // The last save didn't reach the server: the draft stays, the bar says so.
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -154,18 +156,16 @@ export default function PlayerProfile() {
       const next = { ...player, ...payload } as Player;
       setPlayer(next);
       hydrate(next);
+      setSaveFailed(false);
       showToast({ variant: 'success', message: 'Profilul a fost salvat.' });
       return true;
     } catch (err) {
-      // Nothing was saved: the form (and the header built from it) goes back
-      // to the stored values instead of showing a number that isn't real.
-      hydrate(player);
-      showToast({
-        variant: 'error',
-        message: err instanceof ApiError && err.status === 409
-          ? err.message
-          : 'Nu am putut salva modificările. Am revenit la datele salvate.',
-      });
+      // Nothing was saved, but the edits stay (a visa date typed in a gym with
+      // no signal used to vanish): the bar says so and „Reîncearcă” sends them again.
+      // The bar carries the message (a toast over it hid „Reîncearcă” on a phone);
+      // a conflict still explains itself.
+      setSaveFailed(true);
+      if (err instanceof ApiError && err.status === 409) showToast({ variant: 'error', message: err.message });
       return false;
     } finally {
       setSaving(false);
@@ -380,10 +380,11 @@ export default function PlayerProfile() {
       </ScrollView>
       {dirty ? (
         <UnsavedBar
-          label={numberError || yearError ? 'Corectează câmpurile marcate' : 'Modificări nesalvate'}
+          label={numberError || yearError ? 'Corectează câmpurile marcate' : saveFailed ? 'Nu s-a salvat' : 'Modificări nesalvate'}
           saving={saving}
+          saveLabel={saveFailed ? 'Reîncearcă' : 'Salvează'}
           onSave={() => void handleSave()}
-          onDiscard={() => player && hydrate(player)}
+          onDiscard={() => { if (player) hydrate(player); setSaveFailed(false); }}
         />
       ) : null}
       <ConfirmDialog

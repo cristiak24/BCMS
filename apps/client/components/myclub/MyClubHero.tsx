@@ -8,11 +8,14 @@ import { plural } from '../../utils/plural';
 
 export default function MyClubHero({
     teams,
+    loadFailed = false,
     clubName,
     onImport,
     onCreate,
 }: {
     teams: Team[];
+    /** The teams didn't load: no subtitle (it would say the club has none). */
+    loadFailed?: boolean;
     clubName?: string | null;
     onImport: () => void;
     onCreate: () => void;
@@ -29,7 +32,7 @@ export default function MyClubHero({
         };
     }, [teams]);
 
-    const subtitle = stats.total === 0
+    const subtitle = loadFailed ? undefined : stats.total === 0
         ? 'Importă echipele din FRB sau creează prima echipă.'
         : `${plural(stats.total, 'echipă', 'echipe')} și ${plural(stats.players, 'jucător', 'jucători')}, toți într-un singur loc.`;
 

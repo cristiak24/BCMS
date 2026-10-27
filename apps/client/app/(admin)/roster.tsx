@@ -95,6 +95,9 @@ export default function RosterScreen() {
   const selectedRows = useRef(new Map<number, Player>());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [showBulkReassignSheet, setShowBulkReassignSheet] = useState(false);
+  // „Elimină din club” waits on a named confirmation: one player from the row
+  // sheet, or the selection from the bulk bar.
+  const [pendingRemoval, setPendingRemoval] = useState<{ players: Player[]; bulk: boolean } | null>(null);
 
   // The search box is typed into: ask the server once typing pauses.
   const [debouncedSearch, setDebouncedSearch] = useState(searchValue);
@@ -203,32 +206,24 @@ export default function RosterScreen() {
 
   const handleRemoveFromClub = () => {
     if (!selectedPlayer) return;
+    setShowActionModal(false);
+    setPendingRemoval({ players: [selectedPlayer], bulk: false });
+  };
 
-    Alert.alert(
-      'Elimină jucătorul',
-      `Elimini pe ${selectedPlayer.firstName} ${selectedPlayer.lastName} din lotul activ?`,
-      [
-        { text: 'Renunță', style: 'cancel' },
-        {
-          text: 'Elimină',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setPlayerActionBusy(true);
-              await teamsApi.removePlayerFromRoster(selectedPlayer.id);
-              setShowActionModal(false);
-              setSelectedPlayer(null);
-              await fetchRosterData();
-            } catch (removeError: any) {
-              console.error('Remove player error:', removeError);
-              Alert.alert('Eroare', removeError?.message || 'Jucătorul nu a putut fi eliminat din lot.');
-            } finally {
-              setPlayerActionBusy(false);
-            }
-          },
-        },
-      ]
-    );
+  const removeOne = async (player: Player) => {
+    try {
+      setPlayerActionBusy(true);
+      await teamsApi.removePlayerFromRoster(player.id);
+      setPendingRemoval(null);
+      setSelectedPlayer(null);
+      await fetchRosterData();
+    } catch (removeError: any) {
+      console.error('Remove player error:', removeError);
+      setPendingRemoval(null);
+      Alert.alert('Eroare', removeError?.message || 'Jucătorul nu a putut fi eliminat din lot.');
+    } finally {
+      setPlayerActionBusy(false);
+    }
   };
 
   const handleRestorePlayer = async (teamId: number) => {
@@ -311,6 +306,13 @@ export default function RosterScreen() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchValue, selectedTeam, selectedStatus, selectedAttendance, selectedPayment, sortColumn, sortDirection]);
+
+  // A selection is made from the rows on screen: a new search or filter starts a
+  // new one, so a bulk action never reaches players the list no longer shows.
+  useEffect(() => {
+    selectedRows.current.clear();
+    setSelectedIds(new Set());
+  }, [searchValue, selectedTeam, selectedStatus, selectedAttendance, selectedPayment]);
 
   const teamOptions = useMemo(() => [
     { label: 'Toate echipele', value: 'all' },
@@ -397,9 +399,20 @@ export default function RosterScreen() {
     setShowBulkReassignSheet(false);
     setBulkBusy(true);
     try {
-      await Promise.allSettled(Array.from(selectedIds).map((id) => teamsApi.addPlayerToTeam(id, teamId)));
+      const results = await Promise.allSettled(Array.from(selectedIds).map((id) => teamsApi.addPlayerToTeam(id, teamId)));
+      const failed = results.filter((result) => result.status === 'rejected').length;
       clearSelection();
       await fetchRosterData();
+      // Same report as bulk removal: a failed move used to clear the selection without a word.
+      if (failed) {
+        const done = results.length - failed;
+        const reason = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')?.reason;
+        const teamName = teams.find((team) => team.id === teamId)?.name ?? 'echipa aleasă';
+        Alert.alert(
+          done ? 'Mutare parțială' : 'Mutarea nu a mers',
+          `Am mutat ${done} din ${plural(results.length, 'jucător', 'jucători')} la ${teamName}. Pentru ${failed} mutarea nu a mers${reason ? `: ${loadFailureMessage(reason)}` : '.'}`,
+        );
+      }
     } finally {
       setBulkBusy(false);
     }
@@ -407,38 +420,40 @@ export default function RosterScreen() {
 
   const handleBulkRemove = () => {
     if (selectedIds.size === 0) return;
-
-    Alert.alert(
-      'Elimini selecția din lot?',
-      `Elimini ${plural(selectedIds.size, 'jucător', 'jucători')} din lotul activ?`,
-      [
-        { text: 'Renunță', style: 'cancel' },
-        {
-          text: 'Elimină',
-          style: 'destructive',
-          onPress: async () => {
-            setBulkBusy(true);
-            try {
-              const results = await Promise.allSettled(Array.from(selectedIds).map((id) => teamsApi.removePlayerFromRoster(id)));
-              const failed = results.filter((result) => result.status === 'rejected').length;
-              clearSelection();
-              await fetchRosterData();
-              if (failed) {
-                const done = results.length - failed;
-                const reason = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')?.reason;
-                Alert.alert(
-                  'Eliminare parțială',
-                  `Am eliminat ${done} din ${plural(results.length, 'jucător', 'jucători')}. Pentru ${failed} eliminarea nu a mers${reason instanceof Error && reason.message ? `: ${reason.message}` : '.'}`,
-                );
-              }
-            } finally {
-              setBulkBusy(false);
-            }
-          },
-        },
-      ]
-    );
+    const players = Array.from(selectedIds)
+      .map((id) => selectedRows.current.get(id))
+      .filter((player): player is Player => Boolean(player));
+    setPendingRemoval({ players, bulk: true });
   };
+
+  const removeSelection = async () => {
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(Array.from(selectedIds).map((id) => teamsApi.removePlayerFromRoster(id)));
+      const failed = results.filter((result) => result.status === 'rejected').length;
+      setPendingRemoval(null);
+      clearSelection();
+      await fetchRosterData();
+      if (failed) {
+        const done = results.length - failed;
+        const reason = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')?.reason;
+        Alert.alert(
+          'Eliminare parțială',
+          `Am eliminat ${done} din ${plural(results.length, 'jucător', 'jucători')}. Pentru ${failed} eliminarea nu a mers${reason ? `: ${loadFailureMessage(reason)}` : '.'}`,
+        );
+      }
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const removalCount = pendingRemoval ? (pendingRemoval.bulk ? selectedIds.size : 1) : 0;
+  const removalNames = (() => {
+    const names = (pendingRemoval?.players ?? []).map((player) => `${player.firstName} ${player.lastName}`.trim());
+    const shown = names.slice(0, 5).join(', ');
+    const rest = removalCount - Math.min(names.length, 5);
+    return rest > 0 ? `${shown} și încă ${rest}` : shown;
+  })();
 
   // Restanțe = players with something past due, the same definition as
   // Finanțe and the dashboard; owing a fee that is not due yet is not late.
@@ -725,6 +740,21 @@ export default function RosterScreen() {
         loading={sendingReminders}
         onConfirm={() => { void handleSendReminders().finally(() => setConfirmReminders(false)); }}
         onCancel={() => { if (!sendingReminders) setConfirmReminders(false); }}
+      />
+
+      <ConfirmDialog
+        visible={pendingRemoval !== null}
+        destructive
+        title={removalCount === 1 ? 'Elimini jucătorul din club?' : `Elimini ${plural(removalCount, 'jucător', 'jucători')} din club?`}
+        message={`${removalNames}. ${removalCount === 1 ? 'Iese' : 'Ies'} din toate echipele și ${removalCount === 1 ? 'trece' : 'trec'} la inactivi. Datele și istoricul rămân; „Restaurează la echipă” readuce în lot.`}
+        confirmLabel="Elimină din club"
+        loading={pendingRemoval?.bulk ? bulkBusy : playerActionBusy}
+        onConfirm={() => {
+          if (!pendingRemoval) return;
+          if (pendingRemoval.bulk) void removeSelection();
+          else void removeOne(pendingRemoval.players[0]);
+        }}
+        onCancel={() => { if (!bulkBusy && !playerActionBusy) setPendingRemoval(null); }}
       />
 
       <AddPlayerModal

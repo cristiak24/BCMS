@@ -7,15 +7,17 @@ import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../../components/Heade
 import PageHero from '../../../components/admin/PageHero';
 import PageContainer from '../../../components/ui/PageContainer';
 import { Skeleton } from '../../../components/ui/Skeleton';
-import { EmptyState, ErrorState } from '../../../components/ui/ScreenState';
+import { ErrorState } from '../../../components/ui/ScreenState';
+import { isNotFound } from '../../../services/apiClient';
+import { loadFailureMessage } from '../../../utils/errorMessages';
 
 /**
  * "Fișă meci" — pulled live from FRB's own game-detail widget (the one their
  * schedule page links to as "Avancronica"/"Preview"): quarter-by-quarter
  * score, arena, attendance, referees, commissioner. Not every scheduled match
  * carries a `gameId` (FRB only wires one up once the fixture is confirmed on
- * their side), so a missing id is a normal "not published yet" state, not an
- * error.
+ * their side), and only matches with one are linked here. So a URL without
+ * the game or season id is a broken link — „nu există”, not „nu e publicată”.
  */
 
 const SCHEDULE_PATH = '/admin/dashboard';
@@ -63,8 +65,9 @@ export default function MatchDetailScreen() {
   const [detail, setDetail] = useState<GameDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // No FRB game id yet: the normal "not published" state, not a failure.
-  const notPublished = !id || !seasonId;
+  const [missing, setMissing] = useState(false);
+  // Every in-app link carries both ids; without them the link is broken.
+  const brokenLink = !id || !seasonId;
 
   const { setSearchPlaceholder, setHeaderActions, setMobileFab } = useHeader();
 
@@ -87,11 +90,14 @@ export default function MatchDetailScreen() {
     try {
       setLoading(true);
       setError(null);
+      setMissing(false);
       const data = await basketballApi.getGameDetail(id, seasonId);
       setDetail(data);
     } catch (err) {
       console.error('Match detail load error:', err);
-      setError(err instanceof Error ? err.message : 'Fișa FRB nu a putut fi încărcată.');
+      // FRB answers 404 for a game id it doesn't know.
+      setMissing(isNotFound(err));
+      setError(loadFailureMessage(err));
     } finally {
       setLoading(false);
     }
@@ -137,14 +143,13 @@ export default function MatchDetailScreen() {
           <View className="max-w-[920px] w-full self-center">
             <Text className="sr-only" accessibilityRole="header" aria-level={1}>Fișa FRB</Text>
             {backButton}
-            {notPublished ? (
-              <View className="rounded-[16px] border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}>
-                <EmptyState
-                  icon="event-busy"
-                  title="Fișa FRB nu e publicată încă"
-                  message="FRB publică fișa meciului (scorul pe sferturi, sala, arbitrii) după ce confirmă meciul la ei. Revino aici după ce se joacă."
-                />
-              </View>
+            {brokenLink || missing ? (
+              <ErrorState
+                title="Fișa meciului nu există"
+                message="Linkul e incomplet sau nu mai e valid. Deschide meciul din Acasă."
+                actionLabel="Înapoi la Acasă"
+                onAction={() => router.replace(SCHEDULE_PATH as any)}
+              />
             ) : (
               <ErrorState
                 title="Fișa FRB nu s-a încărcat"

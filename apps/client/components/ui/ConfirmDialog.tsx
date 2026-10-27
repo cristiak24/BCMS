@@ -40,6 +40,8 @@ type ConfirmDialogProps = {
     sheetOnPhone?: boolean;
     /** Overrides the confirm button's look (e.g. `warning` for a payment that leaves an advance). */
     confirmVariant?: ButtonVariant;
+    /** A warning line fixed just above the buttons (with `confirmVariant: 'warning'`). */
+    footerNote?: string;
     onConfirm: () => void;
     onCancel: () => void;
 };
@@ -69,6 +71,7 @@ export default function ConfirmDialog({
     role = 'alertdialog',
     sheetOnPhone = false,
     confirmVariant,
+    footerNote,
     onConfirm,
     onCancel,
 }: ConfirmDialogProps) {
@@ -218,11 +221,18 @@ export default function ConfirmDialog({
                         </View>
                     </View>
 
+                    {footerNote ? (
+                        <View className="flex-row items-start gap-2 px-6 pt-3 shrink-0" accessibilityRole="status">
+                            <MaterialIcons name="warning-amber" size={16} color="var(--c-warning-fg)" />
+                            <Text className="flex-1 min-w-0 text-[12.5px] font-semibold leading-snug" style={{ color: 'var(--c-warning-fg)' }}>{footerNote}</Text>
+                        </View>
+                    ) : null}
+
                     {/* The system's buttons: the destructive one is danger-fg on danger-bg
                         (6:1 light, 8.7:1 dark); white on --c-danger was 3.8:1 / 2.8:1. */}
                     {/* Phone sheet: both buttons span the width, the confirm last (in thumb reach), so a long
-                        label („Înregistrează 900,00 RON · 340,00 RON avans”) is never cut. */}
-                    <div ref={footerRef} className={`flex gap-3 px-6 pt-4 pb-6 shrink-0 ${sheetOnPhone ? 'flex-col sm:flex-row sm:justify-end' : 'flex-row justify-end'}`}>
+                        label („Înregistrează 1.440,00 RON”) is never cut; on wider screens the row wraps. */}
+                    <div ref={footerRef} className={`flex gap-3 px-6 ${footerNote ? 'pt-3' : 'pt-4'} pb-6 shrink-0 ${sheetOnPhone ? 'flex-col sm:flex-row sm:flex-wrap sm:justify-end' : 'flex-row flex-wrap justify-end'}`}>
                         <Button
                             label={cancelLabel}
                             onPress={onCancel}

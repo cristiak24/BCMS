@@ -20,6 +20,8 @@ import { useResponsive } from '../../../hooks/useResponsive';
 import { canManageEvents, canMarkAttendance } from '../../../utils/eventPermissions';
 import { plural } from '../../../utils/plural';
 import { isNotFound } from '../../../services/apiClient';
+import { useLeaveGuard } from '../../../hooks/useLeaveGuard';
+import LeaveGuardDialog from '../../../components/ui/LeaveGuardDialog';
 
 /** Roles the server lets change an event (ensureTeamAccess); others only read it. */
 
@@ -218,20 +220,26 @@ export default function EventDetailScreen() {
     }
   };
 
-  const saveNote = async () => {
-    if (!event || savingNote) return;
+  /** True once saved (the leave dialog then carries on). */
+  const saveNote = async (): Promise<boolean> => {
+    if (!event || savingNote) return false;
     try {
       setSavingNote(true);
       setNoteError(null);
       const updated = await eventsApi.updateEvent(event.id, { coachNote: noteDraft.trim() || null });
       setEvent(updated);
       setNoteDraft(updated.coachNote ?? '');
+      return true;
     } catch (err) {
       setNoteError(err instanceof Error ? err.message : 'Nota nu a putut fi salvată.');
+      return false;
     } finally {
       setSavingNote(false);
     }
   };
+
+  // A typed note used to vanish on one tap of the sidebar or „Program”.
+  const leaveGuard = useLeaveGuard(Boolean(event) && canEdit && noteDraft.trim() !== (event?.coachNote ?? '').trim());
 
   const backButton = (
     <Pressable
@@ -542,6 +550,8 @@ export default function EventDetailScreen() {
         onConfirm={deleteEvent}
         onCancel={() => setConfirmDelete(false)}
       />
+
+      <LeaveGuardDialog guard={leaveGuard} saving={savingNote} what="nota pentru jucători" onSave={saveNote} />
     </ScrollView>
   );
 }

@@ -11,6 +11,7 @@ import PageHeader from '../ui/PageHeader';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import UnsavedBar from '../ui/UnsavedBar';
 import { useLeaveGuard } from '../../hooks/useLeaveGuard';
+import LeaveGuardDialog from '../ui/LeaveGuardDialog';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
@@ -170,34 +171,6 @@ const MATCHES_PAGE_SIZE = 12;
 
 type StatusFilter = 'all' | 'unset' | 'set';
 type HomeTab = 'matches' | 'teams';
-
-/**
- * Leaving an L12 sheet with unsaved changes — the sidebar, the bottom bar,
- * „Înapoi”: save and go, stay, or go without saving. It used to guard only
- * closing the browser tab, so a filled sheet vanished on one tap of „Lot”.
- */
-function LeaveSheetDialog({ guard, saving, what, onSave }: {
-  guard: ReturnType<typeof useLeaveGuard>;
-  saving: boolean;
-  what: string;
-  onSave: () => Promise<boolean>;
-}) {
-  return (
-    <ConfirmDialog
-      visible={guard.pending}
-      icon="save"
-      title="Salvezi modificările?"
-      message={`Ai modificări nesalvate în ${what}. Dacă pleci fără să le salvezi, se pierd.`}
-      confirmLabel="Salvează și pleacă"
-      cancelLabel="Rămân pe pagină"
-      loading={saving}
-      onConfirm={() => { void onSave().then((ok) => { if (ok) guard.leave(); }); }}
-      onCancel={guard.stay}
-    >
-      <Button variant="ghost" label="Pleacă fără salvare" disabled={saving} onPress={guard.leave} className="self-start" />
-    </ConfirmDialog>
-  );
-}
 
 function dayKey(iso: string) {
   const date = parseApiDate(iso);
@@ -928,7 +901,7 @@ export function L12MatchScreen() {
         }}
         onCancel={() => setConfirm(null)}
       />
-      <LeaveSheetDialog guard={leaveGuard} saving={saving} what="lista L12 a meciului" onSave={save} />
+      <LeaveGuardDialog guard={leaveGuard} saving={saving} what="lista L12 a meciului" onSave={save} />
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </PageShell>
   );
@@ -1097,7 +1070,7 @@ export function L12TemplateScreen() {
       </View>
 
       <L12Editor lineup={draft} onChange={setDraft} roster={roster} rosterLoading={rosterLoading} showMatchDetails={false} known={saved?.players ?? []} />
-      <LeaveSheetDialog guard={leaveGuard} saving={saving} what="L12-ul constant" onSave={save} />
+      <LeaveGuardDialog guard={leaveGuard} saving={saving} what="L12-ul constant" onSave={save} />
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </PageShell>
   );

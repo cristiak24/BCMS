@@ -27,6 +27,9 @@ import { useSession } from '../../../context/AuthContext';
 import { plural } from '../../../utils/plural';
 import { DenseList, DenseRow } from '../../../components/ui/DenseList';
 import { isNotFound } from '../../../services/apiClient';
+import { useLeaveGuard } from '../../../hooks/useLeaveGuard';
+import LeaveGuardDialog from '../../../components/ui/LeaveGuardDialog';
+import { isRetryableSaveError, readPendingMarks, useAttendanceOutbox } from '../../../hooks/useAttendanceOutbox';
 
 /**
  * Admin "Notare prezență" for one event.
@@ -144,7 +147,9 @@ export default function AttendanceScreen() {
             };
           })
           .sort(sortRoster);
-        setRoster(rows);
+        // Marks tapped offline on this device win over the server's until they're sent.
+        const waiting = readPendingMarks(eventId);
+        setRoster(waiting.size ? rows.map((row) => (waiting.has(row.id) ? { ...row, status: waiting.get(row.id) ?? row.status } : row)) : rows);
         setOpenNotes(new Set(rows.filter((row) => row.note.trim()).map((row) => row.id)));
       } else {
         setRoster([]);
@@ -168,16 +173,10 @@ export default function AttendanceScreen() {
   const readOnly = !canMarkAttendance(session?.role);
   const locked = notYet || readOnly;
 
-  // An unsaved note is easy to lose with one misclick on the sidebar.
-  useEffect(() => {
-    if (!dirtyNotes) return undefined;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirtyNotes]);
+  // An unsaved note is easy to lose with one misclick on the sidebar: every way
+  // out asks first (it used to guard only closing the tab).
+  const leaveGuard = useLeaveGuard(dirtyNotes > 0 && !locked);
+  const [savingNotes, setSavingNotes] = useState(false);
 
   const patchRows = (ids: Set<number>, patch: (row: RosterEntry) => RosterEntry) => {
     setRoster((rows) => rows.map((row) => (ids.has(row.id) ? patch(row) : row)));
@@ -197,7 +196,28 @@ export default function AttendanceScreen() {
     eventsApi.updateEvent(event.id, { status: 'graded' }).then(setEvent).catch(() => { gradedRef.current = false; });
   };
 
-  /** Saves marks at once; optimistic, rolled back on failure. */
+  // No signal in the gym: the marks stay on screen and on the device, and go out
+  // when the connection returns. A mark the server refuses is rolled back.
+  const outbox = useAttendanceOutbox(
+    event?.id ?? null,
+    async (marks) => {
+      if (!event) throw new Error('no event');
+      await saveStatus.track(eventsApi.updateEventAttendance(event.id, marks.map((mark) => ({ playerId: mark.id, status: mark.status }))));
+      markGraded();
+    },
+    (err) => {
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Prezența nu s-a salvat.' });
+      void loadData();
+    },
+  );
+
+  // Sent as soon as the sheet is open again (marks left from an earlier visit).
+  const outboxFlush = outbox.flush;
+  useEffect(() => {
+    if (!loading && event) void outboxFlush();
+  }, [loading, event, outboxFlush]);
+
+  /** Saves marks at once; optimistic. Kept for later without a connection, rolled back if refused. */
   const saveMarks = async (marks: { id: number; status: AttendanceMark }[]) => {
     if (!event || locked || !marks.length) return false;
     const ids = marks.map((mark) => mark.id);
@@ -208,8 +228,13 @@ export default function AttendanceScreen() {
     try {
       await saveStatus.track(eventsApi.updateEventAttendance(event.id, marks.map((mark) => ({ playerId: mark.id, status: mark.status }))));
       markGraded();
+      outbox.drop(ids);
       return true;
     } catch (err) {
+      if (isRetryableSaveError(err)) {
+        outbox.queue(marks);
+        return true;
+      }
       patchRows(new Set(ids), (row) => ({ ...row, status: previous.get(row.id) ?? null }));
       showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Prezența nu s-a salvat. Încearcă din nou.' });
       return false;
@@ -224,19 +249,34 @@ export default function AttendanceScreen() {
     void saveMarks([{ id: playerId, status }]);
   };
 
-  const saveNote = async (playerId: number) => {
+  /** True once saved. */
+  const saveNote = async (playerId: number): Promise<boolean> => {
     const row = roster.find((entry) => entry.id === playerId);
-    if (!event || locked || !row?.status) return;
+    if (!event || locked || !row?.status) return false;
     const note = row.note.trim();
     setBusy([playerId], true);
     try {
       await saveStatus.track(eventsApi.updateEventAttendance(event.id, [{ playerId, status: row.status, note: note || null }]));
       patchRows(new Set([playerId]), (entry) => ({ ...entry, note, savedNote: note }));
       showToast({ variant: 'success', message: note ? 'Nota a fost salvată. Familia primește o notificare.' : 'Nota a fost ștearsă.' });
+      return true;
     } catch (err) {
       showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Nota nu s-a salvat. Încearcă din nou.' });
+      return false;
     } finally {
       setBusy([playerId], false);
+    }
+  };
+
+  /** „Salvează și pleacă”: every unsaved note; false if one didn't save. */
+  const saveDirtyNotes = async () => {
+    setSavingNotes(true);
+    try {
+      let ok = true;
+      for (const row of roster.filter(noteDirty)) ok = (await saveNote(row.id)) && ok;
+      return ok;
+    } finally {
+      setSavingNotes(false);
     }
   };
 
@@ -450,7 +490,7 @@ export default function AttendanceScreen() {
                   </Text>
                 </View>
               ) : (
-                <AttendanceSaveStatus state={saveStatus.state} />
+                <AttendanceSaveStatus state={saveStatus.state} waiting={outbox.pending.size} onSendNow={() => void outbox.flush()} />
               )
             ) : null}
 
@@ -515,6 +555,7 @@ export default function AttendanceScreen() {
         onCancel={() => setBulkConfirmOpen(false)}
       />
 
+      <LeaveGuardDialog guard={leaveGuard} saving={savingNotes} what={dirtyNotes === 1 ? 'nota unui jucător' : `notele pentru ${plural(dirtyNotes, 'jucător', 'jucători')}`} onSave={saveDirtyNotes} />
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </View>
   );

@@ -30,3 +30,26 @@ test('a player without an email can be edited and the change persists', async ({
   expect(after.number).toBe(23);
   expect(after.email ?? null).toBeNull();
 });
+
+test('„Elimină din club” names the selection, starts on „Renunță”, and a search clears it', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await signIn(page, 'admin');
+  await page.goto('/admin/roster');
+  const boxes = page.locator('main [role="checkbox"]');
+  await boxes.nth(1).click();
+  await boxes.nth(2).click();
+  await expect(page.getByText('în selecție', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: /^Elimină din club/ }).click();
+  const dialog = page.getByRole('alertdialog', { name: 'Elimini 2 jucători din club?' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('Ies din toate echipele');
+  await expect(dialog.getByRole('button', { name: 'Renunță' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText('în selecție', { exact: true })).toBeVisible();
+
+  // A new search starts a new selection: no bulk action on rows the list no longer shows.
+  await page.getByPlaceholder('Caută după nume, tricou, echipă sau plată...').first().fill('zzz');
+  await expect(page.getByText('în selecție', { exact: true })).toHaveCount(0);
+});
