@@ -42,6 +42,11 @@ type ConfirmDialogProps = {
     confirmVariant?: ButtonVariant;
     /** A warning line fixed just above the buttons (with `confirmVariant: 'warning'`). */
     footerNote?: string;
+    /**
+     * Opens on „Renunță” although the action isn't destructive: it notifies
+     * families or changes someone's permissions, so Enter alone mustn't do it.
+     */
+    focusCancel?: boolean;
     onConfirm: () => void;
     onCancel: () => void;
 };
@@ -72,6 +77,7 @@ export default function ConfirmDialog({
     sheetOnPhone = false,
     confirmVariant,
     footerNote,
+    focusCancel = false,
     onConfirm,
     onCancel,
 }: ConfirmDialogProps) {
@@ -84,7 +90,9 @@ export default function ConfirmDialog({
         if (!visible) setTyped('');
     }, [visible]);
 
-    const confirmBlocked = confirmDisabled || (!!requireTypedConfirmation && typed.trim().toUpperCase() !== requireTypedConfirmation.toUpperCase());
+    // „ȘTERGE” and „STERGE” both count: a Romanian keyboard types the comma-below letter.
+    const plainUpper = (text: string) => text.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    const confirmBlocked = confirmDisabled || (!!requireTypedConfirmation && plainUpper(typed) !== plainUpper(requireTypedConfirmation));
 
     // Read through refs so the effect below runs only when the dialog opens or
     // closes. Callers pass `onCancel` inline, so with it as a dependency every
@@ -92,10 +100,10 @@ export default function ConfirmDialog({
     // in „Notă” wrote into „Suma”.
     const onCancelRef = useRef(onCancel);
     const loadingRef = useRef(loading);
-    const destructiveRef = useRef(destructive);
+    const destructiveRef = useRef(destructive || focusCancel);
     onCancelRef.current = onCancel;
     loadingRef.current = loading;
-    destructiveRef.current = destructive;
+    destructiveRef.current = destructive || focusCancel;
 
     useEffect(() => {
         if (!visible || typeof document === 'undefined') return;

@@ -491,6 +491,8 @@ export default function ManageAccountsScreen() {
                 message: `Devine ${roleLabel(pending.role).toLowerCase()} și primește imediat permisiunile acestui rol.`,
                 confirmLabel: `Schimbă în ${roleLabel(pending.role).toLowerCase()}`,
                 destructive: false,
+                // Permissions change at once: Enter alone mustn't do it.
+                focusCancel: true,
             };
         }
         if (pending.kind === 'reactivate') {
@@ -508,7 +510,7 @@ export default function ManageAccountsScreen() {
                 confirmLabel: 'Șterge definitiv',
                 destructive: true,
                 icon: 'delete-forever',
-                requireTypedConfirmation: 'STERGE',
+                requireTypedConfirmation: 'ȘTERGE',
             };
         }
         if (pending.kind === 'resend') {
@@ -535,6 +537,7 @@ export default function ManageAccountsScreen() {
                         : `Conturile active din selecție devin ${roleLabel(pending.action).toLowerCase()}. Restul rămân neschimbate.`,
                 confirmLabel: label,
                 destructive: pending.action === 'deactivate',
+                focusCancel: pending.action !== 'reactivate',
             };
         }
         const isInvite = pending.account.source === 'invite';
@@ -701,7 +704,7 @@ export default function ManageAccountsScreen() {
                                         const RowMain: any = isInvite ? View : Pressable;
                                         const actions = sheetActions(account);
                                         const lastSeen = isInvite
-                                            ? `Invitat ${formatRelativeDate(account.createdAt)}`
+                                            ? `Invitație trimisă ${formatRelativeDate(account.createdAt)}`
                                             : account.lastLoginAt ? formatRelativeDate(account.lastLoginAt) : 'Niciodată';
 
                                         return (
@@ -817,6 +820,7 @@ export default function ManageAccountsScreen() {
                 destructive={confirmCopy?.destructive}
                 icon={confirmCopy && 'icon' in confirmCopy ? confirmCopy.icon : undefined}
                 requireTypedConfirmation={confirmCopy && 'requireTypedConfirmation' in confirmCopy ? confirmCopy.requireTypedConfirmation : undefined}
+                focusCancel={confirmCopy && 'focusCancel' in confirmCopy ? confirmCopy.focusCancel : undefined}
                 onConfirm={confirmPending}
                 onCancel={() => setPending(null)}
             />

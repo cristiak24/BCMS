@@ -736,6 +736,8 @@ export default function RosterScreen() {
         title="Trimiți mementouri de plată?"
         message={`${pendingPayments === 1 ? 'Jucătorul cu restanțe primește' : `Cei ${plural(pendingPayments, 'jucător', 'jucători')} cu restanțe primesc`}, împreună cu părinții, o notificare în aplicație. Cine a primit deja un memento în ultimele 7 zile nu îl mai primește acum.`}
         confirmLabel="Trimite mementouri"
+        // Families get notified: it opens on „Renunță”, Enter alone doesn't send.
+        focusCancel
         icon="notifications-active"
         loading={sendingReminders}
         onConfirm={() => { void handleSendReminders().finally(() => setConfirmReminders(false)); }}

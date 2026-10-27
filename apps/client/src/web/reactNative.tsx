@@ -425,7 +425,8 @@ export const Pressable = React.forwardRef<HTMLElement, AnyProps>(function Pressa
       data-testid={native.testID}
       ref={ref as any}
       role={domProps.role ?? roleProps.role ?? 'button'}
-      tabIndex={disabled ? undefined : 0}
+      // A roving tab stop (radiogroup) passes -1 for the controls it skips.
+      tabIndex={disabled ? undefined : (domProps.tabIndex ?? 0)}
       onClick={handleClick}
       onKeyDown={
         disabled

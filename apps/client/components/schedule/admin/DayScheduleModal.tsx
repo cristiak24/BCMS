@@ -1,15 +1,20 @@
 import React from 'react';
-import { View, Text, Modal, Pressable, TouchableOpacity, ScrollView } from '@/src/web/reactNative';
-import { Calendar as CalendarIcon, X, Plus, MapPin, ChevronRight } from 'lucide-react';
+import { View, Text, Modal, Pressable, ScrollView } from '@/src/web/reactNative';
+import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { CalendarEvent } from '../../../services/eventsApi';
-import { EVENT_TYPE_META, formatEventTime, formatTimeRange, isCancelledEvent, RO_LOCALE } from '../scheduleShared';
+import { getEventTypeMeta, formatEventTime, formatTimeRange, isCancelledEvent, RO_LOCALE } from '../scheduleShared';
 import { plural } from '../../../utils/plural';
+import ModalBackdrop from '../../ui/ModalBackdrop';
+import Button from '../../ui/Button';
+import { EmptyState } from '../../ui/ScreenState';
 
 /**
- * Day agenda shown when a calendar cell is tapped. Laid out as a time-ordered
- * timeline (time gutter + colored rail + row) rather than a stack of full
- * event cards, so a busy day stays scannable instead of turning into a wall
- * of near-identical boxes.
+ * Day agenda shown when a calendar cell is tapped: one bordered list, a row
+ * per event in time order (time, a small type dot, title, then type · hours ·
+ * place). A bottom sheet on phones, a centred card from md.
+ *
+ * Rebuilt on the system's parts: it used to ignore Esc, drew a card per event
+ * with a coloured side stripe, 9px all-caps chips and a glowing „ADAUGĂ”.
  */
 export function DayScheduleModal({
   day,
@@ -28,156 +33,96 @@ export function DayScheduleModal({
 }) {
   const events = day?.events ?? [];
   const isToday = day ? day.date.toDateString() === new Date().toDateString() : false;
+  const weekday = day?.date.toLocaleDateString(RO_LOCALE, { weekday: 'long' }) ?? '';
+  const dateLabel = day?.date.toLocaleDateString(RO_LOCALE, { month: 'long', day: 'numeric' }) ?? '';
+  const title = `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${dateLabel}`;
 
   return (
-    <Modal visible={day !== null} transparent animationType={isMobile ? 'slide' : 'fade'}>
-      <Pressable className={`flex-1 bg-black/45 ${isMobile ? 'justify-end' : 'items-center justify-center p-5'}`} onPress={onClose}>
-        <View
-          className={`bg-[var(--c-surface)] w-full overflow-hidden ${isMobile ? 'rounded-t-[24px]' : 'rounded-[20px]'}`}
-          style={{ maxWidth: isMobile ? undefined : 560, maxHeight: isMobile ? '90%' : '86%', boxShadow: '0 24px 60px rgba(11,30,61,0.28)' } as any}
-          onStartShouldSetResponder={() => true}
+    <Modal visible={day !== null} transparent animationType={isMobile ? 'slide' : 'fade'} onRequestClose={onClose}>
+      <ModalBackdrop
+        onDismiss={onClose}
+        className={isMobile ? 'items-stretch justify-end' : 'items-center justify-center p-5'}
+        style={{ backgroundColor: 'rgba(2, 8, 23, 0.62)' }}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Programul zilei: ${title}`}
+          className={`flex flex-col w-full ${isMobile ? 'max-h-[90dvh] rounded-t-[20px] pb-[env(safe-area-inset-bottom)]' : 'max-w-[560px] max-h-[86dvh] rounded-[18px]'}`}
+          style={{ backgroundColor: 'var(--c-surface)', border: '1px solid var(--c-border)', boxShadow: 'var(--e-lg)' }}
         >
           {/* Header */}
-          <View className={`${isMobile ? 'px-5 pt-4 pb-4' : 'px-6 pt-5 pb-4'} border-b border-[var(--c-border)]`}>
-            <View className="flex-row items-start justify-between gap-4">
-              <View className="flex-1">
-                <View className="flex-row items-center gap-2">
-                  <Text className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--c-brand-fg)]">
-                    {day?.date.toLocaleDateString(RO_LOCALE, { weekday: 'long' })}
-                  </Text>
-                  {isToday && (
-                    <View className="bg-[var(--c-surface-tint)] rounded-full px-2 py-[2px]">
-                      <Text className="text-[9px] font-black uppercase tracking-widest text-[color:var(--c-brand-fg)]">Azi</Text>
-                    </View>
-                  )}
-                </View>
-                <Text className="text-[color:var(--c-ink-strong)] text-[21px] font-bold mt-0.5">
-                  {day?.date.toLocaleDateString(RO_LOCALE, { month: 'long', day: 'numeric' })}
-                </Text>
-                <Text className="text-[color:var(--c-faint)] font-bold text-[12px] mt-0.5">
-                  {events.length === 0 ? 'Nimic programat' : `${plural(events.length, 'eveniment planificat', 'evenimente planificate')}`}
-                </Text>
-              </View>
+          <View className="flex-row items-start gap-3 px-5 md:px-6 pt-5 pb-4 border-b shrink-0" style={{ borderColor: 'var(--c-border)' }}>
+            <View className="flex-1 min-w-0">
               <View className="flex-row items-center gap-2">
-                {onQuickAdd ? (
-                  <TouchableOpacity
-                    onPress={() => day && onQuickAdd(day.date)}
-                    className="h-10 rounded-full bg-[var(--c-brand-surface)] px-4 flex-row items-center gap-1.5"
-                    style={{ boxShadow: '0 8px 18px rgba(29,62,144,0.28)' } as any}
-                    accessibilityLabel="Adaugă eveniment în această zi"
-                  >
-                    <Plus color="var(--c-on-brand)" size={15} />
-                    <Text className="text-[color:var(--c-on-brand)] text-[11px] font-black uppercase tracking-widest">Adaugă</Text>
-                  </TouchableOpacity>
+                <Text accessibilityRole="header" className="text-[18px] font-bold leading-snug" style={{ color: 'var(--c-ink-strong)' }}>{title}</Text>
+                {isToday ? (
+                  <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
+                    <Text className="text-[11px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Azi</Text>
+                  </View>
                 ) : null}
-                <TouchableOpacity
-                  onPress={onClose}
-                  className="w-10 h-10 rounded-full bg-[var(--c-surface-2)] border border-[var(--c-border)] items-center justify-center"
-                  accessibilityLabel="Închide"
-                >
-                  <X color="var(--c-ink-soft)" size={18} />
-                </TouchableOpacity>
               </View>
+              <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
+                {events.length === 0 ? 'Nimic programat' : plural(events.length, 'eveniment', 'evenimente')}
+              </Text>
             </View>
+            {onQuickAdd && events.length > 0 ? (
+              <Button size="sm" variant="primary" icon="add" label="Adaugă" accessibilityLabel="Adaugă eveniment în această zi" onPress={() => day && onQuickAdd(day.date)} />
+            ) : null}
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Închide"
+              className="ui-press w-10 h-10 rounded-[10px] border items-center justify-center shrink-0"
+              style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+            >
+              <MaterialIcons name="close" size={18} color="var(--c-ink-soft)" />
+            </Pressable>
           </View>
 
-          {/* Timeline */}
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
+          <ScrollView className="min-h-0 flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: isMobile ? 16 : 20 }}>
             {events.length === 0 ? (
-              <View className="rounded-[22px] border border-dashed border-[var(--c-border)] bg-[var(--c-surface-2)] px-6 py-10 items-center">
-                <View className="w-12 h-12 rounded-full bg-[var(--c-surface)] border border-[var(--c-border)] items-center justify-center">
-                  <CalendarIcon size={22} color="var(--c-faint)" />
-                </View>
-                <Text className="text-[color:var(--c-ink-strong)] font-black mt-4">Niciun eveniment în această zi</Text>
-                <Text className="text-[color:var(--c-faint)] font-semibold text-[12.5px] mt-1 text-center">
-                  Adaugă un antrenament, meci, cantonament sau eveniment de club.
-                </Text>
-                {onQuickAdd ? (
-                  <TouchableOpacity
-                    onPress={() => day && onQuickAdd(day.date)}
-                    className="mt-5 bg-[var(--c-surface-tint)] border border-[var(--c-border)] rounded-full px-5 py-2.5"
-                  >
-                    <Text className="text-[color:var(--c-brand-fg)] text-[12px] font-black uppercase tracking-widest">+ Adaugă eveniment</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
+              <EmptyState
+                icon="event-busy"
+                title="Niciun eveniment în această zi"
+                message={onQuickAdd ? 'Adaugă un antrenament, un meci, un cantonament sau un eveniment de club.' : undefined}
+                actionLabel={onQuickAdd ? 'Adaugă eveniment' : undefined}
+                onAction={onQuickAdd && day ? () => onQuickAdd(day.date) : undefined}
+              />
             ) : (
-              <View>
+              <View className="rounded-[14px] border overflow-hidden" style={{ borderColor: 'var(--c-border)' }}>
                 {events.map((event, index) => {
-                  const meta = EVENT_TYPE_META[event.type];
+                  const meta = getEventTypeMeta(event.type);
                   const cancelled = isCancelledEvent(event);
-                  const isLast = index === events.length - 1;
-
+                  const details = [cancelled ? 'Anulat' : meta.label, formatTimeRange(event.startTime, event.endTime), event.location].filter(Boolean).join(' · ');
                   return (
-                    <View key={event.id} className="flex-row">
-                      {/* Time gutter */}
-                      <View style={{ width: 52 }} className="items-end pr-3 pt-3">
-                        <Text className={`text-[12px] font-black ${cancelled ? 'text-[color:var(--c-faint)]' : 'text-[color:var(--c-ink-strong)]'}`}>
-                          {formatEventTime(event.startTime)}
+                    <Pressable
+                      key={event.id}
+                      onPress={() => onSelectEvent(event)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${event.title}, ${details}`}
+                      className="ui-press flex-row items-center gap-3 px-4 py-3 hover:bg-[var(--c-surface-2)]"
+                      style={{ borderTopWidth: index === 0 ? 0 : 1, borderTopStyle: 'solid', borderColor: 'var(--c-border)', opacity: cancelled ? 0.65 : 1 } as any}
+                    >
+                      <Text className="t-num w-11 text-[13px] font-semibold" style={{ color: cancelled ? 'var(--c-faint)' : 'var(--c-ink)' }}>
+                        {formatEventTime(event.startTime)}
+                      </Text>
+                      <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cancelled ? 'var(--c-border-strong)' : meta.solid }} />
+                      <View className="flex-1 min-w-0">
+                        <Text numberOfLines={1} className={`text-[14px] font-semibold ${cancelled ? 'line-through' : ''}`} style={{ color: 'var(--c-ink-strong)' }}>
+                          {event.title}
                         </Text>
+                        <Text numberOfLines={1} className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>{details}</Text>
                       </View>
-
-                      {/* Rail */}
-                      <View className="items-center" style={{ width: 18 }}>
-                        <View
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: 5,
-                            marginTop: 15,
-                            backgroundColor: cancelled ? 'var(--c-border-strong)' : meta.solid,
-                          }}
-                        />
-                        {!isLast && <View className="flex-1 w-[2px] bg-[var(--c-border)] mt-1" />}
-                      </View>
-
-                      {/* Row */}
-                      <View className={`flex-1 ${isLast ? '' : 'mb-2'}`}>
-                        <TouchableOpacity
-                          onPress={() => onSelectEvent(event)}
-                          activeOpacity={0.85}
-                          className={`rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-3 flex-row items-center gap-3 hover:border-[var(--c-border-strong)] ${
-                            cancelled ? 'opacity-60' : ''
-                          }`}
-                          style={{ borderLeftWidth: 3, borderLeftColor: cancelled ? 'var(--c-border-strong)' : meta.solid }}
-                        >
-                          <View className="flex-1 min-w-0">
-                            <View className="flex-row items-center gap-2">
-                              <Text
-                                numberOfLines={1}
-                                className={`text-[14.5px] font-black text-[color:var(--c-ink-strong)] flex-1 ${cancelled ? 'line-through' : ''}`}
-                              >
-                                {event.title}
-                              </Text>
-                              <View className="rounded-full px-2.5 py-[3px]" style={{ backgroundColor: meta.soft }}>
-                                <Text className="text-[9px] font-black uppercase tracking-widest" style={{ color: meta.onSoft }}>
-                                  {meta.label}
-                                </Text>
-                              </View>
-                            </View>
-                            <View className={`${isMobile ? 'gap-1 mt-1.5' : 'flex-row items-center gap-3 mt-1.5'}`}>
-                              <Text className="text-[11.5px] font-bold text-[color:var(--c-muted)]">
-                                {formatTimeRange(event.startTime, event.endTime)}
-                              </Text>
-                              <View className="flex-row items-center gap-1 flex-1 min-w-0">
-                                <MapPin size={12} color="var(--c-faint)" />
-                                <Text numberOfLines={1} className="text-[11.5px] font-semibold text-[color:var(--c-faint)] flex-1">
-                                  {event.location || 'Sală principală'}
-                                </Text>
-                              </View>
-                            </View>
-                          </View>
-                          <ChevronRight size={16} color="var(--c-faint)" />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
+                      <MaterialIcons name="chevron-right" size={18} color="var(--c-faint)" />
+                    </Pressable>
                   );
                 })}
               </View>
             )}
           </ScrollView>
-        </View>
-      </Pressable>
+        </div>
+      </ModalBackdrop>
     </Modal>
   );
 }

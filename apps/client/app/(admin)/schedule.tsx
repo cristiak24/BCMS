@@ -230,7 +230,11 @@ export default function ScheduleScreen() {
     if (!canSyncFrb) return;
     let last = 0;
     try { last = Number(localStorage.getItem(FRB_SYNC_KEY) || 0); } catch { /* storage unavailable */ }
-    if (Date.now() - last > FRB_SYNC_INTERVAL_MS) runFrbSync(true);
+    if (Date.now() - last <= FRB_SYNC_INTERVAL_MS) return;
+    // The attempt counts, not only a success: a failing sync used to POST again
+    // on every visit to Program.
+    try { localStorage.setItem(FRB_SYNC_KEY, String(Date.now())); } catch { /* storage unavailable */ }
+    runFrbSync(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canSyncFrb]);
 

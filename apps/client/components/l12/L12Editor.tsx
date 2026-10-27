@@ -346,6 +346,8 @@ export default function L12Editor({
   known?: L12Player[];
 }) {
   const [rosterQuery, setRosterQuery] = useState('');
+  // Who „Completează automat” left out for having no visa on file (named under the button).
+  const [skippedNoVisa, setSkippedNoVisa] = useState<string[]>([]);
   const chosen = useMemo(() => new Set(lineup.players.map((player) => player.playerId)), [lineup.players]);
   const full = lineup.players.length >= L12_MAX_PLAYERS;
   const rosterById = useMemo(() => new Map(roster.map((p) => [p.id, p])), [roster]);
@@ -401,18 +403,20 @@ export default function L12Editor({
     onChange({ ...lineup, players: sortLineupPlayers([...lineup.players, buildRow(player, takenNumbers())]) });
   };
 
-  // Fill the free slots with players who can play: active, visa not expired
-  // („Fără viză valabilă nu se poate juca”), those with a visa on file first,
-  // then by number. Inactive and expired players are only added by hand.
+  // Fill the free slots with players who can play: active, with a valid visa
+  // („Fără viză valabilă nu se poate juca” — Acasă says the same of a missing
+  // one), by number. Inactive, expired and visa-less players are only added by
+  // hand; the visa-less ones are named so the button doesn't look broken.
   const autoFill = () => {
     const free = L12_MAX_PLAYERS - lineup.players.length;
     if (free <= 0) return;
-    const eligible = (p: Player) => medicalStatus(p.medicalCheckExpiry) !== 'expired' && !(p.status && p.status.toLowerCase() !== 'active');
-    const rank = (p: Player) => (medicalStatus(p.medicalCheckExpiry) === 'missing' ? 1 : 0);
-    const pool = roster
-      .filter((p) => !chosen.has(p.id) && eligible(p))
-      .sort((a, b) => rank(a) - rank(b) || (a.number ?? 999) - (b.number ?? 999) || a.lastName.localeCompare(b.lastName))
+    const active = (p: Player) => !(p.status && p.status.toLowerCase() !== 'active');
+    const open = roster.filter((p) => !chosen.has(p.id) && active(p));
+    const pool = open
+      .filter((p) => !['expired', 'missing'].includes(medicalStatus(p.medicalCheckExpiry)))
+      .sort((a, b) => (a.number ?? 999) - (b.number ?? 999) || a.lastName.localeCompare(b.lastName))
       .slice(0, free);
+    setSkippedNoVisa(open.filter((p) => medicalStatus(p.medicalCheckExpiry) === 'missing').map((p) => `${p.firstName} ${p.lastName}`.trim()));
     const taken = takenNumbers();
     const rows = pool.map((p) => {
       const row = buildRow(p, taken);
@@ -567,6 +571,11 @@ export default function L12Editor({
         </Pressable>
       ) : null}
     >
+      {skippedNoVisa.length && !full ? (
+        <Text className="t-meta mb-2.5" style={{ color: 'var(--c-muted)' }} role="status">
+          Fără viză, {skippedNoVisa.length === 1 ? 'rămâne' : 'rămân'} în lot: {skippedNoVisa.slice(0, 4).join(', ')}{skippedNoVisa.length > 4 ? ` și încă ${skippedNoVisa.length - 4}` : ''}. Se pot adăuga manual.
+        </Text>
+      ) : null}
       {roster.length > 6 ? (
         <View className="mb-2.5">
           <Input label="Caută în lot" placeholder="Caută după nume sau număr…" value={rosterQuery} onChange={setRosterQuery} />
