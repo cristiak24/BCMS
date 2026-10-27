@@ -345,6 +345,17 @@ export default function PlayerProfile() {
                   <Text className="t-num text-[24px] font-bold mt-1" style={{ color: amountDue > 0 ? 'var(--c-warning-fg)' : 'var(--c-ink)' }}>
                     {money(amountDue > 0 ? amountDue : player.paidAmount ?? transactions.reduce((sum, t) => sum + t.amount, 0))}
                   </Text>
+                  {/* The hero shows only the past-due part („340 Restanță”); here the whole
+                      balance („560 De plătit”) said nothing of how the two relate. */}
+                  {amountDue > 0 ? (
+                    <Text className="t-meta mt-1" style={{ color: 'var(--c-muted)' }}>
+                      {overdue > 0
+                        ? overdue >= amountDue
+                          ? 'Toată suma e restantă.'
+                          : `Din care ${money(overdue)} restanță și ${money(amountDue - overdue)} cu scadență viitoare.`
+                        : 'Nimic restant: totul are scadență viitoare.'}
+                    </Text>
+                  ) : null}
                 </View>
                 {transactions.length === 0 ? (
                   <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Nicio tranzacție încă.</Text>

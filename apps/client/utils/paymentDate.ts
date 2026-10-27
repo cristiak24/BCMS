@@ -16,3 +16,15 @@ export function formatPaymentWhen(value: string, provider?: string | null) {
     ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}),
   }).format(date);
 }
+
+/** How a payment came in, as the desk dialog names it; card payments online are „card online”. */
+export function paymentMethodLabel(provider: string | null | undefined) {
+  switch (provider) {
+    case 'cash': return 'numerar';
+    case 'transfer': return 'transfer bancar';
+    case 'card': return 'card (POS)';
+    case 'stripe': return 'card online';
+    case 'other': return 'altă metodă';
+    default: return null;
+  }
+}

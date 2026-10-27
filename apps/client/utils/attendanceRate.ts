@@ -36,3 +36,8 @@ export function pooledAttendanceRate(players: Counts[]) {
 export function formatAttendanceRate(rate: number | null | undefined) {
   return rate == null ? '—' : `${Math.round(rate)}%`;
 }
+
+/** One decimal, Romanian style: „66,7%”, not „66.7%”. */
+export function formatPercent1(value: number) {
+  return `${value.toLocaleString('ro-RO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+}

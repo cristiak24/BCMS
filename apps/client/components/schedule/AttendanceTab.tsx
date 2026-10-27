@@ -1,3 +1,4 @@
+import { formatPercent1 } from '../../utils/attendanceRate';
 import { parseApiDate } from '@/utils/dates';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from '@/src/web/reactNative';
@@ -490,7 +491,7 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
   const statCells = [
     {
       label: isMobile && mobilePeriodMode === 'month' ? 'Rată lună' : 'Rată săptămână',
-      value: rateStats.denom > 0 ? `${rateStats.rate}%` : '—',
+      value: rateStats.denom > 0 ? formatPercent1(Number(rateStats.rate)) : '—',
       hint: `${rateStats.present}/${rateStats.denom} ${pluralWord(rateStats.denom, 'prezență', 'prezențe')}`,
       tone: rateTone(rateStats.denom > 0 ? rateNumber : null),
       progress: rateStats.denom > 0 ? rateNumber : 0,
@@ -504,14 +505,14 @@ export function AttendanceTab({ events, teams, initialTeamId }: AttendanceTabPro
     },
     {
       label: `An ${viewYear}`,
-      value: statsLoading ? '—' : yearStat.denom > 0 ? `${yearStat.rate.toFixed(1)}%` : '—',
+      value: statsLoading ? '—' : yearStat.denom > 0 ? formatPercent1(yearStat.rate) : '—',
       hint: `${yearStat.present}/${yearStat.denom} ${pluralWord(yearStat.denom, 'prezență', 'prezențe')}`,
       tone: rateTone(statsLoading || !yearStat.denom ? null : yearStat.rate),
       progress: statsLoading ? 0 : yearStat.rate,
     },
     {
       label: months[viewMonth],
-      value: statsLoading ? '—' : monthStat.denom > 0 ? `${monthStat.rate.toFixed(1)}%` : '—',
+      value: statsLoading ? '—' : monthStat.denom > 0 ? formatPercent1(monthStat.rate) : '—',
       hint: `${monthStat.present}/${monthStat.denom} ${pluralWord(monthStat.denom, 'prezență', 'prezențe')}`,
       tone: rateTone(statsLoading || !monthStat.denom ? null : monthStat.rate),
       progress: statsLoading ? 0 : monthStat.rate,

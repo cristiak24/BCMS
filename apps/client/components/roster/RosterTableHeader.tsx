@@ -28,8 +28,15 @@ function SortableLabel({
   onSort: (column: RosterSortColumn) => void;
 }) {
   const active = sortColumn === column;
+  // Not a <table>, so no aria-sort: the name carries the state („Sortează după
+  // Prezență, crescător”); 32px tall instead of the 17px label.
+  const state = active ? (sortDirection === 'asc' ? 'crescător' : 'descrescător') : 'nesortat';
   return (
-    <Pressable onPress={() => onSort(column)} className="flex-row items-center gap-1">
+    <Pressable
+      onPress={() => onSort(column)}
+      accessibilityLabel={`Sortează după ${label}, ${state}`}
+      className="flex-row items-center gap-1 h-8 -my-2 pr-1"
+    >
       <Text style={[styles.label, active && styles.labelActive]}>{label}</Text>
       {active ? (
         sortDirection === 'asc' ? (

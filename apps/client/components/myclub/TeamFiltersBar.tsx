@@ -224,7 +224,8 @@ export default function TeamFiltersBar({
                 <View className="flex-row rounded-[9px] border overflow-hidden" style={{ borderColor: 'var(--c-border)' }}>
                     <Pressable
                         onPress={() => onViewChange('grid')}
-                        accessibilityLabel="Vizualizare grid"
+                        accessibilityLabel="Vizualizare carduri"
+                        aria-pressed={view === 'grid'}
                         className="w-9 h-9 [@media(pointer:coarse)]:w-10 [@media(pointer:coarse)]:h-10 items-center justify-center"
                         style={{ backgroundColor: view === 'grid' ? 'var(--c-brand-surface)' : 'var(--c-surface)' }}
                     >
@@ -233,6 +234,7 @@ export default function TeamFiltersBar({
                     <Pressable
                         onPress={() => onViewChange('table')}
                         accessibilityLabel="Vizualizare tabel"
+                        aria-pressed={view === 'table'}
                         className="w-9 h-9 [@media(pointer:coarse)]:w-10 [@media(pointer:coarse)]:h-10 items-center justify-center border-l"
                         style={{ backgroundColor: view === 'table' ? 'var(--c-brand-surface)' : 'var(--c-surface)', borderColor: 'var(--c-border)' }}
                     >

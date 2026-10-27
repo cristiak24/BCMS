@@ -1,3 +1,4 @@
+import { formatPercent1 } from '../../utils/attendanceRate';
 import { Player, RosterSummary } from '../../services/teamsApi';
 
 export function normalizePaymentStatus(paymentStatus?: string | null) {
@@ -82,11 +83,11 @@ export function buildAttendanceHelperText(summary: RosterSummary | null) {
 
   if (typeof summary.attendanceDelta === 'number') {
     const direction = summary.attendanceDelta >= 0 ? '+' : '';
-    return `Ultimele 30 de zile: ${direction}${summary.attendanceDelta.toFixed(1)}% față de perioada anterioară`;
+    return `Ultimele 30 de zile: ${direction}${formatPercent1(summary.attendanceDelta)} față de perioada anterioară`;
   }
 
   if (typeof summary.currentPeriodAttendance === 'number') {
-    return `Media pe ultimele 30 de zile: ${summary.currentPeriodAttendance.toFixed(1)}%`;
+    return `Media pe ultimele 30 de zile: ${formatPercent1(summary.currentPeriodAttendance)}`;
   }
 
   return 'Nu există încă o tendință de prezență recentă.';

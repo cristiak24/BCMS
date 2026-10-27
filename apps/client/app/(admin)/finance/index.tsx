@@ -1,4 +1,4 @@
-import { formatPaymentWhen } from '../../../utils/paymentDate';
+import { formatPaymentWhen, paymentMethodLabel } from '../../../utils/paymentDate';
 import { parseApiDate } from '@/utils/dates';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, Modal, Platform } from '@/src/web/reactNative';
@@ -902,7 +902,7 @@ export default function FinancialSettingsPage() {
                                                 <View className="flex-1 min-w-0">
                                                     <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{payment.playerName}</Text>
                                                     <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-                                                        {[formatPaymentWhen(payment.date, payment.provider), payment.teamName, payment.provider === 'cash' ? 'numerar' : payment.provider === 'stripe' ? 'card' : null].filter(Boolean).join(' · ')}
+                                                        {[formatPaymentWhen(payment.date, payment.provider), payment.teamName, paymentMethodLabel(payment.provider)].filter(Boolean).join(' · ')}
                                                     </Text>
                                                 </View>
                                                 <View className="items-end shrink-0">
@@ -1068,6 +1068,18 @@ export default function FinancialSettingsPage() {
                 onConfirm={() => void submitReverse()}
                 onCancel={() => { if (!reversing) setPendingReverse(null); }}
             >
+                {/* Which payment, exactly: two 340 RON payments used to look the same here. */}
+                {pendingReverse ? (
+                    <View className="rounded-[10px] border px-3 py-2.5 mb-4 gap-0.5" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' }}>
+                        <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink)' }}>
+                            {[formatPaymentWhen(pendingReverse.date, pendingReverse.provider), paymentMethodLabel(pendingReverse.provider)].filter(Boolean).join(' · ')}
+                        </Text>
+                        {/* „Plată numerar” is the server's default text, whatever the method: the line above says it. */}
+                        {pendingReverse.description && pendingReverse.description !== 'Plată numerar' ? (
+                            <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>{pendingReverse.description}</Text>
+                        ) : null}
+                    </View>
+                ) : null}
                 <Text className="text-[12px] font-semibold mb-1.5" style={{ color: 'var(--c-muted)' }}>Motivul stornării</Text>
                 <TextInput
                     value={reverseReason}

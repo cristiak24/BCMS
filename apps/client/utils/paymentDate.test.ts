@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 
-import { formatPaymentWhen } from './paymentDate';
+import { formatPaymentWhen, paymentMethodLabel } from './paymentDate';
 
 test('a cash payment shows its day only — no "03:00"', () => {
   const text = formatPaymentWhen('2026-10-12T00:00:00.000Z', 'cash');
@@ -12,4 +12,12 @@ test('a cash payment shows its day only — no "03:00"', () => {
 test('a card payment keeps its time, in Romanian time', () => {
   const text = formatPaymentWhen('2026-10-12T11:05:00.000Z', 'stripe');
   assert.match(text, /14:05/);
+});
+
+test('every desk method has a name, so a transfer no longer shows none', () => {
+  assert.equal(paymentMethodLabel('cash'), 'numerar');
+  assert.equal(paymentMethodLabel('transfer'), 'transfer bancar');
+  assert.equal(paymentMethodLabel('card'), 'card (POS)');
+  assert.equal(paymentMethodLabel('stripe'), 'card online');
+  assert.equal(paymentMethodLabel(null), null);
 });
