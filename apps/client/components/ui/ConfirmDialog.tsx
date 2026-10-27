@@ -83,6 +83,17 @@ export default function ConfirmDialog({
 
     const confirmBlocked = confirmDisabled || (!!requireTypedConfirmation && typed.trim().toUpperCase() !== requireTypedConfirmation.toUpperCase());
 
+    // Read through refs so the effect below runs only when the dialog opens or
+    // closes. Callers pass `onCancel` inline, so with it as a dependency every
+    // keystroke re-ran the effect and sent focus back to the first field — typing
+    // in „Notă” wrote into „Suma”.
+    const onCancelRef = useRef(onCancel);
+    const loadingRef = useRef(loading);
+    const destructiveRef = useRef(destructive);
+    onCancelRef.current = onCancel;
+    loadingRef.current = loading;
+    destructiveRef.current = destructive;
+
     useEffect(() => {
         if (!visible || typeof document === 'undefined') return;
 
@@ -105,16 +116,16 @@ export default function ConfirmDialog({
             const items = focusables();
             const field = items.find((el) => el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
             const cancel = footerRef.current?.querySelector<HTMLElement>('button');
-            (field ?? (destructive ? cancel : items.at(-1)))?.focus();
+            (field ?? (destructiveRef.current ? cancel : items.at(-1)))?.focus();
         }, 0);
 
         // Tab is the Modal's (src/web/reactNative.tsx): it keeps focus inside.
         // A second trap here ran after it and wrapped from the last control to
         // the first, so the confirm button could never be reached with Tab.
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape' && !loading) {
+            if (event.key === 'Escape' && !loadingRef.current) {
                 event.preventDefault();
-                onCancel();
+                onCancelRef.current();
             }
         };
 
@@ -126,7 +137,7 @@ export default function ConfirmDialog({
             document.body.style.overflow = overflow;
             previouslyFocused.current?.focus?.();
         };
-    }, [visible, loading, onCancel, destructive]);
+    }, [visible]);
 
     if (!visible) {
         return null;

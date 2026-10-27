@@ -82,6 +82,30 @@ test('"restanță" is the same number on Dashboard, Lot and Finanțe', async ({ 
   await expectFigure(page, /Cu restanțe\s*\n\s*(\d+)/i, expected, 'Finanțe: Cu restanțe');
 });
 
+test('typing in „Notă” stays in „Notă” and leaves the amount alone', async ({ page }) => {
+  // The dialog's focus effect re-ran on every render and put focus back on the
+  // first field, so after one key the rest of a receipt number went into „Suma”.
+  await signIn(page, 'admin');
+  await page.goto('/admin/finance');
+  const row = page.getByText('Radu Stan', { exact: true }).first()
+    .locator('xpath=ancestor::*[.//*[normalize-space(text())="Încasează"]][1]');
+  await row.getByText('Încasează', { exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: /Încasare/ });
+  const amount = dialog.getByLabel('Suma încasată');
+  await expect(amount).not.toHaveValue('');
+  const before = await amount.inputValue();
+
+  const note = dialog.getByLabel('Notă');
+  await note.click();
+  await page.keyboard.type('chitanța 0457', { delay: 30 });
+  await expect(note).toHaveValue('chitanța 0457');
+  await expect(note).toBeFocused();
+  await expect(amount).toHaveValue(before);
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+});
+
 test('the keyboard reaches „Înregistrează” in the payment dialog', async ({ page }) => {
   // Two focus traps (the Modal's and the dialog's own) used to skip the last
   // control, so Tab never landed on the button that records the payment.

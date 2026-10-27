@@ -369,6 +369,12 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
 
     // Escape closes, focus returns to the trigger; body scroll locked. Tab is the
     // Modal's (a second trap here skipped the last control, the primary button).
+    // `busy` and `onClose` come through refs: as dependencies, each change ran the
+    // cleanup, which sent focus to the trigger behind the dialog.
+    const busyRef = useRef(busy);
+    const onCloseRef = useRef(onClose);
+    busyRef.current = busy;
+    onCloseRef.current = onClose;
     useEffect(() => {
         if (!visible || typeof document === 'undefined') return undefined;
         const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -376,9 +382,9 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
         document.body.style.overflow = 'hidden';
 
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape' && !busy) {
+            if (event.key === 'Escape' && !busyRef.current) {
                 event.preventDefault();
-                onClose();
+                onCloseRef.current();
             }
         };
         document.addEventListener('keydown', onKeyDown);
@@ -387,7 +393,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
             document.body.style.overflow = overflow;
             previouslyFocused?.focus?.();
         };
-    }, [visible, busy, onClose]);
+    }, [visible]);
 
     // Each step announces itself: focus moves to its heading.
     useEffect(() => {
