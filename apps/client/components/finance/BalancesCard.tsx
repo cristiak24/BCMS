@@ -246,6 +246,8 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
 
     const parsedAmount = Number(amount.replace(',', '.'));
     const validAmount = Number.isFinite(parsedAmount) && parsedAmount > 0;
+    // What the server's split leaves over after every fee: booked as an advance.
+    const advance = validAmount && allocation ? allocation.credit : 0;
     const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(new Date(date).getTime()) && date <= todayIso();
     const canSave = !saving && validAmount && validDate;
     const selectedKey = Array.from(selectedFees).sort().join(',');
@@ -435,8 +437,15 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                 visible={target != null}
                 title={target ? `Încasare · ${target.playerName}` : ''}
                 message="Bifează taxele pe care le acoperă plata. Suma se completează din ele și se împarte de la cea mai veche; o sumă mai mică le achită parțial."
-                // The amount on the button: the last look before it is booked.
-                confirmLabel={validAmount ? `Înregistrează ${money(parsedAmount, currency)}` : 'Înregistrează plata'}
+                // The amount on the button: the last look before it is booked — and
+                // the advance it leaves, in a warning tone (a mistyped digit used
+                // to read as success, the warning sitting below the button).
+                confirmLabel={!validAmount
+                    ? 'Înregistrează plata'
+                    : advance > 0
+                        ? `Înregistrează ${money(parsedAmount, currency)} · ${money(advance, currency)} avans`
+                        : `Înregistrează ${money(parsedAmount, currency)}`}
+                confirmVariant={validAmount && advance > 0 ? 'warning' : undefined}
                 loading={saving}
                 confirmDisabled={!canSave}
                 icon="payments"
@@ -516,6 +525,15 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                             </View>
                         </View>
 
+                        {validAmount && advance > 0 ? (
+                            <View className="flex-row items-start gap-2 rounded-[10px] border px-3 py-2.5" style={{ backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-fg)' } as any} accessibilityRole={'alert' as any}>
+                                <MaterialIcons name="error-outline" size={16} color="var(--c-warning-fg)" />
+                                <Text className="flex-1 text-[12.5px] leading-[18px]" style={{ color: 'var(--c-warning-fg)' }}>
+                                    <Text className="font-bold">{money(advance, currency)} peste tot ce e de plată.</Text> Rămân avans și acoperă următoarele taxe. Verifică suma.
+                                </Text>
+                            </View>
+                        ) : null}
+
                         <AllocationPreview
                             allocation={allocation}
                             loading={allocating}
@@ -556,7 +574,12 @@ function AllocationPreview({ allocation, loading, visible, noneSelected, currenc
     noneSelected: boolean;
     currency: string;
 }) {
+    const [expanded, setExpanded] = useState(false);
     if (!visible) return null;
+    // Every fee paid in full: one line, not a column of identical ticks that
+    // reads as success and is re-announced line by line as the amount changes.
+    const allSettled = Boolean(allocation && allocation.lines.length > 1 && allocation.lines.every((line) => line.owedAfter <= 0));
+    const collapsed = allSettled && !expanded;
     return (
         <View
             className="rounded-[10px] border px-3 py-2.5 gap-1.5"
@@ -571,7 +594,15 @@ function AllocationPreview({ allocation, loading, visible, noneSelected, currenc
             {noneSelected ? (
                 <Text className="text-[12px]" style={{ color: 'var(--c-muted)' }}>Nicio taxă bifată: suma merge pe cele mai vechi taxe.</Text>
             ) : null}
-            {allocation ? (
+            {allocation && collapsed ? (
+                <View className="flex-row items-center gap-2">
+                    <MaterialIcons name="check-circle" size={15} color="var(--c-success-fg)" />
+                    <Text className="flex-1 text-[12.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>
+                        {`Acoperă integral ${plural(allocation.lines.length, 'taxă', 'taxe')}`}
+                    </Text>
+                    <Button size="sm" variant="ghost" label="Detalii" onPress={() => setExpanded(true)} />
+                </View>
+            ) : allocation ? (
                 <>
                     {allocation.lines.map((line) => {
                         const settled = line.owedAfter <= 0;
@@ -592,15 +623,6 @@ function AllocationPreview({ allocation, loading, visible, noneSelected, currenc
                             </View>
                         );
                     })}
-                    {allocation.credit > 0 ? (
-                        // A warning, not a note: 900 typed for 90 used to become an advance without a word.
-                        <View className="flex-row items-start gap-2 rounded-[8px] px-2 py-1.5" style={{ backgroundColor: 'var(--c-warning-bg)' }}>
-                            <MaterialIcons name="error-outline" size={15} color="var(--c-warning-fg)" />
-                            <Text className="flex-1 text-[12px]" style={{ color: 'var(--c-warning-fg)' }}>
-                                Suma depășește tot ce e de plată cu {money(allocation.credit, currency)}. Verifică suma: diferența rămâne avans și acoperă următoarele taxe.
-                            </Text>
-                        </View>
-                    ) : null}
                 </>
             ) : !loading ? (
                 <Text className="text-[12px]" style={{ color: 'var(--c-muted)' }}>Împărțirea nu e disponibilă acum; plata se salvează oricum.</Text>

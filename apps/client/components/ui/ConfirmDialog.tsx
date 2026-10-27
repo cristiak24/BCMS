@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Modal, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import ModalBackdrop from './ModalBackdrop';
-import Button from './Button';
+import Button, { type ButtonVariant } from './Button';
 
 type IconName = string;
 
@@ -38,6 +38,8 @@ type ConfirmDialogProps = {
      * that can be taller than a phone screen — recording a payment.
      */
     sheetOnPhone?: boolean;
+    /** Overrides the confirm button's look (e.g. `warning` for a payment that leaves an advance). */
+    confirmVariant?: ButtonVariant;
     onConfirm: () => void;
     onCancel: () => void;
 };
@@ -66,6 +68,7 @@ export default function ConfirmDialog({
     confirmDisabled = false,
     role = 'alertdialog',
     sheetOnPhone = false,
+    confirmVariant,
     onConfirm,
     onCancel,
 }: ConfirmDialogProps) {
@@ -105,28 +108,13 @@ export default function ConfirmDialog({
             (field ?? (destructive ? cancel : items.at(-1)))?.focus();
         }, 0);
 
+        // Tab is the Modal's (src/web/reactNative.tsx): it keeps focus inside.
+        // A second trap here ran after it and wrapped from the last control to
+        // the first, so the confirm button could never be reached with Tab.
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape' && !loading) {
                 event.preventDefault();
                 onCancel();
-                return;
-            }
-
-            if (event.key !== 'Tab') return;
-
-            const items = focusables();
-            if (items.length === 0) return;
-
-            const first = items[0];
-            const last = items[items.length - 1];
-            const active = document.activeElement;
-
-            if (event.shiftKey && (active === first || !cardRef.current?.contains(active))) {
-                event.preventDefault();
-                last.focus();
-            } else if (!event.shiftKey && active === last) {
-                event.preventDefault();
-                first.focus();
             }
         };
 
@@ -221,21 +209,22 @@ export default function ConfirmDialog({
 
                     {/* The system's buttons: the destructive one is danger-fg on danger-bg
                         (6:1 light, 8.7:1 dark); white on --c-danger was 3.8:1 / 2.8:1. */}
-                    <div ref={footerRef} className="flex flex-row justify-end gap-3 px-6 pt-4 pb-6 shrink-0">
+                    {/* Phone sheet: both buttons span the width, the confirm last (in thumb reach), so a long
+                        label („Înregistrează 900,00 RON · 340,00 RON avans”) is never cut. */}
+                    <div ref={footerRef} className={`flex gap-3 px-6 pt-4 pb-6 shrink-0 ${sheetOnPhone ? 'flex-col sm:flex-row sm:justify-end' : 'flex-row justify-end'}`}>
                         <Button
                             label={cancelLabel}
                             onPress={onCancel}
                             disabled={loading}
+                            className={sheetOnPhone ? 'w-full sm:w-auto' : ''}
                         />
                         <Button
-                            variant={destructive ? 'danger' : 'primary'}
+                            variant={confirmVariant ?? (destructive ? 'danger' : 'primary')}
                             label={confirmLabel}
                             onPress={onConfirm}
                             loading={loading}
                             disabled={confirmBlocked}
-                            // The phone sheet's confirm takes the rest of the row, so
-                            // „Înregistrează 340,00 RON” is never cut to „Înregistrează …”.
-                            className={sheetOnPhone ? 'flex-1 sm:flex-none' : ''}
+                            className={sheetOnPhone ? 'w-full sm:w-auto' : ''}
                         />
                     </div>
                 </div>

@@ -13,7 +13,8 @@ import SelectField from '../../components/ui/SelectField';
 import ActionSheet, { type SheetAction } from '../../components/ui/ActionSheet';
 import Pagination from '../../components/ui/Pagination';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { EmptyState } from '../../components/ui/ScreenState';
+import { EmptyState, LoadError } from '../../components/ui/ScreenState';
+import { loadFailureMessage } from '../../utils/errorMessages';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
 import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../components/HeaderContext';
 import { formatRelativeDate } from '../../components/myclub/teamDisplay';
@@ -117,6 +118,9 @@ export default function ManageAccountsScreen() {
     const debouncedSearch = useDebouncedValue(searchValue, 200);
     const [accounts, setAccounts] = useState<ClubAdminAccount[]>([]);
     const [loading, setLoading] = useState(true);
+    // A failed load is said as such: zero KPIs and „Niciun cont găsit” read as
+    // a club whose accounts are gone.
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState<(typeof FILTERS)[number]>('all');
     const [busyId, setBusyId] = useState<string | number | null>(null);
@@ -142,8 +146,10 @@ export default function ManageAccountsScreen() {
         try {
             const response = await clubAdminApi.listAccounts();
             setAccounts(response.users);
+            setLoadError(null);
         } catch (error) {
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Nu am putut încărca conturile clubului.' });
+            setLoadError(loadFailureMessage(error));
+            if (mode === 'refresh') showToast({ variant: 'error', message: loadFailureMessage(error) });
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -599,7 +605,7 @@ export default function ManageAccountsScreen() {
                     <PageHero
                         eyebrow="Conturi"
                         title="Conturile clubului"
-                        subtitle={loading ? undefined : `${counts.active} active · ${plural(counts.invites, 'invitație în așteptare', 'invitații în așteptare')}`}
+                        subtitle={loading || (loadError && accounts.length === 0) ? undefined : `${counts.active} active · ${plural(counts.invites, 'invitație în așteptare', 'invitații în așteptare')}`}
                         actions={(
                             <>
                                 <Button icon="refresh" label="Reîncarcă" iconOnlyOnMobile loading={refreshing} disabled={loading} onPress={() => void loadAccounts('refresh')} className="hidden sm:flex" />
@@ -608,7 +614,7 @@ export default function ManageAccountsScreen() {
                             </>
                         )}
                     >
-                        {!loading ? (
+                        {!loading && !(loadError && accounts.length === 0) ? (
                             <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
                                 {/* Labels agree with the number: it read "1 Jucători", "1 Părinți". */}
                                 <GlassStat dot="var(--c-success)" value={counts.active} label={counts.active === 1 ? 'Cont activ' : 'Conturi active'} />
@@ -655,6 +661,8 @@ export default function ManageAccountsScreen() {
                             <View className="gap-2" accessibilityRole="progressbar" accessibilityLabel="Se încarcă conturile">
                                 {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-[60px] w-full rounded-[12px]" />)}
                             </View>
+                        ) : loadError && accounts.length === 0 ? (
+                            <LoadError title="Conturile nu s-au încărcat" message={loadError} onRetry={() => void loadAccounts()} />
                         ) : filteredAccounts.length === 0 ? (
                             <EmptyState
                                 compact

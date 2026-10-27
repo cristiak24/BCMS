@@ -401,17 +401,16 @@ export default function L12Editor({
     onChange({ ...lineup, players: sortLineupPlayers([...lineup.players, buildRow(player, takenNumbers())]) });
   };
 
-  // Fill the free slots: active players with a valid visa first, by number.
+  // Fill the free slots with players who can play: active, visa not expired
+  // („Fără viză valabilă nu se poate juca”), those with a visa on file first,
+  // then by number. Inactive and expired players are only added by hand.
   const autoFill = () => {
     const free = L12_MAX_PLAYERS - lineup.players.length;
     if (free <= 0) return;
-    const rank = (p: Player) => {
-      const visa = medicalStatus(p.medicalCheckExpiry);
-      const inactive = p.status && p.status.toLowerCase() !== 'active';
-      return (inactive ? 2 : 0) + (visa === 'expired' ? 1 : 0);
-    };
+    const eligible = (p: Player) => medicalStatus(p.medicalCheckExpiry) !== 'expired' && !(p.status && p.status.toLowerCase() !== 'active');
+    const rank = (p: Player) => (medicalStatus(p.medicalCheckExpiry) === 'missing' ? 1 : 0);
     const pool = roster
-      .filter((p) => !chosen.has(p.id))
+      .filter((p) => !chosen.has(p.id) && eligible(p))
       .sort((a, b) => rank(a) - rank(b) || (a.number ?? 999) - (b.number ?? 999) || a.lastName.localeCompare(b.lastName))
       .slice(0, free);
     const taken = takenNumbers();
@@ -448,7 +447,9 @@ export default function L12Editor({
   const missingNumbers = rows.filter((r) => r.flags.noNumber).length;
   const duplicates = rows.filter((r) => r.flags.duplicate).length;
   const missingLicenses = rows.filter((r) => r.flags.noLicense).length;
-  const visaIssues = rows.filter((r) => r.flags.visa === 'expired' || r.flags.visa === 'missing');
+  const expiredVisas = rows.filter((r) => r.flags.visa === 'expired');
+  const missingVisas = rows.filter((r) => r.flags.visa === 'missing');
+  const namesOf = (list: typeof rows) => list.map((r) => `${r.player.firstName} ${r.player.lastName}`.trim()).join(', ');
   const headCoach = lineup.staff.headCoach?.name.trim();
   const u22Count = lineup.players.filter((p) => p.u22).length;
   const foreignCount = lineup.players.filter(isForeign).length;
@@ -479,7 +480,19 @@ export default function L12Editor({
       label: count === 0 ? 'Licențe' : missingLicenses > 0 ? `${plural(missingLicenses, 'licență lipsă', 'licențe lipsă')}` : 'Licențe complete',
     },
     { key: 'coach', ok: Boolean(headCoach), severity: 'warn', label: headCoach ? 'Antrenor principal' : 'Fără antrenor principal', detail: headCoach || undefined },
-    { key: 'visa', ok: visaIssues.length === 0, severity: 'warn', label: visaIssues.length ? `${visaIssues.length} fără viză valabilă` : 'Vize medicale valabile', detail: visaIssues.slice(0, 2).map((r) => r.player.lastName).join(', ') || undefined },
+    // An expired visa can't play, so it blocks the sheet; a visa not on file only
+    // nags. Nothing is „valid” on an empty sheet, so it doesn't count as passed.
+    {
+      key: 'visa',
+      ok: count > 0 && expiredVisas.length === 0 && missingVisas.length === 0,
+      severity: expiredVisas.length ? 'error' : 'warn',
+      label: count === 0
+        ? 'Vize medicale'
+        : expiredVisas.length
+          ? `${plural(expiredVisas.length, 'jucător cu viza expirată', 'jucători cu viza expirată')}`
+          : missingVisas.length ? `${plural(missingVisas.length, 'jucător fără viză', 'jucători fără viză')}` : 'Vize medicale valabile',
+      detail: expiredVisas.length ? `Nu pot juca: ${namesOf(expiredVisas)}` : missingVisas.length ? namesOf(missingVisas) : undefined,
+    },
     // The opponent belongs on the sheet too; it used to show only as a red field.
     ...(opponentMissing == null ? [] : [{ key: 'opponent', ok: !opponentMissing, severity: 'warn' as const, label: opponentMissing ? 'Adversar lipsă' : 'Adversar completat', detail: opponentMissing ? 'Se completează sus, sub titlu' : undefined }]),
   ];
@@ -490,7 +503,9 @@ export default function L12Editor({
   const pristine = count === 0;
   const pill = pristine
     ? { bg: 'var(--c-surface-3)', fg: 'var(--c-ink-soft)', label: 'De completat' }
-    : !ready
+    : expiredVisas.length
+      ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', label: 'Viză expirată' }
+      : !ready
       ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', label: 'Incompletă' }
       : passed === checks.length
         ? { bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', label: 'Gata de joc' }

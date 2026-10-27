@@ -18,6 +18,8 @@ import { buildServerUrl, resolveDocumentUrl } from '../../../config/serverUrl';
 import { apiFetch } from '../../../services/apiClient';
 import PageHero, { GlassStat } from '../../../components/admin/PageHero';
 import { EmptyState, SkeletonBlock } from '../../../components/dashboard/ScreenStates';
+import { LoadError } from '../../../components/ui/ScreenState';
+import { loadFailureMessage } from '../../../utils/errorMessages';
 import { dash } from '../../../components/dashboard/dashboardTheme';
 import { plural } from '../../../utils/plural';
 import Button from '../../../components/ui/Button';
@@ -236,14 +238,20 @@ export default function FinancialSettingsPage() {
     const [updatingDocId, setUpdatingDocId] = useState<number | null>(null);
     const [summary, setSummary] = useState<FinanceSummary | null>(null);
     const [loadingSummary, setLoadingSummary] = useState(true);
+    // A load that failed says so — a 0 there reads as a fact about the club's money.
+    const [summaryError, setSummaryError] = useState<string | null>(null);
+    const [documentsError, setDocumentsError] = useState<string | null>(null);
+    const [settingsError, setSettingsError] = useState<string | null>(null);
+    const [recentError, setRecentError] = useState<string | null>(null);
 
     // Collected this month + what is owed today: the same definitions as the
     // dashboard, from the server — no longer the sum of the last 12 payments.
     const loadSummary = useCallback(() => {
         setLoadingSummary(true);
+        setSummaryError(null);
         return financeApi.getSummary()
             .then(setSummary)
-            .catch((error) => console.error('Failed to load finance summary:', error))
+            .catch((error) => setSummaryError(loadFailureMessage(error)))
             .finally(() => setLoadingSummary(false));
     }, []);
 
@@ -252,14 +260,16 @@ export default function FinancialSettingsPage() {
     /* ─── Load data ────────────────────────────────────────────── */
     const loadDocuments = useCallback(() => {
         setLoadingDocuments(true);
+        setDocumentsError(null);
         return financeApi.getDocuments()
             .then((documentsResponse) => setUploads(mapFinancialDocuments(documentsResponse)))
-            .catch((error) => console.error('Failed to load financial documents:', error))
+            .catch((error) => setDocumentsError(loadFailureMessage(error)))
             .finally(() => setLoadingDocuments(false));
     }, []);
 
     const loadData = useCallback(() => {
         setLoadingSettings(true);
+        setSettingsError(null);
 
         void loadDocuments();
 
@@ -269,7 +279,7 @@ export default function FinancialSettingsPage() {
                 setMonthlyFeeInput(String(settingsResponse.monthlyPlayerFee || 0));
                 setDueDayInput(String(settingsResponse.paymentDueDay || 25));
             })
-            .catch((error) => console.error('Failed to load financial settings:', error))
+            .catch((error) => setSettingsError(loadFailureMessage(error)))
             .finally(() => setLoadingSettings(false));
 
     }, [loadDocuments]);
@@ -279,8 +289,9 @@ export default function FinancialSettingsPage() {
     const reloadRecentPayments = useCallback(async () => {
         try {
             setRecentPayments(await financeApi.getAdminRecentPayments(12));
+            setRecentError(null);
         } catch (error) {
-            console.error('Failed to load recent payments:', error);
+            setRecentError(loadFailureMessage(error));
         }
     }, []);
 
@@ -352,8 +363,9 @@ export default function FinancialSettingsPage() {
 
         if (paymentsResult.status === 'fulfilled') {
             setRecentPayments(paymentsResult.value);
+            setRecentError(null);
         } else {
-            console.error('Failed to load recent payments:', paymentsResult.reason);
+            setRecentError(loadFailureMessage(paymentsResult.reason));
         }
 
         setLoadingStripeConfig(false);
@@ -608,8 +620,8 @@ export default function FinancialSettingsPage() {
                             dot="var(--c-purple)"
                             label="Cotizație"
                             hint="per jucător / lună"
-                            value={loadingSettings ? '—' : `${settings?.monthlyPlayerFee ?? 0}`}
-                            suffix={loadingSettings ? undefined : 'RON'}
+                            value={loadingSettings || !settings ? '—' : `${settings.monthlyPlayerFee ?? 0}`}
+                            suffix={loadingSettings || !settings ? undefined : 'RON'}
                         />
                         <GlassStat
                             dot="var(--c-success)"
@@ -628,10 +640,17 @@ export default function FinancialSettingsPage() {
                         <GlassStat
                             dot="var(--c-warning)"
                             label="De verificat"
-                            hint={loadingDocuments ? undefined : formatCurrency(financeStats.pendingAmount)}
-                            value={loadingDocuments ? '—' : financeStats.pendingCount}
+                            hint={loadingDocuments || documentsError ? undefined : formatCurrency(financeStats.pendingAmount)}
+                            value={loadingDocuments || documentsError ? '—' : financeStats.pendingCount}
                         />
                     </View>
+                ) : null}
+                {activeTab === 'Finances' && (summaryError || settingsError) ? (
+                    <LoadError
+                        title="Cifrele nu s-au încărcat"
+                        message={summaryError ?? settingsError ?? ''}
+                        onRetry={() => { void loadSummary(); loadData(); }}
+                    />
                 ) : null}
             </PageHero>
 
@@ -639,7 +658,13 @@ export default function FinancialSettingsPage() {
                TAB: Settings — set once a season (fee, due day, extra fees).
                They sat between the daily work on Situație (~2.900px at 375).
                ═══════════════════════════════════════════════════════ */}
-            {activeTab === 'Settings' && (
+            {activeTab === 'Settings' && settingsError && !settings ? (
+                <View className="mb-20">
+                    {/* Not „0 RON / lună” with „Modifică”: the fees are unknown until they load. */}
+                    <LoadError title="Setările nu s-au încărcat" message={settingsError} onRetry={loadData} />
+                </View>
+            ) : null}
+            {activeTab === 'Settings' && !(settingsError && !settings) && (
                 <View className="mb-20">
                     {/* ── Fees: the monthly fee + due day, then the extra fees ── */}
                     <View className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
@@ -768,6 +793,8 @@ export default function FinancialSettingsPage() {
                                 <View className="gap-2">
                                     {[0, 1, 2].map((i) => <SkeletonBlock key={i} width="100%" height={56} />)}
                                 </View>
+                            ) : documentsError ? (
+                                <LoadError title="Registrul nu s-a încărcat" message={documentsError} onRetry={() => void loadDocuments()} />
                             ) : filteredUploads.length === 0 ? (
                                 <EmptyState
                                     title="Niciun document găsit"
@@ -853,6 +880,8 @@ export default function FinancialSettingsPage() {
                                 <View className="gap-2">
                                     {[0, 1, 2].map((i) => <SkeletonBlock key={i} width="100%" height={44} />)}
                                 </View>
+                            ) : recentError && recentPayments.length === 0 ? (
+                                <LoadError title="Plățile recente nu s-au încărcat" message={recentError} onRetry={() => void reloadRecentPayments()} />
                             ) : recentPayments.length === 0 ? (
                                 <EmptyState title="Nu există plăți" message="Plățile jucătorilor vor apărea aici." icon="payment" />
                             ) : (

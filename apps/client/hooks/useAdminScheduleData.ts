@@ -31,7 +31,10 @@ export function useAdminScheduleData(currentDate: Date, filters: ScheduleFilters
     setError(null);
     try {
       const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      // The last millisecond of the month: `new Date(y, m + 1, 0)` is 00:00 on
+      // the last day, which dropped that whole day (a 31 Oct match showed as
+      // „nimic programat”). The server filters with startTime <= end.
+      const endOfMonth = new Date(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1).getTime() - 1);
 
       const [eventsData, teamsData] = await Promise.all([
         eventsApi.getEvents({

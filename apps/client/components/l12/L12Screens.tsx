@@ -10,7 +10,7 @@ import PageContainer from '../ui/PageContainer';
 import PageHeader from '../ui/PageHeader';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import UnsavedBar from '../ui/UnsavedBar';
-import { useUnloadGuard } from '../../hooks/useUnloadGuard';
+import { useLeaveGuard } from '../../hooks/useLeaveGuard';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
@@ -27,6 +27,7 @@ import { StatusChip, useL12Base } from './L12MatchLink';
 import { DayHeading, KIND_META, L12Hero, MatchTicket, TeamAvatar, TeamTile, isOwnSide, matchKind, type HeroNext, type MatchKind } from './L12Visuals';
 import { plural } from '../../utils/plural';
 import { isNotFound } from '../../services/apiClient';
+import { medicalStatus } from '../myclub/teamDisplay';
 
 /**
  * L12 area, shared by admins (/admin/l12…) and coaches (/coach/l12…):
@@ -169,6 +170,34 @@ const MATCHES_PAGE_SIZE = 12;
 
 type StatusFilter = 'all' | 'unset' | 'set';
 type HomeTab = 'matches' | 'teams';
+
+/**
+ * Leaving an L12 sheet with unsaved changes — the sidebar, the bottom bar,
+ * „Înapoi”: save and go, stay, or go without saving. It used to guard only
+ * closing the browser tab, so a filled sheet vanished on one tap of „Lot”.
+ */
+function LeaveSheetDialog({ guard, saving, what, onSave }: {
+  guard: ReturnType<typeof useLeaveGuard>;
+  saving: boolean;
+  what: string;
+  onSave: () => Promise<boolean>;
+}) {
+  return (
+    <ConfirmDialog
+      visible={guard.pending}
+      icon="save"
+      title="Salvezi modificările?"
+      message={`Ai modificări nesalvate în ${what}. Dacă pleci fără să le salvezi, se pierd.`}
+      confirmLabel="Salvează și pleacă"
+      cancelLabel="Rămân pe pagină"
+      loading={saving}
+      onConfirm={() => { void onSave().then((ok) => { if (ok) guard.leave(); }); }}
+      onCancel={guard.stay}
+    >
+      <Button variant="ghost" label="Pleacă fără salvare" disabled={saving} onPress={guard.leave} className="self-start" />
+    </ConfirmDialog>
+  );
+}
 
 function dayKey(iso: string) {
   const date = parseApiDate(iso);
@@ -649,13 +678,13 @@ export function L12MatchScreen() {
 
   const opponentDirty = opponent.trim() !== savedOpponent.trim();
   const dirty = seeded && (snapshot(draft) !== snapshot(baseline) || opponentDirty);
-  useUnloadGuard(dirty);
+  const leaveGuard = useLeaveGuard(dirty);
 
-  const save = async () => {
+  const save = async (): Promise<boolean> => {
     const problem = validateLineup(draft);
     if (problem) {
       showToast({ variant: 'error', message: problem });
-      return;
+      return false;
     }
     setSaving(true);
     try {
@@ -669,8 +698,10 @@ export function L12MatchScreen() {
       setDraft(team ? withTeamGender(result, team) : result);
       setBaseline(team ? withTeamGender(result, team) : result);
       showToast({ variant: 'success', message: 'L12 salvat pentru acest meci.' });
+      return true;
     } catch (err) {
       showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Salvarea a eșuat.' });
+      return false;
     } finally {
       setSaving(false);
     }
@@ -747,8 +778,13 @@ export function L12MatchScreen() {
   };
   const exportAs = (kind: 'pdf' | 'word') => {
     if (!docInput || !checkBeforeExport(docInput.lineup, notify)) return;
-    // An official sheet with gaps reaches the referee only on purpose.
+    // An official sheet with gaps reaches the referee only on purpose; an
+    // expired visa (can't play) leads the list.
     const gaps = exportGaps(docInput.lineup, { awayTeam: docInput.awayTeam });
+    const expired = docInput.lineup.players
+      .filter((p) => medicalStatus(roster.find((r) => r.id === p.playerId)?.medicalCheckExpiry) === 'expired')
+      .map((p) => `${p.firstName} ${p.lastName}`.trim());
+    if (expired.length) gaps.unshift(`viză medicală expirată: ${expired.join(', ')}`);
     if (gaps.length) {
       setExportConfirm({ kind, gaps });
       return;
@@ -892,6 +928,7 @@ export function L12MatchScreen() {
         }}
         onCancel={() => setConfirm(null)}
       />
+      <LeaveSheetDialog guard={leaveGuard} saving={saving} what="lista L12 a meciului" onSave={save} />
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </PageShell>
   );
@@ -955,13 +992,13 @@ export function L12TemplateScreen() {
   }, [team, saved, roster, rosterLoading, seeded]);
 
   const dirty = seeded && snapshot(draft) !== snapshot(baseline);
-  useUnloadGuard(dirty);
+  const leaveGuard = useLeaveGuard(dirty);
 
-  const save = async () => {
+  const save = async (): Promise<boolean> => {
     const problem = validateLineup(draft);
     if (problem) {
       showToast({ variant: 'error', message: problem });
-      return;
+      return false;
     }
     setSaving(true);
     try {
@@ -970,8 +1007,10 @@ export function L12TemplateScreen() {
       setDraft(team ? withTeamGender(result, team) : result);
       setBaseline(team ? withTeamGender(result, team) : result);
       showToast({ variant: 'success', message: 'L12 constant salvat.' });
+      return true;
     } catch (err) {
       showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Salvarea a eșuat.' });
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1058,6 +1097,7 @@ export function L12TemplateScreen() {
       </View>
 
       <L12Editor lineup={draft} onChange={setDraft} roster={roster} rosterLoading={rosterLoading} showMatchDetails={false} known={saved?.players ?? []} />
+      <LeaveSheetDialog guard={leaveGuard} saving={saving} what="L12-ul constant" onSave={save} />
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </PageShell>
   );

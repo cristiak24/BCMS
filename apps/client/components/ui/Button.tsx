@@ -7,12 +7,14 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
  * same screen rarely matched. Geometry follows the Documents "Încarcă PDF"
  * action: 40px (md) / 32px (sm), radius 10, 13px semibold, sentence case.
  */
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'warning' | 'ghost';
 
 const VARIANTS: Record<ButtonVariant, { bg: string; fg: string; border: string }> = {
   primary: { bg: 'var(--c-brand-surface)', fg: 'var(--c-on-brand)', border: 'transparent' },
   secondary: { bg: 'var(--c-surface)', fg: 'var(--c-ink-soft)', border: 'var(--c-border)' },
   danger: { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', border: 'transparent' },
+  // Allowed but worth a second look (a payment that leaves an advance).
+  warning: { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', border: 'var(--c-warning-fg)' },
   ghost: { bg: 'transparent', fg: 'var(--c-brand-fg)', border: 'transparent' },
 };
 

@@ -81,3 +81,25 @@ test('"restanță" is the same number on Dashboard, Lot and Finanțe', async ({ 
   await expectFigure(page, /Restanțe\s*\n\s*(\d+) jucăto?r/i, expected, 'Finanțe: Restanțe · N jucători');
   await expectFigure(page, /Cu restanțe\s*\n\s*(\d+)/i, expected, 'Finanțe: Cu restanțe');
 });
+
+test('the keyboard reaches „Înregistrează” in the payment dialog', async ({ page }) => {
+  // Two focus traps (the Modal's and the dialog's own) used to skip the last
+  // control, so Tab never landed on the button that records the payment.
+  await signIn(page, 'admin');
+  await page.goto('/admin/finance');
+  const row = page.getByText('Radu Stan', { exact: true }).first()
+    .locator('xpath=ancestor::*[.//*[normalize-space(text())="Încasează"]][1]');
+  await row.getByText('Încasează', { exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: /Încasare/ });
+  await expect(dialog.getByRole('button', { name: /^Înregistrează/ })).toBeEnabled();
+
+  let reached = false;
+  for (let i = 0; i < 30 && !reached; i++) {
+    await page.keyboard.press('Tab');
+    reached = await page.evaluate(() => /^Înregistrează/.test(document.activeElement?.textContent?.trim() ?? ''));
+  }
+  expect(reached, 'Tab lands on „Înregistrează”').toBe(true);
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+});

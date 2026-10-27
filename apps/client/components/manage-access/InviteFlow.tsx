@@ -367,35 +367,18 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
         }
     };
 
-    // Escape closes, Tab stays inside, focus returns to the trigger; body scroll locked.
+    // Escape closes, focus returns to the trigger; body scroll locked. Tab is the
+    // Modal's (a second trap here skipped the last control, the primary button).
     useEffect(() => {
         if (!visible || typeof document === 'undefined') return undefined;
         const previouslyFocused = document.activeElement as HTMLElement | null;
         const { overflow } = document.body.style;
         document.body.style.overflow = 'hidden';
 
-        const focusables = () => Array.from(
-            cardRef.current?.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') ?? [],
-        ).filter((el) => !el.hasAttribute('disabled'));
-
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape' && !busy) {
                 event.preventDefault();
                 onClose();
-                return;
-            }
-            if (event.key !== 'Tab') return;
-            const items = focusables();
-            if (items.length === 0) return;
-            const first = items[0];
-            const last = items[items.length - 1];
-            const active = document.activeElement;
-            if (event.shiftKey && (active === first || !cardRef.current?.contains(active))) {
-                event.preventDefault();
-                last.focus();
-            } else if (!event.shiftKey && active === last) {
-                event.preventDefault();
-                first.focus();
             }
         };
         document.addEventListener('keydown', onKeyDown);

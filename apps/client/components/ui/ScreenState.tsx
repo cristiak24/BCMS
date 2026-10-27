@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
+import Button from './Button';
 
 type LoadingScreenProps = {
   message?: string;
@@ -175,6 +176,30 @@ export function EmptyState({ icon = 'inbox', title, message, actionLabel, onActi
           <Text className="font-black" style={{ color: 'var(--c-on-brand)' }}>{actionLabel}</Text>
         </Pressable>
       ) : null}
+    </View>
+  );
+}
+
+/**
+ * A section whose data didn't load: says so, with „Reîncearcă”. Never an empty
+ * list or a 0 in its place — on a money or accounts page that reads as a fact
+ * („Niciun cont”, „0 RON / lună”) the page never checked.
+ */
+export function LoadError({ title, message, onRetry }: { title: string; message: string; onRetry: () => void }) {
+  return (
+    <View
+      className="flex-row flex-wrap items-center gap-3 rounded-[14px] border px-4 py-3.5"
+      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
+      accessibilityRole="alert"
+    >
+      <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-warning-bg)' }}>
+        <MaterialIcons name="cloud-off" size={18} color="var(--c-warning-fg)" />
+      </View>
+      <View className="flex-1 min-w-[200px]">
+        <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
+        <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{message}</Text>
+      </View>
+      <Button size="sm" icon="refresh" label="Reîncearcă" onPress={onRetry} />
     </View>
   );
 }
