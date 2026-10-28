@@ -447,20 +447,25 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
             <ConfirmDialog
                 visible={target != null}
                 title={target ? `Încasare · ${target.playerName}` : ''}
-                message="Bifează taxele pe care le acoperă plata. Suma se completează din ele și se împarte de la cea mai veche; o sumă mai mică le achită parțial."
+                // What is owed, before anything else: the amount used to be checked against a row left behind.
+                message={target
+                    ? `${target.overdue > 0 ? `Restant ${money(target.overdue, currency)} · ` : ''}de plătit ${money(target.outstanding, currency)}. Bifează taxele pe care le acoperă plata; o sumă mai mică le achită parțial, de la cea mai veche.`
+                    : undefined}
                 // The amount on the button: the last look before it is booked. The
                 // advance it leaves sits on its own line right above, in a warning
                 // tone with the button (on the button, a long label pushed
                 // „Renunță” out of the card).
                 confirmLabel={validAmount ? `Înregistrează ${money(parsedAmount, currency)}` : 'Înregistrează plata'}
                 confirmVariant={validAmount && advance > 0 ? 'warning' : undefined}
-                footerNote={validAmount && advance > 0 ? `Rămân ${money(advance, currency)} avans. Verifică suma.` : undefined}
+                // One warning, fixed above the buttons (it was also repeated inside the form).
+                footerNote={validAmount && advance > 0 ? `${money(advance, currency)} peste tot ce e de plată: rămân avans pentru taxele următoare. Verifică suma.` : undefined}
                 loading={saving}
                 confirmDisabled={!canSave}
                 icon="payments"
                 role="dialog"
                 // Phones: a bottom sheet with the name on top and the button always in reach.
                 sheetOnPhone
+                dismissOnBackdrop={false}
                 onConfirm={() => void savePayment()}
                 onCancel={() => { if (!saving) setTarget(null); }}
             >
@@ -471,7 +476,7 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                                 feesError ? (
                                     <View className="px-3 py-3 gap-2 items-start">
                                         <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{feesError}</Text>
-                                        <Button size="sm" label="Încearcă din nou" onPress={() => void loadTargetFees(target.playerId)} />
+                                        <Button size="sm" label="Reîncearcă" onPress={() => void loadTargetFees(target.playerId)} />
                                     </View>
                                 ) : (
                                     <View className="py-4 items-center" accessibilityRole="progressbar" accessibilityLabel="Se încarcă taxele">
@@ -506,20 +511,23 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                             })}
                         </View>
 
-                        <View className="flex-row gap-2">
-                            <View className="flex-1">
-                                <Text className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Suma (RON)</Text>
+                        {/* Four fields in two rows, each with a visible label: on a phone the method
+                            and the receipt note sat below the fold, so cash was booked unseen. */}
+                        <View className="grid grid-cols-2 gap-x-2 gap-y-3">
+                            <View className="min-w-0">
+                                <FieldLabel>Suma (RON)</FieldLabel>
                                 <TextInput
                                     value={amount}
                                     onChangeText={setAmount}
                                     keyboardType="decimal-pad"
                                     accessibilityLabel="Suma încasată"
+                                    aria-invalid={amount.trim() && !validAmount ? true : undefined}
                                     className="h-10 rounded-[10px] px-3 border text-[15px] font-bold"
                                     style={{ borderColor: 'var(--c-border)', color: 'var(--c-ink)', backgroundColor: 'var(--c-surface)' } as any}
                                 />
                             </View>
-                            <View className="flex-1">
-                                <Text className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Data</Text>
+                            <View className="min-w-0">
+                                <FieldLabel>Data plății</FieldLabel>
                                 {/* The browser's date picker (same YYYY-MM-DD value) instead of typing AAAA-LL-ZZ. */}
                                 <input
                                     type="date"
@@ -532,15 +540,26 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                                     style={{ borderColor: validDate ? 'var(--c-border)' : 'var(--c-danger-border)', color: 'var(--c-ink)', backgroundColor: 'var(--c-surface)', colorScheme: 'light dark' }}
                                 />
                             </View>
-                        </View>
-
-                        {validAmount && advance > 0 ? (
-                            <View className="flex-row items-start gap-2 rounded-[10px] border px-3 py-2.5" style={{ backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-fg)' } as any} accessibilityRole={'alert' as any}>
-                                <MaterialIcons name="error-outline" size={16} color="var(--c-warning-fg)" />
-                                <Text className="flex-1 text-[12.5px] leading-[18px]" style={{ color: 'var(--c-warning-fg)' }}>
-                                    <Text className="font-bold">{money(advance, currency)} peste tot ce e de plată.</Text> Rămân avans și acoperă următoarele taxe. Verifică suma.
-                                </Text>
+                            <View className="min-w-0">
+                                <FieldLabel>Metoda</FieldLabel>
+                                <SelectField<Method> label="Metoda de plată" value={method} onChange={setMethod} options={METHOD_OPTIONS} />
                             </View>
+                            <View className="min-w-0">
+                                <FieldLabel>Notă (opțional)</FieldLabel>
+                                <TextInput
+                                    value={description}
+                                    onChangeText={setDescription}
+                                    placeholder="ex. nr. chitanță"
+                                    placeholderTextColor="var(--c-faint)"
+                                    accessibilityLabel="Notă"
+                                    maxLength={500}
+                                    className="h-10 rounded-[10px] px-3 border text-[13px]"
+                                    style={{ borderColor: 'var(--c-border)', color: 'var(--c-ink)', backgroundColor: 'var(--c-surface)' } as any}
+                                />
+                            </View>
+                        </View>
+                        {amount.trim() && !validAmount ? (
+                            <Text className="text-[12px]" style={{ color: 'var(--c-danger-fg)' }}>Introdu o sumă mai mare ca 0.</Text>
                         ) : null}
 
                         <AllocationPreview
@@ -549,19 +568,6 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                             visible={validAmount}
                             noneSelected={selectedFees.size === 0}
                             currency={currency}
-                        />
-
-                        <SelectField<Method> label="Metoda de plată" value={method} onChange={setMethod} options={METHOD_OPTIONS} />
-
-                        <TextInput
-                            value={description}
-                            onChangeText={setDescription}
-                            placeholder="Notă (opțional) — ex. nr. chitanță"
-                            placeholderTextColor="var(--c-faint)"
-                            accessibilityLabel="Notă"
-                            maxLength={500}
-                            className="h-10 rounded-[10px] px-3 border text-[13px]"
-                            style={{ borderColor: 'var(--c-border)', color: 'var(--c-ink)', backgroundColor: 'var(--c-surface)' } as any}
                         />
 
                         {!validDate ? (
@@ -573,6 +579,11 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
             </ConfirmDialog>
         </FinanceCard>
     );
+}
+
+/** A form field's visible label, the FormField style (12.5px, sentence case). */
+function FieldLabel({ children }: { children: string }) {
+    return <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>{children}</Text>;
 }
 
 /** „Cum se împarte plata”: what each fee gets from the amount typed. */

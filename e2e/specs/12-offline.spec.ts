@@ -28,12 +28,12 @@ test('an attendance mark made offline waits on the device and is sent later', as
   await page.goto(`/admin/attendance/${eventId}`);
   const present = page.getByRole('radio', { name: 'Prezent: Radu Stan' });
   await present.click();
-  await expect(page.getByText('1 marcaj așteaptă conexiunea')).toBeVisible();
+  await expect(page.getByText('1 marcaj așteaptă conexiunea').first()).toBeVisible();
   await expect(present).toHaveAttribute('aria-checked', 'true');
 
   // Still there after a reload while offline.
   await page.reload();
-  await expect(page.getByText('1 marcaj așteaptă conexiunea')).toBeVisible();
+  await expect(page.getByText('1 marcaj așteaptă conexiunea').first()).toBeVisible();
   await expect(page.getByRole('radio', { name: 'Prezent: Radu Stan' })).toHaveAttribute('aria-checked', 'true');
 
   // Back online: „Trimite acum” sends it.

@@ -41,8 +41,9 @@ test('switching child reloads the screens for that child', async ({ page }) => {
 test('the delegated parent opens the match with the other child selected', async ({ page }) => {
   const { events, players, users } = seedIds();
   const admin = await apiAs('admin');
-  const { lineup } = await (await admin.get(`games/events/${events.delegatedMatch}`)).json() as { lineup: { playerId: number }[] };
-  const ids = lineup.map((p) => p.playerId);
+  const { lineup } = await (await admin.get(`games/events/${events.delegatedMatch}`)).json() as { lineup: { playerId: number; visaExpired?: boolean }[] };
+  // An expired visa doesn't play (the server refuses it in the roster).
+  const ids = lineup.filter((p) => !p.visaExpired).map((p) => p.playerId);
   const setup = await admin.put(`games/events/${events.delegatedMatch}/setup`, {
     data: { mode: 'simple', roster: ids, starters: ids.slice(0, 5), opponentName: 'CS Oaspeți', scorekeeperUserId: users.parent },
   });

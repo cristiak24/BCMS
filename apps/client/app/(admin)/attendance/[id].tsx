@@ -19,7 +19,8 @@ import { eventTypeMeta, getPlayerBadge } from '../../../components/coach/coachDi
 import { formatCoachDate, formatCoachTimeRange } from '../../../components/coach/coachUtils';
 import { AttendanceNoteInput, AttendanceNoteToggle } from '../../../components/attendance/AttendanceNoteField';
 import AttendanceMarkButtons from '../../../components/attendance/AttendanceMarkButtons';
-import AttendanceSaveStatus, { useSaveStatus } from '../../../components/attendance/AttendanceSaveStatus';
+import AttendanceSaveStatus, { useSaveStatus, waitingLabel } from '../../../components/attendance/AttendanceSaveStatus';
+import UnsavedBar from '../../../components/ui/UnsavedBar';
 import { toAttendanceMark, type AttendanceMark } from '../../../utils/attendanceStatus';
 import { isAttendanceOpen } from '../../../utils/attendanceWindow';
 import { canMarkAttendance } from '../../../utils/eventPermissions';
@@ -232,7 +233,7 @@ export default function AttendanceScreen() {
       return true;
     } catch (err) {
       if (isRetryableSaveError(err)) {
-        outbox.queue(marks);
+        outbox.queue(marks, err);
         return true;
       }
       patchRows(new Set(ids), (row) => ({ ...row, status: previous.get(row.id) ?? null }));
@@ -490,7 +491,12 @@ export default function AttendanceScreen() {
                   </Text>
                 </View>
               ) : (
-                <AttendanceSaveStatus state={saveStatus.state} waiting={outbox.pending.size} onSendNow={() => void outbox.flush()} />
+                <AttendanceSaveStatus
+                  state={saveStatus.state}
+                  waiting={outbox.pending.size}
+                  reason={outbox.reason}
+                  // „Trimite acum” lives in the fixed bar below: one button, not two with the same name.
+                />
               )
             ) : null}
 
@@ -529,6 +535,7 @@ export default function AttendanceScreen() {
                     row={row}
                     busy={bulkSaving || busyIds.has(row.id)}
                     locked={locked}
+                    waiting={outbox.pending.has(row.id)}
                     noteOpen={openNotes.has(row.id)}
                     onToggleNote={() => toggleNote(row.id)}
                     onStatus={(status) => setStatus(row.id, status)}
@@ -542,6 +549,10 @@ export default function AttendanceScreen() {
           </View>
         </PageContainer>
       </ScrollView>
+      {/* Fixed while anything waits, so it stays in view while scrolling the list. */}
+      {outbox.pending.size > 0 ? (
+        <UnsavedBar label={waitingLabel(outbox.pending.size, outbox.reason)} saving={false} saveLabel="Trimite acum" onSave={() => void outbox.flush()} />
+      ) : null}
 
       <ConfirmDialog
         visible={bulkConfirmOpen}
@@ -571,6 +582,7 @@ function AttendanceRow({
   row,
   busy,
   locked,
+  waiting,
   noteOpen,
   onToggleNote,
   onStatus,
@@ -580,6 +592,8 @@ function AttendanceRow({
   row: RosterEntry;
   busy: boolean;
   locked: boolean;
+  /** The mark is kept on the device, not on the server yet. */
+  waiting: boolean;
   noteOpen: boolean;
   onToggleNote: () => void;
   onStatus: (status: AttendanceMark) => void;
@@ -588,7 +602,9 @@ function AttendanceRow({
 }) {
   const hasNote = Boolean(row.savedNote.trim());
   const dirty = noteDirty(row);
-  const metaParts = [row.position, row.status ? null : 'Fără marcaj'].filter(Boolean);
+  // A mark still on the device says so on its own row: the status line above
+  // the list is off-screen once you scroll down to mark later players.
+  const metaParts = [row.position, waiting ? 'Neîncărcat încă' : row.status ? null : 'Fără marcaj'].filter(Boolean);
   const playerName = `${row.firstName} ${row.lastName}`;
 
   return (
@@ -606,6 +622,7 @@ function AttendanceRow({
             meta={metaParts.length ? metaParts.join(' · ') : null}
           />
         </View>
+        {waiting ? <MaterialIcons name="schedule" size={15} color="var(--c-warning-fg)" /> : null}
         {dirty ? (
           <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: 'var(--c-warning)' }} accessibilityLabel="Notă nesalvată" />
         ) : null}

@@ -57,16 +57,16 @@ test('with an L12 saved, the scorer offers only its players; without one, the wh
     assert.equal(whole.body.lineup.length, 7);
 });
 
-test('an expired visa cannot start the match', async () => {
-    const roster = ['a', 'b', 'c', 'd', 'e', 'expired'].map((key) => ids[key]);
+test('an expired visa cannot play the match, not even from the bench', async () => {
+    const withExpired = ['a', 'b', 'c', 'd', 'e', 'expired'].map((key) => ids[key]);
     const refused = await api.call('PUT', `/api/games/events/${withL12}/setup`, {
-        auth: admin, body: { mode: 'simple', roster, starters: [ids.a, ids.b, ids.c, ids.d, ids.expired] },
+        auth: admin, body: { mode: 'simple', roster: withExpired, starters: [ids.a, ids.b, ids.c, ids.d, ids.e] },
     });
     assert.equal(refused.status, 400);
     assert.match(refused.body.error, /viza expirată/);
 
     const ok = await api.call('PUT', `/api/games/events/${withL12}/setup`, {
-        auth: admin, body: { mode: 'simple', roster, starters: [ids.a, ids.b, ids.c, ids.d, ids.e] },
+        auth: admin, body: { mode: 'simple', roster: withExpired.filter((id) => id !== ids.expired), starters: [ids.a, ids.b, ids.c, ids.d, ids.e] },
     });
     assert.equal(ok.status, 200, JSON.stringify(ok.body));
 });

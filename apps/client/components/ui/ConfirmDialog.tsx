@@ -47,6 +47,12 @@ type ConfirmDialogProps = {
      * families or changes someone's permissions, so Enter alone mustn't do it.
      */
     focusCancel?: boolean;
+    /**
+     * False for a form with typed input (recording a payment): a stray tap beside
+     * the phone sheet used to close it and drop the amount and the note. Esc and
+     * „Renunță” still close it.
+     */
+    dismissOnBackdrop?: boolean;
     onConfirm: () => void;
     onCancel: () => void;
 };
@@ -78,6 +84,7 @@ export default function ConfirmDialog({
     confirmVariant,
     footerNote,
     focusCancel = false,
+    dismissOnBackdrop = true,
     onConfirm,
     onCancel,
 }: ConfirmDialogProps) {
@@ -161,7 +168,7 @@ export default function ConfirmDialog({
     return (
         <Modal visible onRequestClose={loading ? undefined : onCancel}>
             <ModalBackdrop
-                onDismiss={loading ? undefined : onCancel}
+                onDismiss={loading || !dismissOnBackdrop ? undefined : onCancel}
                 className={sheetOnPhone ? 'items-stretch justify-end sm:items-center sm:justify-center sm:p-5' : 'items-center justify-center p-5'}
                 style={{ backgroundColor: 'rgba(2, 8, 23, 0.62)' }}
             >

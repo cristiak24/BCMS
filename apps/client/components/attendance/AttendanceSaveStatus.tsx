@@ -35,10 +35,17 @@ export function useSaveStatus() {
   return { state, track, reset };
 }
 
-export default function AttendanceSaveStatus({ state, waiting = 0, onSendNow }: {
+export function waitingLabel(waiting: number, reason: 'offline' | 'server') {
+  const marks = waiting === 1 ? '1 marcaj' : `${waiting} marcaje`;
+  return reason === 'server' ? `Serverul nu răspunde: ${marks} în așteptare` : `${marks} așteaptă conexiunea`;
+}
+
+export default function AttendanceSaveStatus({ state, waiting = 0, reason = 'offline', onSendNow }: {
   state: SaveState;
   /** Marks kept on the device until the connection returns. */
   waiting?: number;
+  /** Online but the server answers 5xx: said as such, not „așteaptă conexiunea”. */
+  reason?: 'offline' | 'server';
   onSendNow?: () => void;
 }) {
   if (waiting > 0) {
@@ -46,8 +53,8 @@ export default function AttendanceSaveStatus({ state, waiting = 0, onSendNow }: 
       <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1 min-h-[18px]" accessibilityRole="status">
         <MaterialIcons name="cloud-off" size={14} color="var(--c-warning-fg)" />
         <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>
-          {waiting === 1 ? '1 marcaj așteaptă conexiunea' : `${waiting} marcaje așteaptă conexiunea`}
-          <Text className="font-medium" style={{ color: 'var(--c-muted)' }}> · se trimit singure</Text>
+          {waitingLabel(waiting, reason)}
+          <Text className="font-medium" style={{ color: 'var(--c-muted)' }}>{reason === 'server' ? ' · reîncercăm' : ' · se trimit singure'}</Text>
         </Text>
         {onSendNow ? (
           <Pressable onPress={onSendNow} accessibilityRole="button" className="tap-40 ui-press px-1">

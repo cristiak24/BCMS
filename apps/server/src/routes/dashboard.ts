@@ -218,6 +218,21 @@ router.get('/summary', async (req, res) => {
         // due yet is „de plată” (owingPlayersCount). The KPI says „restante”.
         const balances = scope.clubId != null ? await clubBalances(scope.clubId, { now }) : [];
         const pendingPaymentsCount = balances.filter((balance) => balance.state === 'overdue').length;
+
+        // „Încasat X din Y scadent până la sfârșitul lunii”: fees collected this month
+        // against what should be in by month-end (collected + still owed on fees due
+        // by then, older restanțe included). Mid-month the home used to show a red
+        // „-100%” against last month and a negative „profit”.
+        const bucharestMonth = (date: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Bucharest', year: 'numeric', month: '2-digit' }).format(date);
+        const thisMonth = bucharestMonth(now);
+        const feesCollectedThisMonth = postgresMonthlyPaymentIncome;
+        const stillOwedByMonthEnd = balances.reduce((sum, balance) => sum + balance.fees
+            .filter((fee) => {
+                const due = toDate(fee.dueDate);
+                return due != null && bucharestMonth(due) <= thisMonth;
+            })
+            .reduce((owed, fee) => owed + fee.amount, 0), 0);
+        const feesDueByMonthEnd = feesCollectedThisMonth + stillOwedByMonthEnd;
         const owingPlayersCount = balances.filter((balance) => balance.outstanding > 0).length;
 
         const currentAttendance = attendanceRateFromCounts(pgAttendanceCounts.map((row) => ({ status: row.status, count: Number(row.current) })));
@@ -360,6 +375,8 @@ router.get('/summary', async (req, res) => {
             profitChangePercent,
             pendingPaymentsCount,
             owingPlayersCount,
+            feesCollectedThisMonth,
+            feesDueByMonthEnd,
             attendanceRate,
             previousAttendanceRate,
             attendanceChangePoints,

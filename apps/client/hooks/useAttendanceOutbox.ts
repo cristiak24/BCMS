@@ -42,12 +42,20 @@ export function isRetryableSaveError(error: unknown) {
 
 const RETRY_MS = 20_000;
 
+function failureReason(error: unknown): 'offline' | 'server' {
+  const status = (error as { status?: unknown })?.status;
+  const online = typeof navigator === 'undefined' || navigator.onLine !== false;
+  return online && typeof status === 'number' && status >= 500 ? 'server' : 'offline';
+}
+
 export function useAttendanceOutbox(
   eventId: number | null,
   send: (marks: { id: number; status: AttendanceMark }[]) => Promise<void>,
   onRejected: (error: unknown, marks: { id: number; status: AttendanceMark }[]) => void,
 ) {
   const [pending, setPending] = useState<Map<number, AttendanceMark>>(new Map());
+  // Why the last send failed: no connection, or the server answering 5xx while online.
+  const [reason, setReason] = useState<'offline' | 'server'>('offline');
   const pendingRef = useRef(pending);
   const flushing = useRef(false);
   const sendRef = useRef(send);
@@ -68,7 +76,8 @@ export function useAttendanceOutbox(
     setPending(stored);
   }, [eventId]);
 
-  const queue = useCallback((marks: { id: number; status: AttendanceMark }[]) => {
+  const queue = useCallback((marks: { id: number; status: AttendanceMark }[], error?: unknown) => {
+    setReason(failureReason(error));
     const next = new Map(pendingRef.current);
     marks.forEach((mark) => next.set(mark.id, mark.status));
     commit(next);
@@ -93,6 +102,7 @@ export function useAttendanceOutbox(
       batch.forEach((mark) => { if (next.get(mark.id) === mark.status) next.delete(mark.id); });
       commit(next);
     } catch (error) {
+      if (isRetryableSaveError(error)) setReason(failureReason(error));
       if (!isRetryableSaveError(error)) {
         const next = new Map(pendingRef.current);
         batch.forEach((mark) => next.delete(mark.id));
@@ -116,5 +126,5 @@ export function useAttendanceOutbox(
     };
   }, [count, flush]);
 
-  return { pending, queue, drop, flush };
+  return { pending, reason, queue, drop, flush };
 }

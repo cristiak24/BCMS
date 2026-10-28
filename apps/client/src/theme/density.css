@@ -141,12 +141,16 @@
   border-radius: 8px;
 }
 
-/* Wins over global.css (loads later): no outline, no glow — just a border. */
+/* Wins over global.css (loads later): no glow — a 2px indigo edge, the same
+   colour as a focused button. `!important` on the border: fields set their
+   border inline (the payment and storno dialogs, SelectField), and the inline
+   colour used to win, so a focused field looked exactly like an idle one. */
 :where(input, select, textarea):focus,
 :where(input, select, textarea):focus-visible {
-  outline: none !important;
+  outline: 1px solid var(--c-brand-surface) !important;
+  outline-offset: 0;
   box-shadow: none !important;
-  border-color: var(--c-brand-border);
+  border-color: var(--c-brand-surface) !important;
 }
 
 /* ── iOS focus-zoom guard ───────────────────────────────────────────────────

@@ -51,10 +51,12 @@ export default function GameSetup({
   const existing = data.game;
   const [mode, setMode] = useState<GameMode>(existing?.mode ?? 'simple');
   const [periodSec, setPeriodSec] = useState<number | null>(existing ? existing.periodSec : 600);
-  const [roster, setRoster] = useState<number[]>(() =>
-    existing?.roster.map((p) => p.playerId)
-      ?? (data.lineup.some((p) => p.onL12) ? data.lineup.filter((p) => p.onL12) : data.lineup).slice(0, 15).map((p) => p.playerId));
+  // An expired visa doesn't play (the server refuses it too): never ticked, not even by default.
   const expiredIds = new Set(data.lineup.filter((p) => p.visaExpired).map((p) => p.playerId));
+  const [roster, setRoster] = useState<number[]>(() =>
+    (existing?.roster.map((p) => p.playerId)
+      ?? (data.lineup.some((p) => p.onL12) ? data.lineup.filter((p) => p.onL12) : data.lineup).slice(0, 15).map((p) => p.playerId))
+      .filter((id) => !expiredIds.has(id)));
   const [starters, setStarters] = useState<number[]>((existing?.starters ?? []).filter((id) => !expiredIds.has(id)));
   const [opponentName, setOpponentName] = useState(existing?.opponentName ?? (data.event.opponent || opponentFromTitle(data.event.title, data.team.name)));
   const [trackOpponents, setTrackOpponents] = useState((existing?.opponentRoster.length ?? 0) > 0);
@@ -74,6 +76,7 @@ export default function GameSetup({
   const fromL12 = lineup.length > 0 && lineup.every((p) => p.onL12);
 
   const toggleRoster = (id: number) => {
+    if (expiredIds.has(id)) return;
     setRoster((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]));
     setStarters((list) => list.filter((x) => x !== id));
   };
@@ -183,11 +186,15 @@ export default function GameSetup({
             return (
               <View key={p.playerId} className={`flex-row items-center gap-2.5 px-3 ${index > 0 ? 'border-t' : ''}`} style={{ borderColor: 'var(--c-border-soft)' }}>
                 {/* The whole line is the target (44px), not just the 20px of text. */}
-                <Pressable onPress={() => toggleRoster(p.playerId)} accessibilityRole={'checkbox' as any} accessibilityState={{ checked: playing } as any} accessibilityLabel={`${p.firstName} ${p.lastName} joacă`} className="flex-1 min-w-0 min-h-11 flex-row items-center gap-2.5 text-left">
+                <Pressable onPress={() => toggleRoster(p.playerId)} disabled={p.visaExpired} accessibilityRole={'checkbox' as any} accessibilityState={{ checked: playing, disabled: !!p.visaExpired } as any} accessibilityLabel={p.visaExpired ? `${p.firstName} ${p.lastName}: nu poate juca, viză expirată` : `${p.firstName} ${p.lastName} joacă`} className="flex-1 min-w-0 min-h-11 flex-row items-center gap-2.5 text-left">
                   <MaterialIcons name={playing ? 'check-box' : 'check-box-outline-blank'} size={18} color={playing ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
                   <Text className="t-num w-8 text-[13px] font-bold" style={{ color: 'var(--c-muted)' }}>{p.number ? `#${p.number}` : '—'}</Text>
                   <Text className="flex-1 text-[14px] font-semibold" style={{ color: playing ? 'var(--c-ink)' : 'var(--c-muted)' }} numberOfLines={1}>{p.firstName} {p.lastName}</Text>
-                  {p.visaExpired ? <Text className="text-[12px] font-semibold shrink-0" style={{ color: 'var(--c-danger-fg)' }}>Viză expirată</Text> : null}
+                  {p.visaExpired ? (
+                    <Text className="text-[12px] font-semibold shrink-0" style={{ color: 'var(--c-danger-fg)' }}>Nu poate juca: viză expirată</Text>
+                  ) : p.visaMissing ? (
+                    <Text className="text-[12px] font-semibold shrink-0" style={{ color: 'var(--c-warning-fg)' }}>Fără viză</Text>
+                  ) : null}
                 </Pressable>
                 {playing && !p.visaExpired ? (
                   <Pressable onPress={() => toggleStarter(p.playerId)} accessibilityRole="button" accessibilityState={{ selected: starter }}

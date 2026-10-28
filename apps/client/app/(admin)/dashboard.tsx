@@ -47,6 +47,12 @@ function monthName(offset: number, width: 'long' | 'short' = 'long') {
   return new Date(now.getFullYear(), now.getMonth() + offset, 1).toLocaleDateString('ro-RO', { month: width });
 }
 
+/** „31 oct.”: the last day of the current month. */
+function lastDayOfMonthLabel() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + 1, 0).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' });
+}
+
 type RecentResult = Match & { savedTeamName: string; frbSeasonId: string };
 
 type Tone = 'danger' | 'warning' | 'brand' | 'success' | 'sky' | 'purple';
@@ -529,7 +535,7 @@ export default function Dashboard() {
   const attention = useMemo<AttentionItem[]>(() => {
     const items: AttentionItem[] = [];
     if (summary?.expiredVisasCount) {
-      items.push({ key: 'visas', icon: 'medical-services', tone: 'danger', title: `${plural(summary.expiredVisasCount, 'viză medicală expirată', 'vize medicale expirate')}`, detail: 'Fără viză valabilă nu se poate juca', href: '/admin/compliance' });
+      items.push({ key: 'visas', icon: 'medical-services', tone: 'danger', title: `${plural(summary.expiredVisasCount, 'viză medicală expirată', 'vize medicale expirate')}`, detail: 'Cu viza expirată nu se poate juca', href: '/admin/compliance' });
     }
     // Visas only: expiringItems also carries the monthly fee („COTIZAȚIE LUNARĂ”), which
     // showed up here as "1 viză expiră în 7 zile" with no clearance due that week.
@@ -719,12 +725,16 @@ export default function Dashboard() {
                   <KpiCard
                     icon="account-balance"
                     tone="success"
-                    // The month in the label, the comparison in the hint: both used to be unsaid.
-                    label={`Încasări ${monthName(0, 'short')}`}
-                    value={money(summary.monthlyIncome)}
+                    // Collected against what is due by month-end — not a red „-100%” against last
+                    // month and a negative „profit” on the 27th, before the month has closed.
+                    label={`Încasat ${monthName(0, 'short')}`}
+                    value={money(summary.feesCollectedThisMonth ?? summary.monthlyIncome)}
                     suffix=" RON"
-                    hint={`${summary.incomeChangePercent != null ? `față de ${monthName(-1)} · ` : ''}profit ${money(summary.monthlyProfit)} RON`}
-                    delta={summary.incomeChangePercent != null ? { label: `${summary.incomeChangePercent > 0 ? '+' : ''}${Math.round(summary.incomeChangePercent)}%`, direction: summary.incomeChangePercent > 0 ? 'up' : summary.incomeChangePercent < 0 ? 'down' : 'flat' } : null}
+                    hint={summary.feesDueByMonthEnd != null
+                      ? `din ${money(summary.feesDueByMonthEnd)} RON scadent până la ${lastDayOfMonthLabel()}`
+                      : `cotizații și taxe încasate în ${monthName(0)}`}
+                    progress={summary.feesDueByMonthEnd ? Math.min(100, Math.round(((summary.feesCollectedThisMonth ?? 0) / summary.feesDueByMonthEnd) * 100)) : undefined}
+                    delta={null}
                     onPress={canSeeFinance ? () => go('/admin/finance') : undefined}
                   />
                   <KpiCard

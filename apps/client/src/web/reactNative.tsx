@@ -698,6 +698,9 @@ export const TextInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, AnyP
           : keyboardType === 'phone-pad' ? 'tel'
           : 'text'
       }
+      // decimal-pad / number-pad stay type=text (a comma must type: „100,50”) but bring
+      // up the digit keyboard on a phone — they used to open the letters.
+      inputMode={keyboardType === 'decimal-pad' ? 'decimal' : keyboardType === 'number-pad' ? 'numeric' : (common as InputHTMLAttributes<HTMLInputElement>).inputMode}
     />
   );
 }) as ShimComponent<HTMLInputElement | HTMLTextAreaElement>;

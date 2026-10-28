@@ -403,10 +403,10 @@ export default function L12Editor({
     onChange({ ...lineup, players: sortLineupPlayers([...lineup.players, buildRow(player, takenNumbers())]) });
   };
 
-  // Fill the free slots with players who can play: active, with a valid visa
-  // („Fără viză valabilă nu se poate juca” — Acasă says the same of a missing
-  // one), by number. Inactive, expired and visa-less players are only added by
-  // hand; the visa-less ones are named so the button doesn't look broken.
+  // Fill the free slots with players who are clear to play: active, with a valid
+  // visa, by number. The rule: an expired visa never plays; no visa on file is a
+  // warning, so those are only added by hand (named under the button so it
+  // doesn't look broken). Inactive players are added by hand too.
   const autoFill = () => {
     const free = L12_MAX_PLAYERS - lineup.players.length;
     if (free <= 0) return;

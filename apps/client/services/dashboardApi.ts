@@ -27,6 +27,9 @@ export interface DashboardSummary {
     monthlyProfit: number;      // monthlyIncome - monthlyExpense
     previousMonthIncome: number;
     incomeChangePercent: number | null; // % față de luna trecută, null dacă nu există bază de comparație
+    /** Fees collected this month, and what should be in by month-end (older servers: absent). */
+    feesCollectedThisMonth?: number;
+    feesDueByMonthEnd?: number;
     profitChangePercent: number | null;
     /** Players with something past due (restanță). */
     pendingPaymentsCount: number;

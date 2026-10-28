@@ -1103,7 +1103,7 @@ export default function FinancialSettingsPage() {
                     placeholderTextColor={dash.faint}
                     accessibilityLabel="Motivul stornării (obligatoriu)"
                     aria-required
-                    onSubmitEditing={() => { if (reverseReason.trim() && !reversing) void submitReverse(); }}
+                    // No submit on Enter: a reversal takes the button („Stornează”), not a stray key.
                     maxLength={300}
                     className="h-10 rounded-[10px] px-3 border text-[13px]"
                     style={{ borderColor: 'var(--c-border-strong, var(--c-border))', color: 'var(--c-ink)', backgroundColor: 'var(--c-surface-2, var(--c-surface))' } as any}

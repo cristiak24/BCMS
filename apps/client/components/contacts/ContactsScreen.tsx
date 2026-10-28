@@ -419,7 +419,7 @@ export default function ContactsScreen() {
                   ) : null}
                   {/* One count instead of an „Adaugă numere” on every row without a number. */}
                   {(() => {
-                    const missing = players.filter((p) => !(p.phone || p.accountPhone || p.guardianPhone || p.guardian2Phone || p.guardianAccounts?.length)).length;
+                    const missing = players.filter((p) => !(p.phone || p.accountPhone || p.guardianPhone || p.guardian2Phone || p.guardianAccounts?.some((account) => account.phone))).length;
                     return missing && !(data.mode === 'staff' && data.canEdit === false) ? (
                       <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
                         {`${plural(missing, 'jucător nu are', 'jucători nu au')} niciun număr de telefon. Îl adaugi cu butonul de editare din rândul lui.`}

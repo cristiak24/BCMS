@@ -32,6 +32,7 @@ import {
 import { ATTENDANCE_PERIOD_LABEL, formatAttendanceRate } from '../../utils/attendanceRate';
 import { plural } from '../../utils/plural';
 import { loadFailureMessage } from '../../utils/errorMessages';
+import { LoadError } from '../../components/ui/ScreenState';
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 100];
 const DEFAULT_PAGE_SIZE = 12;
@@ -64,6 +65,9 @@ export default function RosterScreen() {
   const [summary, setSummary] = useState<RosterSummary | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // The header figures (attendance, restanțe) come from their own request: when it
+  // fails they read „—” with Reîncearcă — they used to show „100% Fără restanțe”.
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -145,9 +149,10 @@ export default function RosterScreen() {
       const [summaryData, allTeams] = await Promise.all([teamsApi.getRosterSummary(), teamsApi.getTeams()]);
       setSummary(summaryData);
       setTeams(allTeams);
+      setSummaryError(null);
     } catch (fetchError: any) {
       console.error('Fetch roster summary error:', fetchError);
-      setError(loadFailureMessage(fetchError));
+      setSummaryError(loadFailureMessage(fetchError));
       setSummary(null);
     }
   }, []);
@@ -462,7 +467,7 @@ export default function RosterScreen() {
   const attendanceValue = summary ? summary.attendance?.rate ?? summary.averageAttendance ?? null : null;
   const pendingPayments = summary?.pendingPayments ?? 0;
   const paidPlayers = rosterTotal - Math.min(rosterTotal, pendingPayments);
-  const rosterReadiness = rosterTotal ? Math.round((paidPlayers / rosterTotal) * 100) : 0;
+  const rosterReadiness = summary && rosterTotal ? Math.round((paidPlayers / rosterTotal) * 100) : null;
 
   const hasActiveFilters =
     Boolean(searchValue.trim()) ||
@@ -564,10 +569,15 @@ export default function RosterScreen() {
       >
         <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
           <GlassStat dot="var(--c-brand-fg)" value={formatAttendanceRate(attendanceValue)} label="Prezență" hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()} />
-          <GlassStat dot="var(--c-success)" value={`${rosterReadiness}%`} label="Fără restanțe" bar={rosterReadiness} />
+          <GlassStat dot="var(--c-success)" value={rosterReadiness == null ? '—' : `${rosterReadiness}%`} label="Fără restanțe" bar={rosterReadiness ?? undefined} />
           <GlassStat dot="var(--c-muted)" value={rosterTotal} label="Jucători în lot" />
-          <GlassStat dot={pendingPayments > 0 ? 'var(--c-danger)' : 'var(--c-success)'} danger={pendingPayments > 0} value={pendingPayments} label="Cu restanțe" />
+          <GlassStat dot={!summary ? 'var(--c-faint)' : pendingPayments > 0 ? 'var(--c-danger)' : 'var(--c-success)'} danger={pendingPayments > 0} value={summary ? pendingPayments : '—'} label="Cu restanțe" />
         </View>
+        {summaryError && !summary ? (
+          <View className="mt-3">
+            <LoadError title="Cifrele lotului nu s-au încărcat" message={summaryError} onRetry={() => void fetchMeta()} />
+          </View>
+        ) : null}
       </PageHero>
 
       <View className="rounded-[16px] p-4 border" style={{ backgroundColor: dash.surface, borderColor: dash.hairlineStrong, ...dash.shadow.sm }}>
