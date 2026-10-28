@@ -20,7 +20,8 @@ import { loadFailureMessage } from '../../../utils/errorMessages';
  * the game or season id is a broken link — „nu există”, not „nu e publicată”.
  */
 
-const SCHEDULE_PATH = '/admin/dashboard';
+// FRB sheets are opened from „Rezultate recente” on Acasă (the only place that links here).
+const RESULTS_PATH = '/admin/dashboard';
 
 function formatDateLabel(dateStr: string) {
   const parts = dateStr.split('.');
@@ -107,7 +108,7 @@ export default function MatchDetailScreen() {
     loadData();
   }, [loadData]);
 
-  const goBack = () => router.back(SCHEDULE_PATH);
+  const goBack = () => router.back(RESULTS_PATH);
 
   const backButton = (
     <Pressable
@@ -146,9 +147,9 @@ export default function MatchDetailScreen() {
             {brokenLink || missing ? (
               <ErrorState
                 title="Fișa meciului nu există"
-                message="Linkul e incomplet sau nu mai e valid. Deschide meciul din Acasă."
+                message="Linkul e incomplet sau nu mai e valid. Fișele FRB se deschid din „Rezultate recente”, pe Acasă."
                 actionLabel="Înapoi la Acasă"
-                onAction={() => router.replace(SCHEDULE_PATH as any)}
+                onAction={() => router.replace(RESULTS_PATH as any)}
               />
             ) : (
               <ErrorState

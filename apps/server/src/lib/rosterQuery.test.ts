@@ -77,3 +77,17 @@ test('the team filter lists the roster\'s teams whatever the current filter', ()
     assert.deepEqual(result.teams, ['U12', 'U14']);
     assert.equal(result.hasUnassigned, true);
 });
+
+test('sorting by visa puts no visa first, then the earliest expiry', () => {
+    const visas = [
+        row(1, 'Ana', 'U12', { medicalCheckExpiry: '2026-12-01T00:00:00.000Z' }),
+        row(2, 'Radu', 'U12', { medicalCheckExpiry: null }),
+        row(3, 'Ioana', 'U12', { medicalCheckExpiry: '2026-09-01T00:00:00.000Z' }),
+        row(4, 'Luca', 'U12', { medicalCheckExpiry: null }),
+    ];
+    const asc = applyRosterQuery(visas, query({ sort: 'medical', dir: 'asc' }));
+    assert.deepEqual(asc.items.map((r) => r.id).slice(2), [3, 1]);
+    assert.deepEqual(asc.items.slice(0, 2).map((r) => r.id).sort(), [2, 4]);
+    const desc = applyRosterQuery(visas, query({ sort: 'medical', dir: 'desc' }));
+    assert.deepEqual(desc.items.map((r) => r.id).slice(0, 2), [1, 3]);
+});

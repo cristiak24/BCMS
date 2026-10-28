@@ -136,6 +136,7 @@ export default function ManageAccountsScreen() {
     const [handoverBusy, setHandoverBusy] = useState(false);
     const [page, setPage] = useState(1);
     const [menuFor, setMenuFor] = useState<ClubAdminAccount | null>(null);
+    const [bulkRoleOpen, setBulkRoleOpen] = useState(false);
 
     const loadAccounts = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
         if (mode === 'refresh') {
@@ -619,11 +620,12 @@ export default function ManageAccountsScreen() {
                     >
                         {!loading && !(loadError && accounts.length === 0) ? (
                             <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
-                                {/* Labels agree with the number: it read "1 Jucători", "1 Părinți". */}
-                                <GlassStat dot="var(--c-success)" value={counts.active} label={counts.active === 1 ? 'Cont activ' : 'Conturi active'} />
-                                <GlassStat dot="var(--c-faint)" value={filterCounts.coach} label={filterCounts.coach === 1 ? 'Antrenor' : 'Antrenori'} />
-                                <GlassStat dot="var(--c-faint)" value={filterCounts.player} label={filterCounts.player === 1 ? 'Jucător' : 'Jucători'} />
-                                <GlassStat dot="var(--c-faint)" value={filterCounts.parent} label={filterCounts.parent === 1 ? 'Părinte' : 'Părinți'} />
+                                {/* By state, so the tiles add up to the total: the role tiles left
+                                    Contabil and Admin out and repeated the filter chips below. */}
+                                <GlassStat dot="var(--c-faint)" value={counts.total} label={counts.total === 1 ? 'Cont' : 'Conturi'} />
+                                <GlassStat dot="var(--c-success)" value={counts.active} label={counts.active === 1 ? 'Activ' : 'Active'} />
+                                <GlassStat dot="var(--c-warning)" value={counts.invites} label={counts.invites === 1 ? 'Invitație în așteptare' : 'Invitații în așteptare'} />
+                                <GlassStat dot="var(--c-faint)" value={filterCounts.inactive} label={filterCounts.inactive === 1 ? 'Dezactivat' : 'Dezactivate'} />
                             </View>
                         ) : null}
                     </PageHero>
@@ -650,11 +652,17 @@ export default function ManageAccountsScreen() {
                                     {`${selectedAccounts.length.toLocaleString('ro-RO')} în selecție`}
                                 </Text>
                                 <View className="flex-row flex-wrap items-center gap-1.5">
-                                    {(['coach', 'player', 'parent'] as ClubAdminAccountRole[]).map((role) => (
-                                        <Button key={role} size="sm" label={roleLabel(role)} disabled={bulkBusy} onPress={() => setPending({ kind: 'bulk', action: role, ids: bulkIds })} />
-                                    ))}
-                                    <Button size="sm" label="Reactivează" disabled={bulkBusy} onPress={() => setPending({ kind: 'bulk', action: 'reactivate', ids: bulkIds })} />
-                                    <Button size="sm" variant="danger" label="Dezactivează" disabled={bulkBusy} onPress={() => setPending({ kind: 'bulk', action: 'deactivate', ids: bulkIds })} />
+                                    {/* One „Schimbă rolul” menu with all four roles (the bar had three bare
+                                        role names and no Contabil), and only the status actions that apply. */}
+                                    {selectedAccounts.some((account) => account.status === 'active') ? (
+                                        <Button size="sm" icon="swap-horiz" label="Schimbă rolul" disabled={bulkBusy} onPress={() => setBulkRoleOpen(true)} />
+                                    ) : null}
+                                    {selectedAccounts.some((account) => account.status === 'inactive') ? (
+                                        <Button size="sm" label="Reactivează" disabled={bulkBusy} onPress={() => setPending({ kind: 'bulk', action: 'reactivate', ids: bulkIds })} />
+                                    ) : null}
+                                    {selectedAccounts.some((account) => account.status === 'active') ? (
+                                        <Button size="sm" variant="danger" label="Dezactivează" disabled={bulkBusy} onPress={() => setPending({ kind: 'bulk', action: 'deactivate', ids: bulkIds })} />
+                                    ) : null}
                                     <Button size="sm" variant="ghost" label="Deselectează" onPress={clearSelection} />
                                 </View>
                             </View>
@@ -797,6 +805,18 @@ export default function ManageAccountsScreen() {
                 </PageContainer>
             </ScrollView>
 
+            <ActionSheet
+                visible={bulkRoleOpen}
+                title="Schimbă rolul"
+                subtitle={`${selectedAccounts.length.toLocaleString('ro-RO')} în selecție`}
+                actions={ROLE_ACTIONS.map((option) => ({
+                    key: option.role,
+                    label: option.label,
+                    icon: option.icon,
+                    onPress: () => setPending({ kind: 'bulk', action: option.role, ids: bulkIds }),
+                }))}
+                onClose={() => setBulkRoleOpen(false)}
+            />
             <ActionSheet
                 visible={menuFor != null}
                 title={menuFor?.name || menuFor?.email || ''}

@@ -108,7 +108,7 @@ export function ToastHost({ toasts, onDismiss }: { toasts: ToastData[]; onDismis
     return (
         <View
             // Phones: above the bottom bar (like UnsavedBar), or the bar takes the tap meant for „Anulează”.
-            className="fixed left-1/2 bottom-[calc(96px+env(safe-area-inset-bottom,0px))] lg:bottom-6 z-[100] flex-col gap-2.5 items-center"
+            className="toast-host fixed left-1/2 bottom-[calc(96px+env(safe-area-inset-bottom,0px))] lg:bottom-6 z-[100] flex-col gap-2.5 items-center"
             style={{ transform: 'translateX(-50%)' as any }}
             pointerEvents="box-none"
         >

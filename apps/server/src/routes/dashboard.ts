@@ -384,6 +384,9 @@ router.get('/summary', async (req, res) => {
             presentCount,
             totalAttendanceRecords,
             expiredVisasCount: expiredVisasItems.length,
+            // No clearance on file: the L12 autofill skips them, so the club
+            // must see them before match day, not on the sheet.
+            missingVisasCount: medicalCheckCandidates.filter((player) => !toDate(player.medicalCheckExpiry)).length,
             expiringItems: riskItems,
         });
     } catch (e) {

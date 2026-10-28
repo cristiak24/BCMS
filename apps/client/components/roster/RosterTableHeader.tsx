@@ -72,7 +72,10 @@ export default function RosterTableHeader({
       </View>
       {/* Viza medicală instead of "Poziție" (never filled in anywhere) and
           "Categorie" (it repeated the team shown under the name). */}
-      <Text style={[styles.label, styles.medicalCell]}>Viză medicală</Text>
+      {/* Sortable: who can't play (no visa, then the earliest expiry) is what the admin triages. */}
+      <View style={styles.medicalCell}>
+        <SortableLabel label="Viză medicală" column="medical" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+      </View>
       <View style={styles.attendanceCell}>
         <SortableLabel label="Prezență" column="attendance" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </View>

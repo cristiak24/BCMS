@@ -22,5 +22,5 @@ export const ROSTER_TABLE_WIDTH =
   ROSTER_COLUMN_WIDTHS.payment +
   ROSTER_COLUMN_WIDTHS.actions;
 
-export type RosterSortColumn = 'name' | 'attendance' | 'payment';
+export type RosterSortColumn = 'name' | 'attendance' | 'payment' | 'medical';
 export type RosterSortDirection = 'asc' | 'desc';

@@ -416,7 +416,8 @@ export default function AttendanceScreen() {
                 {markedPercent === 100 ? (
                   <MaterialIcons name="check" size={20} color="var(--c-success-fg)" />
                 ) : (
-                  <Text className="f-display t-num text-[13px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>{markedPercent}%</Text>
+                  // „3/6” marked, not „50%”: under „Prezență” a percentage read as the share present.
+                  <Text className="f-display t-num text-[13px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>{`${marked}/${counts.all}`}</Text>
                 )}
               </ProgressRing>
             ) : (

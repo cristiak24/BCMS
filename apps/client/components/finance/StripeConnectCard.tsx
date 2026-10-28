@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Platform } from '@/src/web/reactNative';
 import Button from '../ui/Button';
+import { MaterialIcons } from '@/src/web/expoVectorIcons';
+import { loadFailureMessage } from '../../utils/errorMessages';
 import { financeApi, type StripeConnectStatus } from '../../services/financeApi';
 
 /**
@@ -13,14 +15,19 @@ export default function StripeConnectCard({ returned }: { returned?: boolean }) 
     const [loading, setLoading] = useState(true);
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // A status that never arrived is not „not activated”: the admin would tell
+    // families card payments don't exist because of one failed request.
+    const [loadFailed, setLoadFailed] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         setLoading(true);
         setError(null);
+        setLoadFailed(null);
         try {
             setStatus(await financeApi.getConnectStatus());
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Nu am putut citi starea contului Stripe.');
+            setStatus(null);
+            setLoadFailed(loadFailureMessage(err));
         } finally {
             setLoading(false);
         }
@@ -58,6 +65,15 @@ export default function StripeConnectCard({ returned }: { returned?: boolean }) 
 
             {loading ? (
                 <Text className="text-[13px]" style={{ color: 'var(--c-muted)' }}>Se verifică…</Text>
+            ) : loadFailed ? (
+                <View className="flex-row flex-wrap items-center gap-3" accessibilityRole="alert">
+                    <MaterialIcons name="cloud-off" size={18} color="var(--c-warning-fg)" />
+                    <View className="flex-1 min-w-[200px]">
+                        <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>Starea contului Stripe nu s-a încărcat.</Text>
+                        <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{loadFailed}</Text>
+                    </View>
+                    <Button size="sm" icon="refresh" label="Reîncearcă" onPress={() => void load()} />
+                </View>
             ) : (
                 <View className="gap-3">
                     <View className="flex-row items-center gap-2">

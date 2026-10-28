@@ -189,9 +189,19 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
         setCopied(false);
     }, []);
 
+    // Esc or „Renunță” with an email or a label typed and nothing created yet
+    // keeps the draft for the next open: it used to vanish without a word.
+    const keepDraftRef = useRef(false);
+    keepDraftRef.current = !result && Boolean(email.trim() || label.trim());
+
     useEffect(() => {
         if (!visible) return;
-        reset();
+        if (keepDraftRef.current) {
+            setErrors({});
+            setError(null);
+        } else {
+            reset();
+        }
         setTeams(null);
         void familyRequestsApi.teamCodes().then(setTeams).catch(() => setTeams([]));
     }, [visible, reset]);
@@ -518,7 +528,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                                                 <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>
                                                     Echipă <Text className="font-medium" style={{ color: 'var(--c-faint)' }}>· opțional</Text>
                                                 </Text>
-                                                <View className="flex-row flex-wrap gap-1.5">
+                                                <View className="flex-row flex-wrap gap-1.5" accessibilityRole={'radiogroup' as any} accessibilityLabel="Echipă">
                                                     <OptionChip label="Fără echipă" active={teamId == null} onPress={() => setTeamId(null)} />
                                                     {teams.map((item) => (
                                                         <OptionChip key={item.id} label={item.name} active={teamId === item.id} onPress={() => setTeamId(item.id)} />
@@ -550,7 +560,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                                         <View className="flex-col sm:flex-row gap-4">
                                             <View className="sm:flex-1">
                                                 <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Valabil</Text>
-                                                <View className="flex-row flex-wrap gap-1.5">
+                                                <View className="flex-row flex-wrap gap-1.5" accessibilityRole={'radiogroup' as any} accessibilityLabel="Valabil">
                                                     {VALIDITY_OPTIONS.map((option) => (
                                                         <OptionChip
                                                             key={option.hours}

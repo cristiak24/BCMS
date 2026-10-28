@@ -1,6 +1,6 @@
 import { parseApiDate } from '@/utils/dates';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, TextInput, ActivityIndicator } from '@/src/web/reactNative';
+import { View, Text, TextInput, ActivityIndicator } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import Button from '../ui/Button';
 import { FinanceCard, FinanceCardHeader } from './FinanceCard';
@@ -106,7 +106,6 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
     const [feesError, setFeesError] = useState<string | null>(null);
     const targetIdRef = useRef<number | null>(null);
     targetIdRef.current = target?.playerId ?? null;
-    const [selectedFees, setSelectedFees] = useState<Set<string>>(new Set());
     const [amount, setAmount] = useState('');
     const [method, setMethod] = useState<Method>('cash');
     const [date, setDate] = useState(todayIso());
@@ -211,11 +210,10 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
             const { fees } = await financeApi.getPlayerBalance(playerId);
             // The admin may have closed the dialog or opened another player meanwhile.
             if (targetIdRef.current !== playerId) return;
-            // Pre-select what is late (or everything owed when nothing is late yet).
+            // Suggest what is late (or everything owed when nothing is late yet).
             const preset = fees.filter((fee) => fee.status === 'overdue');
             const chosen = preset.length ? preset : fees;
             setTargetFees(fees);
-            setSelectedFees(new Set(chosen.map((fee) => fee.id)));
             // Only into an empty field: on a slow connection the fees arrive after
             // the admin typed a sum, which used to be replaced without a word.
             setAmount((current) => (current.trim() ? current : String(chosen.reduce((sum, fee) => sum + fee.amount, 0))));
@@ -227,7 +225,6 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
     const openPayment = (balance: PlayerBalanceSummary) => {
         targetIdRef.current = balance.playerId;
         setTarget(balance);
-        setSelectedFees(new Set());
         setAmount('');
         setMethod('cash');
         setDate(todayIso());
@@ -236,23 +233,20 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
         void loadTargetFees(balance.playerId);
     };
 
-    const toggleFee = (fee: BalanceFee) => {
-        if (!targetFees) return;
-        setSelectedFees((current) => {
-            const next = new Set(current);
-            if (next.has(fee.id)) next.delete(fee.id); else next.add(fee.id);
-            setAmount(String(targetFees.filter((item) => next.has(item.id)).reduce((sum, item) => sum + item.amount, 0)));
-            return next;
-        });
-    };
-
-    const parsedAmount = Number(amount.replace(',', '.'));
+    // The typed amount is the only input: the server splits it oldest first
+    // and each fee row shows what it gets. Ticks used to be a second model that
+    // rewrote the amount and disagreed with the split.
+    const amountText = amount.trim().replace(/\s/g, '').replace(',', '.');
+    const parsedAmount = /^\d+(\.\d{1,2})?$/.test(amountText) ? Number(amountText) : NaN;
     const validAmount = Number.isFinite(parsedAmount) && parsedAmount > 0;
+    const amountError = !amount.trim() || validAmount
+        ? null
+        : Number.isFinite(parsedAmount) ? 'Introdu o sumă mai mare ca 0.' : 'Scrie suma în cifre, de ex. 150 sau 150,50.';
+    const appliedByFee = useMemo(() => new Map((allocation?.lines ?? []).map((line) => [line.feeId, line])), [allocation]);
     // What the server's split leaves over after every fee: booked as an advance.
     const advance = validAmount && allocation ? allocation.credit : 0;
     const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(new Date(date).getTime()) && date <= todayIso();
     const canSave = !saving && validAmount && validDate;
-    const selectedKey = Array.from(selectedFees).sort().join(',');
 
     // Ask the server how this amount would be split (the same calculation the
     // save uses), a moment after the admin stops typing.
@@ -262,14 +256,14 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
         let cancelled = false;
         setAllocating(true);
         const timer = setTimeout(() => {
-            financeApi.previewManualPayment({ playerId: target.playerId, amount: parsedAmount, feeIds: selectedKey ? selectedKey.split(',') : [] })
+            financeApi.previewManualPayment({ playerId: target.playerId, amount: parsedAmount })
                 .then((result) => { if (!cancelled) setAllocation(result); })
                 // An older server has no preview: the dialog still saves.
                 .catch(() => { if (!cancelled) setAllocation(null); })
                 .finally(() => { if (!cancelled) setAllocating(false); });
         }, 300);
         return () => { cancelled = true; clearTimeout(timer); setAllocating(false); };
-    }, [target, validAmount, parsedAmount, selectedKey]);
+    }, [target, validAmount, parsedAmount]);
 
     const savePayment = async () => {
         if (!target || !canSave) return;
@@ -279,7 +273,6 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
             const result = await financeApi.createManualPayment({
                 playerId: target.playerId,
                 amount: parsedAmount,
-                feeIds: Array.from(selectedFees),
                 method,
                 date,
                 description: description.trim() || undefined,
@@ -341,7 +334,7 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                         className="self-start md:self-auto"
                     />
                 ) : null}
-                <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 [@media(pointer:coarse)]:h-10 border md:ml-auto md:w-[240px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
+                <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 [@media(pointer:coarse)]:h-[42px] border md:ml-auto md:w-[240px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
                     <MaterialIcons name="search" size={15} color="var(--c-faint)" />
                     <TextInput
                         value={query}
@@ -362,7 +355,7 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
             ) : error ? (
                 <View className="py-6 items-center gap-2">
                     <Text className="text-[13px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text>
-                    <Button size="sm" label="Încearcă din nou" onPress={() => void load()} />
+                    <Button size="sm" icon="refresh" label="Reîncearcă" onPress={() => void load()} />
                 </View>
             ) : filtered.length === 0 ? (
                 <View className="py-6 items-center">
@@ -449,7 +442,7 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                 title={target ? `Încasare · ${target.playerName}` : ''}
                 // What is owed, before anything else: the amount used to be checked against a row left behind.
                 message={target
-                    ? `${target.overdue > 0 ? `Restant ${money(target.overdue, currency)} · ` : ''}de plătit ${money(target.outstanding, currency)}. Bifează taxele pe care le acoperă plata; o sumă mai mică le achită parțial, de la cea mai veche.`
+                    ? `${target.overdue > 0 ? `Restant ${money(target.overdue, currency)} · ` : ''}de plătit ${money(target.outstanding, currency)}. Suma se împarte de la cea mai veche taxă.`
                     : undefined}
                 // The amount on the button: the last look before it is booked. The
                 // advance it leaves sits on its own line right above, in a warning
@@ -471,44 +464,73 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
             >
                 {target ? (
                     <View className="gap-3">
-                        <View className="rounded-[10px] border overflow-hidden" style={{ borderColor: 'var(--c-border)', maxHeight: 220, overflowY: 'auto' } as any}>
-                            {targetFees == null ? (
-                                feesError ? (
-                                    <View className="px-3 py-3 gap-2 items-start">
-                                        <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{feesError}</Text>
-                                        <Button size="sm" label="Reîncearcă" onPress={() => void loadTargetFees(target.playerId)} />
-                                    </View>
+                        <View className="rounded-[10px] border overflow-hidden" style={{ borderColor: 'var(--c-border)' } as any}>
+                            {/* What the typed amount does, in one line that is announced as it changes. */}
+                            <View
+                                className="flex-row items-center justify-between gap-2 px-3 py-2 border-b"
+                                style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
+                                {...({ 'aria-live': 'polite' } as any)}
+                            >
+                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Cum se împarte plata</Text>
+                                {allocating ? (
+                                    <ActivityIndicator size="small" color="var(--c-faint)" />
                                 ) : (
-                                    <View className="py-4 items-center" accessibilityRole="progressbar" accessibilityLabel="Se încarcă taxele">
-                                        <ActivityIndicator size="small" color="var(--c-brand-fg)" />
-                                    </View>
-                                )
-                            ) : targetFees.map((fee, index) => {
-                                const checked = selectedFees.has(fee.id);
-                                return (
-                                    <Pressable
-                                        key={fee.id}
-                                        onPress={() => toggleFee(fee)}
-                                        // Ticking a fee is a checkbox, not a toggle button.
-                                        accessibilityRole={'checkbox' as any}
-                                        accessibilityState={{ checked }}
-                                        accessibilityLabel={`${fee.label}, ${money(fee.amount, currency)}`}
-                                        // shrink-0: inside the scrolling list a row must keep its height, or its two lines overlap.
-                                        className={`flex-row items-center gap-2.5 px-3 py-2 shrink-0 ${index ? 'border-t' : ''}`}
-                                        style={{ borderColor: 'var(--c-border)' } as any}
-                                    >
-                                        <MaterialIcons name={checked ? 'check-box' : 'check-box-outline-blank'} size={18} color={checked ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
-                                        <View className="flex-1 min-w-0">
-                                            <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{fee.label}</Text>
-                                            <Text className="text-[11.5px]" style={{ color: fee.status === 'overdue' ? 'var(--c-danger-fg)' : 'var(--c-muted)' }}>
-                                                {fee.status === 'overdue' ? 'Restanță' : 'Scadent'}{fee.dueDate ? ` · ${shortDate(fee.dueDate)}` : ''}
-                                                {fee.paidAmount ? ` · achitat ${money(fee.paidAmount, currency)} din ${money(fee.amount + fee.paidAmount, currency)}` : ''}
-                                            </Text>
+                                    <Text className="text-[12px] text-right" style={{ color: 'var(--c-muted)' }}>{splitSummary(allocation, validAmount, targetFees != null)}</Text>
+                                )}
+                            </View>
+                            <View style={{ maxHeight: 220, overflowY: 'auto' } as any}>
+                                {targetFees == null ? (
+                                    feesError ? (
+                                        <View className="px-3 py-3 gap-2 items-start">
+                                            <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{feesError}</Text>
+                                            <Button size="sm" label="Reîncearcă" onPress={() => void loadTargetFees(target.playerId)} />
                                         </View>
-                                        <Text className="t-num text-[13px] font-bold" style={{ color: 'var(--c-ink)' }}>{money(fee.amount, currency)}</Text>
-                                    </Pressable>
-                                );
-                            })}
+                                    ) : (
+                                        <View className="py-4 items-center" accessibilityRole="progressbar" accessibilityLabel="Se încarcă taxele">
+                                            <ActivityIndicator size="small" color="var(--c-brand-fg)" />
+                                        </View>
+                                    )
+                                ) : targetFees.map((fee, index) => {
+                                    const line = appliedByFee.get(fee.id);
+                                    const settled = Boolean(line && line.owedAfter <= 0);
+                                    const effect = !validAmount || !allocation
+                                        ? null
+                                        : !line
+                                            ? { icon: 'radio-button-unchecked', color: 'var(--c-faint)', text: 'Neatinsă' }
+                                            : settled
+                                                ? { icon: 'check-circle', color: 'var(--c-success-fg)', text: 'Achitată integral' }
+                                                : { icon: 'access-time', color: 'var(--c-warning-fg)', text: `Parțial · rămân ${money(line.owedAfter, currency)}` };
+                                    return (
+                                        <View
+                                            key={fee.id}
+                                            // shrink-0: inside the scrolling list a row must keep its height, or its lines overlap.
+                                            className={`flex-row items-start gap-2.5 px-3 py-2 shrink-0 ${index ? 'border-t' : ''}`}
+                                            style={{ borderColor: 'var(--c-border)' } as any}
+                                        >
+                                            <View className="flex-1 min-w-0">
+                                                {/* Two lines: on a phone „Contribuție antrenament …” lost its month and two rows read the same. */}
+                                                <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{fee.label}</Text>
+                                                <Text className="text-[11.5px]" style={{ color: fee.status === 'overdue' ? 'var(--c-danger-fg)' : 'var(--c-muted)' }}>
+                                                    {fee.status === 'overdue' ? 'Restanță' : 'Scadent'}{fee.dueDate ? ` · ${shortDate(fee.dueDate)}` : ''}
+                                                    {fee.paidAmount ? ` · achitat ${money(fee.paidAmount, currency)} din ${money(fee.amount + fee.paidAmount, currency)}` : ''}
+                                                </Text>
+                                                {effect ? (
+                                                    <View className="flex-row items-center gap-1 mt-0.5">
+                                                        <MaterialIcons name={effect.icon as any} size={13} color={effect.color} />
+                                                        <Text className="text-[11.5px] font-medium" style={{ color: effect.icon === 'radio-button-unchecked' ? 'var(--c-muted)' : effect.color }}>{effect.text}</Text>
+                                                    </View>
+                                                ) : null}
+                                            </View>
+                                            <View className="items-end shrink-0">
+                                                <Text className="t-num text-[13px] font-bold" style={{ color: 'var(--c-ink)' }}>{money(fee.amount, currency)}</Text>
+                                                {line ? (
+                                                    <Text className="t-num text-[11.5px] font-semibold" style={{ color: settled ? 'var(--c-success-fg)' : 'var(--c-warning-fg)' }}>{`−${money(line.applied, currency)}`}</Text>
+                                                ) : null}
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+                            </View>
                         </View>
 
                         {/* Four fields in two rows, each with a visible label: on a phone the method
@@ -521,7 +543,7 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                                     onChangeText={setAmount}
                                     keyboardType="decimal-pad"
                                     accessibilityLabel="Suma încasată"
-                                    aria-invalid={amount.trim() && !validAmount ? true : undefined}
+                                    aria-invalid={amountError ? true : undefined}
                                     className="h-10 rounded-[10px] px-3 border text-[15px] font-bold"
                                     style={{ borderColor: 'var(--c-border)', color: 'var(--c-ink)', backgroundColor: 'var(--c-surface)' } as any}
                                 />
@@ -558,17 +580,9 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                                 />
                             </View>
                         </View>
-                        {amount.trim() && !validAmount ? (
-                            <Text className="text-[12px]" style={{ color: 'var(--c-danger-fg)' }}>Introdu o sumă mai mare ca 0.</Text>
+                        {amountError ? (
+                            <Text className="text-[12px]" style={{ color: 'var(--c-danger-fg)' }}>{amountError}</Text>
                         ) : null}
-
-                        <AllocationPreview
-                            allocation={allocation}
-                            loading={allocating}
-                            visible={validAmount}
-                            noneSelected={selectedFees.size === 0}
-                            currency={currency}
-                        />
 
                         {!validDate ? (
                             <Text className="text-[12px]" style={{ color: 'var(--c-danger-fg)' }}>Alege o dată de azi sau din trecut.</Text>
@@ -586,67 +600,12 @@ function FieldLabel({ children }: { children: string }) {
     return <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>{children}</Text>;
 }
 
-/** „Cum se împarte plata”: what each fee gets from the amount typed. */
-function AllocationPreview({ allocation, loading, visible, noneSelected, currency }: {
-    allocation: PaymentAllocation | null;
-    loading: boolean;
-    visible: boolean;
-    noneSelected: boolean;
-    currency: string;
-}) {
-    const [expanded, setExpanded] = useState(false);
-    if (!visible) return null;
-    // Every fee paid in full: one line, not a column of identical ticks that
-    // reads as success and is re-announced line by line as the amount changes.
-    const allSettled = Boolean(allocation && allocation.lines.length > 1 && allocation.lines.every((line) => line.owedAfter <= 0));
-    const collapsed = allSettled && !expanded;
-    return (
-        <View
-            className="rounded-[10px] border px-3 py-2.5 gap-1.5"
-            style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
-            accessibilityLabel="Cum se împarte plata"
-            {...({ 'aria-live': 'polite' } as any)}
-        >
-            <View className="flex-row items-center justify-between gap-2">
-                <Text className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--c-muted)' }}>Cum se împarte plata</Text>
-                {loading ? <ActivityIndicator size="small" color="var(--c-faint)" /> : null}
-            </View>
-            {noneSelected ? (
-                <Text className="text-[12px]" style={{ color: 'var(--c-muted)' }}>Nicio taxă bifată: suma merge pe cele mai vechi taxe.</Text>
-            ) : null}
-            {allocation && collapsed ? (
-                <View className="flex-row items-center gap-2">
-                    <MaterialIcons name="check-circle" size={15} color="var(--c-success-fg)" />
-                    <Text className="flex-1 text-[12.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>
-                        {`Acoperă integral ${plural(allocation.lines.length, 'taxă', 'taxe')}`}
-                    </Text>
-                    <Button size="sm" variant="ghost" label="Detalii" onPress={() => setExpanded(true)} />
-                </View>
-            ) : allocation ? (
-                <>
-                    {allocation.lines.map((line) => {
-                        const settled = line.owedAfter <= 0;
-                        return (
-                            <View key={line.feeId} className="flex-row items-start gap-2">
-                                <MaterialIcons
-                                    name={settled ? 'check-circle' : 'access-time'}
-                                    size={15}
-                                    color={settled ? 'var(--c-success-fg)' : 'var(--c-warning-fg)'}
-                                />
-                                <View className="flex-1 min-w-0">
-                                    <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{line.label}</Text>
-                                    <Text className="text-[11.5px]" style={{ color: settled ? 'var(--c-muted)' : 'var(--c-warning-fg)' }}>
-                                        {settled ? 'Achitată integral' : `Parțial · rămân ${money(line.owedAfter, currency)}`}
-                                    </Text>
-                                </View>
-                                <Text className="t-num text-[12.5px] font-bold" style={{ color: 'var(--c-ink)' }}>{money(line.applied, currency)}</Text>
-                            </View>
-                        );
-                    })}
-                </>
-            ) : !loading ? (
-                <Text className="text-[12px]" style={{ color: 'var(--c-muted)' }}>Împărțirea nu e disponibilă acum; plata se salvează oricum.</Text>
-            ) : null}
-        </View>
-    );
+/** One line over the fee list: what the typed amount does overall. */
+function splitSummary(allocation: PaymentAllocation | null, validAmount: boolean, feesLoaded: boolean): string {
+    if (!validAmount) return feesLoaded ? 'Scrie suma încasată' : '';
+    if (!allocation) return 'Indisponibilă acum; plata se salvează oricum';
+    const full = allocation.lines.filter((line) => line.owedAfter <= 0).length;
+    const partial = allocation.lines.length - full;
+    if (!full && !partial) return 'Nu acoperă nicio taxă';
+    return [full ? `${plural(full, 'taxă', 'taxe')} integral` : '', partial ? `${partial} parțial` : ''].filter(Boolean).join(' · ');
 }

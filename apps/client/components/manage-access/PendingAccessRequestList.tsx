@@ -73,9 +73,9 @@ export default function PendingAccessRequestList({
         return (
             <View className="rounded-[14px] border px-4 py-8 items-center" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
                 <MaterialIcons name="error-outline" size={28} color="var(--c-danger-fg)" />
-                <Text className="text-[15px] font-bold mt-2" style={{ color: 'var(--c-ink)' }}>Nu am putut încărca cererile</Text>
+                <Text className="text-[15px] font-bold mt-2" style={{ color: 'var(--c-ink)' }}>Nu am putut încărca cererile de acces</Text>
                 <Text className="t-meta text-center mt-1" style={{ color: 'var(--c-muted)' }}>{error}</Text>
-                <AccessButton className="mt-4" variant="secondary" icon="refresh" label="Încearcă din nou" onPress={onRetry} />
+                <AccessButton className="mt-4" variant="secondary" icon="refresh" label="Reîncearcă" onPress={onRetry} />
             </View>
         );
     }

@@ -207,9 +207,9 @@ export default function AuditLogList({ load, platform = false }: { load: (filter
                     <ActivityIndicator size="small" color="var(--c-brand-fg)" />
                 </View>
             ) : error ? (
-                <View className="py-8 items-center gap-2">
+                <View className="py-8 items-center gap-2" accessibilityRole="alert">
                     <Text className="text-[13px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text>
-                    <Button size="sm" label="Încearcă din nou" onPress={() => void fetchPage()} />
+                    <Button size="sm" icon="refresh" label="Reîncearcă" onPress={() => void fetchPage()} />
                 </View>
             ) : !data?.logs.length ? (
                 // „pentru acest filtru” read wrong under „Toate acțiunile”: say which case it is.

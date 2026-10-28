@@ -70,13 +70,13 @@ export function FieldLabel({ children, hint }: { children: string; hint?: string
     );
 }
 
-/** Compact option chip (validity presets). */
+/** Compact option chip (team, validity presets): one of a group, so a radio. */
 export function OptionChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
     return (
         <Pressable
             onPress={onPress}
-            accessibilityRole="button"
-            accessibilityState={{ selected: active }}
+            accessibilityRole={'radio' as any}
+            accessibilityState={{ checked: active }}
             className="ui-press h-8 [@media(pointer:coarse)]:h-10 px-3 rounded-[9px] border items-center justify-center shrink-0"
             style={active
                 ? { backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' } as any

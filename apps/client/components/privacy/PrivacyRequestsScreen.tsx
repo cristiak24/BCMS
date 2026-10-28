@@ -6,6 +6,7 @@ import { privacyRequestsApi, type PrivacyRequestRow } from '../../services/priva
 import { deadlineLabel } from '../../utils/privacyDeadline';
 import PageContainer from '../ui/PageContainer';
 import PageHeader from '../ui/PageHeader';
+import PageHero from '../admin/PageHero';
 import FilterChips from '../ui/FilterChips';
 import Button from '../ui/Button';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -146,28 +147,39 @@ export default function PrivacyRequestsScreen({ platform = false }: { platform?:
     }
   };
 
+  const refreshButton = (
+    <Pressable
+      onPress={load}
+      accessibilityRole="button"
+      accessibilityLabel="Reîmprospătează"
+      className="ui-press w-10 h-10 rounded-[11px] border items-center justify-center"
+      style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
+    >
+      <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />
+    </Pressable>
+  );
+
   return (
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-24" showsVerticalScrollIndicator={false}>
       <PageContainer>
-        <PageHeader
-          keepTitleOnMobile
-          // The club admin's menu calls this page „Date personale”; one name everywhere.
-          title={platform ? 'Cereri privind datele personale' : 'Date personale'}
-          subtitle={platform
-            ? 'Cererile de ștergere din toate cluburile. Răspunsul e obligatoriu în cel mult 30 de zile de la cerere.'
-            : 'Cererile de ștergere ale membrilor clubului. Răspunsul e obligatoriu în cel mult 30 de zile de la cerere.'}
-          actions={
-            <Pressable
-              onPress={load}
-              accessibilityRole="button"
-              accessibilityLabel="Reîmprospătează"
-              className="ui-press w-10 h-10 rounded-[11px] border items-center justify-center"
-              style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
-            >
-              <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />
-            </Pressable>
-          }
-        />
+        {/* The club admin's pages open on the same eyebrow + title as Jurnal and Finanțe;
+            the platform console keeps its own header. */}
+        {platform ? (
+          <PageHeader
+            keepTitleOnMobile
+            title="Cereri privind datele personale"
+            subtitle="Cererile de ștergere din toate cluburile. Răspunsul e obligatoriu în cel mult 30 de zile de la cerere."
+            actions={refreshButton}
+          />
+        ) : (
+          <PageHero
+            eyebrow="Date personale"
+            title="Cererile de date personale"
+            subtitle="Cererile de ștergere ale membrilor clubului. Răspunsul e obligatoriu în cel mult 30 de zile de la cerere."
+            className="mb-4"
+            actions={refreshButton}
+          />
+        )}
 
         <View className="mb-4">
           <FilterChips<Filter>
@@ -193,8 +205,10 @@ export default function PrivacyRequestsScreen({ platform = false }: { platform?:
           <EmptyState
             compact
             icon="verified-user"
-            title={filter === 'open' ? 'Nicio cerere deschisă' : 'Nicio cerere'}
-            message={filter === 'open' ? 'Când cineva cere ștergerea datelor din Profil, cererea apare aici.' : 'Cererile închise apar aici, cu nota de rezolvare.'}
+            title={filter === 'open' ? 'Nicio cerere deschisă' : filter === 'closed' ? 'Nicio cerere rezolvată' : 'Nicio cerere'}
+            message={filter === 'closed'
+              ? 'Cererile închise apar aici, cu nota de rezolvare.'
+              : 'Când cineva cere ștergerea datelor din Profil, cererea apare aici.'}
           />
         ) : (
           <View className="grid grid-cols-1 xl:grid-cols-2 gap-2.5">

@@ -203,7 +203,7 @@ export type RosterPageQuery = {
     status?: 'active' | 'inactive' | 'all';
     attendance?: 'all' | 'high' | 'medium' | 'low';
     payment?: 'all' | 'paid' | 'pending' | 'overdue';
-    sort?: 'name' | 'attendance' | 'payment';
+    sort?: 'name' | 'attendance' | 'payment' | 'medical';
     dir?: 'asc' | 'desc';
     page: number;
     /** 'all' = every matching player (CSV export). */

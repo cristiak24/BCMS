@@ -116,6 +116,8 @@ function PlayerCard({
   /** The accountant sees the numbers but does not edit them or manage parents. */
   readOnly?: boolean;
 }) {
+  // Editable lists carry one count of rows without a number above them; the
+  // same sentence on every row repeated it (eleven times on a new club).
   const [editing, setEditing] = useState(false);
   const [family, setFamily] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -220,11 +222,9 @@ function PlayerCard({
             <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>Fără număr: {missing.join(', ')}</Text>
           ) : null}
         </View>
-      ) : (
-        // Quiet: an indigo „Adaugă numere” on every row without a number spent
-        // the brand colour nine times on one screen. The edit button adds them.
+      ) : readOnly ? (
         <Text className="t-meta pl-12" style={{ color: 'var(--c-faint)' }}>Niciun număr de telefon încă.</Text>
-      )}
+      ) : null}
 
       {family && !editing ? (
         <View className="md:pl-12">

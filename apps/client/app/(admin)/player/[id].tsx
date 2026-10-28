@@ -178,7 +178,7 @@ export default function PlayerProfile() {
         {missing ? (
           <ErrorState title="Jucătorul nu mai există" message="A fost șters din club sau linkul nu mai e valid." actionLabel="Înapoi la Lot" onAction={() => router.replace('/admin/roster' as any)} />
         ) : (
-          <ErrorState title="Nu am putut încărca jucătorul" message={loadError} actionLabel="Încearcă din nou" onAction={fetchPlayer} />
+          <ErrorState title="Nu am putut încărca jucătorul" message={loadError} actionLabel="Reîncearcă" onAction={fetchPlayer} />
         )}
       </View>
     );
@@ -259,8 +259,10 @@ export default function PlayerProfile() {
               />
               <GlassStat value={medMeta.label} label="Viză medicală" dot={medMeta.fg} />
               <GlassStat
-                value={paid ? 'Plătit' : overdue > 0 ? money(overdue) : amountDue > 0 ? money(amountDue) : '—'}
-                label={overdue > 0 ? 'Restanță' : amountDue > 0 ? 'De plată' : 'Plată'}
+                // The same figure as the Plăți card („De plătit”): the strip used to show
+                // only the past-due part, so the page carried two different sums.
+                value={paid ? 'Plătit' : amountDue > 0 ? money(amountDue) : '—'}
+                label={overdue > 0 ? 'De plată, cu restanță' : amountDue > 0 ? 'De plată' : 'Plată'}
                 dot={paid ? 'var(--c-success)' : overdue > 0 ? 'var(--c-danger)' : 'var(--c-faint)'}
                 danger={overdue > 0}
               />
@@ -334,8 +336,9 @@ export default function PlayerProfile() {
                     colorScheme: 'light dark',
                   }}
                 />
-                <Text className="t-meta mt-2" style={{ color: 'var(--c-muted)' }}>
-                  {medicalExpiry ? `Expiră pe ${formatDate(medicalExpiry)}.` : 'Nicio viză înregistrată.'} Salvează ca să aplici.
+                <Text className="t-meta mt-2" style={{ color: med === 'expired' ? 'var(--c-danger-fg)' : 'var(--c-muted)' }}>
+                  {!medicalExpiry ? 'Nicio viză înregistrată.' : med === 'expired' ? `A expirat pe ${formatDate(medicalExpiry)}: nu poate juca.` : `Expiră pe ${formatDate(medicalExpiry)}.`}
+                  {medicalExpiry !== toCalendarDay(player.medicalCheckExpiry) ? ' Salvează ca să aplici.' : ''}
                 </Text>
               </Card>
 

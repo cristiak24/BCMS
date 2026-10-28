@@ -27,6 +27,21 @@ test('the payment dialog states the debt and labels every field', async ({ page 
   await expect(dialog).toHaveCount(0);
 });
 
+test('critique 8: the typed amount is the only input and each fee shows what it gets', async ({ page }) => {
+  await signIn(page, 'admin');
+  const dialog = await openPayment(page, 'Radu Stan');
+  // No ticks to rewrite the amount any more.
+  await expect(dialog.getByRole('checkbox')).toHaveCount(0);
+  const amount = dialog.getByLabel('Suma încasată');
+  await amount.fill('abc');
+  await expect(dialog).toContainText('Scrie suma în cifre');
+  await amount.fill('1');
+  await expect(dialog).toContainText(/Parțial · rămân/);
+  await expect(amount).toHaveValue('1');
+  await expect(dialog.getByRole('button', { name: /Înregistrează 1,00 RON/ })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Renunță' }).click();
+});
+
 test('Enter in the storno reason does not reverse the payment', async ({ page }) => {
   await signIn(page, 'admin');
   let reversed = false;

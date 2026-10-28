@@ -426,6 +426,27 @@ export default function L12Editor({
     onChange({ ...lineup, players: sortLineupPlayers([...lineup.players, ...rows]) });
   };
 
+  // After the autofill: the ones with no visa on file, added in one go when the
+  // admin decides they play (a warning, not a block). Under the minimum the
+  // sheet can't go out otherwise.
+  const addSkipped = () => {
+    const free = L12_MAX_PLAYERS - lineup.players.length;
+    if (free <= 0) return;
+    const active = (p: Player) => !(p.status && p.status.toLowerCase() !== 'active');
+    const pool = roster
+      .filter((p) => !chosen.has(p.id) && active(p) && medicalStatus(p.medicalCheckExpiry) === 'missing')
+      .sort((a, b) => (a.number ?? 999) - (b.number ?? 999) || a.lastName.localeCompare(b.lastName))
+      .slice(0, free);
+    const taken = takenNumbers();
+    const rows = pool.map((p) => {
+      const row = buildRow(p, taken);
+      if (row.shirtNumber) taken.add(row.shirtNumber);
+      return row;
+    });
+    setSkippedNoVisa([]);
+    onChange({ ...lineup, players: sortLineupPlayers([...lineup.players, ...rows]) });
+  };
+
   const clearSheet = () => onChange({ ...lineup, players: [], captainPlayerId: null });
 
   const patchPlayer = (playerId: number, patch: Partial<L12Player>) => {
@@ -572,9 +593,12 @@ export default function L12Editor({
       ) : null}
     >
       {skippedNoVisa.length && !full ? (
-        <Text className="t-meta mb-2.5" style={{ color: 'var(--c-muted)' }} role="status">
-          Fără viză, {skippedNoVisa.length === 1 ? 'rămâne' : 'rămân'} în lot: {skippedNoVisa.slice(0, 4).join(', ')}{skippedNoVisa.length > 4 ? ` și încă ${skippedNoVisa.length - 4}` : ''}. Se pot adăuga manual.
-        </Text>
+        <View className="mb-2.5 gap-2 items-start" role="status">
+          <Text className="t-meta" style={{ color: count < L12_MIN_PLAYERS ? 'var(--c-warning-fg)' : 'var(--c-muted)' }}>
+            {count < L12_MIN_PLAYERS ? `Doar ${count} din minimum ${L12_MIN_PLAYERS}. ` : ''}Fără viză, {skippedNoVisa.length === 1 ? 'rămâne' : 'rămân'} în lot: {skippedNoVisa.slice(0, 4).join(', ')}{skippedNoVisa.length > 4 ? ` și încă ${skippedNoVisa.length - 4}` : ''}. Vizele se completează în Conformitate.
+          </Text>
+          <Button size="sm" icon="person-add" label={`Adaugă și pe cei fără viză (${Math.min(skippedNoVisa.length, L12_MAX_PLAYERS - count)})`} onPress={addSkipped} />
+        </View>
       ) : null}
       {roster.length > 6 ? (
         <View className="mb-2.5">

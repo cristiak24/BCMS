@@ -189,12 +189,15 @@ export default function GameSetup({
                 <Pressable onPress={() => toggleRoster(p.playerId)} disabled={p.visaExpired} accessibilityRole={'checkbox' as any} accessibilityState={{ checked: playing, disabled: !!p.visaExpired } as any} accessibilityLabel={p.visaExpired ? `${p.firstName} ${p.lastName}: nu poate juca, viză expirată` : `${p.firstName} ${p.lastName} joacă`} className="flex-1 min-w-0 min-h-11 flex-row items-center gap-2.5 text-left">
                   <MaterialIcons name={playing ? 'check-box' : 'check-box-outline-blank'} size={18} color={playing ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
                   <Text className="t-num w-8 text-[13px] font-bold" style={{ color: 'var(--c-muted)' }}>{p.number ? `#${p.number}` : '—'}</Text>
-                  <Text className="flex-1 text-[14px] font-semibold" style={{ color: playing ? 'var(--c-ink)' : 'var(--c-muted)' }} numberOfLines={1}>{p.firstName} {p.lastName}</Text>
-                  {p.visaExpired ? (
-                    <Text className="text-[12px] font-semibold shrink-0" style={{ color: 'var(--c-danger-fg)' }}>Nu poate juca: viză expirată</Text>
-                  ) : p.visaMissing ? (
-                    <Text className="text-[12px] font-semibold shrink-0" style={{ color: 'var(--c-warning-fg)' }}>Fără viză</Text>
-                  ) : null}
+                  {/* The visa note under the name: beside it, on a phone the name was cut to „Andrei …”. */}
+                  <View className="flex-1 min-w-0 py-1">
+                    <Text className="text-[14px] font-semibold" style={{ color: playing ? 'var(--c-ink)' : 'var(--c-muted)' }} numberOfLines={1}>{p.firstName} {p.lastName}</Text>
+                    {p.visaExpired ? (
+                      <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>Nu poate juca: viză expirată</Text>
+                    ) : p.visaMissing ? (
+                      <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-warning-fg)' }}>Fără viză</Text>
+                    ) : null}
+                  </View>
                 </Pressable>
                 {playing && !p.visaExpired ? (
                   <Pressable onPress={() => toggleStarter(p.playerId)} accessibilityRole="button" accessibilityState={{ selected: starter }}

@@ -70,7 +70,7 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false, cla
         <View className="min-w-0 justify-end">
             <Text className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--c-muted)' }}>{label}</Text>
             <View
-                className="flex-row items-center h-10 rounded-[10px] border pr-3"
+                className="flex-row items-center h-10 [@media(pointer:coarse)]:h-[42px] rounded-[10px] border pr-3"
                 style={{ borderColor: invalid ? 'var(--c-danger-border)' : 'var(--c-border)', backgroundColor: readOnly ? 'var(--c-surface-2)' : 'var(--c-surface)' } as any}
             >
                 <TextInput

@@ -19,6 +19,7 @@ export type RosterRowLike = {
     teamNames?: string[];
     isUnassigned?: boolean;
     position?: string | null;
+    medicalCheckExpiry?: Date | string | null;
 };
 
 export const UNASSIGNED_TEAM_FILTER = '__unassigned__';
@@ -30,7 +31,7 @@ export type RosterQuery = {
     status: 'active' | 'inactive' | 'all';
     attendance: 'all' | 'high' | 'medium' | 'low';
     payment: 'all' | 'paid' | 'pending' | 'overdue';
-    sort: 'name' | 'attendance' | 'payment' | null;
+    sort: 'name' | 'attendance' | 'payment' | 'medical' | null;
     dir: 'asc' | 'desc';
     page: number;
     /** null = every matching row (CSV export). */
@@ -46,6 +47,12 @@ export function categoryLabel(row: RosterRowLike) {
 export function attendanceRateOf(row: RosterRowLike) {
     if (typeof row.attendanceRate !== 'number') return 0;
     return Math.max(0, Math.min(Math.round(row.attendanceRate), 100));
+}
+
+/** Ascending = most urgent first: no visa on file, then the earliest expiry. */
+export function medicalRank(row: RosterRowLike) {
+    const at = row.medicalCheckExpiry ? new Date(row.medicalCheckExpiry).getTime() : NaN;
+    return Number.isFinite(at) ? at : -8.64e15; // the earliest representable date: no NaN from -∞ − -∞
 }
 
 export function paymentBucket(status?: string | null): 'paid' | 'pending' | 'overdue' {
@@ -103,7 +110,7 @@ export function parseRosterQuery(query: Record<string, unknown>): RosterQuery | 
         status: oneOf(query.status, ['active', 'inactive', 'all'] as const, 'all'),
         attendance: oneOf(query.attendance, ['all', 'high', 'medium', 'low'] as const, 'all'),
         payment: oneOf(query.payment, ['all', 'paid', 'pending', 'overdue'] as const, 'all'),
-        sort: query.sort === 'name' || query.sort === 'attendance' || query.sort === 'payment' ? query.sort : null,
+        sort: query.sort === 'name' || query.sort === 'attendance' || query.sort === 'payment' || query.sort === 'medical' ? query.sort : null,
         dir: query.dir === 'desc' ? 'desc' : 'asc',
         page,
         pageSize: query.pageSize === 'all' ? null : ROSTER_PAGE_SIZES.includes(size) ? size : ROSTER_PAGE_SIZES[0],
@@ -134,6 +141,7 @@ export function applyRosterQuery<T extends RosterRowLike>(rows: T[], query: Rost
             let result = 0;
             if (query.sort === 'name') result = `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, 'ro');
             else if (query.sort === 'attendance') result = attendanceRateOf(a) - attendanceRateOf(b);
+            else if (query.sort === 'medical') result = medicalRank(a) - medicalRank(b);
             else result = paymentRank(a.paymentStatus) - paymentRank(b.paymentStatus);
             return query.dir === 'asc' ? result : -result;
         })

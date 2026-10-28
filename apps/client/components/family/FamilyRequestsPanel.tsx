@@ -406,7 +406,7 @@ export default function FamilyRequestsPanel({ onNotify, onCountChange, showTeamC
       {showTeamCodes ? <TeamCodes codes={codes} onRotate={(team) => setConfirm({ kind: 'rotate', team })} onToggle={toggleCode} onNotify={onNotify} /> : null}
 
       {error ? (
-        <ErrorState title="Nu am putut încărca cererile" message={error} actionLabel="Reîncearcă" onAction={load} />
+        <ErrorState title={hideEmpty ? 'Nu am putut încărca înscrierile cu codul echipei' : 'Nu am putut încărca cererile'} message={error} actionLabel="Reîncearcă" onAction={load} />
       ) : !requests ? (
         <View className="gap-2.5" accessibilityRole="progressbar" accessibilityLabel="Se încarcă cererile">
           <Skeleton className="h-[180px] w-full rounded-[14px]" />

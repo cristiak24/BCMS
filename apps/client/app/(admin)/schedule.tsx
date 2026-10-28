@@ -474,7 +474,10 @@ export default function ScheduleScreen() {
             <View className={`${isWideDesktop ? 'shrink-0' : 'w-full'} gap-3`} style={isWideDesktop ? { width: 380 } : undefined}>
               <View className="flex-row items-center justify-between px-0.5">
                 <Text accessibilityRole="header" className="text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>
-                  Evenimente viitoare{upcomingCount ? <Text style={{ color: 'var(--c-faint)' }}>{` · ${upcomingCount}`}</Text> : null}
+                  Evenimente viitoare{upcomingCount ? (
+                    // „· 4” over three rows read as a missing event: say how many are shown.
+                    <Text style={{ color: 'var(--c-faint)' }}>{upcomingCount > featuredUpcoming.length ? ` · ${featuredUpcoming.length} din ${upcomingCount}` : ` · ${upcomingCount}`}</Text>
+                  ) : null}
                 </Text>
                 <TouchableOpacity onPress={() => changeView('agenda')} className="tap-40 h-8 justify-center px-1">
                   <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Vezi tot</Text>

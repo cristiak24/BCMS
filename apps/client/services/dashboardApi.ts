@@ -41,6 +41,8 @@ export interface DashboardSummary {
     presentCount: number;
     totalAttendanceRecords: number;
     expiredVisasCount: number;
+    /** Players with no clearance on file (absent on an older server). */
+    missingVisasCount?: number;
     expiringItems: ExpiringItem[];
 }
 

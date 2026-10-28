@@ -137,18 +137,15 @@
     animation: dashFadeIn 0.55s var(--ease-out) both;
   }
 
+  /* 200ms with a 30ms step, capped after the 5th child: at 550ms + 420ms of
+     delay a tile could still be blank when the page was read or captured. */
   .ui-stagger > * {
-    animation: dashFadeIn 0.55s var(--ease-out) both;
+    animation: dashFadeIn 0.2s var(--ease-out) both;
   }
-  .ui-stagger > *:nth-child(1) { animation-delay: 0.03s; }
-  .ui-stagger > *:nth-child(2) { animation-delay: 0.08s; }
-  .ui-stagger > *:nth-child(3) { animation-delay: 0.13s; }
-  .ui-stagger > *:nth-child(4) { animation-delay: 0.18s; }
-  .ui-stagger > *:nth-child(5) { animation-delay: 0.23s; }
-  .ui-stagger > *:nth-child(6) { animation-delay: 0.28s; }
-  .ui-stagger > *:nth-child(7) { animation-delay: 0.33s; }
-  .ui-stagger > *:nth-child(8) { animation-delay: 0.38s; }
-  .ui-stagger > *:nth-child(n + 9) { animation-delay: 0.42s; }
+  .ui-stagger > *:nth-child(2) { animation-delay: 0.03s; }
+  .ui-stagger > *:nth-child(3) { animation-delay: 0.06s; }
+  .ui-stagger > *:nth-child(4) { animation-delay: 0.09s; }
+  .ui-stagger > *:nth-child(n + 5) { animation-delay: 0.12s; }
 
   /* Hover lift for interactive cards. Gated on a real hover pointer so a tap
      on a phone doesn't leave a card stuck in its raised state. */
@@ -573,4 +570,16 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .auth-float { animation: none !important; }
+}
+
+/* A toast and the unsaved bar share the bottom edge: an L12 save error sat on
+   top of the bar's „Salvează”, the one button that retries it. With a bar on
+   screen, toasts move up by its height. */
+body:has(.unsaved-bar) .toast-host {
+  bottom: calc(96px + 72px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 1024px) {
+  body:has(.unsaved-bar) .toast-host {
+    bottom: calc(24px + 72px);
+  }
 }

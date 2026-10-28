@@ -17,6 +17,7 @@ import { useSession } from '../../../context/AuthContext';
 import { buildServerUrl, resolveDocumentUrl } from '../../../config/serverUrl';
 import { apiFetch } from '../../../services/apiClient';
 import PageHero, { GlassStat } from '../../../components/admin/PageHero';
+import PageContainer from '../../../components/ui/PageContainer';
 import { EmptyState, SkeletonBlock } from '../../../components/dashboard/ScreenStates';
 import { LoadError } from '../../../components/ui/ScreenState';
 import { loadFailureMessage } from '../../../utils/errorMessages';
@@ -222,6 +223,9 @@ export default function FinancialSettingsPage() {
     const [balancesReload, setBalancesReload] = useState(0);
     const [pendingReverse, setPendingReverse] = useState<AdminRecentPayment | null>(null);
     const [reverseReason, setReverseReason] = useState('');
+    // Esc or „Renunță” keeps the typed reason for the same payment: reopening it
+    // used to start from an empty field.
+    const reverseReasonFor = useRef<AdminRecentPayment['id'] | null>(null);
     const [reversing, setReversing] = useState(false);
     const [loadingStripeConfig, setLoadingStripeConfig] = useState(false);
     const [showStripeDetails, setShowStripeDetails] = useState(false);
@@ -342,7 +346,7 @@ export default function FinancialSettingsPage() {
         setReversing(true);
         const ok = await reversePayment(pendingReverse.id, reverseReason.trim(), `Plata de ${formatCurrency(pendingReverse.amount, pendingReverse.currency)} de la ${pendingReverse.playerName} a fost stornată.`);
         setReversing(false);
-        if (ok) setPendingReverse(null);
+        if (ok) { setPendingReverse(null); setReverseReason(''); reverseReasonFor.current = null; }
     };
 
     const loadFinanceMeta = useCallback(async () => {
@@ -582,11 +586,13 @@ export default function FinancialSettingsPage() {
 
     return (
         <ScrollView
-            className="flex-1 px-4 md:px-10 pt-5 md:pt-8"
+            className="flex-1"
             style={{ backgroundColor: dash.bg }}
             contentContainerStyle={{ paddingBottom: isMobile ? 156 : 72 }}
             showsVerticalScrollIndicator={false}
         >
+            {/* The shared page measure: Finanțe had its own padding, so its title sat 8px off every other page's. */}
+            <PageContainer>
 
             {/* ──────────── HEADER + TABS ──────────── */}
             <PageHero
@@ -628,7 +634,8 @@ export default function FinancialSettingsPage() {
                             suffix={loadingSettings || !settings ? undefined : 'RON'}
                         />
                         <GlassStat
-                            dot="var(--c-success)"
+                            // Green only once something came in: „0 RON” with a success dot read as good news.
+                            dot={summary && summary.collected > 0 ? 'var(--c-success)' : 'var(--c-faint)'}
                             label="Încasat luna aceasta"
                             hint={summary ? new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric' }).format(new Date(`${summary.month}-01T12:00:00`)) : undefined}
                             value={loadingSummary || !summary ? '—' : Math.round(summary.collected).toLocaleString('ro-RO')}
@@ -647,12 +654,12 @@ export default function FinancialSettingsPage() {
                             onPress={openPendingDocuments}
                             disabled={loadingDocuments || !!documentsError || financeStats.pendingCount === 0}
                             accessibilityRole="button"
-                            accessibilityLabel={`De verificat: ${financeStats.pendingCount}. Arată documentele în așteptare`}
+                            accessibilityLabel={`Documente de verificat: ${financeStats.pendingCount}. Arată documentele în așteptare`}
                             className="ui-press text-left rounded-[14px]"
                         >
                             <GlassStat
                                 dot="var(--c-warning)"
-                                label="De verificat"
+                                label="Documente de verificat"
                                 hint={loadingDocuments || documentsError ? undefined : formatCurrency(financeStats.pendingAmount)}
                                 value={loadingDocuments || documentsError ? '—' : financeStats.pendingCount}
                             />
@@ -784,7 +791,7 @@ export default function FinancialSettingsPage() {
                                         count: f.key === 'all' ? uploads.length : uploads.filter((u) => u.accountingStatus === f.key).length,
                                     }))}
                                 />
-                                <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 [@media(pointer:coarse)]:h-10 border md:ml-auto md:w-[220px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
+                                <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 [@media(pointer:coarse)]:h-[42px] border md:ml-auto md:w-[220px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
                                     <MaterialIcons name="search" size={15} color="var(--c-faint)" />
                                     <TextInput
                                         value={documentSearch}
@@ -927,11 +934,16 @@ export default function FinancialSettingsPage() {
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
-                                                        icon="undo"
+                                                        // Its own icon: on a phone „Redeschide” (a document) used the same undo arrow.
+                                                        icon="remove-circle-outline"
                                                         label="Stornează"
                                                         iconOnlyOnMobile
                                                         accessibilityLabel={`Stornează plata de ${formatCurrency(payment.amount, payment.currency)} de la ${payment.playerName}`}
-                                                        onPress={() => { setReverseReason(''); setPendingReverse(payment); }}
+                                                        onPress={() => {
+                                                            if (reverseReasonFor.current !== payment.id) setReverseReason('');
+                                                            reverseReasonFor.current = payment.id;
+                                                            setPendingReverse(payment);
+                                                        }}
                                                     />
                                                 ) : null}
                                             </View>
@@ -1072,7 +1084,9 @@ export default function FinancialSettingsPage() {
             <ConfirmDialog
                 visible={pendingReverse != null}
                 destructive
-                icon="undo"
+                icon="remove-circle-outline"
+                // Phones: a bottom sheet like the payment it reverses.
+                sheetOnPhone
                 title={pendingReverse ? `Stornezi plata de ${formatCurrency(pendingReverse.amount, pendingReverse.currency)} de la ${pendingReverse.playerName}?` : ''}
                 message="Plata rămâne în istoric, marcată „Stornată”, iar taxele pe care le acoperea redevin de plată. Stornarea ajunge în jurnal."
                 confirmLabel="Stornează"
@@ -1095,7 +1109,7 @@ export default function FinancialSettingsPage() {
                         ) : null}
                     </View>
                 ) : null}
-                <Text className="text-[12px] font-semibold mb-1.5" style={{ color: 'var(--c-muted)' }}>Motivul stornării</Text>
+                <Text className="text-[12px] font-semibold mb-1.5" style={{ color: 'var(--c-muted)' }}>Motivul stornării (obligatoriu)</Text>
                 <TextInput
                     value={reverseReason}
                     onChangeText={setReverseReason}
@@ -1111,6 +1125,7 @@ export default function FinancialSettingsPage() {
             </ConfirmDialog>
 
             <ToastHost toasts={toasts} onDismiss={dismissToast} />
+            </PageContainer>
         </ScrollView>
     );
 }

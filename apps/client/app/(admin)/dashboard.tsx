@@ -209,7 +209,7 @@ function KpiCard({
         ) : null}
         {/* On a phone's half-width card the hint was cut ("Profit −1.134 RON lun…"):
             it now wraps under the delta chip when the row is too narrow. */}
-        {hint ? <Text className="t-meta flex-1" style={{ color: 'var(--c-muted)', minWidth: 112 } as any} numberOfLines={2}>{hint}</Text> : null}
+        {hint ? <Text className="t-meta flex-1" style={{ color: 'var(--c-muted)', minWidth: 112 } as any} numberOfLines={3}>{hint}</Text> : null}
       </View>
     </Shell>
   );
@@ -536,6 +536,14 @@ export default function Dashboard() {
     const items: AttentionItem[] = [];
     if (summary?.expiredVisasCount) {
       items.push({ key: 'visas', icon: 'medical-services', tone: 'danger', title: `${plural(summary.expiredVisasCount, 'viză medicală expirată', 'vize medicale expirate')}`, detail: 'Cu viza expirată nu se poate juca', href: '/admin/compliance' });
+    }
+    if (summary?.missingVisasCount) {
+      // The L12 autofill skips them: a match this week makes it urgent.
+      const matchSoon = Boolean(l12?.matches.some((m) => {
+        const at = parseApiDate(m.startTime).getTime();
+        return m.status !== 'cancelled' && at >= Date.now() - DAY && at <= Date.now() + 7 * DAY;
+      }));
+      items.push({ key: 'missing-visas', icon: 'medical-services', tone: matchSoon ? 'danger' : 'warning', title: plural(summary.missingVisasCount, 'jucător fără viză medicală', 'jucători fără viză medicală'), detail: matchSoon ? 'Meci în 7 zile · nu intră automat pe L12' : 'Nu intră automat pe L12', href: '/admin/compliance' });
     }
     // Visas only: expiringItems also carries the monthly fee („COTIZAȚIE LUNARĂ”), which
     // showed up here as "1 viză expiră în 7 zile" with no clearance due that week.
