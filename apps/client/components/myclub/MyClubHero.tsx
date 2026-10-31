@@ -3,7 +3,6 @@ import { View } from '@/src/web/reactNative';
 import type { Team } from '../../services/teamsApi';
 import Button from '../ui/Button';
 import PageHero, { GlassStat } from '../admin/PageHero';
-import { isFrbTeam } from './teamDisplay';
 import { plural } from '../../utils/plural';
 
 export default function MyClubHero({
@@ -20,17 +19,10 @@ export default function MyClubHero({
     onImport: () => void;
     onCreate: () => void;
 }) {
-    const stats = useMemo(() => {
-        const frb = teams.filter(isFrbTeam).length;
-        return {
-            total: teams.length,
-            frb,
-            manual: teams.length - frb,
-            players: teams.reduce((sum, t) => sum + t.playerCount, 0),
-            masculine: teams.filter((t) => t.gender === 'M').length,
-            feminine: teams.filter((t) => t.gender === 'F').length,
-        };
-    }, [teams]);
+    const stats = useMemo(() => ({
+        total: teams.length,
+        players: teams.reduce((sum, t) => sum + t.playerCount, 0),
+    }), [teams]);
 
     const subtitle = loadFailed ? undefined : stats.total === 0
         ? 'Importă echipele din FRB sau creează prima echipă.'
@@ -49,14 +41,11 @@ export default function MyClubHero({
             }
         >
             {stats.total > 0 ? (
-                <View className="grid grid-cols-3 lg:grid-cols-6 gap-2 ui-stagger">
+                // Two figures, not six: FRB/manual and the gender split are already the
+                // filter counts below (six tiles sat over two teams).
+                <View className="grid grid-cols-2 gap-2 ui-stagger sm:max-w-[420px]">
                     <GlassStat value={stats.total} label="Echipe" dot="var(--c-brand-fg)" />
                     <GlassStat value={stats.players} label="Jucători" dot="var(--c-muted)" />
-                    {/* A source, not a problem: the red dot read as an alert. */}
-                    <GlassStat value={stats.frb} label="Din FRB" dot="var(--c-faint)" />
-                    <GlassStat value={stats.manual} label="Manuale" dot="var(--c-success)" />
-                    <GlassStat value={stats.masculine} label="Masculine" dot="var(--c-gender-m)" />
-                    <GlassStat value={stats.feminine} label="Feminine" dot="var(--c-gender-f)" />
                 </View>
             ) : null}
         </PageHero>

@@ -1,3 +1,4 @@
+import ModalBackdrop from '../../ui/ModalBackdrop';
 import { parseApiDate } from '@/utils/dates';
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, ActivityIndicator, TextInput } from '@/src/web/reactNative';
@@ -147,41 +148,53 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View className={`flex-1 bg-[#0E2041]/60 ${isMobile ? 'justify-end' : 'justify-center items-center p-4'}`}>
-        <View className={`bg-white shadow-2xl overflow-hidden w-full ${isMobile ? 'rounded-t-[24px] max-h-[92%]' : 'rounded-[20px] max-w-xl'}`}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      {/* The system's dialog shell: dark veil (closes on a click outside), a named
+          dialog, fine border and --e-lg — it was an indigo-tinted veil and an unnamed box. */}
+      <ModalBackdrop
+        onDismiss={onClose}
+        className={isMobile ? 'justify-end' : 'justify-center items-center p-4'}
+        style={{ backgroundColor: 'rgba(2, 8, 23, 0.62)' }}
+      >
+        <View
+          role="dialog"
+          aria-modal="true"
+          accessibilityLabel={`Raport plăți${teamName ? ` · ${teamName}` : ''}`}
+          className={`bg-[var(--c-surface)] border border-[var(--c-border)] overflow-hidden w-full ${isMobile ? 'rounded-t-[20px] max-h-[92%]' : 'rounded-[18px] max-w-xl'}`}
+          style={{ boxShadow: 'var(--e-lg)' }}
+        >
 
-          <View className="p-6 border-b border-gray-100 flex-row justify-between items-center bg-gray-50/50">
+          <View className="p-6 border-b border-[var(--c-border)] flex-row justify-between items-center bg-[var(--c-surface-2)]">
             <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 rounded-2xl bg-[#EAF2FF] items-center justify-center">
+              <View className="w-10 h-10 rounded-2xl bg-[var(--c-surface-tint)] items-center justify-center">
                 <Receipt size={20} color="var(--c-brand-fg)" />
               </View>
               <View>
-                <Text className="text-xl font-black text-[#0D2040] mb-0.5">Raport plăți</Text>
-                <Text className="text-xs font-bold text-gray-500">{teamName ? teamName : 'Echipa selectată'}</Text>
+                <Text className="text-xl font-bold text-[color:var(--c-ink-strong)] mb-0.5">Raport plăți</Text>
+                <Text className="text-xs font-bold text-[color:var(--c-muted)]">{teamName ? teamName : 'Echipa selectată'}</Text>
               </View>
             </View>
-            <Pressable onPress={onClose} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center hover:bg-gray-50">
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Închide" className="w-10 h-10 bg-[var(--c-surface)] border border-[var(--c-border)] rounded-full items-center justify-center hover:bg-[var(--c-surface-2)]">
               <X size={20} color="var(--c-muted)" />
             </Pressable>
           </View>
 
           {/* Summary */}
           <View className="flex-row gap-3 px-6 pt-5">
-            <View className="flex-1 rounded-2xl bg-[#E6F8F1] p-4">
+            <View className="flex-1 rounded-2xl bg-[var(--c-success-bg)] p-4">
               <View className="flex-row items-center gap-1.5 mb-1">
                 <TrendingUp size={14} color="var(--c-success-fg)" />
-                <Text className="text-[10px] font-black uppercase tracking-widest text-[#0B7A55]">Încasat</Text>
+                <Text className="text-[12px] font-bold text-[color:var(--c-success-fg)]">Încasat</Text>
               </View>
-              <Text className="text-[18px] font-black text-[#0B7A55]">{loading ? '—' : formatCurrency(collected, currency)}</Text>
+              <Text className="text-[18px] font-bold text-[color:var(--c-success-fg)]">{loading ? '—' : formatCurrency(collected, currency)}</Text>
               <Text className="text-[10px] font-bold text-[color:var(--c-success-fg)] mt-0.5">{plural(paid.length, 'plată', 'plăți')}</Text>
             </View>
-            <View className="flex-1 rounded-2xl bg-[#FEF3C7] p-4">
+            <View className="flex-1 rounded-2xl bg-[var(--c-warning-bg)] p-4">
               <View className="flex-row items-center gap-1.5 mb-1">
                 <Clock size={14} color="var(--c-warning-fg)" />
-                <Text className="text-[10px] font-black uppercase tracking-widest text-[#B45309]">În așteptare</Text>
+                <Text className="text-[12px] font-bold text-[color:var(--c-warning-fg)]">În așteptare</Text>
               </View>
-              <Text className="text-[18px] font-black text-[#B45309]">{loading ? '—' : pending.length}</Text>
+              <Text className="text-[18px] font-bold text-[color:var(--c-warning-fg)]">{loading ? '—' : pending.length}</Text>
               <Text className="text-[10px] font-bold text-[color:var(--c-warning-fg)] mt-0.5">tranzacții</Text>
             </View>
           </View>
@@ -191,24 +204,24 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
             {!showForm ? (
               <Pressable
                 onPress={() => setShowForm(true)}
-                className="flex-row items-center justify-center gap-2 h-11 rounded-2xl bg-[#0B7A55] active:opacity-90"
+                className="flex-row items-center justify-center gap-2 h-11 rounded-2xl bg-[var(--c-brand-surface)] active:opacity-90"
               >
-                <Banknote size={16} color="#fff" />
-                <Text className="text-white text-[12px] font-black uppercase tracking-wide">Adaugă plată cash</Text>
+                <Banknote size={16} color="var(--c-on-brand)" />
+                <Text className="text-[color:var(--c-on-brand)] text-[13.5px] font-bold">Adaugă plată numerar</Text>
               </Pressable>
             ) : (
-              <View className="rounded-2xl border border-[#E3E9F2] bg-[#F7F9FC] p-4">
+              <View className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface-2)] p-4">
                 <View className="flex-row items-center justify-between mb-3">
-                  <Text className="text-[12px] font-black text-[#0D2040] uppercase tracking-wide">Plată numerar</Text>
-                  <Pressable onPress={() => setShowForm(false)} className="w-7 h-7 rounded-full bg-white border border-gray-200 items-center justify-center">
+                  <Text className="text-[13.5px] font-bold text-[color:var(--c-ink-strong)]">Plată numerar</Text>
+                  <Pressable onPress={() => setShowForm(false)} className="w-7 h-7 rounded-full bg-[var(--c-surface)] border border-[var(--c-border)] items-center justify-center">
                     <X size={14} color="var(--c-muted)" />
                   </Pressable>
                 </View>
 
                 {/* Player selector */}
-                <Text className="text-[10px] font-black tracking-widest text-[#1D3E90] uppercase mb-2">Jucător</Text>
+                <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-2">Jucător</Text>
                 {players.length === 0 ? (
-                  <Text className="text-gray-400 text-xs font-bold mb-3">Această echipă nu are jucători.</Text>
+                  <Text className="text-[color:var(--c-faint)] text-xs font-bold mb-3">Această echipă nu are jucători.</Text>
                 ) : (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
                     <View className="flex-row gap-2">
@@ -218,10 +231,10 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
                           <Pressable
                             key={p.id}
                             onPress={() => setFormPlayerId(p.id)}
-                            className={`px-3 py-2 rounded-xl border flex-row items-center gap-1.5 ${isSel ? 'bg-[#1D3E90] border-[#1D3E90]' : 'bg-white border-gray-200'}`}
+                            className={`px-3 py-2 rounded-xl border flex-row items-center gap-1.5 ${isSel ? 'bg-[var(--c-brand-surface)] border-[var(--c-brand-border)]' : 'bg-[var(--c-surface)] border-[var(--c-border)]'}`}
                           >
-                            {isSel && <Check size={12} color="#fff" />}
-                            <Text className={`text-[12px] font-bold ${isSel ? 'text-white' : 'text-[#0D2040]'}`}>{p.firstName} {p.lastName}</Text>
+                            {isSel && <Check size={12} color="var(--c-on-brand)" />}
+                            <Text className={`text-[12px] font-bold ${isSel ? 'text-[color:var(--c-on-brand)]' : 'text-[color:var(--c-ink-strong)]'}`}>{p.firstName} {p.lastName}</Text>
                           </Pressable>
                         );
                       })}
@@ -231,18 +244,18 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
 
                 <View className="flex-row gap-3">
                   <View className="w-32">
-                    <Text className="text-[10px] font-black tracking-widest text-[#1D3E90] uppercase mb-2">Sumă ({currency.toUpperCase()})</Text>
+                    <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-2">Sumă ({currency.toUpperCase()})</Text>
                     <TextInput
                       value={formAmount}
                       onChangeText={setFormAmount}
                       placeholder="0"
                       placeholderTextColor="var(--c-faint)"
                       keyboardType="numeric"
-                      className="border border-gray-200 bg-white rounded-xl px-3 h-12 font-bold text-[#0E2041] outline-none"
+                      className="border border-[var(--c-border)] bg-[var(--c-surface)] rounded-xl px-3 h-12 font-bold text-[color:var(--c-ink-strong)] outline-none"
                     />
                   </View>
                   <View className="w-36">
-                    <Text className="text-[10px] font-black tracking-widest text-[#1D3E90] uppercase mb-2">Data plății</Text>
+                    <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-2">Data plății</Text>
                     <TextInput
                       value={formDate}
                       onChangeText={(t: string) => setFormDate(maskDMY(t))}
@@ -250,33 +263,33 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
                       placeholderTextColor="var(--c-faint)"
                       keyboardType="number-pad"
                       maxLength={10}
-                      className="border border-gray-200 bg-white rounded-xl px-3 h-12 font-bold text-[#0E2041] outline-none"
+                      className="border border-[var(--c-border)] bg-[var(--c-surface)] rounded-xl px-3 h-12 font-bold text-[color:var(--c-ink-strong)] outline-none"
                     />
                   </View>
                 </View>
 
                 <View className="mt-3">
-                  <Text className="text-[10px] font-black tracking-widest text-[#1D3E90] uppercase mb-2">Descriere (opțional)</Text>
+                  <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-2">Descriere (opțional)</Text>
                   <TextInput
                     value={formDescription}
                     onChangeText={setFormDescription}
                     placeholder="ex. Cotizație numerar"
                     placeholderTextColor="var(--c-faint)"
-                    className="border border-gray-200 bg-white rounded-xl px-3 h-12 font-bold text-[#0E2041] outline-none"
+                    className="border border-[var(--c-border)] bg-[var(--c-surface)] rounded-xl px-3 h-12 font-bold text-[color:var(--c-ink-strong)] outline-none"
                   />
                 </View>
 
-                {formError && <Text className="text-[11px] font-bold text-red-600 mt-2">{formError}</Text>}
+                {formError && <Text className="text-[11px] font-bold text-[color:var(--c-danger-fg)] mt-2">{formError}</Text>}
 
                 <Pressable
                   onPress={handleSubmit}
                   disabled={!canSubmit}
-                  className={`flex-row items-center justify-center gap-2 h-11 rounded-2xl mt-3 ${canSubmit ? 'bg-[#1D3E90] active:bg-[var(--c-brand-strong)]' : 'bg-[var(--c-surface-3)]'}`}
+                  className={`flex-row items-center justify-center gap-2 h-11 rounded-2xl mt-3 ${canSubmit ? 'bg-[var(--c-brand-surface)] active:bg-[var(--c-brand-strong)]' : 'bg-[var(--c-surface-3)]'}`}
                 >
-                  {submitting ? <ActivityIndicator size="small" color="#fff" /> : (
+                  {submitting ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : (
                     <>
-                      <Plus size={16} color="#fff" />
-                      <Text className="text-white text-[12px] font-black uppercase tracking-wide">Înregistrează plata</Text>
+                      <Plus size={16} color="var(--c-on-brand)" />
+                      <Text className="text-[color:var(--c-on-brand)] text-[13.5px] font-bold">Înregistrează plata</Text>
                     </>
                   )}
                 </Pressable>
@@ -289,12 +302,12 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
               <View className="py-12 items-center"><ActivityIndicator size="large" color="var(--c-brand-fg)" /></View>
             ) : error ? (
               <View className="py-12 items-center">
-                <Text className="text-gray-400 font-bold">Nu s-au putut încărca plățile.</Text>
+                <Text className="text-[color:var(--c-faint)] font-bold">Nu s-au putut încărca plățile.</Text>
               </View>
             ) : payments.length === 0 ? (
               <View className="py-12 items-center">
                 <Receipt size={28} color="var(--c-faint)" />
-                <Text className="text-gray-400 font-bold mt-3">Nicio plată pentru această echipă.</Text>
+                <Text className="text-[color:var(--c-faint)] font-bold mt-3">Nicio plată pentru această echipă.</Text>
               </View>
             ) : (
               <View className="gap-2.5">
@@ -302,23 +315,23 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
                   const meta = statusMeta(payment.status);
                   const isCash = (payment.provider ?? '').toLowerCase() === 'cash';
                   return (
-                    <View key={payment.id} className="flex-row items-center justify-between rounded-2xl border border-gray-100 bg-white px-4 py-3">
+                    <View key={payment.id} className="flex-row items-center justify-between rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-3">
                       <View className="flex-1 min-w-0 pr-3">
                         <View className="flex-row items-center gap-1.5">
-                          <Text className="font-black text-[#0D2040]" numberOfLines={1}>{payment.playerName}</Text>
+                          <Text className="font-bold text-[color:var(--c-ink-strong)]" numberOfLines={1}>{payment.playerName}</Text>
                           {isCash && (
-                            <View className="px-1.5 py-0.5 rounded-md bg-[#E6F8F1] flex-row items-center gap-1">
+                            <View className="px-1.5 py-0.5 rounded-md bg-[var(--c-success-bg)] flex-row items-center gap-1">
                               <Banknote size={10} color="var(--c-success-fg)" />
-                              <Text className="text-[9px] font-black uppercase text-[#0B7A55]">Cash</Text>
+                              <Text className="text-[11px] font-bold text-[color:var(--c-success-fg)]">Numerar</Text>
                             </View>
                           )}
                         </View>
-                        <Text className="text-[11px] font-bold text-gray-400" numberOfLines={1}>
+                        <Text className="text-[11px] font-bold text-[color:var(--c-faint)]" numberOfLines={1}>
                           {payment.description} · {parseApiDate(payment.date).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </Text>
                       </View>
                       <View className="items-end">
-                        <Text className="font-black text-[15px] text-[#0D2040]">{formatCurrency(payment.amount, payment.currency)}</Text>
+                        <Text className="font-bold text-[15px] text-[color:var(--c-ink-strong)]">{formatCurrency(payment.amount, payment.currency)}</Text>
                         <View className="px-2 py-0.5 rounded-full mt-1" style={{ backgroundColor: meta.bg }}>
                           <Text className="text-[11px] font-semibold" style={{ color: meta.color }}>{meta.label}</Text>
                         </View>
@@ -331,7 +344,7 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
           </ScrollView>
 
         </View>
-      </View>
+      </ModalBackdrop>
     </Modal>
   );
 }

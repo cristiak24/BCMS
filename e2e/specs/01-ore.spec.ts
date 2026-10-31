@@ -20,6 +20,12 @@ function targetDay() {
   return day.toISOString().slice(0, 10);
 }
 
+/** On the last day of a month „tomorrow” is next month, while Program opens on this one. */
+async function showTargetMonth(page: import('@playwright/test').Page) {
+  const thisMonth = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' }).slice(0, 7);
+  if (targetDay().slice(0, 7) !== thisMonth) await page.getByRole('button', { name: 'Luna următoare' }).click();
+}
+
 test.describe.configure({ mode: 'serial' });
 
 let eventId: number;
@@ -36,6 +42,7 @@ test('admin creates a training at 19:00 from the form', async ({ page }) => {
   await page.getByLabel('Ora de început').fill('19:00');
   await page.getByLabel('Ora de sfârșit').fill('20:30');
   await page.getByRole('button', { name: 'Salvează evenimentul', exact: true }).click();
+  await showTargetMonth(page);
   await expect(page.getByText(TITLE).first()).toBeVisible();
 
   const api = await apiAs('admin');
@@ -61,6 +68,7 @@ test('the calendar shows 19:00 – 20:30', async ({ page }) => {
   await signIn(page, 'admin');
   await page.goto('/admin/schedule');
   await page.getByRole('tab', { name: 'Agendă' }).click();
+  await showTargetMonth(page);
   const entry = page.getByRole('button').filter({ hasText: TITLE });
   await expect(entry.first()).toContainText('19:00 - 20:30');
 });

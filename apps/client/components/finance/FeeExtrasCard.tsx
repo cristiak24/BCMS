@@ -7,8 +7,17 @@ import { financeApi, type FinancialSettings } from '../../services/financeApi';
 
 /**
  * The fees that were billed but had no screen (training levy, facility fee)
- * and the month from which unpaid fees count as arrears.
+ * and the month from which unpaid fees count as arrears. The same edit model
+ * as the tiles beside it: values first, „Modifică”, then fields with
+ * „Renunță” / „Salvează” (it used to be an always-open form next to them).
  */
+
+function monthLabel(value: string) {
+    if (!value) return 'Necompletat';
+    const [year, month] = value.split('-').map(Number);
+    const label = new Date(year, month - 1, 1).toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
 function currentMonth() {
     const now = new Date();
@@ -26,8 +35,15 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false, cla
     const [facility, setFacility] = useState('');
     const [startMonth, setStartMonth] = useState('');
     const [saving, setSaving] = useState(false);
+    const [editing, setEditing] = useState(false);
     const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
+    const reset = () => {
+        if (!settings) return;
+        setLevy(String(settings.trainingLevy ?? 0));
+        setFacility(String(settings.facilityFee ?? 0));
+        setStartMonth(settings.billingStartMonth ?? '');
+    };
     useEffect(() => {
         if (!settings) return;
         setLevy(String(settings.trainingLevy ?? 0));
@@ -56,6 +72,7 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false, cla
                 billingStartMonth: startMonth || null,
             });
             onSaved(next);
+            setEditing(false);
             setMessage({ tone: 'ok', text: 'Setările au fost salvate.' });
         } catch (err) {
             setMessage({ tone: 'error', text: err instanceof Error ? err.message : 'Nu am putut salva setările.' });
@@ -68,7 +85,7 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false, cla
     // label that wraps on a narrow column doesn't push its field out of line.
     const field = (label: string, value: string, onChange: (text: string) => void, suffix: string, invalid = false, placeholder?: string) => (
         <View className="min-w-0 justify-end">
-            <Text className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--c-muted)' }}>{label}</Text>
+            <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>{label}</Text>
             <View
                 className="flex-row items-center h-10 [@media(pointer:coarse)]:h-[42px] rounded-[10px] border pr-3"
                 style={{ borderColor: invalid ? 'var(--c-danger-border)' : 'var(--c-border)', backgroundColor: readOnly ? 'var(--c-surface-2)' : 'var(--c-surface)' } as any}
@@ -95,14 +112,37 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false, cla
                 tone="purple"
                 title="Alte taxe și restanțe"
                 subtitle="Se adaugă cotizației pentru fiecare jucător activ."
+                actions={!readOnly && !editing && settings ? (
+                    <Button size="sm" variant="ghost" icon="edit" label="Modifică" accessibilityLabel="Modifică alte taxe și restanțe" onPress={() => { setMessage(null); setEditing(true); }} />
+                ) : undefined}
             />
 
+            {!editing ? (
+                // Rows (label · value): three tiles in the half-width card cut every label.
+                <View className="rounded-[12px] border overflow-hidden mb-3" style={{ borderColor: 'var(--c-border)' }}>
+                    {[
+                        { label: 'Contribuție antrenament', value: `${settings?.trainingLevy ?? 0}`, unit: 'RON / lună' },
+                        { label: 'Taxă bază sportivă', value: `${settings?.facilityFee ?? 0}`, unit: 'RON / lună' },
+                        { label: 'Restanțe începând cu luna', value: monthLabel(settings?.billingStartMonth ?? ''), unit: '' },
+                    ].map((item, index) => (
+                        <View key={item.label} className={`flex-row items-baseline justify-between gap-3 px-3.5 py-2.5 ${index ? 'border-t' : ''}`} style={{ borderColor: 'var(--c-border)' }}>
+                            <Text className="flex-1 min-w-0 text-[13px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{item.label}</Text>
+                            <View className="flex-row items-baseline gap-1.5 shrink-0">
+                                <Text className="t-num text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{item.value}</Text>
+                                {item.unit ? <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>{item.unit}</Text> : null}
+                            </View>
+                        </View>
+                    ))}
+                </View>
+            ) : null}
+
+            {editing ? (
             <View className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 {field('Contribuție antrenament', levy, setLevy, 'RON / lună', !(Number.isFinite(levyValue) && levyValue >= 0))}
                 {field('Taxă bază sportivă', facility, setFacility, 'RON / lună', !(Number.isFinite(facilityValue) && facilityValue >= 0))}
                 {/* A month picker (same YYYY-MM value) instead of typing AAAA-LL; browsers without one show a text field with the hint. */}
                 <View className="min-w-0 justify-end">
-                    <Text className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--c-muted)' }}>Restanțe începând cu luna</Text>
+                    <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Restanțe începând cu luna</Text>
                     <input
                         type="month"
                         value={startMonth}
@@ -117,6 +157,7 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false, cla
                     />
                 </View>
             </View>
+            ) : null}
 
             <View className="flex-row items-start gap-2 rounded-[10px] px-3 py-2.5 mb-3" style={{ backgroundColor: 'var(--c-surface-2)' }}>
                 <MaterialIcons name="info-outline" size={15} color="var(--c-muted)" style={{ marginTop: 1 }} />
@@ -129,14 +170,17 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false, cla
 
             {readOnly ? (
                 <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>Doar administratorul clubului poate modifica taxele.</Text>
-            ) : (
-                <View className="flex-row items-center gap-3 flex-wrap">
+            ) : editing ? (
+                <View className="flex-row items-center gap-2 flex-wrap">
+                    <Button size="sm" label="Renunță" disabled={saving} onPress={() => { reset(); setMessage(null); setEditing(false); }} />
                     <Button variant="primary" size="sm" icon="save" label="Salvează" loading={saving} disabled={!valid || !dirty} onPress={() => void save()} />
-                    {message ? (
-                        <Text className="text-[12px] font-medium" style={{ color: message.tone === 'ok' ? 'var(--c-success-fg)' : 'var(--c-danger-fg)' }}>{message.text}</Text>
+                    {message?.tone === 'error' ? (
+                        <Text className="text-[12px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{message.text}</Text>
                     ) : null}
                 </View>
-            )}
+            ) : message?.tone === 'ok' ? (
+                <Text className="text-[12px] font-medium" style={{ color: 'var(--c-success-fg)' }}>{message.text}</Text>
+            ) : null}
         </FinanceCard>
     );
 }

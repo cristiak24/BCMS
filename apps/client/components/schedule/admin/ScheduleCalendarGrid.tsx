@@ -138,10 +138,9 @@ const CalendarCell = React.memo(({
         className="flex-row items-center justify-between mb-1"
       >
         <View
-          className={`w-6 h-6 rounded-full items-center justify-center ${dayData.isToday ? 'bg-[#1D3E90]' : ''}`}
-          style={dayData.isToday ? { boxShadow: '0 2px 6px rgba(29,62,144,0.35)' } as any : undefined}
+          className={`w-6 h-6 rounded-full items-center justify-center ${dayData.isToday ? 'bg-[var(--c-brand-surface)]' : ''}`}
         >
-          <Text className={`font-black text-[11px] ${dayData.isToday ? 'text-white' : 'text-slate-500'}`}>
+          <Text className={`t-num font-bold text-[11px] ${dayData.isToday ? 'text-[color:var(--c-on-brand)]' : 'text-[color:var(--c-muted)]'}`}>
             {dayData.dayNumber}
           </Text>
         </View>

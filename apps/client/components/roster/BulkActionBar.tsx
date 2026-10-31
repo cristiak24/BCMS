@@ -18,11 +18,12 @@ export default function BulkActionBar({ selectedCount, busy, onExportCsv, onReas
   return (
     <View
       className="dash-fade-in mb-4 flex-row flex-wrap items-center justify-between gap-3 rounded-[20px] border px-4 py-3"
-      style={{ backgroundColor: 'rgba(37,99,235,0.06)', borderColor: 'rgba(37,99,235,0.18)' }}
+      // Brand tokens: a stray blue (rgba 37,99,235) that wasn't the indigo brand.
+      style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-border)' }}
     >
       <View className="flex-row items-center gap-2">
-        <View className="h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: dash.accentBlue }}>
-          <Text className="text-[12px] font-black text-white">{selectedCount}</Text>
+        <View className="h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: 'var(--c-brand-surface)' }}>
+          <Text className="t-num text-[12px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{selectedCount}</Text>
         </View>
         <Text className="text-[13px] font-black" style={{ color: dash.ink }}>
           în selecție

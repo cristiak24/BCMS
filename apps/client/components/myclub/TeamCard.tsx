@@ -84,19 +84,17 @@ export default function TeamCard({
                 </View>
             </View>
 
+            {/* Descriptive chips are neutral: colour is kept for status. FRB in red and
+                Feminin on the danger tint read as errors next to the visa warning. */}
             <View className="flex-row flex-wrap gap-1.5 mt-3">
                 <Chip
                     label={frb ? 'FRB' : 'Manual'}
-                    bg={frb ? 'var(--c-danger-bg)' : 'var(--c-success-bg)'}
-                    fg={frb ? 'var(--c-danger-fg)' : 'var(--c-success-fg)'}
-                    icon={frb ? <RefreshCw size={9} color="var(--c-danger-fg)" /> : undefined}
+                    bg="var(--c-surface-3)"
+                    fg="var(--c-ink-soft)"
+                    icon={frb ? <RefreshCw size={10} color="var(--c-muted)" /> : undefined}
                 />
                 {team.gender && GENDER_LABELS[team.gender] ? (
-                    <Chip
-                        label={GENDER_LABELS[team.gender]}
-                        bg={team.gender === 'M' ? 'var(--c-surface-tint)' : 'var(--c-danger-bg)'}
-                        fg={team.gender === 'M' ? 'var(--c-gender-m)' : 'var(--c-gender-f)'}
-                    />
+                    <Chip label={GENDER_LABELS[team.gender]} bg="var(--c-surface-3)" fg="var(--c-ink-soft)" />
                 ) : null}
                 {team.level && LEVEL_LABELS[team.level] ? (
                     <Chip label={LEVEL_LABELS[team.level]} bg="var(--c-surface-3)" fg="var(--c-muted)" />
@@ -127,7 +125,7 @@ export default function TeamCard({
                         className="w-6 h-6 rounded-full items-center justify-center flex-none"
                         style={{ backgroundColor: coachInitials ? 'var(--c-surface-tint)' : 'var(--c-surface-3)' }}
                     >
-                        <Text className="text-[9.5px] font-bold" style={{ color: coachInitials ? 'var(--c-brand-fg)' : 'var(--c-faint)' }}>
+                        <Text className="text-[10px] font-bold" style={{ color: coachInitials ? 'var(--c-brand-fg)' : 'var(--c-faint)' }}>
                             {coachInitials ?? '—'}
                         </Text>
                     </View>

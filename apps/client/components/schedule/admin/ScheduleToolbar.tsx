@@ -67,10 +67,10 @@ function IconButton({
       {children}
       {badge ? (
         <View
-          className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full items-center justify-center"
+          className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full items-center justify-center"
           style={{ backgroundColor: 'var(--c-brand-surface)' }}
         >
-          <Text className="text-[9px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{badge}</Text>
+          <Text className="t-num text-[10.5px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{badge}</Text>
         </View>
       ) : null}
     </TouchableOpacity>

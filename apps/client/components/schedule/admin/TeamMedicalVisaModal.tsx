@@ -1,3 +1,4 @@
+import ModalBackdrop from '../../ui/ModalBackdrop';
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, Pressable, ScrollView, ActivityIndicator } from '@/src/web/reactNative';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -108,21 +109,33 @@ export default function TeamMedicalVisaModal({ visible, teamId, teamName, onClos
   const canSubmit = !loading && selectedPlayerIds.length > 0 && expiryDate.length === 10;
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View className={`flex-1 bg-[#0E2041]/60 ${isMobile ? 'justify-end' : 'justify-center items-center p-4'}`}>
-        <View className={`bg-white shadow-2xl overflow-hidden w-full ${isMobile ? 'rounded-t-[24px] max-h-[92%]' : 'rounded-[20px] max-w-lg'}`}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      {/* The system's dialog shell: dark veil (closes on a click outside), a named
+          dialog, fine border and --e-lg — it was an indigo-tinted veil and an unnamed box. */}
+      <ModalBackdrop
+        onDismiss={onClose}
+        className={isMobile ? 'justify-end' : 'justify-center items-center p-4'}
+        style={{ backgroundColor: 'rgba(2, 8, 23, 0.62)' }}
+      >
+        <View
+          role="dialog"
+          aria-modal="true"
+          accessibilityLabel={`Vize medicale${teamName ? ` · ${teamName}` : ''}`}
+          className={`bg-[var(--c-surface)] border border-[var(--c-border)] overflow-hidden w-full ${isMobile ? 'rounded-t-[20px] max-h-[92%]' : 'rounded-[18px] max-w-lg'}`}
+          style={{ boxShadow: 'var(--e-lg)' }}
+        >
 
-          <View className="p-6 border-b border-gray-100 flex-row justify-between items-center bg-gray-50/50">
+          <View className="p-6 border-b border-[var(--c-border)] flex-row justify-between items-center bg-[var(--c-surface-2)]">
             <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 rounded-2xl bg-[#E6F8F1] items-center justify-center">
+              <View className="w-10 h-10 rounded-2xl bg-[var(--c-success-bg)] items-center justify-center">
                 <ShieldCheck size={20} color="var(--c-success-fg)" />
               </View>
               <View>
-                <Text className="text-xl font-black text-[#0D2040] mb-0.5">Vize medicale</Text>
-                <Text className="text-xs font-bold text-gray-500">{teamName ? teamName : 'Echipa selectată'}</Text>
+                <Text className="text-xl font-bold text-[color:var(--c-ink-strong)] mb-0.5">Vize medicale</Text>
+                <Text className="text-xs font-bold text-[color:var(--c-muted)]">{teamName ? teamName : 'Echipa selectată'}</Text>
               </View>
             </View>
-            <Pressable onPress={onClose} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center hover:bg-gray-50">
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Închide" className="w-10 h-10 bg-[var(--c-surface)] border border-[var(--c-border)] rounded-full items-center justify-center hover:bg-[var(--c-surface-2)]">
               <X size={20} color="var(--c-muted)" />
             </Pressable>
           </View>
@@ -132,24 +145,24 @@ export default function TeamMedicalVisaModal({ visible, teamId, teamName, onClos
 
               {/* Validity period */}
               <View>
-                <Text className="text-[10px] font-black tracking-widest text-[#1D3E90] uppercase mb-2 ml-1">Perioadă de valabilitate</Text>
+                <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-2">Perioadă de valabilitate</Text>
                 <View className="flex-row flex-wrap gap-2 mb-3">
                   {VALIDITY_PRESETS.map((preset) => (
                     <Pressable
                       key={preset.months}
                       onPress={() => applyPreset(preset.months)}
-                      className="px-4 py-2 rounded-xl border bg-gray-50 border-gray-200 hover:bg-blue-50"
+                      className="px-4 py-2 rounded-xl border bg-[var(--c-surface-2)] border-[var(--c-border)] hover:bg-[var(--c-surface-tint)]"
                     >
-                      <Text className="text-[12px] font-bold text-[#0D2040]">{preset.label}</Text>
+                      <Text className="text-[12px] font-bold text-[color:var(--c-ink-strong)]">{preset.label}</Text>
                     </Pressable>
                   ))}
                 </View>
-                <Text className="text-[10px] font-black tracking-widest text-[#1D3E90] uppercase mb-2 ml-1">Dată expirare (DD-MM-YYYY)</Text>
-                <View className="flex-row items-center border border-gray-200 bg-gray-50 rounded-2xl px-4 h-14">
+                <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-2">Dată expirare (DD-MM-YYYY)</Text>
+                <View className="flex-row items-center border border-[var(--c-border)] bg-[var(--c-surface-2)] rounded-2xl px-4 h-14">
                   <CalendarIcon size={18} color="var(--c-faint)" />
                   <TextInput
                     placeholder="DD-MM-YYYY"
-                    className="flex-1 ml-3 text-[14px] font-bold text-[#0E2041] outline-none"
+                    className="flex-1 ml-3 text-[14px] font-bold text-[color:var(--c-ink-strong)] outline-none"
                     placeholderTextColor="var(--c-faint)"
                     value={expiryDate}
                     onChangeText={handleDateChange}
@@ -162,19 +175,19 @@ export default function TeamMedicalVisaModal({ visible, teamId, teamName, onClos
               {/* Players */}
               <View>
                 <View className="flex-row justify-between items-center mb-2 px-1">
-                  <Text className="text-[10px] font-black tracking-widest text-[#1D3E90] uppercase">Jucători vizați</Text>
+                  <Text className="text-[12px] font-bold text-[color:var(--c-brand-fg)]">Jucători vizați</Text>
                   {players.length > 0 && !loadingPlayers && (
-                    <Pressable onPress={handleSelectAll} className="flex-row items-center gap-1.5 bg-blue-50 px-2 py-1 rounded-md">
+                    <Pressable onPress={handleSelectAll} className="flex-row items-center gap-1.5 bg-[var(--c-surface-tint)] px-2 py-1 rounded-md">
                       <CheckSquare size={12} color="var(--c-brand-fg)" />
-                      <Text className="text-[10px] font-bold text-[#1D3E90] uppercase">{allSelected ? 'Deselectează' : 'Selectează toți'}</Text>
+                      <Text className="text-[12px] font-bold text-[color:var(--c-brand-fg)]">{allSelected ? 'Deselectează' : 'Selectează toți'}</Text>
                     </Pressable>
                   )}
                 </View>
 
-                <View className="border border-gray-200 bg-white rounded-2xl overflow-hidden min-h-[60px] p-2 flex-row flex-wrap gap-2">
+                <View className="border border-[var(--c-border)] bg-[var(--c-surface)] rounded-2xl overflow-hidden min-h-[60px] p-2 flex-row flex-wrap gap-2">
                   {loadingPlayers && <ActivityIndicator size="small" color="var(--c-brand-fg)" className="m-2" />}
                   {!loadingPlayers && players.length === 0 && (
-                    <Text className="p-2 text-gray-400 text-xs">Această echipă nu are jucători.</Text>
+                    <Text className="p-2 text-[color:var(--c-faint)] text-xs">Această echipă nu are jucători.</Text>
                   )}
                   {!loadingPlayers && players.map((p) => {
                     const isSelected = selectedPlayerIds.includes(p.id);
@@ -182,12 +195,12 @@ export default function TeamMedicalVisaModal({ visible, teamId, teamName, onClos
                       <Pressable
                         key={p.id}
                         onPress={() => togglePlayer(p.id)}
-                        className={`px-3 py-2 rounded-xl flex-row items-center gap-2 border ${isSelected ? 'bg-[#1D3E90] border-[#1D3E90]' : 'bg-gray-50 border-gray-200'}`}
+                        className={`px-3 py-2 rounded-xl flex-row items-center gap-2 border ${isSelected ? 'bg-[var(--c-brand-surface)] border-[var(--c-brand-border)]' : 'bg-[var(--c-surface-2)] border-[var(--c-border)]'}`}
                       >
-                        <View className={`w-3.5 h-3.5 rounded border items-center justify-center ${isSelected ? 'bg-white border-white' : 'border-gray-400'}`}>
-                          {isSelected && <View className="w-1.5 h-1.5 bg-[#1D3E90] rounded-sm" />}
+                        <View className={`w-3.5 h-3.5 rounded border items-center justify-center ${isSelected ? 'bg-[var(--c-surface)] border-[var(--c-surface)]' : 'border-[var(--c-border-strong)]'}`}>
+                          {isSelected && <View className="w-1.5 h-1.5 bg-[var(--c-brand-surface)] rounded-sm" />}
                         </View>
-                        <Text className={`text-[12px] font-bold ${isSelected ? 'text-white' : 'text-[#0D2040]'}`}>{p.firstName} {p.lastName}</Text>
+                        <Text className={`text-[12px] font-bold ${isSelected ? 'text-[color:var(--c-on-brand)]' : 'text-[color:var(--c-ink-strong)]'}`}>{p.firstName} {p.lastName}</Text>
                       </Pressable>
                     );
                   })}
@@ -197,21 +210,21 @@ export default function TeamMedicalVisaModal({ visible, teamId, teamName, onClos
             </View>
           </ScrollView>
 
-          <View className="flex-row justify-end gap-3 p-6 border-t border-gray-100 bg-gray-50/50">
-            <Pressable onPress={onClose} className="px-6 py-3.5 rounded-[14px] bg-white border border-gray-200 shadow-sm">
-              <Text className="font-bold tracking-tight text-[#0D2040]">Renunță</Text>
+          <View className="flex-row justify-end gap-3 p-6 border-t border-[var(--c-border)] bg-[var(--c-surface-2)]">
+            <Pressable onPress={onClose} className="px-6 py-3.5 rounded-[14px] bg-[var(--c-surface)] border border-[var(--c-border)] shadow-sm">
+              <Text className="font-bold tracking-tight text-[color:var(--c-ink-strong)]">Renunță</Text>
             </Pressable>
             <Pressable
               onPress={handleSubmit}
               disabled={!canSubmit}
-              className={`px-6 py-3.5 rounded-[14px] shadow-sm flex-row items-center gap-2 ${canSubmit ? 'bg-[#1D3E90] hover:bg-[var(--c-brand-strong)]' : 'bg-[var(--c-surface-3)]'}`}
+              className={`px-6 py-3.5 rounded-[14px] shadow-sm flex-row items-center gap-2 ${canSubmit ? 'bg-[var(--c-brand-surface)] hover:bg-[var(--c-brand-strong)]' : 'bg-[var(--c-surface-3)]'}`}
             >
-              {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text className="font-black text-[13px] tracking-wide text-white uppercase">Setează ({selectedPlayerIds.length})</Text>}
+              {loading ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : <Text className="font-bold text-[13px] text-[color:var(--c-on-brand)]">Setează ({selectedPlayerIds.length})</Text>}
             </Pressable>
           </View>
 
         </View>
-      </View>
+      </ModalBackdrop>
     </Modal>
   );
 }

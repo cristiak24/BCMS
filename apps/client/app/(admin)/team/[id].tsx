@@ -2,7 +2,7 @@ import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput, Alert } from '@/src/web/reactNative';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import {
-    ArrowLeft, Users, UserPlus, Copy, Check, Pencil, Search, X, UserMinus, Shield, ListOrdered, History,
+    ArrowLeft, Users, UserPlus, Copy, Check, Search, X, Shield, ListOrdered, History,
     CalendarClock, BarChart3,
 } from 'lucide-react';
 import TeamSeasonTable from '../../../components/stats/TeamSeasonTable';
@@ -62,6 +62,7 @@ export default function TeamDetailsScreen() {
     const [medicalVisaOpen, setMedicalVisaOpen] = useState(false);
     const [paymentsReportOpen, setPaymentsReportOpen] = useState(false);
     const [removingId, setRemovingId] = useState<number | null>(null);
+    const [rowMenuFor, setRowMenuFor] = useState<Player | null>(null);
     // Removing a player from a team is destructive, so it goes through the shared
     // ConfirmDialog rather than a native window.confirm (unstyled, not themeable,
     // and blocks the whole tab).
@@ -414,11 +415,12 @@ export default function TeamDetailsScreen() {
                                     label="Lotul echipei"
                                     header={
                                         <DenseHeader>
+                                            {/* Lot's order: Viză, Prezență, Plată. */}
                                             <DenseHeading className="flex-1">Jucător</DenseHeading>
+                                            <DenseHeading className="w-[112px]">Viză medicală</DenseHeading>
                                             <DenseHeading className="w-[150px]">Prezență</DenseHeading>
                                             <DenseHeading className="w-[84px]">Plată</DenseHeading>
-                                            <DenseHeading className="w-[112px]">Viză medicală</DenseHeading>
-                                            <View className="w-[72px]" />
+                                            <View className="w-[40px]" />
                                         </DenseHeader>
                                     }
                                 >
@@ -429,7 +431,7 @@ export default function TeamDetailsScreen() {
                                             stat={statsByPlayer.get(p.id)}
                                             removing={removingId === p.id}
                                             onOpen={() => router.push(`/admin/player/${p.id}` as any)}
-                                            onRemove={() => handleRemovePlayer(p)}
+                                            onActions={() => setRowMenuFor(p)}
                                         />
                                     ))}
                                 </DenseList>
@@ -447,6 +449,17 @@ export default function TeamDetailsScreen() {
                     onSaved={(updated) => { setTeam(updated); setEditOpen(false); }}
                 />
             )}
+
+            <ActionSheet
+                visible={rowMenuFor != null}
+                title={rowMenuFor ? `${rowMenuFor.firstName} ${rowMenuFor.lastName}` : ''}
+                subtitle={team.name}
+                actions={rowMenuFor ? [
+                    { key: 'open', label: 'Deschide fișa', icon: 'person', onPress: () => router.push(`/admin/player/${rowMenuFor.id}` as any) },
+                    { key: 'remove', label: 'Scoate din echipă', icon: 'person-remove', tone: 'danger', onPress: () => handleRemovePlayer(rowMenuFor) },
+                ] : []}
+                onClose={() => setRowMenuFor(null)}
+            />
 
             <ActionSheet
                 visible={teamActionsOpen}
@@ -512,9 +525,10 @@ function TabButton({ active, onPress, icon, label }: { active: boolean; onPress:
             onPress={onPress}
             accessibilityRole={'tab' as any}
             accessibilityState={{ selected: active }}
-            className={`flex-row items-center gap-1.5 px-4 min-h-10 rounded-[11px] shrink-0 ${active ? 'bg-[var(--c-brand-surface)]' : ''}`}
+            // Phones: no icon and tighter padding, so the four tabs fit at 375 („Statistici” was cut off).
+            className={`flex-row items-center gap-1.5 px-2.5 sm:px-4 min-h-10 rounded-[11px] shrink-0 ${active ? 'bg-[var(--c-brand-surface)]' : ''}`}
         >
-            {icon}
+            <View className="hidden sm:flex">{icon}</View>
             <Text className={`text-[12.5px] font-semibold whitespace-nowrap ${active ? 'text-[color:var(--c-on-brand)]' : 'text-[color:var(--c-muted)]'}`}>{label}</Text>
         </Pressable>
     );
@@ -525,7 +539,7 @@ type RowProps = {
     stat: TeamPlayerStat | undefined;
     removing: boolean;
     onOpen: () => void;
-    onRemove: () => void;
+    onActions: () => void;
 };
 
 function PaymentPill({ status }: { status: 'paid' | 'due' | 'pending' | 'none' }) {
@@ -542,16 +556,18 @@ function PaymentPill({ status }: { status: 'paid' | 'due' | 'pending' | 'none' }
     );
 }
 
-function RowActions({ removing, onOpen, onRemove }: { removing: boolean; onOpen: () => void; onRemove: () => void }) {
+/** One ⋯ per row, as in Lot (a pencil and a red remove icon sat on every row). */
+function RowActions({ name, removing, onActions }: { name: string; removing: boolean; onActions: () => void }) {
     return (
-        <View className="flex-row items-center gap-0.5 flex-none">
-            <Pressable onPress={onOpen} className="tap-40 w-9 h-9 rounded-[9px] items-center justify-center hover:bg-[var(--c-surface-3)]" accessibilityLabel="Detalii jucător">
-                <Pencil size={14} color="var(--c-muted)" />
-            </Pressable>
-            <Pressable onPress={onRemove} disabled={removing} className="tap-40 w-9 h-9 rounded-[9px] items-center justify-center hover:bg-[var(--c-danger-bg)]" accessibilityLabel="Scoate din echipă">
-                {removing ? <ActivityIndicator size="small" color="var(--c-danger)" /> : <UserMinus size={15} color="var(--c-danger)" />}
-            </Pressable>
-        </View>
+        <Pressable
+            onPress={onActions}
+            disabled={removing}
+            accessibilityRole="button"
+            accessibilityLabel={`Acțiuni pentru ${name}`}
+            className="ui-press tap-40 w-9 h-9 rounded-[9px] items-center justify-center flex-none hover:bg-[var(--c-surface-3)]"
+        >
+            {removing ? <ActivityIndicator size="small" color="var(--c-muted)" /> : <MaterialIcons name="more-horiz" size={20} color="var(--c-muted)" />}
+        </Pressable>
     );
 }
 
@@ -576,7 +592,7 @@ function AttendanceMeter({ stat, showCount }: { stat: TeamPlayerStat | undefined
     );
 }
 
-function PlayerRosterRow({ player: p, stat, removing, onOpen, onRemove }: RowProps) {
+function PlayerRosterRow({ player: p, stat, removing, onOpen, onActions }: RowProps) {
     const age = computeAge(p.birthYear);
     const med = MEDICAL_META[medicalStatus(p.medicalCheckExpiry)];
     const rate = stat?.attendanceRate ?? null;
@@ -593,21 +609,21 @@ function PlayerRosterRow({ player: p, stat, removing, onOpen, onRemove }: RowPro
                     <Text className="t-meta text-[color:var(--c-muted)] hidden md:flex" numberOfLines={1}>{meta}</Text>
                     {/* Phones: payment and clearance under the name instead of their own columns. */}
                     <View className="md:hidden flex-row flex-wrap items-center gap-1.5 mt-1">
-                        <PaymentPill status={stat?.paymentStatus ?? 'none'} />
                         <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: med.bg }}>
                             <Text className="text-[11px] font-semibold" style={{ color: med.fg }}>{med.label}</Text>
                         </View>
+                        <PaymentPill status={stat?.paymentStatus ?? 'none'} />
                     </View>
                 </View>
             </Pressable>
-            <View className="w-[150px] hidden md:flex flex-none"><AttendanceMeter stat={stat} /></View>
-            <View className="w-[84px] hidden md:flex flex-none"><PaymentPill status={stat?.paymentStatus ?? 'none'} /></View>
             <View className="w-[112px] hidden md:flex flex-none">
                 <View className="px-2 py-0.5 rounded-full self-start" style={{ backgroundColor: med.bg }}>
                     <Text className="text-[11px] font-semibold" style={{ color: med.fg }}>{med.label}</Text>
                 </View>
             </View>
-            <RowActions removing={removing} onOpen={onOpen} onRemove={onRemove} />
+            <View className="w-[150px] hidden md:flex flex-none"><AttendanceMeter stat={stat} /></View>
+            <View className="w-[84px] hidden md:flex flex-none"><PaymentPill status={stat?.paymentStatus ?? 'none'} /></View>
+            <RowActions name={`${p.firstName} ${p.lastName}`} removing={removing} onActions={onActions} />
         </DenseRow>
     );
 }

@@ -250,7 +250,7 @@ function SheetRow({
     // shirt number next to it; now it is a small, faint "rând" marker with no
     // box, while the shirt number stays a bold input.
     <View className={`${COL.slot} h-8 items-center justify-center shrink-0`} accessibilityLabel={`Rândul ${index + 4} din formular`}>
-      <Text className="text-[8.5px] font-semibold uppercase tracking-[0.06em] leading-none" style={{ color: 'var(--c-faint)' }}>rând</Text>
+      <Text className="text-[10px] font-semibold leading-none" style={{ color: 'var(--c-faint)' }}>rând</Text>
       <Text className="t-num text-[11px] font-medium leading-tight" style={{ color: 'var(--c-faint)' }}>{index + 4}</Text>
     </View>
   );

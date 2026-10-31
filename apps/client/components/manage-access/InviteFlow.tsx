@@ -55,7 +55,9 @@ const VALIDITY_OPTIONS: { label: string; hours: number }[] = [
 const STEPS: { step: Step; title: string }[] = [
     { step: 1, title: 'Pe cine inviți?' },
     { step: 2, title: 'Cum primește invitația?' },
-    { step: 3, title: 'Gata de trimis' },
+    // Step 2 already creates the code / sends the email: step 3 reports it, it
+    // isn't a review before sending („Gata de trimis” promised one).
+    { step: 3, title: 'Gata' },
 ];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -503,8 +505,14 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                                 className="text-[18px] font-bold tracking-tight outline-none mb-4"
                                 style={{ color: 'var(--c-ink-strong)' }}
                             >
-                                {/* A failed email is not „Gata de trimis”: the heading says what happened. */}
-                                {step === 3 && result?.kind === 'email' && !result.emailSent ? 'Emailul nu a plecat' : STEPS[step - 1].title}
+                                {/* Step 3 says what happened, not a generic „Gata”. */}
+                                {step !== 3
+                                    ? STEPS[step - 1].title
+                                    : result?.kind === 'email'
+                                        ? (result.emailSent ? 'Invitația a plecat pe email' : 'Emailul nu a plecat')
+                                        : result?.kind === 'link'
+                                            ? 'Linkul e creat: trimite-l mai departe'
+                                            : 'Codul e creat: trimite-l mai departe'}
                             </h2>
 
                             {step === 1 ? (

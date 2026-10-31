@@ -215,8 +215,8 @@ export default function TeamFiltersBar({
                     <SlidersHorizontal size={14} color={expanded ? 'var(--c-brand-fg)' : 'var(--c-muted)'} />
                     <Text className="text-[12px] font-semibold" style={{ color: expanded ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)' }}>Filtre</Text>
                     {activeFilterCount > 0 ? (
-                        <View className="min-w-[16px] h-4 px-1 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-brand-surface)' }}>
-                            <Text className="text-[9px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{activeFilterCount}</Text>
+                        <View className="min-w-[18px] h-[18px] px-1 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-brand-surface)' }}>
+                            <Text className="t-num text-[10.5px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{activeFilterCount}</Text>
                         </View>
                     ) : null}
                 </Pressable>
