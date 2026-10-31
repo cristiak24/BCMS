@@ -72,9 +72,10 @@ function Checkbox({ checked, onPress, label }: { checked: boolean; onPress: () =
   );
 }
 
-function todayPlusYear() {
+/** A quick pick the admin chooses on purpose (the field itself starts empty). */
+function monthsFromToday(months: number) {
   const d = new Date();
-  d.setFullYear(d.getFullYear() + 1);
+  d.setMonth(d.getMonth() + months);
   return toCalendarDay(d);
 }
 
@@ -90,7 +91,7 @@ export default function ComplianceScreen() {
   const [teamFilter, setTeamFilter] = useState('all');
   const [selected, setSelected] = useState<number[]>([]);
   const [editing, setEditing] = useState<number[] | null>(null);
-  const [expiryInput, setExpiryInput] = useState(todayPlusYear());
+  const [expiryInput, setExpiryInput] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -162,9 +163,11 @@ export default function ComplianceScreen() {
 
   const openEditor = (ids: number[]) => {
     const single = ids.length === 1 ? players?.find((p) => p.id === ids[0]) : null;
+    // Empty unless the player's current visa is still valid: a date a year from
+    // today was pre-filled, so one tap recorded an eligibility nobody had checked.
     setExpiryInput(single?.medicalCheckExpiry && medicalStatus(single.medicalCheckExpiry) === 'valid'
       ? toCalendarDay(single.medicalCheckExpiry)
-      : todayPlusYear());
+      : '');
     setEditing(ids);
   };
 
@@ -342,7 +345,7 @@ export default function ComplianceScreen() {
         onCancel={() => setEditing(null)}
       >
         <View className="gap-1.5">
-          <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>Valabilă până la</Text>
+          <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Data de pe viza medicală (valabilă până la)</Text>
           <input
             type="date"
             value={expiryInput}
@@ -360,6 +363,12 @@ export default function ComplianceScreen() {
               colorScheme: 'light dark',
             }}
           />
+          <View className="flex-row flex-wrap items-center gap-2 mt-1">
+            <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Sau de azi:</Text>
+            {[6, 12].map((months) => (
+              <Button key={months} size="sm" label={months === 12 ? '+1 an' : `+${months} luni`} onPress={() => setExpiryInput(monthsFromToday(months))} />
+            ))}
+          </View>
         </View>
       </ConfirmDialog>
 

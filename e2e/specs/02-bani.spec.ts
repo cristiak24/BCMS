@@ -102,7 +102,9 @@ test('typing in „Notă” stays in „Notă” and leaves the amount alone', a
   await expect(note).toBeFocused();
   await expect(amount).toHaveValue(before);
 
+  // A typed note isn't dropped on Esc without asking.
   await page.keyboard.press('Escape');
+  await page.getByRole('alertdialog', { name: 'Renunți la încasare?' }).getByRole('button', { name: 'Renunță la încasare' }).click();
   await expect(dialog).toHaveCount(0);
 });
 

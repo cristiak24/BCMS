@@ -200,7 +200,7 @@ export default function GameSetup({
                   </View>
                 </Pressable>
                 {playing && !p.visaExpired ? (
-                  <Pressable onPress={() => toggleStarter(p.playerId)} accessibilityRole="button" accessibilityState={{ selected: starter }}
+                  <Pressable onPress={() => toggleStarter(p.playerId)} accessibilityRole="button" accessibilityState={{ selected: starter }} accessibilityLabel={`Titular: ${p.firstName} ${p.lastName}`}
                     className="h-10 px-3 rounded-[10px] border items-center justify-center"
                     style={{ borderColor: starter ? 'var(--c-success)' : 'var(--c-border)', backgroundColor: starter ? 'var(--c-success-bg)' : 'var(--c-surface)', opacity: !starter && starters.length >= 5 ? 0.5 : 1 } as any}>
                     <Text className="text-[12px] font-bold" style={{ color: starter ? 'var(--c-success-fg)' : 'var(--c-muted)' }}>Titular</Text>

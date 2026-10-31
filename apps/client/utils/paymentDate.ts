@@ -32,6 +32,11 @@ export function paymentMethodLabel(provider: string | null | undefined) {
 /** The server's text for a desk payment recorded without a note (apps/server finance.ts, MANUAL_PAYMENT_DEFAULT_DESCRIPTION). */
 const DEFAULT_DESK_DESCRIPTIONS = new Set(['Plată numerar', 'Transfer bancar', 'Plată card (POS)', 'Plată la club']);
 
-export function isDefaultDeskDescription(description: string) {
-  return DEFAULT_DESK_DESCRIPTIONS.has(description.trim());
+const plain = (text: string) => text.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+/** True for the server's default text, or a note that only repeats the method („Transfer” beside „transfer bancar”). */
+export function isDefaultDeskDescription(description: string, provider?: string | null) {
+  if (DEFAULT_DESK_DESCRIPTIONS.has(description.trim())) return true;
+  const method = paymentMethodLabel(provider ?? null);
+  return method != null && plain(method).startsWith(plain(description));
 }

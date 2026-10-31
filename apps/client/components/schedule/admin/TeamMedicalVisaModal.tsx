@@ -1,3 +1,4 @@
+import Button from '../../ui/Button';
 import ModalBackdrop from '../../ui/ModalBackdrop';
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, Pressable, ScrollView, ActivityIndicator } from '@/src/web/reactNative';
@@ -210,17 +211,17 @@ export default function TeamMedicalVisaModal({ visible, teamId, teamName, onClos
             </View>
           </ScrollView>
 
-          <View className="flex-row justify-end gap-3 p-6 border-t border-[var(--c-border)] bg-[var(--c-surface-2)]">
-            <Pressable onPress={onClose} className="px-6 py-3.5 rounded-[14px] bg-[var(--c-surface)] border border-[var(--c-border)] shadow-sm">
-              <Text className="font-bold tracking-tight text-[color:var(--c-ink-strong)]">Renunță</Text>
-            </Pressable>
-            <Pressable
-              onPress={handleSubmit}
+          {/* The system's buttons: the hand-built ones were 52px, bold 16px, and the
+              disabled „Setează (0)” was white on grey (~1.2:1), unreadable. */}
+          <View className="flex-row justify-end gap-3 px-6 py-4 border-t border-[var(--c-border)]">
+            <Button label="Renunță" onPress={onClose} />
+            <Button
+              variant="primary"
+              label={selectedPlayerIds.length ? `Setează pentru ${selectedPlayerIds.length}` : 'Alege jucătorii'}
+              loading={loading}
               disabled={!canSubmit}
-              className={`px-6 py-3.5 rounded-[14px] shadow-sm flex-row items-center gap-2 ${canSubmit ? 'bg-[var(--c-brand-surface)] hover:bg-[var(--c-brand-strong)]' : 'bg-[var(--c-surface-3)]'}`}
-            >
-              {loading ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : <Text className="font-bold text-[13px] text-[color:var(--c-on-brand)]">Setează ({selectedPlayerIds.length})</Text>}
-            </Pressable>
+              onPress={() => void handleSubmit()}
+            />
           </View>
 
         </View>

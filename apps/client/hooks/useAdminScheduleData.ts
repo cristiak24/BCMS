@@ -15,12 +15,16 @@ export interface ScheduleFilters {
 
 /**
  * Fetches the data behind the admin schedule screen: events for the visible
- * month (server-filtered by type/coach/team), the club's teams, and the
- * coach list used by the filter modal. Centralized here so the screen
- * component only deals with rendering.
+ * month (server-filtered by type/coach/team), the next 14 days from now (the
+ * „upcoming” list — it used to come from the visible month, so on the 31st it
+ * said nothing was coming up), the club's teams, and the coach list used by
+ * the filter modal. Centralized here so the screen only deals with rendering.
  */
+
+export const UPCOMING_DAYS = 14;
 export function useAdminScheduleData(currentDate: Date, filters: ScheduleFilters) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [upcoming, setUpcoming] = useState<CalendarEvent[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [coaches, setCoaches] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,18 +40,16 @@ export function useAdminScheduleData(currentDate: Date, filters: ScheduleFilters
       // „nimic programat”). The server filters with startTime <= end.
       const endOfMonth = new Date(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1).getTime() - 1);
 
-      const [eventsData, teamsData] = await Promise.all([
-        eventsApi.getEvents({
-          start: startOfMonth.toISOString(),
-          end: endOfMonth.toISOString(),
-          type: filters.type || undefined,
-          coachId: filters.coachId || undefined,
-          teamId: filters.teamId || undefined,
-        }),
+      const now = new Date();
+      const scope = { type: filters.type || undefined, coachId: filters.coachId || undefined, teamId: filters.teamId || undefined };
+      const [eventsData, upcomingData, teamsData] = await Promise.all([
+        eventsApi.getEvents({ start: startOfMonth.toISOString(), end: endOfMonth.toISOString(), ...scope }),
+        eventsApi.getEvents({ start: now.toISOString(), end: new Date(now.getTime() + UPCOMING_DAYS * 86_400_000).toISOString(), ...scope }),
         teamsApi.getTeams(),
       ]);
 
       setEvents(eventsData);
+      setUpcoming(upcomingData);
       setTeams(teamsData);
     } catch (err) {
       console.error('Fetch schedule error:', err);
@@ -78,5 +80,5 @@ export function useAdminScheduleData(currentDate: Date, filters: ScheduleFilters
     })();
   }, []);
 
-  return { events, teams, coaches, loading, error, refetch: fetchEvents };
+  return { events, upcoming, teams, coaches, loading, error, refetch: fetchEvents };
 }

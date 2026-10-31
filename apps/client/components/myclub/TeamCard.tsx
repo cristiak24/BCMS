@@ -143,9 +143,9 @@ export default function TeamCard({
                             {syncing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <RefreshCw size={14} color="var(--c-brand-fg)" />}
                         </IconAction>
                     ) : null}
-                    <IconAction label="Editează" onPress={onEdit}><Pencil size={14} color="var(--c-muted)" /></IconAction>
-                    <IconAction label="Program" onPress={onSchedule}><Calendar size={14} color="var(--c-muted)" /></IconAction>
-                    <IconAction label="Șterge" onPress={onDelete} disabled={deleting} danger>
+                    <IconAction label={`Editează ${team.name}`} onPress={onEdit}><Pencil size={14} color="var(--c-muted)" /></IconAction>
+                    <IconAction label={`Programul echipei ${team.name}`} onPress={onSchedule}><Calendar size={14} color="var(--c-muted)" /></IconAction>
+                    <IconAction label={`Șterge echipa ${team.name}`} onPress={onDelete} disabled={deleting} danger>
                         {deleting ? <ActivityIndicator size="small" color="var(--c-danger)" /> : <Trash2 size={14} color="var(--c-danger)" />}
                     </IconAction>
                 </View>

@@ -23,7 +23,11 @@ test('the payment dialog states the debt and labels every field', async ({ page 
   await expect(dialog.getByLabel('Suma încasată')).toHaveAttribute('inputmode', 'decimal');
   await dialog.getByLabel('Suma încasată').fill('0');
   await expect(dialog.getByText('Introdu o sumă mai mare ca 0.')).toBeVisible();
+  // A typed amount isn't dropped on Esc without asking.
   await page.keyboard.press('Escape');
+  const discard = page.getByRole('alertdialog', { name: 'Renunți la încasare?' });
+  await expect(discard).toBeVisible();
+  await discard.getByRole('button', { name: 'Renunță la încasare' }).click();
   await expect(dialog).toHaveCount(0);
 });
 

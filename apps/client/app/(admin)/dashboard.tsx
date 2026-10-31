@@ -108,16 +108,24 @@ function dayPhrase(date: Date) {
   return `pe ${label.charAt(0).toLowerCase()}${label.slice(1)}`;
 }
 
-/** "în 2 zile" / "în 5 h" / "în 40 min" / "acum". */
+/**
+ * "în 40 min" / "în 5 h" today, then calendar days: „mâine”, „în 2 zile”.
+ * Rounding hours (41.6 h → „în 2 zile”) contradicted the „Mâine” beside it.
+ */
 function countdown(iso: string) {
-  const diff = parseApiDate(iso).getTime() - Date.now();
+  const when = parseApiDate(iso);
+  const diff = when.getTime() - Date.now();
   if (diff <= 0) return 'acum';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = new Date(when);
+  day.setHours(0, 0, 0, 0);
+  const days = Math.round((day.getTime() - today.getTime()) / 86_400_000);
+  if (days >= 2) return `în ${plural(days, 'zi', 'zile')}`;
+  if (days === 1) return 'mâine';
   const minutes = Math.round(diff / 60000);
   if (minutes < 60) return `în ${minutes} min`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `în ${hours} h`;
-  const days = Math.round(hours / 24);
-  return `în ${plural(days, 'zi', 'zile')}`;
+  return `în ${Math.round(minutes / 60)} h`;
 }
 
 const time = (iso: string) => parseApiDate(iso).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
@@ -444,6 +452,9 @@ export default function Dashboard() {
   // Remembered per account (hooks/useCachedState): a revisit or a reopened
   // app paints last time's figures at once while the requests below refresh them.
   const [summary, setSummary] = useCachedState<DashboardSummary | null>('admin-home.summary', null);
+  // A check that failed while last visit's copy is on screen: the page says so
+  // instead of passing old figures (or a count missing L12) off as current.
+  const [l12Failed, setL12Failed] = useState(false);
   const [summaryFailed, setSummaryFailed] = useState(false);
   const [events, setEvents] = useCachedState<CalendarEvent[] | null>('admin-home.events', null);
   const [eventsFailed, setEventsFailed] = useState(false);
@@ -488,6 +499,7 @@ export default function Dashboard() {
 
     setSummaryFailed(false);
     setEventsFailed(false);
+    setL12Failed(false);
     dashboardApi.getSummary().then(setSummary).catch(() => setSummaryFailed(true));
     // A failure keeps last time's events if there are any; with none it shows
     // an error, not „Nimic programat” (an empty week the page never loaded).
@@ -495,7 +507,11 @@ export default function Dashboard() {
       .then((rows) => setEvents(rows.filter((e) => e.status !== 'cancelled')))
       .catch(() => setEventsFailed(true));
     // Staff/accountant roles get 403 on these — the home just leaves them out.
-    l12Api.overview().then(setL12).catch(() => setL12(null));
+    // Any other failure is said („Verificare parțială”): the L12 alert used to vanish.
+    l12Api.overview().then(setL12).catch((err) => {
+      setL12(null);
+      if ((err as { status?: number })?.status !== 403) setL12Failed(true);
+    });
     Promise.allSettled([manageAccessApi.listRequests(), familyRequestsApi.list()]).then(([access, family]) => {
       const a = access.status === 'fulfilled' ? access.value.filter((r) => r.status === 'pending').length : 0;
       const f = family.status === 'fulfilled' ? family.value.length : 0;
@@ -543,7 +559,7 @@ export default function Dashboard() {
         const at = parseApiDate(m.startTime).getTime();
         return m.status !== 'cancelled' && at >= Date.now() - DAY && at <= Date.now() + 7 * DAY;
       }));
-      items.push({ key: 'missing-visas', icon: 'medical-services', tone: matchSoon ? 'danger' : 'warning', title: plural(summary.missingVisasCount, 'jucător fără viză medicală', 'jucători fără viză medicală'), detail: matchSoon ? 'Meci în 7 zile · nu intră automat pe L12' : 'Nu intră automat pe L12', href: '/admin/compliance' });
+      items.push({ key: 'missing-visas', icon: 'medical-services', tone: matchSoon ? 'danger' : 'warning', title: plural(summary.missingVisasCount, 'jucător fără viză medicală', 'jucători fără viză medicală'), detail: matchSoon ? 'Meci în 7 zile · completează data vizei' : 'Pot juca, dar data vizei lipsește din fișă', href: '/admin/compliance' });
     }
     // Visas only: expiringItems also carries the monthly fee („COTIZAȚIE LUNARĂ”), which
     // showed up here as "1 viză expiră în 7 zile" with no clearance due that week.
@@ -588,6 +604,8 @@ export default function Dashboard() {
   // Failed with nothing remembered: the checks behind „Necesită atenție” never ran.
   const summaryUnavailable = !summary && summaryFailed;
   const eventsUnavailable = !events && eventsFailed;
+  // Something on screen is last visit's copy, or a check is missing.
+  const partialCheck = !summaryUnavailable && (l12Failed || (summaryFailed && !!summary) || (eventsFailed && !!events));
   const attendanceDelta = summary?.attendanceChangePoints;
   const attendanceRate = summary?.attendanceRate == null ? null : Math.round(summary.attendanceRate);
   const attendanceTone: Tone = attendanceRate == null ? 'sky' : attendanceRate >= 75 ? 'success' : attendanceRate >= 60 ? 'warning' : 'danger';
@@ -597,7 +615,7 @@ export default function Dashboard() {
   const attentionCard = (
     <SectionCard
       title="Necesită atenție"
-      subtitle={loadingSummary ? 'Se verifică…' : summaryUnavailable ? 'Nu am putut verifica tot' : attention.length ? `${plural(attention.length, 'lucru de rezolvat', 'lucruri de rezolvat')}` : 'Totul la zi'}
+      subtitle={loadingSummary ? 'Se verifică…' : summaryUnavailable ? 'Nu am putut verifica tot' : attention.length ? `${plural(attention.length, 'lucru de rezolvat', 'lucruri de rezolvat')}` : partialCheck ? 'Verificare parțială' : 'Totul la zi'}
       icon="notifications-active"
       tone={attention.some((a) => a.tone === 'danger') ? 'danger' : attention.length || summaryUnavailable ? 'warning' : 'success'}
     >
@@ -608,11 +626,20 @@ export default function Dashboard() {
           onRetry={loadDashboard}
         />
       ) : null}
+      {partialCheck ? (
+        <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1 px-4 md:px-5 pb-3" accessibilityRole={'status' as never}>
+          <MaterialIcons name="cloud-off" size={15} color="var(--c-warning-fg)" />
+          <Text className="flex-1 min-w-[200px] t-meta" style={{ color: 'var(--c-muted)' }}>
+            {l12Failed ? 'Listele L12 nu s-au verificat' : 'Nu am putut actualiza tot'}: ce vezi poate fi de la ultima vizită.
+          </Text>
+          <Button size="sm" variant="ghost" icon="refresh" label="Reîncearcă" onPress={loadDashboard} />
+        </View>
+      ) : null}
       {loadingSummary ? (
         <View className="px-4 md:px-5 pb-4 gap-2">
           {[0, 1].map((i) => <Skeleton key={i} className="h-[56px] w-full rounded-[14px]" />)}
         </View>
-      ) : attention.length === 0 ? (summaryUnavailable ? null : (
+      ) : attention.length === 0 ? (summaryUnavailable || partialCheck ? null : (
         <View className="flex-row items-center gap-3 px-4 md:px-5 pb-4">
           <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-success-bg)' }}>
             <MaterialIcons name="check" size={18} color="var(--c-success-fg)" />
@@ -686,9 +713,11 @@ export default function Dashboard() {
                       {!loadingSummary ? (
                         summaryUnavailable
                           ? <HeaderChip icon="cloud-off" tone="warning" label="Nu am putut verifica" />
-                          : attention.length
-                            ? <HeaderChip icon="warning-amber" tone="warning" label={`${attention.length} de rezolvat`} />
-                            : <HeaderChip icon="verified" tone="success" label="Totul la zi" />
+                          : partialCheck
+                            ? <HeaderChip icon="cloud-off" tone="warning" label={attention.length ? `${attention.length} de rezolvat · verificare parțială` : 'Verificare parțială'} />
+                            : attention.length
+                              ? <HeaderChip icon="warning-amber" tone="warning" label={`${attention.length} de rezolvat`} />
+                              : <HeaderChip icon="verified" tone="success" label="Totul la zi" />
                       ) : null}
                     </View>
                     <View className="flex-row flex-wrap gap-2 mt-3">

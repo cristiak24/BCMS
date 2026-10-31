@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 
-import { formatPaymentWhen, paymentMethodLabel } from './paymentDate';
+import { formatPaymentWhen, isDefaultDeskDescription, paymentMethodLabel } from './paymentDate';
 
 test('a cash payment shows its day only — no "03:00"', () => {
   const text = formatPaymentWhen('2026-10-12T00:00:00.000Z', 'cash');
@@ -20,4 +20,10 @@ test('every desk method has a name, so a transfer no longer shows none', () => {
   assert.equal(paymentMethodLabel('card'), 'card (POS)');
   assert.equal(paymentMethodLabel('stripe'), 'card online');
   assert.equal(paymentMethodLabel(null), null);
+});
+
+test('a note that only repeats the method is not shown twice in the storno summary', () => {
+  assert.equal(isDefaultDeskDescription('Transfer', 'transfer'), true);
+  assert.equal(isDefaultDeskDescription('Plată numerar', 'cash'), true);
+  assert.equal(isDefaultDeskDescription('chitanța 12', 'cash'), false);
 });

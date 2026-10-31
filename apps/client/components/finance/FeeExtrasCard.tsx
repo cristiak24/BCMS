@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { View, Text, TextInput } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import Button from '../ui/Button';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import type { ToastVariant } from '../ui/Toast';
 import { FinanceCard, FinanceCardHeader } from './FinanceCard';
 import { financeApi, type FinancialSettings } from '../../services/financeApi';
 
@@ -24,9 +26,10 @@ function currentMonth() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export default function FeeExtrasCard({ settings, onSaved, readOnly = false, className }: {
+export default function FeeExtrasCard({ settings, onSaved, onNotify, readOnly = false, className }: {
     settings: FinancialSettings | null;
     onSaved: (next: FinancialSettings) => void;
+    onNotify?: (toast: { variant: ToastVariant; message: string }) => void;
     /** The accountant sees the fees but only the club admin changes them. */
     readOnly?: boolean;
     className?: string;
@@ -36,6 +39,8 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false, cla
     const [startMonth, setStartMonth] = useState('');
     const [saving, setSaving] = useState(false);
     const [editing, setEditing] = useState(false);
+    // Fee changes reach every unpaid month: asked first, like the monthly fee.
+    const [confirming, setConfirming] = useState(false);
     const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
     const reset = () => {
@@ -73,8 +78,10 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false, cla
             });
             onSaved(next);
             setEditing(false);
-            setMessage({ tone: 'ok', text: 'Setările au fost salvate.' });
+            setConfirming(false);
+            onNotify?.({ variant: 'success', message: 'Taxele au fost salvate.' });
         } catch (err) {
+            setConfirming(false);
             setMessage({ tone: 'error', text: err instanceof Error ? err.message : 'Nu am putut salva setările.' });
         } finally {
             setSaving(false);
@@ -173,14 +180,24 @@ export default function FeeExtrasCard({ settings, onSaved, readOnly = false, cla
             ) : editing ? (
                 <View className="flex-row items-center gap-2 flex-wrap">
                     <Button size="sm" label="Renunță" disabled={saving} onPress={() => { reset(); setMessage(null); setEditing(false); }} />
-                    <Button variant="primary" size="sm" icon="save" label="Salvează" loading={saving} disabled={!valid || !dirty} onPress={() => void save()} />
+                    <Button variant="primary" size="sm" icon="save" label="Salvează" loading={saving} disabled={!valid || !dirty} onPress={() => setConfirming(true)} />
                     {message?.tone === 'error' ? (
                         <Text className="text-[12px] font-medium" style={{ color: 'var(--c-danger-fg)' }}>{message.text}</Text>
                     ) : null}
                 </View>
-            ) : message?.tone === 'ok' ? (
-                <Text className="text-[12px] font-medium" style={{ color: 'var(--c-success-fg)' }}>{message.text}</Text>
             ) : null}
+
+            <ConfirmDialog
+                visible={confirming}
+                icon="tune"
+                title="Schimbi taxele?"
+                message="Sumele noi se aplică fiecărei luni încă neplătite, inclusiv restanțelor de acum. Lunile deja plătite rămân cum sunt. Familiile văd sumele noi imediat."
+                confirmLabel="Salvează taxele"
+                focusCancel
+                loading={saving}
+                onConfirm={() => void save()}
+                onCancel={() => { if (!saving) setConfirming(false); }}
+            />
         </FinanceCard>
     );
 }

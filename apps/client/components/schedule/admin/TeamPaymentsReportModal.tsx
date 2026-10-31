@@ -3,8 +3,8 @@ import { parseApiDate } from '@/utils/dates';
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, ActivityIndicator, TextInput } from '@/src/web/reactNative';
 import { useResponsive } from '../../../hooks/useResponsive';
-import { X, Receipt, TrendingUp, Clock, Plus, Banknote, Check } from 'lucide-react';
-import { financeApi, AdminRecentPayment } from '../../../services/financeApi';
+import { X, Receipt, Plus, Banknote, Check } from 'lucide-react';
+import { financeApi, type PlayerBalanceSummary, AdminRecentPayment } from '../../../services/financeApi';
 import { teamsApi, Player } from '../../../services/teamsApi';
 import { plural } from '../../../utils/plural';
 
@@ -61,6 +61,8 @@ function statusMeta(status: string) {
 export default function TeamPaymentsReportModal({ visible, teamId, teamName, onClose }: TeamPaymentsReportModalProps) {
   const { isMobile } = useResponsive();
   const [payments, setPayments] = useState<AdminRecentPayment[]>([]);
+  // Who owes what in this team — the report used to open on „collected” only.
+  const [owing, setOwing] = useState<PlayerBalanceSummary[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
@@ -79,8 +81,12 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
     setLoading(true);
     setError(false);
     try {
-      const data = await financeApi.getAdminRecentPayments(50, teamId);
+      const [data, balances] = await Promise.all([
+        financeApi.getAdminRecentPayments(50, teamId),
+        financeApi.getBalances(teamId).catch(() => null),
+      ]);
       setPayments(data);
+      setOwing(balances ? balances.players.filter((row) => row.overdue > 0).sort((a, b) => b.overdue - a.overdue) : null);
     } catch (e) {
       console.error('Load team payments failed', e);
       setError(true);
@@ -179,25 +185,34 @@ export default function TeamPaymentsReportModal({ visible, teamId, teamName, onC
             </Pressable>
           </View>
 
-          {/* Summary */}
+          {/* What is owed first, then what came in: neutral cards with a status dot
+              (filled green/orange panels read „all paid” over a team in arrears). */}
           <View className="flex-row gap-3 px-6 pt-5">
-            <View className="flex-1 rounded-2xl bg-[var(--c-success-bg)] p-4">
-              <View className="flex-row items-center gap-1.5 mb-1">
-                <TrendingUp size={14} color="var(--c-success-fg)" />
-                <Text className="text-[12px] font-bold text-[color:var(--c-success-fg)]">Încasat</Text>
+            {[
+              { dot: 'var(--c-danger)', label: 'Restanțe', value: owing == null ? '—' : formatCurrency(owing.reduce((sum, row) => sum + row.overdue, 0), currency), hint: owing == null ? 'nu s-au încărcat' : plural(owing.length, 'jucător', 'jucători') },
+              { dot: 'var(--c-success)', label: 'Încasat', value: loading ? '—' : formatCurrency(collected, currency), hint: `${plural(paid.length, 'plată', 'plăți')}${pending.length ? ` · ${pending.length} în așteptare` : ''}` },
+            ].map((tile) => (
+              <View key={tile.label} className="flex-1 rounded-[14px] border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+                <View className="flex-row items-center gap-1.5 mb-1">
+                  <View className="w-2 h-2 rounded-full" style={{ backgroundColor: tile.dot }} />
+                  <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)]">{tile.label}</Text>
+                </View>
+                <Text className="t-num text-[18px] font-bold text-[color:var(--c-ink-strong)]">{tile.value}</Text>
+                <Text className="t-meta text-[color:var(--c-muted)] mt-0.5">{tile.hint}</Text>
               </View>
-              <Text className="text-[18px] font-bold text-[color:var(--c-success-fg)]">{loading ? '—' : formatCurrency(collected, currency)}</Text>
-              <Text className="text-[10px] font-bold text-[color:var(--c-success-fg)] mt-0.5">{plural(paid.length, 'plată', 'plăți')}</Text>
-            </View>
-            <View className="flex-1 rounded-2xl bg-[var(--c-warning-bg)] p-4">
-              <View className="flex-row items-center gap-1.5 mb-1">
-                <Clock size={14} color="var(--c-warning-fg)" />
-                <Text className="text-[12px] font-bold text-[color:var(--c-warning-fg)]">În așteptare</Text>
-              </View>
-              <Text className="text-[18px] font-bold text-[color:var(--c-warning-fg)]">{loading ? '—' : pending.length}</Text>
-              <Text className="text-[10px] font-bold text-[color:var(--c-warning-fg)] mt-0.5">tranzacții</Text>
-            </View>
+            ))}
           </View>
+          {owing && owing.length ? (
+            <View className="mx-6 mt-3 rounded-[14px] border border-[var(--c-border)] overflow-hidden">
+              {owing.slice(0, 6).map((row, index) => (
+                <View key={row.playerId} className={`flex-row items-center justify-between gap-3 px-4 py-2.5 ${index ? 'border-t border-[var(--c-border)]' : ''}`}>
+                  <Text className="flex-1 min-w-0 text-[13.5px] font-semibold text-[color:var(--c-ink)]" numberOfLines={1}>{row.playerName}</Text>
+                  <Text className="t-num text-[13.5px] font-bold text-[color:var(--c-danger-fg)]">{formatCurrency(row.overdue, currency)}</Text>
+                </View>
+              ))}
+              {owing.length > 6 ? <Text className="t-meta px-4 py-2 border-t border-[var(--c-border)] text-[color:var(--c-muted)]">{`și încă ${plural(owing.length - 6, 'jucător', 'jucători')} · lista completă în Finanțe`}</Text> : null}
+            </View>
+          ) : null}
 
           {/* Manual cash payment */}
           <View className="px-6 pt-4">

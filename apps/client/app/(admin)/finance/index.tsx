@@ -1,7 +1,7 @@
 import { formatPaymentWhen, isDefaultDeskDescription, paymentMethodLabel } from '../../../utils/paymentDate';
 import { parseApiDate } from '@/utils/dates';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, Modal, Platform } from '@/src/web/reactNative';
+import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Modal, Platform } from '@/src/web/reactNative';
 import ModalBackdrop from '../../../components/ui/ModalBackdrop';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import * as DocumentPicker from '@/src/web/documentPicker';
@@ -142,12 +142,14 @@ function SettingTile({ label, canEdit, editing, onEdit, loading, value, unit, in
                         <TextInput
                             value={input}
                             onChangeText={onInput}
-                            keyboardType="numeric"
+                            keyboardType="decimal-pad"
                             maxLength={maxLength}
                             placeholder={placeholder}
                             placeholderTextColor="var(--c-faint)"
                             accessibilityLabel={label}
                             autoFocus
+                            onSubmitEditing={onSave}
+                            onKeyDown={(event: { key: string }) => { if (event.key === 'Escape') onCancel(); }}
                             className="flex-1 h-full px-3 text-[16px] font-bold t-num"
                             style={{ color: 'var(--c-ink)' }}
                         />
@@ -155,7 +157,8 @@ function SettingTile({ label, canEdit, editing, onEdit, loading, value, unit, in
                     </View>
                     <View className="flex-row gap-2">
                         <Button size="sm" label="Renunță" className="flex-1" disabled={saving} onPress={onCancel} />
-                        <Button size="sm" variant="primary" icon="save" label="Salvează" className="flex-1" loading={saving} onPress={onSave} />
+                        {/* No icon: in the narrow tile it cut the label to „Salveaz”. */}
+                        <Button size="sm" variant="primary" label="Salvează" className="flex-1" loading={saving} onPress={onSave} />
                     </View>
                 </View>
             ) : loading ? (
@@ -211,6 +214,8 @@ export default function FinancialSettingsPage() {
     const [monthlyFeeInput, setMonthlyFeeInput] = useState('');
     const [editingFee, setEditingFee] = useState(false);
     const [savingFee, setSavingFee] = useState(false);
+    // The fee changes every unpaid month, past restanțe included: asked first.
+    const [confirmFee, setConfirmFee] = useState(false);
     const [dueDayInput, setDueDayInput] = useState('');
     const [editingDueDay, setEditingDueDay] = useState(false);
     const [savingDueDay, setSavingDueDay] = useState(false);
@@ -416,20 +421,26 @@ export default function FinancialSettingsPage() {
     }, [uploads, documentFilter, documentSearch]);
 
     /* ─── Finances handlers ────────────────────────────────────── */
-    const handleSaveMonthlyFee = async () => {
-        const val = parseFloat(monthlyFeeInput);
-        if (isNaN(val) || val < 0) {
-            Alert.alert('Eroare', 'Introduceți o valoare validă pentru cotizație.');
+    // „150,5” or „150.5”, rounded to bani: „150.5015” used to reach the server as is.
+    const parsedFee = Math.round(Number(monthlyFeeInput.replace(',', '.')) * 100) / 100;
+    const askSaveMonthlyFee = () => {
+        if (!Number.isFinite(parsedFee) || parsedFee < 0) {
+            showToast({ variant: 'error', message: 'Scrie o cotizație validă: 0 sau mai mult.' });
             return;
         }
+        setConfirmFee(true);
+    };
+    const handleSaveMonthlyFee = async () => {
         setSavingFee(true);
         try {
-            await financeApi.updateSettings({ monthlyPlayerFee: val });
-            setSettings(prev => prev ? { ...prev, monthlyPlayerFee: val } : prev);
+            await financeApi.updateSettings({ monthlyPlayerFee: parsedFee });
+            setSettings(prev => prev ? { ...prev, monthlyPlayerFee: parsedFee } : prev);
             setEditingFee(false);
-            Alert.alert('Succes', `Cotizația lunară a fost actualizată la ${val} RON.`);
-        } catch {
-            Alert.alert('Eroare', 'Nu s-a putut actualiza cotizația.');
+            setConfirmFee(false);
+            showToast({ variant: 'success', message: `Cotizația lunară e acum ${parsedFee} RON.` });
+        } catch (error) {
+            setConfirmFee(false);
+            showToast({ variant: 'error', message: `Cotizația nu s-a salvat. ${loadFailureMessage(error)}` });
         } finally {
             setSavingFee(false);
         }
@@ -438,7 +449,7 @@ export default function FinancialSettingsPage() {
     const handleSaveDueDay = async () => {
         const day = parseInt(dueDayInput, 10);
         if (isNaN(day) || day < 1 || day > 31) {
-            Alert.alert('Eroare', 'Introduceți o zi validă (între 1 și 31).');
+            showToast({ variant: 'error', message: 'Scrie o zi între 1 și 31.' });
             return;
         }
         setSavingDueDay(true);
@@ -446,9 +457,9 @@ export default function FinancialSettingsPage() {
             await financeApi.updateSettings({ paymentDueDay: day });
             setSettings(prev => prev ? { ...prev, paymentDueDay: day } : prev);
             setEditingDueDay(false);
-            Alert.alert('Succes', `Ziua limită de plată a fost setată la ${day}.`);
-        } catch {
-            Alert.alert('Eroare', 'Nu s-a putut actualiza ziua limită.');
+            showToast({ variant: 'success', message: `Ziua limită de plată e acum ${day}.` });
+        } catch (error) {
+            showToast({ variant: 'error', message: `Ziua limită nu s-a salvat. ${loadFailureMessage(error)}` });
         } finally {
             setSavingDueDay(false);
         }
@@ -475,7 +486,7 @@ export default function FinancialSettingsPage() {
             });
         } catch (error) {
             console.error('Error picking document', error);
-            Alert.alert('Eroare', 'Nu am putut selecta fișierul.');
+            showToast({ variant: 'error', message: 'Nu am putut selecta fișierul.' });
         } finally {
             setPickingFile(null);
         }
@@ -490,7 +501,7 @@ export default function FinancialSettingsPage() {
         if (!uploadModal.file) return;
         const amountValue = parseFloat(uploadModal.amount.replace(',', '.'));
         if (!Number.isFinite(amountValue) || amountValue < 0) {
-            Alert.alert('Eroare', 'Introduceți o sumă validă (0 sau mai mare).');
+            showToast({ variant: 'error', message: 'Scrie o sumă validă: 0 sau mai mult.' });
             return;
         }
 
@@ -509,10 +520,10 @@ export default function FinancialSettingsPage() {
 
             await loadDocuments();
             setUploadModal(EMPTY_UPLOAD_MODAL);
-            Alert.alert('Succes', `${typeLabel === 'Expense' ? 'Cheltuiala' : 'Factura'} a fost încărcată cu succes.`);
+            showToast({ variant: 'success', message: `${typeLabel === 'Expense' ? 'Cheltuiala' : 'Factura'} a fost încărcată.` });
         } catch (error) {
             console.error('Error uploading document', error);
-            Alert.alert('Eroare', 'Nu am putut încărca documentul.');
+            showToast({ variant: 'error', message: 'Nu am putut încărca documentul.' });
             setUploadModal((prev) => ({ ...prev, submitting: false }));
         }
     };
@@ -534,7 +545,8 @@ export default function FinancialSettingsPage() {
             return true;
         } catch (error) {
             console.error('Failed to update document status:', error);
-            Alert.alert('Eroare', error instanceof Error ? error.message : 'Nu am putut actualiza statusul documentului.');
+            // A toast, not the browser's „127.0.0.1 says” box, and never the server's raw text.
+            showToast({ variant: 'error', message: `Statusul documentului nu s-a schimbat. ${loadFailureMessage(error)}` });
             return false;
         } finally {
             setUpdatingDocId(null);
@@ -555,7 +567,7 @@ export default function FinancialSettingsPage() {
 
     const openDocumentUrl = async (documentUrl: string | null) => {
         if (Platform.OS !== 'web' || !documentUrl) {
-            Alert.alert('Info', 'Folosiți interfața web pentru a descărca documentul.');
+            showToast({ variant: 'info', message: 'Documentul se descarcă din browser.' });
             return;
         }
         // Documents stored in the database are private: ask for a 5-minute
@@ -574,7 +586,7 @@ export default function FinancialSettingsPage() {
             else window.location.assign(url);
         } catch {
             tab?.close();
-            Alert.alert('Eroare', 'Nu am putut deschide documentul.');
+            showToast({ variant: 'error', message: 'Nu am putut deschide documentul.' });
         }
     };
 
@@ -702,7 +714,8 @@ export default function FinancialSettingsPage() {
                                     label="Cotizație"
                                     canEdit={canEditFees}
                                     editing={editingFee}
-                                    onEdit={() => setEditingFee(true)}
+                                    // One editor at a time: two open tiles each had a Salvează.
+                                    onEdit={() => { setEditingDueDay(false); setEditingFee(true); }}
                                     loading={loadingSettings}
                                     value={String(settings?.monthlyPlayerFee || 0)}
                                     unit="RON / lună"
@@ -710,7 +723,7 @@ export default function FinancialSettingsPage() {
                                     onInput={setMonthlyFeeInput}
                                     placeholder="0"
                                     saving={savingFee}
-                                    onSave={handleSaveMonthlyFee}
+                                    onSave={askSaveMonthlyFee}
                                     onCancel={() => {
                                         setEditingFee(false);
                                         setMonthlyFeeInput(String(settings?.monthlyPlayerFee || 0));
@@ -720,7 +733,7 @@ export default function FinancialSettingsPage() {
                                     label="Zi limită"
                                     canEdit={canEditFees}
                                     editing={editingDueDay}
-                                    onEdit={() => setEditingDueDay(true)}
+                                    onEdit={() => { setEditingFee(false); setEditingDueDay(true); }}
                                     loading={loadingSettings}
                                     value={String(settings?.paymentDueDay || 25)}
                                     unit="a lunii următoare"
@@ -749,6 +762,18 @@ export default function FinancialSettingsPage() {
                             settings={settings}
                             readOnly={!canEditFees}
                             onSaved={(next) => { setSettings(next); void loadSummary(); }}
+                            onNotify={showToast}
+                        />
+                        <ConfirmDialog
+                            visible={confirmFee}
+                            icon="payments"
+                            title={`Schimbi cotizația la ${parsedFee} RON?`}
+                            message={`Noua sumă se aplică fiecărei luni încă neplătite, inclusiv restanțelor de acum. Lunile deja plătite rămân cum sunt. Familiile văd suma nouă imediat.`}
+                            confirmLabel="Schimbă cotizația"
+                            focusCancel
+                            loading={savingFee}
+                            onConfirm={() => void handleSaveMonthlyFee()}
+                            onCancel={() => { if (!savingFee) setConfirmFee(false); }}
                         />
                     </View>
                 </View>
@@ -859,11 +884,11 @@ export default function FinancialSettingsPage() {
                                                             <ActivityIndicator size="small" color="var(--c-brand-fg)" />
                                                         ) : entry.accountingStatus === 'pending' ? (
                                                             <>
-                                                                <Button size="sm" variant="danger" icon="close" label="Respinge" onPress={() => { setReviewReason(''); setReviewDialog({ id: entry.id, mode: 'reject' }); }} />
-                                                                <Button size="sm" variant="primary" icon="check" label="Aprobă" onPress={() => void handleUpdateDocumentStatus(entry.id, 'processed')} />
+                                                                <Button size="sm" variant="danger" icon="close" label="Respinge" accessibilityLabel={`Respinge ${entry.label}`} onPress={() => { setReviewReason(''); setReviewDialog({ id: entry.id, mode: 'reject' }); }} />
+                                                                <Button size="sm" variant="primary" icon="check" label="Aprobă" accessibilityLabel={`Aprobă ${entry.label}`} onPress={() => void handleUpdateDocumentStatus(entry.id, 'processed')} />
                                                             </>
                                                         ) : (
-                                                            <Button size="sm" icon="undo" label="Redeschide" iconOnlyOnMobile accessibilityLabel="Redeschide documentul" onPress={() => { setReviewReason(''); setReviewDialog({ id: entry.id, mode: 'reopen' }); }} />
+                                                            <Button size="sm" icon="undo" label="Redeschide" iconOnlyOnMobile accessibilityLabel={`Redeschide ${entry.label}`} onPress={() => { setReviewReason(''); setReviewDialog({ id: entry.id, mode: 'reopen' }); }} />
                                                         )}
                                                     </View>
                                                 </View>
@@ -1104,7 +1129,7 @@ export default function FinancialSettingsPage() {
                         </Text>
                         {/* A desk payment without a note carries the server's default text („Plată numerar”,
                             „Transfer bancar”…): the line above already says it. */}
-                        {pendingReverse.description && !isDefaultDeskDescription(pendingReverse.description) ? (
+                        {pendingReverse.description && !isDefaultDeskDescription(pendingReverse.description, pendingReverse.provider) ? (
                             <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>{pendingReverse.description}</Text>
                         ) : null}
                     </View>

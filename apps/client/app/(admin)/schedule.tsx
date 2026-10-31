@@ -14,7 +14,7 @@ import { AttendanceTab } from '../../components/schedule/AttendanceTab';
 import { GradeTab } from '../../components/schedule/GradeTab';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../components/HeaderContext';
 import { useResponsive } from '../../hooks/useResponsive';
-import { useAdminScheduleData } from '../../hooks/useAdminScheduleData';
+import { useAdminScheduleData, UPCOMING_DAYS } from '../../hooks/useAdminScheduleData';
 import {
   eventMatchesSearch, isCancelledEvent, buildICSCalendar, triggerFileDownload, toDateKey,
   startOfWeek, addDays, RO_LOCALE,
@@ -94,7 +94,7 @@ export default function ScheduleScreen() {
   const [showCancelled, setShowCancelled] = useState(false);
 
   const filters = useMemo(() => ({ type: filterType, coachId: filterCoachId, teamId: filterTeamId }), [filterType, filterCoachId, filterTeamId]);
-  const { events, teams, coaches, error: loadError, refetch } = useAdminScheduleData(currentDate, filters);
+  const { events, upcoming, teams, coaches, error: loadError, refetch } = useAdminScheduleData(currentDate, filters);
 
   // ── HeaderContext integration ─────────────────────────────────────
   const { setSearchPlaceholder, setHeaderActions, setMobileFab, searchValue, setSearchValue } = useHeader();
@@ -347,17 +347,17 @@ export default function ScheduleScreen() {
 
   const monthName = currentDate.toLocaleString('ro-RO', { month: 'long' });
   const viewYear = currentDate.getFullYear();
-  const upcomingCount = visibleEvents.filter((event) => parseApiDate(event.endTime || event.startTime) >= new Date()).length;
-  const featuredUpcoming = useMemo(
-    () => [...visibleEvents]
+  // The next 14 days from now, whatever month is on screen.
+  const comingUp = useMemo(
+    () => upcoming
+      .filter((event) => (showCancelled || !isCancelledEvent(event)) && eventMatchesSearch(event, searchValue))
       .filter((event) => parseApiDate(event.endTime || event.startTime) >= new Date())
-      .sort((a, b) => parseApiDate(a.startTime).getTime() - parseApiDate(b.startTime).getTime())
-      .slice(0, 3),
-    [visibleEvents]
+      .sort((a, b) => parseApiDate(a.startTime).getTime() - parseApiDate(b.startTime).getTime()),
+    [upcoming, showCancelled, searchValue]
   );
-  const nextMatch = featuredUpcoming.find((event) => event.type === 'match')
-    ?? [...visibleEvents].filter((e) => e.type === 'match' && parseApiDate(e.endTime || e.startTime) >= new Date())
-      .sort((a, b) => parseApiDate(a.startTime).getTime() - parseApiDate(b.startTime).getTime())[0];
+  const upcomingCount = comingUp.length;
+  const featuredUpcoming = comingUp.slice(0, 3);
+  const nextMatch = comingUp.find((event) => event.type === 'match');
 
   // Per-type counts feed the toolbar chips (which double as the calendar's
   // legend). Computed off the search-filtered set, ignoring the active type
@@ -474,7 +474,8 @@ export default function ScheduleScreen() {
             <View className={`${isWideDesktop ? 'shrink-0' : 'w-full'} gap-3`} style={isWideDesktop ? { width: 380 } : undefined}>
               <View className="flex-row items-center justify-between px-0.5">
                 <Text accessibilityRole="header" className="text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>
-                  Evenimente viitoare{upcomingCount ? (
+                  {/* The range named: it no longer follows the month on screen. */}
+                  {`Următoarele ${UPCOMING_DAYS} zile`}{upcomingCount ? (
                     // „· 4” over three rows read as a missing event: say how many are shown.
                     <Text style={{ color: 'var(--c-faint)' }}>{upcomingCount > featuredUpcoming.length ? ` · ${featuredUpcoming.length} din ${upcomingCount}` : ` · ${upcomingCount}`}</Text>
                   ) : null}
@@ -492,7 +493,7 @@ export default function ScheduleScreen() {
                   <View className="w-10 h-10 rounded-[12px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
                     <CalendarIcon size={18} color="var(--c-brand-fg)" />
                   </View>
-                  <Text className="text-[14px] font-semibold mt-3 text-center" style={{ color: 'var(--c-ink)' }}>Niciun eveniment viitor</Text>
+                  <Text className="text-[14px] font-semibold mt-3 text-center" style={{ color: 'var(--c-ink)' }}>{`Nimic programat în următoarele ${UPCOMING_DAYS} zile`}</Text>
                   <Text className="t-meta mt-1 text-center" style={{ color: 'var(--c-muted)' }}>Adaugă unul cu „Eveniment” sau sincronizează meciurile FRB.</Text>
                 </View>
               ) : (

@@ -480,7 +480,14 @@ export default function RosterScreen() {
   // "Adaugă jucător" itself lives in PageHero's actions (desktop) and this FAB
   // (mobile), fixed to the viewport above the bottom nav — same geometry as the
   // Program screen's "+ Eveniment" FAB, so both add actions match.
+  // While players are selected the fixed bulk bar takes that corner: no FAB over it.
+  const selecting = selectedIds.size > 0;
   useEffect(() => {
+    if (isMobile && selecting) {
+      setHeaderActions(null);
+      setMobileFab(null);
+      return;
+    }
     if (isMobile) {
       setHeaderActions(null);
       setMobileFab(
@@ -515,7 +522,7 @@ export default function RosterScreen() {
     setMobileFab(null);
     setHeaderActions(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMobile]);
+  }, [isMobile, selecting]);
 
   if (loading) {
     return (
@@ -737,7 +744,8 @@ export default function RosterScreen() {
 
   return (
     <>
-      <ScrollView contentContainerStyle={styles.listContent} style={styles.screen}>
+      {/* Room under the last row for the fixed bulk bar on a phone. */}
+      <ScrollView contentContainerStyle={isMobile && selecting ? [styles.listContent, { paddingBottom: 180 }] : styles.listContent} style={styles.screen}>
         {headerContent}
       </ScrollView>
 

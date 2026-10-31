@@ -627,7 +627,7 @@ function AttendanceRow({
         {dirty ? (
           <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: 'var(--c-warning)' }} accessibilityLabel="Notă nesalvată" />
         ) : null}
-        <AttendanceNoteToggle open={noteOpen} hasNote={hasNote} onPress={onToggleNote} className="xl:hidden" />
+        <AttendanceNoteToggle open={noteOpen} hasNote={hasNote} onPress={onToggleNote} playerName={playerName} className="xl:hidden" />
       </View>
 
       <View className={`${noteOpen ? 'flex' : 'hidden'} xl:flex order-last xl:order-none w-full xl:w-auto xl:flex-1 min-w-0 flex-row items-start gap-2`}>

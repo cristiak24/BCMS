@@ -1,7 +1,8 @@
+import Button from '../ui/Button';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, TextInput, ActivityIndicator, Modal, ScrollView } from '@/src/web/reactNative';
 import ModalBackdrop from '../ui/ModalBackdrop';
-import { RefreshCw, Plus, X, Check, Search } from 'lucide-react';
+import { RefreshCw, Plus, X, Search } from 'lucide-react';
 import { basketballApi } from '../../services/basketballApi';
 import { teamsApi, Team, Coach, TeamGender, TeamLevel, Player } from '../../services/teamsApi';
 import { LEAGUES_M, LEAGUES_F } from './frbLeagues';
@@ -179,13 +180,17 @@ export default function CreateTeamWizard({
     return (
         <Modal visible transparent animationType={isMobile ? 'slide' : 'fade'} onRequestClose={onClose}>
         <ModalBackdrop className={`flex-1 ${isMobile ? 'justify-end' : 'items-center justify-center px-4'}`} style={{ backgroundColor: 'rgba(2, 8, 23, 0.62)' }} onDismiss={creating ? undefined : onClose} >
+            {/* A named dialog on the system shell (it was unnamed, with an unlabelled close). */}
             <View
-                className={`bg-[var(--c-surface)] w-full shadow-2xl overflow-hidden flex-col ${isMobile ? 'rounded-t-[24px]' : 'rounded-[20px] max-w-[600px]'}`}
-                style={{ maxHeight: isMobile ? '94%' : '90%' } as any}
+                role="dialog"
+                aria-modal="true"
+                accessibilityLabel="Creează echipă"
+                className={`bg-[var(--c-surface)] border border-[var(--c-border)] w-full overflow-hidden flex-col ${isMobile ? 'rounded-t-[20px]' : 'rounded-[18px] max-w-[600px]'}`}
+                style={{ maxHeight: isMobile ? '94%' : '90%', boxShadow: 'var(--e-lg)' } as any}
             >
                 <View className="flex-row items-center justify-between px-6 pt-6 pb-1">
                     <Text className="text-[18px] font-bold text-[color:var(--c-ink-strong)]">Creează echipă</Text>
-                    <Pressable onPress={onClose} disabled={creating} className="w-9 h-9 rounded-full bg-[var(--c-surface-2)] items-center justify-center border border-[var(--c-border)]">
+                    <Pressable onPress={onClose} disabled={creating} accessibilityRole="button" accessibilityLabel="Închide" className="tap-40 w-9 h-9 rounded-full bg-[var(--c-surface-2)] items-center justify-center border border-[var(--c-border)]">
                         <X size={16} color="var(--c-muted)" />
                     </Pressable>
                 </View>
@@ -425,23 +430,16 @@ export default function CreateTeamWizard({
                 </ScrollView>
 
                 <View className="flex-row justify-between items-center px-6 py-4 border-t border-[var(--c-border)]">
-                    <Pressable onPress={goBack} disabled={step === 0 || creating} className={`h-10 px-3 ${step === 0 ? 'opacity-0' : ''}`}>
-                        <Text className="text-[color:var(--c-muted)] font-bold text-[13.5px]">Înapoi</Text>
-                    </Pressable>
-                    <Pressable
+                    {/* The system's buttons: a disabled „Continuă” was white on grey, nearly invisible. */}
+                    {step === 0 ? <View /> : <Button variant="ghost" label="Înapoi" disabled={creating} onPress={goBack} />}
+                    <Button
+                        variant="primary"
+                        icon={step === 3 ? 'check' : undefined}
+                        label={step === 3 ? 'Creează echipa' : 'Continuă'}
+                        loading={creating}
+                        disabled={(step === 0 && !canAdvanceFromStep1) || (step === 1 && !canAdvanceFromStep2)}
                         onPress={goNext}
-                        disabled={creating || (step === 0 && !canAdvanceFromStep1) || (step === 1 && !canAdvanceFromStep2)}
-                        className={`h-11 px-5 rounded-[14px] flex-row items-center gap-2 ${
-                            creating || (step === 0 && !canAdvanceFromStep1) || (step === 1 && !canAdvanceFromStep2) ? 'bg-[var(--c-surface-3)]' : 'bg-[var(--c-brand-surface)]'
-                        }`}
-                    >
-                        {creating ? <ActivityIndicator size="small" color="var(--c-surface)" /> : (
-                            <>
-                                {step === 3 && <Check size={14} color="var(--c-surface)" />}
-                                <Text className="text-[color:var(--c-on-brand)] font-bold text-[13.5px]">{step === 3 ? 'Creează echipa' : 'Continuă'}</Text>
-                            </>
-                        )}
-                    </Pressable>
+                    />
                 </View>
             </View>
         </ModalBackdrop>

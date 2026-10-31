@@ -12,18 +12,21 @@ export function AttendanceNoteToggle({
   open,
   hasNote,
   onPress,
+  playerName,
   className = '',
 }: {
   open: boolean;
   hasNote: boolean;
   onPress: () => void;
+  /** Names the row: six buttons called only „Adaugă notă” read the same. */
+  playerName?: string;
   className?: string;
 }) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={open ? 'Ascunde nota' : hasNote ? 'Vezi nota' : 'Adaugă notă'}
+      accessibilityLabel={`${open ? 'Ascunde nota' : hasNote ? 'Vezi nota' : 'Adaugă notă'}${playerName ? `: ${playerName}` : ''}`}
       accessibilityState={{ expanded: open }}
       className={`ui-press tap-40 w-9 h-9 rounded-[10px] border items-center justify-center shrink-0 ${className}`}
       style={{

@@ -17,7 +17,9 @@ export default function BulkActionBar({ selectedCount, busy, onExportCsv, onReas
 
   return (
     <View
-      className="dash-fade-in mb-4 flex-row flex-wrap items-center justify-between gap-3 rounded-[20px] border px-4 py-3"
+      // Phones: fixed above the bottom bar (selecting the last row left it 600px
+      // up the page, off-screen). From md it sits in the page above the table.
+      className="dash-fade-in md:mb-4 flex-row flex-wrap items-center justify-between gap-3 rounded-[16px] md:rounded-[20px] border px-4 py-3 max-md:fixed max-md:left-3 max-md:right-3 max-md:z-30 max-md:bottom-[calc(88px+env(safe-area-inset-bottom,0px))] max-md:shadow-[var(--e-lg)]"
       // Brand tokens: a stray blue (rgba 37,99,235) that wasn't the indigo brand.
       style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-border)' }}
     >

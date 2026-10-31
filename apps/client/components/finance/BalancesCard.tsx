@@ -110,6 +110,9 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
     const [method, setMethod] = useState<Method>('cash');
     const [date, setDate] = useState(todayIso());
     const [description, setDescription] = useState('');
+    // The suggested amount, to tell a typed one apart; and the „drop it?” question.
+    const [suggestedAmount, setSuggestedAmount] = useState('');
+    const [confirmDiscard, setConfirmDiscard] = useState(false);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [allocation, setAllocation] = useState<PaymentAllocation | null>(null);
@@ -216,7 +219,9 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
             setTargetFees(fees);
             // Only into an empty field: on a slow connection the fees arrive after
             // the admin typed a sum, which used to be replaced without a word.
-            setAmount((current) => (current.trim() ? current : String(chosen.reduce((sum, fee) => sum + fee.amount, 0))));
+            const suggestion = String(chosen.reduce((sum, fee) => sum + fee.amount, 0));
+            setSuggestedAmount(suggestion);
+            setAmount((current) => (current.trim() ? current : suggestion));
         } catch (err) {
             if (targetIdRef.current === playerId) setFeesError(err instanceof Error ? err.message : 'Nu am putut încărca taxele jucătorului.');
         }
@@ -226,6 +231,7 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
         targetIdRef.current = balance.playerId;
         setTarget(balance);
         setAmount('');
+        setSuggestedAmount('');
         setMethod('cash');
         setDate(todayIso());
         setDescription('');
@@ -460,7 +466,13 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                 sheetOnPhone
                 dismissOnBackdrop={false}
                 onConfirm={() => void savePayment()}
-                onCancel={() => { if (!saving) setTarget(null); }}
+                // Esc and „Renunță” used to drop a typed amount and receipt note at once.
+                onCancel={() => {
+                    if (saving) return;
+                    const typed = (amount.trim() && amount.trim() !== suggestedAmount) || description.trim();
+                    if (typed) setConfirmDiscard(true);
+                    else setTarget(null);
+                }}
             >
                 {target ? (
                     <View className="gap-3">
@@ -591,6 +603,17 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                     </View>
                 ) : null}
             </ConfirmDialog>
+            <ConfirmDialog
+                visible={confirmDiscard}
+                destructive
+                icon="delete-outline"
+                title="Renunți la încasare?"
+                message={`Suma${description.trim() ? ' și nota' : ''} pe care le-ai scris nu se înregistrează.`}
+                confirmLabel="Renunță la încasare"
+                cancelLabel="Continuă încasarea"
+                onConfirm={() => { setConfirmDiscard(false); setTarget(null); }}
+                onCancel={() => setConfirmDiscard(false)}
+            />
         </FinanceCard>
     );
 }
