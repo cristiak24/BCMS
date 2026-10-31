@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput } from '@/src/web/reactNative';
-import { Search, LayoutGrid, Table2, ArrowUpDown, X, SlidersHorizontal, AlertTriangle } from 'lucide-react';
+import { Search, LayoutGrid, Table2, X, SlidersHorizontal } from 'lucide-react';
+import SelectField from '../ui/SelectField';
 import type { Coach } from '../../services/teamsApi';
 import type {
     FilterCounts,
@@ -39,48 +40,34 @@ function isMeaningful<T extends string>(options: ChipOption<T>[]): boolean {
     return options.filter((o) => o.value !== 'all' && (o.count ?? 0) > 0).length >= 2;
 }
 
-function ChipGroup<T extends string>({
+/** One tray filter: a small sentence-case label over a native select (the chip rows read as noise). */
+function LabeledSelect<T extends string>({
     label,
     options,
     value,
     onChange,
 }: {
     label: string;
-    options: ChipOption<T>[];
+    options: { key: T; label: string; count?: number }[];
     value: T;
     onChange: (value: T) => void;
 }) {
     return (
-        <View className="flex-row items-center flex-wrap gap-1">
-            <Text className="text-[10px] font-semibold uppercase tracking-wider mr-1" style={{ color: 'var(--c-faint)' }}>{label}</Text>
-            {options.map((opt) => {
-                const active = opt.value === value;
-                return (
-                    <Pressable
-                        key={opt.value}
-                        onPress={() => onChange(opt.value)}
-                        className="flex-row items-center gap-1.5 px-2.5 h-7 rounded-[8px] border"
-                        style={active
-                            ? { backgroundColor: 'var(--c-brand-surface)', borderColor: 'transparent' }
-                            : { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}
-                    >
-                        {opt.dot ? <View className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: opt.dot }} /> : null}
-                        <Text className="text-[12px] font-semibold" style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>{opt.label}</Text>
-                        {typeof opt.count === 'number' && (
-                            <Text className="text-[11px] font-semibold" style={{ color: active ? 'rgba(255,255,255,0.7)' : 'var(--c-faint)' }}>{opt.count}</Text>
-                        )}
-                    </Pressable>
-                );
-            })}
+        <View className="gap-1.5 min-w-0">
+            <Text className="t-label" style={{ color: 'var(--c-muted)' }}>{label}</Text>
+            <SelectField label={label} options={options} value={value} onChange={onChange} />
         </View>
     );
 }
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-    { value: 'updated', label: 'Actualizare' },
-    { value: 'name', label: 'Nume' },
-    { value: 'players', label: 'Jucători' },
-    { value: 'medical', label: 'Vize expirate' },
+/** Sort key and direction as one choice, worded by what comes first. */
+const SORT_OPTIONS: { key: `${SortKey}:${'asc' | 'desc'}`; label: string }[] = [
+    { key: 'name:asc', label: 'Nume (A–Z)' },
+    { key: 'name:desc', label: 'Nume (Z–A)' },
+    { key: 'updated:desc', label: 'Actualizate recent' },
+    { key: 'players:desc', label: 'Cei mai mulți jucători' },
+    { key: 'players:asc', label: 'Cei mai puțini jucători' },
+    { key: 'medical:desc', label: 'Cele mai multe vize expirate' },
 ];
 
 export default function TeamFiltersBar({
@@ -209,11 +196,12 @@ export default function TeamFiltersBar({
                     accessibilityLabel="Sortare și filtre"
                     className="h-9 [@media(pointer:coarse)]:h-10 px-2.5 rounded-[9px] border flex-row items-center gap-1.5"
                     style={expanded
-                        ? { backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' }
+                        ? { backgroundColor: 'var(--c-surface-3)', borderColor: 'var(--c-border-strong)' }
                         : { backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
+                    aria-expanded={expanded}
                 >
-                    <SlidersHorizontal size={14} color={expanded ? 'var(--c-brand-fg)' : 'var(--c-muted)'} />
-                    <Text className="text-[12px] font-semibold" style={{ color: expanded ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)' }}>Filtre</Text>
+                    <SlidersHorizontal size={14} color={expanded ? 'var(--c-ink)' : 'var(--c-muted)'} />
+                    <Text className="text-[12px] font-semibold" style={{ color: expanded ? 'var(--c-ink-strong)' : 'var(--c-ink-soft)' }}>Filtre</Text>
                     {activeFilterCount > 0 ? (
                         <View className="min-w-[18px] h-[18px] px-1 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-brand-surface)' }}>
                             <Text className="t-num text-[10.5px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{activeFilterCount}</Text>
@@ -227,18 +215,18 @@ export default function TeamFiltersBar({
                         accessibilityLabel="Vizualizare carduri"
                         aria-pressed={view === 'grid'}
                         className="w-9 h-9 [@media(pointer:coarse)]:w-10 [@media(pointer:coarse)]:h-10 items-center justify-center"
-                        style={{ backgroundColor: view === 'grid' ? 'var(--c-brand-surface)' : 'var(--c-surface)' }}
+                        style={{ backgroundColor: view === 'grid' ? 'var(--c-surface-3)' : 'var(--c-surface)' }}
                     >
-                        <LayoutGrid size={14} color={view === 'grid' ? 'var(--c-on-brand)' : 'var(--c-muted)'} />
+                        <LayoutGrid size={14} color={view === 'grid' ? 'var(--c-ink-strong)' : 'var(--c-muted)'} />
                     </Pressable>
                     <Pressable
                         onPress={() => onViewChange('table')}
                         accessibilityLabel="Vizualizare tabel"
                         aria-pressed={view === 'table'}
                         className="w-9 h-9 [@media(pointer:coarse)]:w-10 [@media(pointer:coarse)]:h-10 items-center justify-center border-l"
-                        style={{ backgroundColor: view === 'table' ? 'var(--c-brand-surface)' : 'var(--c-surface)', borderColor: 'var(--c-border)' }}
+                        style={{ backgroundColor: view === 'table' ? 'var(--c-surface-3)' : 'var(--c-surface)', borderColor: 'var(--c-border)' }}
                     >
-                        <Table2 size={14} color={view === 'table' ? 'var(--c-on-brand)' : 'var(--c-muted)'} />
+                        <Table2 size={14} color={view === 'table' ? 'var(--c-ink-strong)' : 'var(--c-muted)'} />
                     </Pressable>
                 </View>
             </View>
@@ -254,10 +242,10 @@ export default function TeamFiltersBar({
                             onPress={c.clear}
                             accessibilityLabel={`Elimină filtrul ${c.label}`}
                             className="flex-row items-center gap-1 h-7 pl-2.5 pr-1.5 rounded-[8px] border"
-                            style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' }}
+                            style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}
                         >
-                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{c.label}</Text>
-                            <X size={12} color="var(--c-brand-fg)" />
+                            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{c.label}</Text>
+                            <X size={12} color="var(--c-muted)" />
                         </Pressable>
                     ))}
                     <Pressable onPress={onReset} className="h-7 px-2 justify-center">
@@ -269,87 +257,54 @@ export default function TeamFiltersBar({
             {/* Expanded tray — every filter dimension (Tip/Sex/Nivel/Status),
                 sort controls, the medical-alert quick filter, and the coach
                 select. Nothing lives permanently in the page anymore. */}
+            {/* Expanded tray: one grid of labelled selects (sort first, then each
+                dimension that actually splits the set, the visa alert and the coach)
+                instead of five rows of chips with tracked-caps labels. */}
             {expanded && (
-                <View className="gap-3 pt-2.5 border-t" style={{ borderColor: 'var(--c-border-soft)' }}>
-                    {/* Dimensions */}
+                <View
+                    className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-x-3 gap-y-3 pt-3 border-t"
+                    style={{ borderColor: 'var(--c-border-soft)' }}
+                >
+                    <LabeledSelect
+                        label="Sortează"
+                        options={SORT_OPTIONS}
+                        value={(SORT_OPTIONS.some((o) => o.key === `${sort.key}:${sort.dir}`) ? `${sort.key}:${sort.dir}` : 'name:asc') as (typeof SORT_OPTIONS)[number]['key']}
+                        onChange={(next) => {
+                            const [key, dir] = next.split(':') as [SortKey, 'asc' | 'desc'];
+                            setSort({ key, dir });
+                        }}
+                    />
                     {trayDims.map((d) => (
-                        <ChipGroup
+                        <LabeledSelect
                             key={d.key}
                             label={d.label}
-                            value={d.value as any}
+                            value={d.value as string}
                             onChange={(v) => setFilter(d.filterKey, v as any)}
-                            options={d.options as any}
+                            options={(d.options as ChipOption<string>[]).map((o) => ({ key: o.value, label: o.label, count: o.count }))}
                         />
                     ))}
-
-                    {/* Sortare */}
-                    <View className="flex-row items-center flex-wrap gap-1.5">
-                        <View className="flex-row items-center gap-1 mr-1">
-                            <ArrowUpDown size={12} color="var(--c-faint)" />
-                            <Text className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-faint)' }}>Sortează</Text>
+                    {counts.alert.medical > 0 || filters.alert === 'medical' ? (
+                        <LabeledSelect
+                            label="Vize medicale"
+                            value={filters.alert}
+                            onChange={(v) => setFilter('alert', v)}
+                            options={[
+                                { key: 'all' as const, label: 'Toate echipele' },
+                                { key: 'medical' as const, label: 'Cu vize expirate', count: counts.alert.medical },
+                            ]}
+                        />
+                    ) : null}
+                    {hasCoachFilter ? (
+                        // Phones: the coach select takes the whole row when it would sit alone in it.
+                        <View className={(1 + trayDims.length + (counts.alert.medical > 0 || filters.alert === 'medical' ? 1 : 0)) % 2 === 0 ? 'col-span-2 md:col-span-1' : ''}>
+                        <LabeledSelect
+                            label="Antrenor"
+                            value={filters.coachId === 'all' ? 'all' : String(filters.coachId)}
+                            onChange={(v) => setFilter('coachId', v === 'all' ? 'all' : Number(v))}
+                            options={[{ key: 'all', label: 'Toți antrenorii' }, ...coaches.map((c) => ({ key: String(c.id), label: c.name }))]}
+                        />
                         </View>
-                        {SORT_OPTIONS.map((o) => {
-                            const active = sort.key === o.value;
-                            return (
-                                <Pressable
-                                    key={o.value}
-                                    onPress={() => setSort(active ? { key: o.value, dir: sort.dir === 'asc' ? 'desc' : 'asc' } : { key: o.value, dir: o.value === 'name' ? 'asc' : 'desc' })}
-                                    className="flex-row items-center gap-1 px-2.5 h-7 rounded-[8px] border"
-                                    style={active
-                                        ? { backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' }
-                                        : { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}
-                                >
-                                    <Text className="text-[12px] font-semibold" style={{ color: active ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)' }}>{o.label}</Text>
-                                    {active ? <Text className="text-[11px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{sort.dir === 'asc' ? '↑' : '↓'}</Text> : null}
-                                </Pressable>
-                            );
-                        })}
-                    </View>
-
-                    {/* Alertă — teams with expired/stale medical checks. Only when
-                        the club actually has any, so it never adds empty noise. */}
-                    {counts.alert.medical > 0 && (
-                        <View className="flex-row items-center flex-wrap gap-1.5">
-                            <Text className="text-[10px] font-semibold uppercase tracking-wider mr-1" style={{ color: 'var(--c-faint)' }}>Alertă</Text>
-                            <Pressable
-                                onPress={() => setFilter('alert', 'all')}
-                                className="px-2.5 h-7 rounded-[8px] border justify-center"
-                                style={filters.alert === 'all'
-                                    ? { backgroundColor: 'var(--c-brand-surface)', borderColor: 'transparent' }
-                                    : { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}
-                            >
-                                <Text className="text-[12px] font-semibold" style={{ color: filters.alert === 'all' ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>Toate</Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={() => setFilter('alert', filters.alert === 'medical' ? 'all' : 'medical')}
-                                className="flex-row items-center gap-1.5 px-2.5 h-7 rounded-[8px] border"
-                                style={filters.alert === 'medical'
-                                    ? { backgroundColor: 'var(--c-warning)', borderColor: 'transparent' }
-                                    : { backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-border)' }}
-                            >
-                                <AlertTriangle size={12} color={filters.alert === 'medical' ? 'var(--c-on-brand)' : 'var(--c-warning-fg)'} />
-                                <Text className="text-[12px] font-semibold" style={{ color: filters.alert === 'medical' ? 'var(--c-on-brand)' : 'var(--c-warning-fg)' }}>Vize expirate</Text>
-                                <Text className="text-[11px] font-bold" style={{ color: filters.alert === 'medical' ? 'rgba(255,255,255,0.8)' : 'var(--c-warning-fg)' }}>{counts.alert.medical}</Text>
-                            </Pressable>
-                        </View>
-                    )}
-
-                    {hasCoachFilter && (
-                        <View className="flex-row items-center gap-1.5">
-                            <Text className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-faint)' }}>Antrenor</Text>
-                            <select
-                                value={filters.coachId === 'all' ? 'all' : String(filters.coachId)}
-                                onChange={(e) => setFilter('coachId', e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                                className="h-8 rounded-[8px] border px-2.5 text-[12px] font-semibold"
-                                style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', color: 'var(--c-ink-soft)' }}
-                            >
-                                <option value="all">Toți antrenorii</option>
-                                {coaches.map((c) => (
-                                    <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                            </select>
-                        </View>
-                    )}
+                    ) : null}
                 </View>
             )}
         </View>

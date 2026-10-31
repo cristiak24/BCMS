@@ -3,11 +3,12 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { contactsApi, type ContactsResponse, type PlayerContact, type PlayerContactUpdate, type StaffContact } from '../../services/contactsApi';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../HeaderContext';
+import { usePathname } from '@/src/web/expoRouter';
 import PageContainer from '../ui/PageContainer';
 import PageHero from '../admin/PageHero';
 import SelectField from '../ui/SelectField';
 import Button from '../ui/Button';
-import { DenseAvatar, DenseList, DenseRow } from '../ui/DenseList';
+import { DenseAvatar, DenseHeader, DenseHeading, DenseList, DenseRow } from '../ui/DenseList';
 import { Skeleton } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
@@ -81,6 +82,29 @@ function PhoneLine({ label, name, phone, hint }: { label: string; name?: string 
   );
 }
 
+/**
+ * Admin rows: one number as a compact line (who · number · call icon), so every
+ * row of the list keeps one height and the numbers share one column.
+ */
+function PhoneInline({ label, name, phone, hint }: { label: string; name?: string | null; phone: string; hint?: string }) {
+  const who = `${label}${name ? ` · ${name}` : ''}${hint ? ` · ${hint}` : ''}`;
+  return (
+    <View className="flex-row items-center gap-2 min-w-0">
+      <Text className="t-meta shrink min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{who}</Text>
+      <Text className="t-num text-[13.5px] font-semibold shrink-0" style={{ color: 'var(--c-ink)', userSelect: 'text' } as any}>{phone}</Text>
+      <Pressable
+        onPress={() => { window.location.href = telHref(phone); }}
+        accessibilityRole={'link' as any}
+        accessibilityLabel={`Sună ${name || label}: ${phone}`}
+        className="tap-40 ui-press w-7 h-7 rounded-[8px] border items-center justify-center shrink-0"
+        style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
+      >
+        <MaterialIcons name="phone" size={14} color="var(--c-success-fg)" />
+      </Pressable>
+    </View>
+  );
+}
+
 function Field({ label, value, onChange, phone, placeholder }: { label: string; value: string; onChange: (v: string) => void; phone?: boolean; placeholder?: string }) {
   const invalid = phone && !isValidPhone(value);
   return (
@@ -108,6 +132,7 @@ function PlayerCard({
   onSave,
   onNotify,
   readOnly = false,
+  wide = false,
 }: {
   player: PlayerContact;
   teamNames: string;
@@ -115,6 +140,8 @@ function PlayerCard({
   onNotify: (toast: { variant: 'success' | 'error'; message: string }) => void;
   /** The accountant sees the numbers but does not edit them or manage parents. */
   readOnly?: boolean;
+  /** Admin: name, numbers and actions on one line from md up (numbers in their own column). */
+  wide?: boolean;
 }) {
   // Editable lists carry one count of rows without a number above them; the
   // same sentence on every row repeated it (eleven times on a new club).
@@ -160,6 +187,18 @@ function PlayerCard({
           <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{name}</Text>
           <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{teamNames || 'Fără echipă'}</Text>
         </View>
+        {wide && !editing ? (
+          <View className="hidden md:flex flex-[1.6] min-w-0 gap-1">
+            {withPhone.length ? withPhone.map((line) => (
+              <PhoneInline key={line.key} label={line.label} name={line.name} phone={line.phone as string} hint={line.hint} />
+            )) : (
+              <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>Fără număr</Text>
+            )}
+            {withPhone.length && missing.length ? (
+              <Text className="t-meta" style={{ color: 'var(--c-faint)' }} numberOfLines={1}>Fără număr: {missing.join(', ')}</Text>
+            ) : null}
+          </View>
+        ) : null}
         {!editing && !readOnly ? (
           <Pressable
             onPress={() => setFamily((v) => !v)}
@@ -214,7 +253,8 @@ function PlayerCard({
         </View>
       ) : withPhone.length ? (
         // Under the name, not behind a separator: these are the row's details.
-        <View className="gap-2.5 pl-12">
+        // Admin from md up: the numbers already sit in the row's own column.
+        <View className={`gap-2.5 pl-12 ${wide ? 'md:hidden' : ''}`}>
           <View className="gap-2.5 md:flex-row md:flex-wrap md:gap-x-8">
             {withPhone.map((line) => <PhoneLine key={line.key} label={line.label} name={line.name} phone={line.phone} hint={line.hint} />)}
           </View>
@@ -235,7 +275,7 @@ function PlayerCard({
   );
 }
 
-function StaffCard({ person, showMissing }: { person: StaffContact; showMissing?: boolean }) {
+function StaffCard({ person, showMissing, wide = false }: { person: StaffContact; showMissing?: boolean; wide?: boolean }) {
   return (
     <DenseRow stacked>
       <View className="flex-row items-center gap-3 min-w-0">
@@ -246,17 +286,28 @@ function StaffCard({ person, showMissing }: { person: StaffContact; showMissing?
             {[ROLE_LABEL[person.role] ?? person.role, person.teams.map((t) => t.name).join(', ')].filter(Boolean).join(' · ')}
           </Text>
         </View>
+        {wide ? (
+          <View className="hidden md:flex flex-[1.6] min-w-0">
+            {person.phone ? (
+              <PhoneInline label="Telefon" phone={person.phone} />
+            ) : (
+              <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>{showMissing ? 'Fără număr — îl poate adăuga din Profil' : 'Fără număr'}</Text>
+            )}
+          </View>
+        ) : null}
       </View>
       {person.phone ? (
-        <View className="pl-12"><PhoneLine label="Telefon" phone={person.phone} name={null} /></View>
+        <View className={`pl-12 ${wide ? 'md:hidden' : ''}`}><PhoneLine label="Telefon" phone={person.phone} name={null} /></View>
       ) : showMissing ? (
-        <Text className="t-meta pl-12" style={{ color: 'var(--c-faint)' }}>Fără număr — îl poate adăuga din Profil.</Text>
+        <Text className={`t-meta pl-12 ${wide ? 'md:hidden' : ''}`} style={{ color: 'var(--c-faint)' }}>Fără număr — îl poate adăuga din Profil.</Text>
       ) : null}
     </DenseRow>
   );
 }
 
 export default function ContactsScreen() {
+  // Admin: one-line rows with the numbers in their own column (other roles keep the stacked rows).
+  const wide = usePathname().startsWith('/admin/');
   const { searchValue, setSearchPlaceholder, setSearchValue, setHeaderActions, setMobileFab } = useHeader();
   const { toasts, showToast, dismissToast } = useToasts();
   const [data, setData] = useState<ContactsResponse | null>(null);
@@ -434,9 +485,19 @@ export default function ContactsScreen() {
                       message={query ? `Nimic pentru „${searchValue.trim()}”.` : 'Jucătorii din loturile clubului apar aici.'}
                     />
                   ) : (
-                    <DenseList label="Jucători">
+                    <DenseList
+                      label="Jucători"
+                      header={wide ? (
+                        <DenseHeader>
+                          <DenseHeading className="flex-1 pl-12">Jucător</DenseHeading>
+                          <DenseHeading className="flex-[1.6]">Telefoane</DenseHeading>
+                          {data.mode === 'staff' && data.canEdit === false ? null : <View className="w-[84px]" />}
+                        </DenseHeader>
+                      ) : undefined}
+                    >
                       {players.slice(0, visibleCount).map((p) => (
                         <PlayerCard
+                          wide={wide}
                           key={p.id}
                           player={p}
                           teamNames={p.teamIds.map((id) => teamName.get(id)).filter(Boolean).join(', ')}
@@ -461,8 +522,16 @@ export default function ContactsScreen() {
               ) : staff.length === 0 ? (
                 <EmptyState compact icon="contacts" title="Niciun membru al staff-ului" message={query ? `Nimic pentru „${searchValue.trim()}”.` : 'Antrenorii și adminii clubului apar aici.'} />
               ) : (
-                <DenseList label="Staff">
-                  {staff.map((s) => <StaffCard key={s.id} person={s} showMissing />)}
+                <DenseList
+                  label="Staff"
+                  header={wide ? (
+                    <DenseHeader>
+                      <DenseHeading className="flex-1 pl-12">Nume</DenseHeading>
+                      <DenseHeading className="flex-[1.6]">Telefon</DenseHeading>
+                    </DenseHeader>
+                  ) : undefined}
+                >
+                  {staff.map((s) => <StaffCard key={s.id} person={s} showMissing wide={wide} />)}
                 </DenseList>
               )}
             </>

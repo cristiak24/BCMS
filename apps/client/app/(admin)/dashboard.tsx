@@ -726,6 +726,8 @@ export default function Dashboard() {
                     progress={attendanceRate}
                     hint={attendanceRate == null ? `Nimic marcat · ${ATTENDANCE_PERIOD_LABEL.toLowerCase()}` : attendanceDelta == null ? ATTENDANCE_PERIOD_LABEL : `${ATTENDANCE_PERIOD_LABEL} · față de cele 30 anterioare`}
                     delta={attendanceRate != null && attendanceDelta != null ? { label: `${attendanceDelta > 0 ? '+' : ''}${attendanceDelta} pp`, direction: attendanceDelta > 0 ? 'up' : attendanceDelta < 0 ? 'down' : 'flat' } : null}
+                    // The figure opens where it is analysed: Program → Prezență (per player and session).
+                    onPress={() => go('/admin/schedule?tab=attendance')}
                   />
                   <KpiCard
                     icon="account-balance"
