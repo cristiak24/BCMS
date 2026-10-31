@@ -227,6 +227,13 @@
     letter-spacing: 0.07em;
     text-transform: uppercase;
   }
+  /* Admin labels (table headers, KPI names, day groups): sentence case at a
+     readable size instead of tracked caps, which read as template chrome. */
+  .t-label {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+  }
   .t-meta {
     font-size: 12.5px;
     line-height: 17px;

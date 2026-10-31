@@ -6,7 +6,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import PageContainer from '../../components/ui/PageContainer';
-import PageHero, { GlassStat } from '../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../components/admin/PageHero';
 import Button from '../../components/ui/Button';
 import FilterChips from '../../components/ui/FilterChips';
 import SelectField from '../../components/ui/SelectField';
@@ -619,14 +619,14 @@ export default function ManageAccountsScreen() {
                         )}
                     >
                         {!loading && !(loadError && accounts.length === 0) ? (
-                            <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
+                            <StatStrip className="grid-cols-2 lg:grid-cols-4">
                                 {/* By state, so the tiles add up to the total: the role tiles left
                                     Contabil and Admin out and repeated the filter chips below. */}
                                 <GlassStat dot="var(--c-faint)" value={counts.total} label={counts.total === 1 ? 'Cont' : 'Conturi'} />
                                 <GlassStat dot="var(--c-success)" value={counts.active} label={counts.active === 1 ? 'Activ' : 'Active'} />
                                 <GlassStat dot="var(--c-warning)" value={counts.invites} label={counts.invites === 1 ? 'Invitație în așteptare' : 'Invitații în așteptare'} />
                                 <GlassStat dot="var(--c-faint)" value={filterCounts.inactive} label={filterCounts.inactive === 1 ? 'Dezactivat' : 'Dezactivate'} />
-                            </View>
+                            </StatStrip>
                         ) : null}
                     </PageHero>
 
@@ -695,10 +695,10 @@ export default function ManageAccountsScreen() {
                                         >
                                             <MaterialIcons name={allSelectableSelected ? 'check-box' : 'check-box-outline-blank'} size={19} color={allSelectableSelected ? 'var(--c-brand-fg)' : 'var(--c-border-strong)'} />
                                         </Pressable>
-                                        <Text className="t-eyebrow flex-[2.2] pl-2" style={{ color: 'var(--c-faint)' }}>Cont</Text>
-                                        <Text className="t-eyebrow flex-1" style={{ color: 'var(--c-faint)' }}>Rol</Text>
-                                        <Text className="t-eyebrow flex-1" style={{ color: 'var(--c-faint)' }}>Stare</Text>
-                                        <Text className="t-eyebrow flex-1" style={{ color: 'var(--c-faint)' }}>Ultima autentificare</Text>
+                                        <Text className="t-label flex-[2.2] pl-2" style={{ color: 'var(--c-muted)' }}>Cont</Text>
+                                        <Text className="t-label flex-1" style={{ color: 'var(--c-muted)' }}>Rol</Text>
+                                        <Text className="t-label flex-1" style={{ color: 'var(--c-muted)' }}>Stare</Text>
+                                        <Text className="t-label flex-1" style={{ color: 'var(--c-muted)' }}>Ultima autentificare</Text>
                                         <View className="w-9" />
                                     </View>
 

@@ -403,7 +403,7 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                                     </Text>
                                 </View>
                                 {balance.outstanding > 0 ? (
-                                    <Button size="sm" variant="primary" icon="payments" label="Încasează" accessibilityLabel={`Încasează de la ${balance.playerName}`} onPress={() => openPayment(balance)} />
+                                    <Button size="sm" variant="secondary" icon="payments" label="Încasează" accessibilityLabel={`Încasează de la ${balance.playerName}`} onPress={() => openPayment(balance)} />
                                 ) : null}
                             </View>
                         );

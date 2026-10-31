@@ -9,7 +9,7 @@ import ThemedCheckbox from './ThemedCheckbox';
 // Tokens only: the legacy hex classes here (`hover:bg-[#FBFDFF]` above all)
 // are not reached by palette.css, so in dark mode a hovered row went
 // near-white under light text.
-const HEADER = 'text-[11px] font-semibold uppercase tracking-[0.06em]';
+const HEADER = 't-label';
 const CELL = 'px-3 py-2.5';
 
 function SortableHeader({

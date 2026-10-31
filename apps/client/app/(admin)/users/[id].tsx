@@ -36,7 +36,7 @@ function formatDate(iso: string | null | undefined) {
 }
 
 function SectionLabel({ children }: { children: string }) {
-    return <Text className="text-[11px] font-black uppercase tracking-widest mb-3" style={{ color: 'var(--c-faint)' }}>{children}</Text>;
+    return <Text className="t-label mb-3" style={{ color: 'var(--c-muted)' }}>{children}</Text>;
 }
 
 function DetailRow({ label, children, last = false }: { label: string; children: React.ReactNode; last?: boolean }) {

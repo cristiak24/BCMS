@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
+import { usePathname } from '@/src/web/expoRouter';
 
 /**
  * One pagination implementation for every player list.
@@ -125,6 +126,8 @@ export default function Pagination({
   pageSize?: number;
   onPageSizeChange?: (size: number) => void;
 }) {
+  // Admin screens: a neutral selected page size; other roles keep the brand fill.
+  const neutral = usePathname().startsWith('/admin/');
   const sizePicker = pageSize != null && onPageSizeChange != null;
   if (totalPages <= 1 && !(sizePicker && (total ?? 0) > PAGE_SIZE_OPTIONS[0])) return null;
 
@@ -159,10 +162,12 @@ export default function Pagination({
                 accessibilityLabel={`${size} pe pagină`}
                 className="h-8 min-w-[36px] px-2 rounded-[9px] border items-center justify-center"
                 style={active
-                  ? { backgroundColor: 'var(--c-brand-surface)', borderColor: 'var(--c-brand-surface)' }
+                  ? neutral
+                    ? { backgroundColor: 'var(--c-surface-3)', borderColor: 'var(--c-border-strong)' }
+                    : { backgroundColor: 'var(--c-brand-surface)', borderColor: 'var(--c-brand-surface)' }
                   : { backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
               >
-                <Text className="text-[12px] font-semibold" style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>{size}</Text>
+                <Text className="text-[12px] font-semibold" style={{ color: active ? (neutral ? 'var(--c-ink-strong)' : 'var(--c-on-brand)') : 'var(--c-ink-soft)' }}>{size}</Text>
               </Pressable>
             );
           })}

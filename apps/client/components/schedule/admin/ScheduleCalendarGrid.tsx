@@ -5,7 +5,7 @@ import { CalendarEvent } from '../../../services/eventsApi';
 import { EVENT_TYPE_META, CalendarDayCell, getMonthGridDays, groupEventsByDay, isCancelledEvent } from '../scheduleShared';
 import { CalendarEventPill, calendarDayLabel } from '../CalendarEventPill';
 
-const WEEKDAY_LABELS = ['LUN', 'MAR', 'MIE', 'JOI', 'VIN', 'SÂM', 'DUM'];
+const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm', 'Dum'];
 
 export const CalendarLegend = React.memo(() => (
   <View className="flex-row flex-wrap items-center gap-5 px-1">
@@ -23,7 +23,7 @@ const WeekdayHeader = React.memo(() => (
   <View className="flex-row border-b" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
     {WEEKDAY_LABELS.map((day) => (
       <View key={day} className="flex-1 py-2.5 items-center">
-        <Text className="text-[11px] font-bold uppercase tracking-[0.06em]" style={{ color: 'var(--c-muted)' }}>{day}</Text>
+        <Text className="t-label" style={{ color: 'var(--c-muted)' }}>{day}</Text>
       </View>
     ))}
   </View>

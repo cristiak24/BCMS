@@ -72,9 +72,7 @@ export default function GuardiansPanel({ playerId, playerName, onNotify, bare = 
     >
       {!bare ? (
         <View className="flex-row items-center gap-2.5">
-          <View className="w-9 h-9 rounded-[10px] items-center justify-center" style={{ backgroundColor: 'var(--c-purple-bg)' }}>
-            <MaterialIcons name="family-restroom" size={18} color="var(--c-purple-fg)" />
-          </View>
+          <MaterialIcons name="family-restroom" size={18} color="var(--c-muted)" />
           <View className="flex-1 min-w-0">
             <Text accessibilityRole="header" className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>Părinți</Text>
             <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Conturi legate de {playerName}</Text>

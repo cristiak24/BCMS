@@ -37,7 +37,10 @@ export default function RosterPagination({
   onPageSizeChange,
   onPageChange,
 }: RosterPaginationProps) {
-  if (totalItems === 0) {
+  // One page that the smallest size already holds: the count is in the list
+  // header, so a pager and a size picker would only be noise.
+  const smallestSize = pageSizeOptions?.length ? Math.min(...pageSizeOptions) : pageSize;
+  if (totalItems === 0 || (totalPages <= 1 && totalItems <= smallestSize)) {
     return null;
   }
 
@@ -73,6 +76,7 @@ export default function RosterPagination({
         ) : null}
       </View>
 
+      {totalPages > 1 ? (
       <View style={styles.controls}>
         <Pressable
           onPress={() => onPageChange(currentPage - 1)}
@@ -109,6 +113,7 @@ export default function RosterPagination({
           <Text style={[styles.navLabel, currentPage === totalPages && styles.disabledLabel]}>Următor</Text>
         </Pressable>
       </View>
+      ) : null}
     </View>
   );
 }
@@ -149,8 +154,10 @@ const styles = StyleSheet.create({
   navButton: {
     minHeight: 40,
     paddingHorizontal: 14,
-    borderRadius: 999,
-    backgroundColor: 'rgba(37,99,235,0.08)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'var(--c-border)',
+    backgroundColor: 'var(--c-surface)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -160,7 +167,7 @@ const styles = StyleSheet.create({
   navLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: dash.accentBlue,
+    color: 'var(--c-ink-soft)',
   },
   disabledLabel: {
     color: dash.faint,
@@ -180,7 +187,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pageButtonActive: {
-    backgroundColor: dash.accentBlue,
+    backgroundColor: 'var(--c-surface-3)',
+    borderWidth: 1,
+    borderColor: 'var(--c-border-strong)',
   },
   pageLabel: {
     fontSize: 13,
@@ -188,6 +197,6 @@ const styles = StyleSheet.create({
     color: dash.inkSoft,
   },
   pageLabelActive: {
-    color: 'var(--c-surface)',
+    color: 'var(--c-ink-strong)',
   },
 });

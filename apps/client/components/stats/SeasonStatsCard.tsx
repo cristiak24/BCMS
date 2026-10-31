@@ -55,9 +55,7 @@ export default function SeasonStatsCard({ playerId }: { playerId: number }) {
   return (
     <View className="ui-rise rounded-[16px] border p-4 md:p-5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
       <View className="flex-row flex-wrap items-center gap-2.5 mb-4">
-        <View className="w-8 h-8 rounded-[9px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-          <MaterialIcons name="sports-basketball" size={17} color="var(--c-brand-fg)" />
-        </View>
+        <MaterialIcons name="sports-basketball" size={18} color="var(--c-muted)" />
         <View className="flex-1 min-w-[140px]">
           <Text accessibilityRole="header" className="f-display text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>
             Sezonul {data?.season.label ?? ''}

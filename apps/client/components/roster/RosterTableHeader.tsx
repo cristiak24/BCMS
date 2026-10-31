@@ -99,12 +99,11 @@ const styles = StyleSheet.create({
     borderBottomColor: dash.hairline,
     backgroundColor: 'var(--c-surface-2)',
   },
+  // Sentence case at 12px: tracked caps were louder than the rows they head.
   label: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    color: dash.faint,
+    fontSize: 12,
+    fontWeight: '600',
+    color: dash.muted,
   },
   labelActive: {
     color: dash.accentBlue,

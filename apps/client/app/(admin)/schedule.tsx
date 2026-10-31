@@ -490,9 +490,7 @@ export default function ScheduleScreen() {
                   ("Viitoare", "Următorul meci") that restated the same data. */}
               {featuredUpcoming.length === 0 ? (
                 <View className="rounded-[16px] border border-dashed px-5 py-6 items-center" style={{ borderColor: 'var(--c-border)' } as any}>
-                  <View className="w-10 h-10 rounded-[12px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-                    <CalendarIcon size={18} color="var(--c-brand-fg)" />
-                  </View>
+                  <CalendarIcon size={20} color="var(--c-muted)" />
                   <Text className="text-[14px] font-semibold mt-3 text-center" style={{ color: 'var(--c-ink)' }}>{`Nimic programat în următoarele ${UPCOMING_DAYS} zile`}</Text>
                   <Text className="t-meta mt-1 text-center" style={{ color: 'var(--c-muted)' }}>Adaugă unul cu „Eveniment” sau sincronizează meciurile FRB.</Text>
                 </View>
@@ -508,7 +506,7 @@ export default function ScheduleScreen() {
                       className="flex-row items-center gap-2 px-3.5 py-2.5"
                       style={{ backgroundColor: 'var(--c-surface-2)' } as any}
                     >
-                      <Text className="t-eyebrow shrink-0" style={{ color: 'var(--c-faint)' }}>Următorul meci</Text>
+                      <Text className="t-label shrink-0" style={{ color: 'var(--c-muted)' }}>Următorul meci</Text>
                       <Text className="t-meta flex-1 min-w-0" numberOfLines={1} style={{ color: 'var(--c-ink-soft)' }}>
                         {parseApiDate(nextMatch.startTime).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })} · {nextMatch.title}
                       </Text>

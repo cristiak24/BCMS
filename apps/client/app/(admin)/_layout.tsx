@@ -174,7 +174,7 @@ function AdminLayoutContent() {
         <div className="flex flex-1 min-h-screen bg-[#EAF1F8] lg:flex-row flex-col">
             {/* Keyboard users skip the menu (12+ stops) straight to the page. */}
             <a href="#continut" className="skip-link">Sari la conținut</a>
-            <Sidebar items={availableMenuItems} />
+            <Sidebar items={availableMenuItems} plain />
 
             <div className="flex flex-1 min-w-0 flex-col relative">
                 <div className="lg:hidden sticky top-0 z-30">

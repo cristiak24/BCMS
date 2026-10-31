@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { eventsApi, CalendarEvent } from '../../../services/eventsApi';
 import { teamsApi, Team, Player } from '../../../services/teamsApi';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../../components/HeaderContext';
-import PageHero, { GlassStat } from '../../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../../components/admin/PageHero';
 import Button from '../../../components/ui/Button';
 import PageContainer from '../../../components/ui/PageContainer';
 import FilterChips from '../../../components/ui/FilterChips';
@@ -454,12 +454,12 @@ export default function AttendanceScreen() {
               ))}
             </View>
             {roster.length > 0 ? (
-              <View className="grid grid-cols-3 gap-2 max-w-[520px] ui-stagger">
+              <StatStrip className="grid-cols-3 max-w-[520px]">
                 {/* „1 Absență”, not „1 Absențe”. */}
                 <GlassStat value={counts.present + counts.late} label={counts.present + counts.late === 1 ? 'Prezență' : 'Prezențe'} dot="var(--c-success)" hint={counts.late ? plural(counts.late, 'întârziere', 'întârzieri') : undefined} />
                 <GlassStat value={counts.absent} label={counts.absent === 1 ? 'Absență' : 'Absențe'} dot="var(--c-danger)" />
                 <GlassStat value={counts.medical} label={counts.medical === 1 ? 'Motivată' : 'Motivate'} dot="var(--c-warning)" />
-              </View>
+              </StatStrip>
             ) : null}
           </PageHero>
 

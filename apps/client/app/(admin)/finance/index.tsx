@@ -16,7 +16,7 @@ import { useResponsive } from '../../../hooks/useResponsive';
 import { useSession } from '../../../context/AuthContext';
 import { buildServerUrl, resolveDocumentUrl } from '../../../config/serverUrl';
 import { apiFetch } from '../../../services/apiClient';
-import PageHero, { GlassStat } from '../../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../../components/admin/PageHero';
 import PageContainer from '../../../components/ui/PageContainer';
 import { EmptyState, SkeletonBlock } from '../../../components/dashboard/ScreenStates';
 import { LoadError } from '../../../components/ui/ScreenState';
@@ -131,7 +131,7 @@ function SettingTile({ label, canEdit, editing, onEdit, loading, value, unit, in
     return (
         <View className="rounded-[12px] border px-3.5 py-3 min-w-0" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
             <View className="flex-row items-center justify-between gap-2 h-7 mb-1.5">
-                <Text className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
+                <Text className="t-label" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
                 {canEdit && !editing ? (
                     <Button size="sm" variant="ghost" icon="edit" label="Modifică" accessibilityLabel={`Modifică ${label.toLowerCase()}`} className="h-7 -mr-1.5" onPress={onEdit} />
                 ) : null}
@@ -637,7 +637,7 @@ export default function FinancialSettingsPage() {
                 }
             >
                 {activeTab === 'Finances' ? (
-                    <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
+                    <StatStrip className="grid-cols-2 lg:grid-cols-4">
                         <GlassStat
                             dot="var(--c-purple)"
                             label="Cotizație"
@@ -667,7 +667,7 @@ export default function FinancialSettingsPage() {
                             disabled={loadingDocuments || !!documentsError || financeStats.pendingCount === 0}
                             accessibilityRole="button"
                             accessibilityLabel={`Documente de verificat: ${financeStats.pendingCount}. Arată documentele în așteptare`}
-                            className="ui-press text-left rounded-[14px]"
+                            className="ui-press text-left h-full"
                         >
                             <GlassStat
                                 dot="var(--c-warning)"
@@ -676,7 +676,7 @@ export default function FinancialSettingsPage() {
                                 value={loadingDocuments || documentsError ? '—' : financeStats.pendingCount}
                             />
                         </Pressable>
-                    </View>
+                    </StatStrip>
                 ) : null}
                 {activeTab === 'Finances' && (summaryError || settingsError) ? (
                     <LoadError
@@ -1053,7 +1053,7 @@ export default function FinancialSettingsPage() {
                     </View>
                 ) : null}
 
-                <Text className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: dash.muted }}>Sumă (RON)</Text>
+                <Text className="t-label mb-2" style={{ color: dash.muted }}>Sumă (RON)</Text>
                 <TextInput
                     value={uploadModal.amount}
                     onChangeText={(text: string) => setUploadModal((prev) => ({ ...prev, amount: text }))}
@@ -1064,7 +1064,7 @@ export default function FinancialSettingsPage() {
                     style={{ borderColor: dash.hairlineStrong, color: dash.ink }}
                 />
 
-                <Text className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: dash.muted }}>Descriere</Text>
+                <Text className="t-label mb-2" style={{ color: dash.muted }}>Descriere</Text>
                 <TextInput
                     value={uploadModal.description}
                     onChangeText={(text: string) => setUploadModal((prev) => ({ ...prev, description: text }))}

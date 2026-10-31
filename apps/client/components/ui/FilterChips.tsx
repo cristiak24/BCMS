@@ -1,4 +1,5 @@
 import { View, Text, Pressable, ScrollView } from '@/src/web/reactNative';
+import { usePathname } from '@/src/web/expoRouter';
 
 /**
  * Admin's filter chip, extracted so the player screens stop inventing their own.
@@ -42,6 +43,10 @@ export default function FilterChips<T extends string>({
   scrollOnMobile?: boolean;
   label?: string;
 }) {
+  // Admin screens: a neutral selected chip (the brand fill on every active filter was
+  // accent on chrome). Other roles keep the brand fill.
+  const neutral = usePathname().startsWith('/admin/');
+  const activeFg = neutral ? 'var(--c-ink-strong)' : 'var(--c-on-brand)';
   const row = (
     <View className={`flex-row items-center gap-1.5 ${scrollOnMobile ? '' : 'flex-wrap'}`} accessibilityRole={'group' as any} accessibilityLabel={label}>
       {options.map((option) => {
@@ -56,7 +61,9 @@ export default function FilterChips<T extends string>({
             className={`flex-row items-center gap-1.5 h-8 [@media(pointer:coarse)]:h-10 ${option.dot ? 'px-2.5' : 'px-3'} rounded-[9px] justify-center border shrink-0`}
             style={
               active
-                ? ({ backgroundColor: 'var(--c-brand-surface)', borderColor: 'transparent' } as any)
+                ? (neutral
+                    ? { backgroundColor: 'var(--c-surface-3)', borderColor: 'var(--c-border-strong)' }
+                    : { backgroundColor: 'var(--c-brand-surface)', borderColor: 'transparent' }) as any
                 : ({ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any)
             }
           >
@@ -66,13 +73,13 @@ export default function FilterChips<T extends string>({
                   width: 7,
                   height: 7,
                   borderRadius: 999,
-                  backgroundColor: active ? 'var(--c-on-brand)' : option.dot,
+                  backgroundColor: active && !neutral ? 'var(--c-on-brand)' : option.dot,
                 }}
               />
             ) : null}
             <Text
               className="text-[12px] font-semibold"
-              style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}
+              style={{ color: active ? activeFg : 'var(--c-ink-soft)' }}
               numberOfLines={1}
             >
               {option.label}
@@ -80,7 +87,7 @@ export default function FilterChips<T extends string>({
             {option.count != null && option.count > 0 ? (
               <Text
                 className="text-[11px] font-semibold"
-                style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-faint)' }}
+                style={{ color: active ? (neutral ? 'var(--c-ink-soft)' : 'var(--c-on-brand)') : 'var(--c-faint)' }}
               >
                 {option.count}
               </Text>

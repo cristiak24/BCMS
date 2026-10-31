@@ -74,7 +74,7 @@ function Card({ title, children, trailing }: { title: string; children: ReactNod
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
       <View className="flex-row items-center justify-between gap-3 mb-3.5">
-        <Text accessibilityRole="header" className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{title}</Text>
+        <Text accessibilityRole="header" className="t-label" style={{ color: 'var(--c-muted)' }}>{title}</Text>
         {trailing}
       </View>
       {children}
@@ -369,7 +369,7 @@ export default function EventDetailScreen() {
                   <Text className="f-display t-num text-[28px] font-extrabold leading-none" style={{ color: 'var(--c-ink-strong)' }}>
                     {scoreMatch[1]}<Text style={{ color: 'var(--c-faint)' }}> : </Text>{scoreMatch[2]}
                   </Text>
-                  <Text className="text-[10.5px] font-semibold mt-1 uppercase tracking-[0.06em]" style={{ color: 'var(--c-faint)' }}>Final</Text>
+                  <Text className="t-label mt-1" style={{ color: 'var(--c-muted)' }}>Final</Text>
                 </View>
                 <Text className="f-display flex-1 text-[14px] md:text-[16px] font-bold leading-tight" style={{ color: 'var(--c-ink-strong)' }}>{sides[1]}</Text>
               </View>

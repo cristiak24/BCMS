@@ -5,7 +5,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
 import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../../components/HeaderContext';
 import PageContainer from '../../../components/ui/PageContainer';
-import PageHero, { GlassStat } from '../../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../../components/admin/PageHero';
 import Button from '../../../components/ui/Button';
 import FilterChips from '../../../components/ui/FilterChips';
 import SelectField from '../../../components/ui/SelectField';
@@ -208,12 +208,12 @@ export default function ComplianceScreen() {
         <PageContainer>
           <PageHero eyebrow="Conformitate" title="Vizele medicale" subtitle="Vizele medicale ale jucătorilor din club.">
             {players && !error ? (
-              <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
+              <StatStrip className="grid-cols-2 lg:grid-cols-4">
                 <GlassStat dot="var(--c-success)" value={metrics.valid} label="Valabile" hint={`${metrics.securePercent}% din lot`} />
                 <GlassStat dot="var(--c-warning)" value={metrics.dueSoon} label="Expiră în 30 de zile" hint="De reînnoit curând" />
                 <GlassStat dot="var(--c-danger)" danger={metrics.expired > 0} value={metrics.expired} label="Expirate" hint="Nu pot juca" />
                 <GlassStat dot="var(--c-muted)" value={metrics.missing} label="Fără viză" hint="Nicio dată înregistrată" />
-              </View>
+              </StatStrip>
             ) : null}
           </PageHero>
 
@@ -257,10 +257,10 @@ export default function ComplianceScreen() {
                     <View className="rounded-[14px] border overflow-hidden" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
                       <View className="hidden md:flex flex-row items-center px-3 py-2 border-b" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }}>
                         <Checkbox checked={allOnPageSelected} onPress={togglePage} label="Selectează pagina" />
-                        <Text className="t-eyebrow flex-[2] pl-2" style={{ color: 'var(--c-faint)' }}>Jucător</Text>
-                        <Text className="t-eyebrow flex-[1.4]" style={{ color: 'var(--c-faint)' }}>Echipă</Text>
-                        <Text className="t-eyebrow flex-1" style={{ color: 'var(--c-faint)' }}>Stare</Text>
-                        <Text className="t-eyebrow flex-[1.2]" style={{ color: 'var(--c-faint)' }}>Expiră</Text>
+                        <Text className="t-label flex-[2] pl-2" style={{ color: 'var(--c-muted)' }}>Jucător</Text>
+                        <Text className="t-label flex-[1.4]" style={{ color: 'var(--c-muted)' }}>Echipă</Text>
+                        <Text className="t-label flex-1" style={{ color: 'var(--c-muted)' }}>Stare</Text>
+                        <Text className="t-label flex-[1.2]" style={{ color: 'var(--c-muted)' }}>Expiră</Text>
                         <View className="w-[108px]" />
                       </View>
                       {pageItems.map(({ player, status }, index) => {

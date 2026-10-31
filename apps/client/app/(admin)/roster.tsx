@@ -7,7 +7,7 @@ import { useResponsive } from '../../hooks/useResponsive';
 import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../components/HeaderContext';
 import { dash } from '../../components/dashboard/dashboardTheme';
 import { EmptyState, ErrorState, SkeletonBlock } from '../../components/dashboard/ScreenStates';
-import PageHero, { GlassStat } from '../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../components/admin/PageHero';
 import Button from '../../components/ui/Button';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { DenseList } from '../../components/ui/DenseList';
@@ -574,12 +574,12 @@ export default function RosterScreen() {
           </View>
         }
       >
-        <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
+        <StatStrip className="grid-cols-2 lg:grid-cols-4">
           <GlassStat dot="var(--c-brand-fg)" value={formatAttendanceRate(attendanceValue)} label="Prezență" hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()} />
           <GlassStat dot="var(--c-success)" value={rosterReadiness == null ? '—' : `${rosterReadiness}%`} label="Fără restanțe" bar={rosterReadiness ?? undefined} />
           <GlassStat dot="var(--c-muted)" value={rosterTotal} label="Jucători în lot" />
           <GlassStat dot={!summary ? 'var(--c-faint)' : pendingPayments > 0 ? 'var(--c-danger)' : 'var(--c-success)'} danger={pendingPayments > 0} value={summary ? pendingPayments : '—'} label="Cu restanțe" />
-        </View>
+        </StatStrip>
         {summaryError && !summary ? (
           <View className="mt-3">
             <LoadError title="Cifrele lotului nu s-au încărcat" message={summaryError} onRetry={() => void fetchMeta()} />

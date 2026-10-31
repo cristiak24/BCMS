@@ -45,6 +45,12 @@ type SidebarProps = {
     items?: typeof ADMIN_MENU_ITEMS;
     /** Line under the logo; defaults to the signed-in user's club. */
     subtitle?: string;
+    /**
+     * Admin: sentence-case group names, plain grey icons and a neutral pill on
+     * the active item (the brand only on its icon). The default keeps the
+     * boxed icons and the brand-tinted active row for the other roles.
+     */
+    plain?: boolean;
 };
 
 /** Open-items count next to a menu label (e.g. open GDPR requests). */
@@ -56,7 +62,7 @@ export function MenuBadge({ count }: { count: number }) {
     );
 }
 
-export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarProps) {
+export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle, plain = false }: SidebarProps) {
     const { pathname } = useLocation();
     const { session } = useSession();
     const { width } = useResponsive();
@@ -79,7 +85,7 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarP
         >
             {/* Logo Area */}
             <View className="pt-5 px-4 pb-4 flex-row items-center gap-3">
-                <View className="w-10 h-10 rounded-[12px] items-center justify-center" style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)' } as any}>
+                <View className="w-10 h-10 rounded-[12px] items-center justify-center" style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: plain ? undefined : 'var(--e-brand)' } as any}>
                     <FontAwesome5 name="basketball-ball" size={16} color="var(--c-on-brand)" />
                 </View>
                 <View className="flex-col">
@@ -97,7 +103,11 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarP
                     return (
                         <Fragment key={item.href}>
                         {groupStart ? (
-                            <Text className={`t-eyebrow px-3 pb-1 ${index ? 'pt-3' : 'pt-1'}`} style={{ color: 'var(--c-faint)' }}>{item.group}</Text>
+                            plain ? (
+                                <Text className={`t-label px-3 pb-1 ${index ? 'pt-4' : 'pt-1'}`} style={{ color: 'var(--c-muted)' }}>{item.group}</Text>
+                            ) : (
+                                <Text className={`t-eyebrow px-3 pb-1 ${index ? 'pt-3' : 'pt-1'}`} style={{ color: 'var(--c-faint)' }}>{item.group}</Text>
+                            )
                         ) : null}
                         <View className="relative">
                             {/* Link, not NavLink: NavLink sets aria-current from its own URL match
@@ -107,6 +117,18 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarP
                                 aria-current={isActive ? 'page' : undefined}
                                 className="block no-underline"
                             >
+                                {plain ? (
+                                <View
+                                    className={`flex-row items-center gap-2.5 px-3 h-9 rounded-[8px] ${isActive ? '' : 'hover:bg-[var(--c-surface-2)]'}`}
+                                    style={isActive ? { backgroundColor: 'var(--c-surface-3)' } : undefined}
+                                >
+                                    <MaterialIcons name={item.icon} size={18} color={isActive ? 'var(--c-brand-fg)' : 'var(--c-muted)'} />
+                                    <Text className="flex-1 min-w-0 text-[13.5px]" style={{ color: isActive ? 'var(--c-ink-strong)' : 'var(--c-ink-soft)', fontWeight: isActive ? '700' : '500' } as any} numberOfLines={1}>
+                                        {item.label}
+                                    </Text>
+                                    {item.badge ? <MenuBadge count={item.badge} /> : null}
+                                </View>
+                                ) : (
                                 <View
                                     className="flex-row items-center px-3 py-2.5 rounded-[12px] border"
                                     style={isActive
@@ -130,8 +152,9 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle }: SidebarP
                                     </Text>
                                     {item.badge ? <MenuBadge count={item.badge} /> : null}
                                 </View>
+                                )}
                             </Link>
-                            {isActive && (
+                            {isActive && !plain && (
                                 <View className="absolute -left-2.5 top-2.5 bottom-2.5 w-1 rounded-r-full" style={{ backgroundColor: 'var(--c-brand-surface)' }} />
                             )}
                         </View>

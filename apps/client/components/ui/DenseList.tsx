@@ -57,7 +57,7 @@ export function DenseHeader({ children, className }: { children: ReactNode; clas
 
 /** One column title in a DenseHeader. */
 export function DenseHeading({ children, className }: { children: string; className?: string }) {
-  return <Text className={`t-eyebrow ${className ?? ''}`} style={{ color: 'var(--c-faint)' }}>{children}</Text>;
+  return <Text className={`t-label ${className ?? ''}`} style={{ color: 'var(--c-muted)' }}>{children}</Text>;
 }
 
 /**

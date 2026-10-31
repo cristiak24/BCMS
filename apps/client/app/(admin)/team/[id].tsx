@@ -22,7 +22,7 @@ import TeamAddPlayersPanel from '../../../components/myclub/team-detail/TeamAddP
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import BulkAddPlayersDialog from '../../../components/family/BulkAddPlayersDialog';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import PageHero, { GlassStat } from '../../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../../components/admin/PageHero';
 import { ATTENDANCE_PERIOD_LABEL } from '../../../utils/attendanceRate';
 import { plural, pluralWord } from '../../../utils/plural';
 import { ErrorState } from '../../../components/ui/ScreenState';
@@ -254,7 +254,7 @@ export default function TeamDetailsScreen() {
                         actions={
                             <View className="flex-row items-center gap-2.5 rounded-[12px] border pl-3 pr-1.5 py-1.5 md:pr-3 md:py-2" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
                                 <View className="flex-row md:flex-col items-baseline md:items-start gap-2 md:gap-0">
-                                    <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Cod invitație</Text>
+                                    <Text className="t-label" style={{ color: 'var(--c-muted)' }}>Cod invitație</Text>
                                     <Text className="f-display t-num text-[16px] md:text-[18px] font-extrabold tracking-[2px] leading-tight" style={{ color: 'var(--c-brand-fg)' }}>{team.inviteCode}</Text>
                                 </View>
                                 <Pressable onPress={handleCopyInvite} className="tap-40 ui-press w-8 h-8 md:w-9 md:h-9 rounded-[10px] items-center justify-center border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any} accessibilityLabel="Copiază codul">
@@ -284,7 +284,7 @@ export default function TeamDetailsScreen() {
                                 <View className="px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--c-surface-3)' }}><Text className="text-[11px] font-semibold" style={{ color: 'var(--c-muted)' }}>Inactivă</Text></View>
                             )}
                         </View>
-                        <View className="grid grid-cols-4 lg:grid-cols-5 gap-1.5 lg:gap-2 ui-stagger">
+                        <StatStrip className="grid-cols-4 lg:grid-cols-5">
                             <GlassStat value={players.length} label="Jucători în lot" shortLabel="în lot" dot="var(--c-brand-fg)" />
                             <GlassStat
                                 value={monthlyAtt != null ? monthlyAtt : '—'}
@@ -312,7 +312,7 @@ export default function TeamDetailsScreen() {
                             <View className="hidden lg:flex">
                                 <GlassStat value={avgAge ?? '—'} suffix={avgAge ? 'ani' : undefined} label="Vârstă medie" dot="var(--c-purple)" />
                             </View>
-                        </View>
+                        </StatStrip>
                     </PageHero>
 
                     {team.coachDisabled ? (
@@ -343,13 +343,14 @@ export default function TeamDetailsScreen() {
                         className="mb-4 -mx-4 px-4 md:mx-0 md:px-0"
                         contentContainerStyle={{ flexGrow: 0 }}
                     >
-                    <View accessibilityRole={'tablist' as any} className="flex-row p-1 rounded-[14px] border gap-1" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
-                        <TabButton active={tab === 'roster'} onPress={() => setTab('roster')} icon={<Users size={14} color={tab === 'roster' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label={`Lot (${players.length})`} />
-                        <TabButton active={tab === 'events'} onPress={() => setTab('events')} icon={<CalendarClock size={14} color={tab === 'events' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label="Evenimente" />
-                        <TabButton active={tab === 'history'} onPress={() => setTab('history')} icon={<History size={14} color={tab === 'history' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label="Istoric" />
-                        <TabButton active={tab === 'stats'} onPress={() => setTab('stats')} icon={<BarChart3 size={14} color={tab === 'stats' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label="Statistici" />
+                    {/* Same neutral segmented track as Program and Finanțe: the brand fill on the active tab was accent on chrome. */}
+                    <View accessibilityRole={'tablist' as any} className="flex-row p-[3px] rounded-[10px] gap-[2px]" style={{ backgroundColor: 'var(--c-surface-3)' } as any}>
+                        <TabButton active={tab === 'roster'} onPress={() => setTab('roster')} icon={<Users size={14} color={tab === 'roster' ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />} label={`Lot (${players.length})`} />
+                        <TabButton active={tab === 'events'} onPress={() => setTab('events')} icon={<CalendarClock size={14} color={tab === 'events' ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />} label="Evenimente" />
+                        <TabButton active={tab === 'history'} onPress={() => setTab('history')} icon={<History size={14} color={tab === 'history' ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />} label="Istoric" />
+                        <TabButton active={tab === 'stats'} onPress={() => setTab('stats')} icon={<BarChart3 size={14} color={tab === 'stats' ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />} label="Statistici" />
                         {frb && (
-                            <TabButton active={tab === 'frb'} onPress={() => setTab('frb')} icon={<ListOrdered size={14} color={tab === 'frb' ? 'var(--c-on-brand)' : 'var(--c-faint)'} />} label="Competiție FRB" />
+                            <TabButton active={tab === 'frb'} onPress={() => setTab('frb')} icon={<ListOrdered size={14} color={tab === 'frb' ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />} label="Competiție FRB" />
                         )}
                     </View>
                     </ScrollView>
@@ -526,10 +527,11 @@ function TabButton({ active, onPress, icon, label }: { active: boolean; onPress:
             accessibilityRole={'tab' as any}
             accessibilityState={{ selected: active }}
             // Phones: no icon and tighter padding, so the four tabs fit at 375 („Statistici” was cut off).
-            className={`flex-row items-center gap-1.5 px-2.5 sm:px-4 min-h-10 rounded-[11px] shrink-0 ${active ? 'bg-[var(--c-brand-surface)]' : ''}`}
+            className="flex-row items-center gap-1.5 px-2.5 sm:px-3.5 min-h-9 [@media(pointer:coarse)]:min-h-10 rounded-[8px] shrink-0"
+            style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
         >
             <View className="hidden sm:flex">{icon}</View>
-            <Text className={`text-[12.5px] font-semibold whitespace-nowrap ${active ? 'text-[color:var(--c-on-brand)]' : 'text-[color:var(--c-muted)]'}`}>{label}</Text>
+            <Text className={`text-[12.5px] font-semibold whitespace-nowrap ${active ? 'text-[color:var(--c-ink)]' : 'text-[color:var(--c-muted)]'}`}>{label}</Text>
         </Pressable>
     );
 }

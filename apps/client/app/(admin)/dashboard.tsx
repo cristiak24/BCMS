@@ -144,7 +144,6 @@ const DELTA_TONE = {
 } as const;
 
 function KpiCard({
-  icon,
   tone,
   label,
   value,
@@ -175,8 +174,8 @@ function KpiCard({
   return (
     <Shell
       {...(onPress ? { onPress, accessibilityRole: 'link' } : {})}
-      className="home-card relative overflow-hidden rounded-[14px] border p-3.5 md:p-4 min-w-0 h-full flex flex-col text-left"
-      style={CARD as any}
+      className={`relative overflow-hidden p-3.5 md:p-4 min-w-0 h-full flex flex-col text-left ${onPress ? 'hover:bg-[var(--c-surface-2)]' : ''}`}
+      style={{ backgroundColor: 'var(--c-surface)' }}
     >
       <View className="flex-row items-center justify-between gap-2 min-w-0">
         <View className="flex-row items-center gap-2 min-w-0 flex-1">
@@ -184,10 +183,7 @@ function KpiCard({
           {tone === 'warning' || tone === 'danger' ? (
             <View className="w-[3px] h-3 rounded-full shrink-0" style={{ backgroundColor: accent.solid }} />
           ) : null}
-          <Text className="t-eyebrow flex-1 min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
-        </View>
-        <View className="hidden sm:flex w-7 h-7 rounded-[9px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-3)' }}>
-          <MaterialIcons name={icon} size={15} color="var(--c-muted)" />
+          <Text className="t-label flex-1 min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
         </View>
       </View>
 
@@ -233,9 +229,7 @@ function QuickAction({ icon, label, detail, onPress }: { icon: string; label: st
       className="home-card rounded-[14px] border px-3 py-2.5 flex-row items-center gap-2.5 min-w-0 text-left"
       style={CARD as any}
     >
-      <View className="w-8 h-8 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-        <MaterialIcons name={icon} size={17} color="var(--c-brand-fg)" />
-      </View>
+      <MaterialIcons name={icon} size={18} color="var(--c-muted)" />
       <View className="flex-1 min-w-0">
         <Text className="f-display text-[13.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{label}</Text>
         <Text className="t-meta hidden sm:flex" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{detail}</Text>
@@ -251,7 +245,6 @@ function SectionCard({
   title,
   subtitle,
   icon,
-  tone,
   action,
   children,
 }: {
@@ -262,13 +255,10 @@ function SectionCard({
   action?: { label: string; onPress: () => void };
   children: ReactNode;
 }) {
-  const accent = ACCENT[tone];
   return (
     <View className="rounded-[14px] border overflow-hidden" style={CARD as any}>
       <View className="flex-row items-center gap-3 px-4 md:px-5 py-3 mb-3" style={{ borderBottomWidth: 1, borderBottomColor: 'var(--c-border-soft)' } as any}>
-        <View className="w-8 h-8 rounded-[9px] items-center justify-center shrink-0" style={{ backgroundColor: accent.bg }}>
-          <MaterialIcons name={icon} size={16} color={accent.fg} />
-        </View>
+        <MaterialIcons name={icon} size={18} color="var(--c-muted)" />
         <View className="flex-1 min-w-0">
           <Text accessibilityRole="header" className="f-display text-[15px] font-bold" style={{ color: 'var(--c-ink)', letterSpacing: '-0.015em' } as any} numberOfLines={1}>{title}</Text>
           {subtitle ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{subtitle}</Text> : null}
@@ -287,27 +277,6 @@ function SectionCard({
       </View>
       {children}
     </View>
-  );
-}
-
-/** Half-court line drawing in the welcome panel — hairline ink, no animation. */
-function CourtLines() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 320 200"
-      width="320"
-      height="200"
-      style={{ position: 'absolute', right: -40, bottom: -60, pointerEvents: 'none', opacity: 0.55 }}
-    >
-      <g fill="none" stroke="var(--c-border)" strokeWidth="1.5">
-        <rect x="10" y="10" width="300" height="240" rx="2" />
-        <rect x="110" y="10" width="100" height="110" />
-        <circle cx="160" cy="120" r="40" />
-        <path d="M40 10v50a120 120 0 0 0 240 0V10" />
-        <circle cx="160" cy="34" r="8" />
-      </g>
-    </svg>
   );
 }
 
@@ -346,11 +315,12 @@ function LoadFailed({ title, message, onRetry }: { title: string; message: strin
 
 /** Header aside: the very next event, with a live dot and a countdown. */
 function NextEventPanel({ event, failed, onPress }: { event: CalendarEvent | null | undefined; failed?: boolean; onPress: (id: CalendarEvent['id']) => void }) {
-  const panel = { boxShadow: 'var(--e-md)' } as any;
+  // Opaque, one tone step off the card: it used to be glass over the hero artwork.
+  const panel = { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any;
   if (!event) {
     return (
-      <View className="glass rounded-[14px] px-4 py-3.5 md:w-[300px]" style={panel}>
-        <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Următorul eveniment</Text>
+      <View className="rounded-[14px] border px-4 py-3.5 md:w-[300px]" style={panel}>
+        <Text className="t-label" style={{ color: 'var(--c-muted)' }}>Următorul eveniment</Text>
         <Text className="text-[14px] font-medium mt-2" style={{ color: 'var(--c-ink-soft)' }}>
           {failed ? 'Programul nu s-a încărcat.' : event === undefined ? 'Se încarcă…' : 'Nimic programat în 7 zile.'}
         </Text>
@@ -363,14 +333,14 @@ function NextEventPanel({ event, failed, onPress }: { event: CalendarEvent | nul
       onPress={() => onPress(event.id)}
       accessibilityRole="link"
       accessibilityLabel={`Următorul eveniment: ${event.title}`}
-      className="glass home-row ui-press ui-lift relative overflow-hidden rounded-[14px] pl-4 pr-3.5 py-3 md:w-[300px] text-left"
+      className="border home-row ui-press ui-lift relative overflow-hidden rounded-[14px] pl-4 pr-3.5 py-3 md:w-[300px] text-left"
       style={panel}
     >
       <View pointerEvents="none" className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: meta.solid }} />
       <View className="flex-row items-center justify-between gap-3">
         <View className="flex-row items-center gap-2">
           <View className="ui-ping w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--c-success)' }} />
-          <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Următorul eveniment</Text>
+          <Text className="t-label" style={{ color: 'var(--c-muted)' }}>Următorul eveniment</Text>
         </View>
         <Text className="t-num text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{countdown(event.startTime)}</Text>
       </View>
@@ -662,9 +632,8 @@ export default function Dashboard() {
                 className={`home-row ui-press flex-row items-center gap-3 px-4 md:px-5 py-3 text-left hover:bg-[var(--c-surface-2)] ${index > 0 ? 'border-t' : ''}`}
                 style={{ borderColor: 'var(--c-border-soft)' } as any}
               >
-                <View className="w-8 h-8 rounded-[9px] items-center justify-center shrink-0" style={{ backgroundColor: tone.bg }}>
-                  <MaterialIcons name={item.icon} size={16} color={tone.fg} />
-                </View>
+                {/* The glyph alone carries the severity colour; a tinted tile per row only repeated it. */}
+                <MaterialIcons name={item.icon} size={18} color={tone.fg} />
                 <View className="flex-1 min-w-0">
                   <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{item.title}</Text>
                   {item.detail ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{item.detail}</Text> : null}
@@ -687,11 +656,9 @@ export default function Dashboard() {
               {role === 'admin' ? <PrivacyRequestsBanner /> : null}
               {/* Welcome panel */}
               <View className="ui-rise relative overflow-hidden rounded-[16px] border" style={CARD as any}>
-                <View pointerEvents="none" className="absolute rounded-full" style={{ width: 300, height: 300, right: -70, top: -130, backgroundColor: 'var(--c-surface-tint)', opacity: 0.85 }} />
-                <CourtLines />
                 <View className="relative flex-col md:flex-row md:items-center gap-4 p-4 md:p-5">
                   <View className="flex-1 min-w-0">
-                    <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{formatToday()}</Text>
+                    <Text className="t-label" style={{ color: 'var(--c-muted)' }}>{formatToday()}</Text>
                     <Text
                       accessibilityRole="header"
                       aria-level={1}
@@ -735,7 +702,8 @@ export default function Dashboard() {
                   {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[120px] w-full rounded-[14px]" />)}
                 </View>
               ) : summary ? (
-                <View className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 ui-stagger">
+                // One container split by 1px dividers (the gap shows the divider colour), not four cards.
+                <View className="grid grid-cols-2 lg:grid-cols-4 rounded-[14px] border overflow-hidden ui-stagger" style={{ gap: 1, backgroundColor: 'var(--c-border-soft)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
                   <KpiCard
                     icon="groups"
                     tone="brand"
@@ -786,8 +754,8 @@ export default function Dashboard() {
                 </View>
               ) : null}
 
-              {/* Quick actions */}
-              <View className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 ui-stagger">
+              {/* Quick actions: phones and tablets only; from lg up the sidebar already lists them. */}
+              <View className="grid grid-cols-2 gap-2.5 md:gap-3 ui-stagger lg:hidden">
                 <QuickAction icon="calendar-month" label="Program" detail="Antrenamente, meciuri" onPress={() => go('/admin/schedule')} />
                 <QuickAction icon="assignment" label="Liste L12" detail="Loturile pentru meciuri" onPress={() => go('/admin/l12')} />
                 <QuickAction icon="verified-user" label="Conformitate" detail="Vize și documente" onPress={() => go('/admin/compliance')} />
@@ -839,7 +807,7 @@ export default function Dashboard() {
                         {upcoming.map((group) => (
                           <View key={group.key}>
                             <View className="px-4 md:px-5 pt-3 pb-1.5">
-                              <Text className="t-eyebrow" style={{ color: group.label === 'Azi' ? 'var(--c-brand-fg)' : 'var(--c-muted)' }}>{group.label}</Text>
+                              <Text className="t-label" style={{ color: group.label === 'Azi' ? 'var(--c-brand-fg)' : 'var(--c-muted)' }}>{group.label}</Text>
                             </View>
                             <View className="ui-stagger">
                               {group.items.map((event) => {
@@ -852,9 +820,10 @@ export default function Dashboard() {
                                     className="home-row ui-press flex-row items-center gap-3 border-t px-4 md:px-5 py-2.5 text-left hover:bg-[var(--c-surface-2)]"
                                     style={{ borderColor: 'var(--c-border-soft)' } as any}
                                   >
-                                    <View className="w-[54px] h-[46px] rounded-[12px] items-center justify-center shrink-0" style={{ backgroundColor: meta.soft }}>
-                                      <MaterialIcons name={EVENT_ICON[event.type] ?? 'event'} size={15} color={meta.onSoft} />
-                                      <Text className="t-num text-[13px] font-bold mt-0.5" style={{ color: meta.onSoft }}>{time(event.startTime)}</Text>
+                                    {/* Neutral tile: the glyph alone carries the event type's colour. */}
+                                    <View className="w-[54px] h-[46px] rounded-[12px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+                                      <MaterialIcons name={EVENT_ICON[event.type] ?? 'event'} size={15} color={meta.solid} />
+                                      <Text className="t-num text-[13px] font-bold mt-0.5" style={{ color: 'var(--c-ink)' }}>{time(event.startTime)}</Text>
                                     </View>
                                     <View className="flex-1 min-w-0">
                                       <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{event.title}</Text>

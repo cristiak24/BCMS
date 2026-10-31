@@ -9,8 +9,8 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
  */
 export type FinanceTone = 'brand' | 'warning' | 'sky' | 'success' | 'purple';
 
-// Every card header shares one neutral tile; a hue per card (sky, amber,
-// green, purple) only decorated. `tone` stays in the props for the call sites.
+// Every card header shares one plain grey icon (no tile); a hue per card (sky,
+// amber, green, purple) only decorated. `tone` stays in the props for the call sites.
 const TILE = { bg: 'var(--c-surface-3)', fg: 'var(--c-muted)' };
 
 export function FinanceCard({ children, className, nativeID }: { children: ReactNode; className?: string; nativeID?: string }) {
@@ -25,7 +25,7 @@ export function FinanceCard({ children, className, nativeID }: { children: React
     );
 }
 
-/** Icon chip + title + one-line description; `actions` sit right from sm (lg with wideActions) up, below on phones. */
+/** Grey icon + title + one-line description; `actions` sit right from sm (lg with wideActions) up, below on phones. */
 export function FinanceCardHeader({ icon, title, subtitle, actions, wideActions }: {
     icon: string;
     tone?: FinanceTone;
@@ -39,9 +39,7 @@ export function FinanceCardHeader({ icon, title, subtitle, actions, wideActions 
     return (
         <View className={`flex-col gap-3 mb-4 ${wideActions ? 'lg:flex-row lg:items-center' : 'sm:flex-row sm:items-center'}`}>
             <View className="flex-row items-center gap-3 flex-1 min-w-0">
-                <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: colors.bg }}>
-                    <MaterialIcons name={icon} size={18} color={colors.fg} />
-                </View>
+                <MaterialIcons name={icon} size={18} color={colors.fg} />
                 <View className="flex-1 min-w-0">
                     <Text accessibilityRole="header" aria-level={2} className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)', letterSpacing: '-0.015em' } as any}>{title}</Text>
                     {subtitle ? <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>{subtitle}</Text> : null}

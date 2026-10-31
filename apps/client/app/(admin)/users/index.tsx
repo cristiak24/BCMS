@@ -5,7 +5,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { usersApi, User } from '../../../services/usersApi';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { DEFAULT_SEARCH_PLACEHOLDER, useHeader } from '../../../components/HeaderContext';
-import PageHero, { GlassStat } from '../../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../../components/admin/PageHero';
 import { SkeletonList } from '../../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../../components/dashboard/ScreenStates';
 import PageContainer from '../../../components/ui/PageContainer';
@@ -92,10 +92,10 @@ export default function UserList() {
         <PageContainer className="pb-16">
             <PageHero eyebrow="Platformă" title="Utilizatori" subtitle="Toate conturile, din toate cluburile platformei.">
                 {!loading && !error ? (
-                    <View className="grid grid-cols-2 gap-2 max-w-[440px] ui-stagger">
+                    <StatStrip className="grid-cols-2 max-w-[440px]">
                         <GlassStat value={roleCounts.total} label="Utilizatori" dot="var(--c-brand-fg)" />
                         <GlassStat value={roleCounts.admins} label="Administratori" dot="var(--c-purple)" />
-                    </View>
+                    </StatStrip>
                 ) : null}
             </PageHero>
 

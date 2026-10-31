@@ -1,6 +1,6 @@
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Text, TextInput, View } from '@/src/web/reactNative';
 import ModalBackdrop from './ui/ModalBackdrop';
-import { useRouter } from '@/src/web/expoRouter';
+import { usePathname, useRouter } from '@/src/web/expoRouter';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
@@ -58,6 +58,8 @@ export default function AppHeader({
 }: AppHeaderProps) {
   const router = useRouter();
   const { signOut, session } = useSession();
+  // Admin screens: sentence-case role, neutral avatar, token colours (other roles unchanged).
+  const adminUi = usePathname().startsWith('/admin/');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   // Mobile search is collapsed to an icon by default and expands to a full
@@ -167,7 +169,7 @@ export default function AppHeader({
                 )}
               </Pressable>
               <View className="flex-1 min-w-0">
-                <Text className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--c-faint)' }}>{subtitle}</Text>
+                <Text className={adminUi ? 'text-[11px] font-semibold' : 'text-[10px] font-semibold uppercase tracking-wider'} style={{ color: adminUi ? 'var(--c-muted)' : 'var(--c-faint)' }}>{subtitle}</Text>
                 <Text className="font-black text-[18px] tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }} numberOfLines={1}>
                   {title}
                 </Text>
@@ -288,17 +290,32 @@ export default function AppHeader({
         </Pressable>
         <Pressable
           onPress={() => setProfileMenuOpen(true)}
-          className="flex-row items-center pl-4 border-l border-[#DDE7F5] gap-3"
+          className={`flex-row items-center pl-4 border-l gap-3 ${adminUi ? '' : 'border-[#DDE7F5]'}`}
+          style={adminUi ? { borderColor: 'var(--c-border)' } as any : undefined}
           accessibilityRole="button"
           accessibilityLabel="Deschide meniul contului"
         >
           <View className="flex-col items-end">
-            <Text className="text-[12px] font-black tracking-tight text-[#0E2041]">{userName ?? 'Contul meu'}</Text>
-            <Text className="text-[9px] font-black tracking-widest uppercase text-[#94A3B8]">{roleLabel(role)}</Text>
+            {adminUi ? (
+              <>
+                <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink-strong)' }}>{userName ?? 'Contul meu'}</Text>
+                <Text className="text-[12px]" style={{ color: 'var(--c-muted)' }}>{roleLabel(role)}</Text>
+              </>
+            ) : (
+              <>
+                <Text className="text-[12px] font-black tracking-tight text-[#0E2041]">{userName ?? 'Contul meu'}</Text>
+                <Text className="text-[9px] font-black tracking-widest uppercase text-[#94A3B8]">{roleLabel(role)}</Text>
+              </>
+            )}
           </View>
-          <View className="w-9 h-9 rounded-full bg-[#0B1E3D] items-center justify-center overflow-hidden border-2 border-white">
+          <View
+            className={`w-9 h-9 rounded-full items-center justify-center overflow-hidden ${adminUi ? 'border' : 'bg-[#0B1E3D] border-2 border-white'}`}
+            style={adminUi ? { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any : undefined}
+          >
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} className="w-full h-full" />
+            ) : adminUi ? (
+              <Text className="font-bold text-[13px]" style={{ color: 'var(--c-ink)' }}>{initials}</Text>
             ) : (
               <Text className="font-black text-[14px] text-white">{initials}</Text>
             )}
@@ -353,6 +370,7 @@ function ProfileActionsMenu({
   mobile?: boolean;
   topInset?: number;
 }) {
+  const adminUi = usePathname().startsWith('/admin/');
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <ModalBackdrop className="flex-1 bg-black/10" onDismiss={onClose} >
@@ -366,9 +384,14 @@ function ProfileActionsMenu({
           ]}
         >
           <View className="px-4 py-4 border-b border-[#EEF3FA] flex-row items-center gap-3">
-            <View className="w-11 h-11 rounded-full bg-[#0B1E3D] items-center justify-center overflow-hidden">
+            <View
+              className={`w-11 h-11 rounded-full items-center justify-center overflow-hidden ${adminUi ? 'border' : 'bg-[#0B1E3D]'}`}
+              style={adminUi ? { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any : undefined}
+            >
               {avatarUrl ? (
                 <Image source={{ uri: avatarUrl }} className="w-full h-full" />
+              ) : adminUi ? (
+                <Text className="font-bold" style={{ color: 'var(--c-ink)' }}>{initials}</Text>
               ) : (
                 <Text className="font-black text-white">{initials}</Text>
               )}
@@ -377,7 +400,11 @@ function ProfileActionsMenu({
               <Text className="text-[#0E2041] text-[14px] font-black" numberOfLines={1}>
                 {userName ?? 'Contul meu'}
               </Text>
-              <Text className="text-[#94A3B8] text-[10px] font-black uppercase tracking-widest mt-1" numberOfLines={1}>
+              <Text
+                className={adminUi ? 'text-[12px] mt-0.5' : 'text-[#94A3B8] text-[10px] font-black uppercase tracking-widest mt-1'}
+                style={adminUi ? { color: 'var(--c-muted)' } : undefined}
+                numberOfLines={1}
+              >
                 {roleLabel(role)}
               </Text>
             </View>

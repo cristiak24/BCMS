@@ -11,7 +11,7 @@ import DateTile from '../../ui/DateTile';
  * coloured left stripe bending round the corner and 9px black uppercase
  * badges — it never matched the tokenised cards elsewhere in the app.
  *
- * The type colour now lives in the date tile and a small dot; actions only
+ * The type colour lives in the small dot only (the date tile is neutral); actions only
  * appear on desktop, on phones the whole row opens the event.
  */
 export const ScheduleEventRow = React.memo(({
@@ -46,7 +46,7 @@ export const ScheduleEventRow = React.memo(({
         accessibilityLabel={item.title}
         className="flex-1 min-w-0 flex-row items-center gap-3"
       >
-        <DateTile value={item.startTime} fg={meta.onSoft} bg={meta.soft} size={44} />
+        <DateTile value={item.startTime} fg="var(--c-muted)" bg="var(--c-surface-2)" size={44} dayFirst />
         <View className="flex-1 min-w-0">
           <Text
             numberOfLines={1}

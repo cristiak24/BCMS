@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { teamsApi, type Player } from '../../../services/teamsApi';
 import { ApiError, isNotFound } from '../../../services/apiClient';
 import PageContainer from '../../../components/ui/PageContainer';
-import PageHero, { GlassStat } from '../../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../../components/admin/PageHero';
 import Button from '../../../components/ui/Button';
 import UnsavedBar from '../../../components/ui/UnsavedBar';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
@@ -36,9 +36,7 @@ function Card({ title, icon, right, children }: { title: string; icon: string; r
   return (
     <View className="ui-rise rounded-[16px] border p-4 md:p-5" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-xs)' } as any}>
       <View className="flex-row items-center gap-2.5 mb-4">
-        <View className="w-8 h-8 rounded-[9px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-          <MaterialIcons name={icon} size={17} color="var(--c-brand-fg)" />
-        </View>
+        <MaterialIcons name={icon} size={18} color="var(--c-muted)" />
         <Text accessibilityRole="header" className="f-display flex-1 text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{title}</Text>
         {right}
       </View>
@@ -248,7 +246,7 @@ export default function PlayerProfile() {
                 </View>
               ) : null}
             </View>
-            <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
+            <StatStrip className="grid-cols-2 lg:grid-cols-4">
               <GlassStat value={number ? `#${number}` : '—'} label="Tricou" dot="var(--c-purple)" />
               <GlassStat
                 value={attendance != null ? Math.round(attendance) : '—'}
@@ -266,7 +264,7 @@ export default function PlayerProfile() {
                 dot={paid ? 'var(--c-success)' : overdue > 0 ? 'var(--c-danger)' : 'var(--c-faint)'}
                 danger={overdue > 0}
               />
-            </View>
+            </StatStrip>
           </PageHero>
 
           <View className="flex-col lg:flex-row lg:items-start gap-5">
@@ -344,7 +342,7 @@ export default function PlayerProfile() {
 
               <Card title="Plăți" icon="payments">
                 <View className="rounded-[12px] px-3.5 py-3 mb-3" style={{ backgroundColor: 'var(--c-surface-2)' }}>
-                  <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{amountDue > 0 ? 'De plătit' : 'Plătit total'}</Text>
+                  <Text className="t-label" style={{ color: 'var(--c-muted)' }}>{amountDue > 0 ? 'De plătit' : 'Plătit total'}</Text>
                   <Text className="t-num text-[24px] font-bold mt-1" style={{ color: amountDue > 0 ? 'var(--c-warning-fg)' : 'var(--c-ink)' }}>
                     {money(amountDue > 0 ? amountDue : player.paidAmount ?? transactions.reduce((sum, t) => sum + t.amount, 0))}
                   </Text>

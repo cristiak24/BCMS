@@ -39,7 +39,7 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
       className="ui-rise rounded-[16px] border p-4 md:p-5"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
-      <Text className="t-eyebrow mb-3.5" style={{ color: 'var(--c-faint)' }}>{title}</Text>
+      <Text className="t-label mb-3.5" style={{ color: 'var(--c-muted)' }}>{title}</Text>
       {children}
     </View>
   );
@@ -197,7 +197,7 @@ export default function MatchDetailScreen() {
                   ) : (
                     <Text className="f-display text-[16px] font-bold leading-none" style={{ color: 'var(--c-brand-fg)' }}>vs</Text>
                   )}
-                  <Text className="text-[10.5px] font-semibold mt-1 uppercase tracking-[0.06em]" style={{ color: 'var(--c-faint)' }}>
+                  <Text className="t-label mt-1" style={{ color: 'var(--c-muted)' }}>
                     {isFinished ? 'Final' : 'Programat'}
                   </Text>
                 </View>
@@ -213,7 +213,7 @@ export default function MatchDetailScreen() {
                 <View className="flex-row justify-center gap-1.5 flex-wrap">
                   {detail.quarters.map((q, i) => (
                     <View key={i} className="rounded-[10px] px-2.5 py-1 items-center min-w-[52px]" style={{ backgroundColor: 'var(--c-surface-2)' }}>
-                      <Text className="text-[10px] font-semibold uppercase tracking-[0.06em]" style={{ color: 'var(--c-faint)' }}>
+                      <Text className="t-label" style={{ color: 'var(--c-muted)' }}>
                         {i < 4 ? `Sf. ${i + 1}` : `Prel. ${i - 3}`}
                       </Text>
                       <Text className="t-num text-[13px] font-bold mt-0.5" style={{ color: 'var(--c-ink)' }}>{q.home}-{q.away}</Text>

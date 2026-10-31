@@ -62,8 +62,9 @@ export default function PageHero({
             <View className="flex-row items-center gap-3.5 min-w-0 flex-1">
                 {leading}
                 <View className="min-w-0 flex-1">
-                    <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{eyebrow}</Text>
-                    <Text accessibilityRole="header" aria-level={1} className="f-display text-[22px] md:text-[26px] font-extrabold leading-tight mt-1" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.035em' } as any}>
+                    {/* Admin (plain) drops the eyebrow: the nav already names the section. */}
+                    {plain ? null : <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{eyebrow}</Text>}
+                    <Text accessibilityRole="header" aria-level={1} className={`f-display text-[22px] md:text-[26px] font-extrabold leading-tight ${plain ? '' : 'mt-1'}`} style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.035em' } as any}>
                         {title}
                     </Text>
                     {subtitle ? <Text className="text-[13px] mt-1" style={{ color: 'var(--c-muted)' }}>{subtitle}</Text> : null}
@@ -103,7 +104,23 @@ export default function PageHero({
     );
 }
 
-/** Stat tile for PageHero: translucent over the hero artwork, a plain card in a plain header. */
+/**
+ * Plain headers: the figures share one bordered container split by 1px
+ * dividers (the gap shows the divider colour) instead of a card per figure.
+ * `className` carries the grid columns, chosen by the number of figures.
+ */
+export function StatStrip({ children, className }: { children: ReactNode; className?: string }) {
+    return (
+        <View
+            className={`grid rounded-[12px] border overflow-hidden ui-stagger ${className ?? ''}`}
+            style={{ gap: 1, backgroundColor: 'var(--c-border-soft)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
+        >
+            {children}
+        </View>
+    );
+}
+
+/** Stat tile for PageHero: translucent over the hero artwork, a cell of a StatStrip in a plain header. */
 export function GlassStat({
     value,
     suffix,
@@ -127,13 +144,14 @@ export function GlassStat({
     const plain = useContext(PlainHeader);
     return (
         <View
-            className={`${plain ? 'border' : 'glass'} rounded-[12px] ${shortLabel ? 'px-2.5 lg:px-3' : 'px-3'} py-2.5 min-w-0`}
+            className={`${plain ? 'h-full' : 'glass rounded-[12px]'} ${shortLabel ? 'px-2.5 lg:px-3.5' : plain ? 'px-3.5' : 'px-3'} ${plain ? 'py-3' : 'py-2.5'} min-w-0`}
             style={(plain
-                ? { backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' }
+                ? { backgroundColor: 'var(--c-surface)' }
                 : { boxShadow: 'var(--e-sm)' }) as any}
         >
             <View className="flex-row items-baseline gap-1">
-                <View className="w-[6px] h-[6px] rounded-full shrink-0 self-center" style={{ backgroundColor: dot }} />
+                {/* In a plain header the dot only decorated; danger still colours the figure. */}
+                {plain ? null : <View className="w-[6px] h-[6px] rounded-full shrink-0 self-center" style={{ backgroundColor: dot }} />}
                 <Text className="f-display t-num text-[19px] font-extrabold leading-none" style={{ color: danger ? 'var(--c-danger-fg)' : 'var(--c-ink-strong)' }} numberOfLines={1}>{value}</Text>
                 {suffix ? <Text className="text-[11.5px] font-semibold leading-none" style={{ color: 'var(--c-muted)' }}>{suffix}</Text> : null}
             </View>
