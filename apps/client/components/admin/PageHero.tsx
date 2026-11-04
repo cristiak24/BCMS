@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { View, Text } from '@/src/web/reactNative';
 import { usePathname } from '@/src/web/expoRouter';
+import { useSession } from '../../context/AuthContext';
 
 /** Stat tiles drop the glass effect when there is no artwork behind them. */
 const PlainHeader = createContext(false);
@@ -34,6 +35,7 @@ function CourtLines() {
  * only, and admin Acasă has its own). Coach and player/parent pages keep the
  * hero until they get their own review — so the default follows the route,
  * which also covers screens shared between roles (Contacte, Documente).
+ * Player and parent accounts got theirs on 2026-11-05: plain everywhere.
  */
 export default function PageHero({
     eyebrow,
@@ -55,7 +57,10 @@ export default function PageHero({
     variant?: 'hero' | 'plain';
 }) {
     const pathname = usePathname();
-    const plain = (variant ?? (pathname.startsWith('/admin/') ? 'plain' : 'hero')) === 'plain';
+    const { session } = useSession();
+    const role = String(session?.role ?? '').toLowerCase();
+    const plainByDefault = pathname.startsWith('/admin/') || role === 'player' || role === 'parent';
+    const plain = (variant ?? (plainByDefault ? 'plain' : 'hero')) === 'plain';
 
     const heading = (
         <View className="flex-col md:flex-row md:items-center md:justify-between gap-3.5">
@@ -110,6 +115,11 @@ export default function PageHero({
  * `className` carries the grid columns, chosen by the number of figures.
  */
 export function StatStrip({ children, className }: { children: ReactNode; className?: string }) {
+    // Over the hero artwork (coach screens) the figures stay separate glass tiles.
+    const plain = useContext(PlainHeader);
+    if (!plain) {
+        return <View className={`grid gap-2.5 ui-stagger ${className ?? ''}`}>{children}</View>;
+    }
     return (
         <View
             className={`grid rounded-[12px] border overflow-hidden ui-stagger ${className ?? ''}`}

@@ -2,6 +2,7 @@ import { parseApiDate } from '@/utils/dates';
 import { CalendarEvent, EventAttendance, eventsApi } from '../services/eventsApi';
 import { ApiError } from '../services/apiClient';
 import { AuthUser } from './authSession';
+import { ATTENDANCE_PERIOD_DAYS } from './attendanceRate';
 
 export type PlayerAttendanceSummary = {
   rate: number | null;
@@ -81,6 +82,20 @@ export function summarizePlayerAttendance(records: PlayerAttendanceRecord[]): Pl
   };
 }
 
+/**
+ * The rate on every screen covers the last ATTENDANCE_PERIOD_DAYS days (the
+ * same window as the coach and admin screens, utils/attendanceRate.ts). The
+ * records themselves can reach further back — the strip and the streak read
+ * them — so the summary is taken over the window only.
+ */
+export function summarizeRecentAttendance(records: PlayerAttendanceRecord[], now = Date.now()): PlayerAttendanceSummary {
+  const since = now - ATTENDANCE_PERIOD_DAYS * 86400000;
+  return summarizePlayerAttendance(records.filter((record) => {
+    const time = parseApiDate(record.event.startTime).getTime();
+    return !Number.isNaN(time) && time >= since && time <= now;
+  }));
+}
+
 const MY_ATTENDANCE_BATCH = 100;
 
 /**
@@ -121,19 +136,26 @@ async function loadOwnAttendanceRecords(user: AuthUser, pastEvents: CalendarEven
   });
 }
 
+/**
+ * Own attendance on past sessions: the most recent `limit` of them, plus every
+ * session since `since` (default: the rate window), so the summary always
+ * covers the whole window however many sessions it holds.
+ */
 export async function loadPlayerAttendanceDetails(
   user: AuthUser | null,
   allEvents: CalendarEvent[],
-  limit = 30
+  limit = 30,
+  since?: Date,
 ) {
   const now = Date.now();
+  const windowStart = Math.min(since?.getTime() ?? Infinity, now - ATTENDANCE_PERIOD_DAYS * 86400000);
   const recentPastEvents = allEvents
     .filter((event) => {
       const eventDate = parseApiDate(event.startTime).getTime();
       return event.status !== 'cancelled' && !Number.isNaN(eventDate) && eventDate <= now;
     })
     .sort((a, b) => parseApiDate(b.startTime).getTime() - parseApiDate(a.startTime).getTime())
-    .slice(0, limit);
+    .filter((event, index) => index < limit || parseApiDate(event.startTime).getTime() >= windowStart);
 
   if (!user || recentPastEvents.length === 0) {
     return { summary: { rate: null, present: 0, total: 0 }, records: [] };
@@ -142,7 +164,7 @@ export async function loadPlayerAttendanceDetails(
   const records = await loadOwnAttendanceRecords(user, recentPastEvents);
 
   return {
-    summary: summarizePlayerAttendance(records),
+    summary: summarizeRecentAttendance(records, now),
     records,
   };
 }
@@ -162,7 +184,7 @@ export async function loadMyAttendanceHistory(user: AuthUser | null, limit = 40)
       attendance: { playerId: row.playerId, firstName: '', lastName: '', number: null, status: row.status, note: row.note ?? null },
       status: row.status,
     }));
-    return { summary: summarizePlayerAttendance(records), records };
+    return { summary: summarizeRecentAttendance(records), records };
   } catch (error) {
     if (!(error instanceof ApiError && error.status === 404)) {
       throw error;

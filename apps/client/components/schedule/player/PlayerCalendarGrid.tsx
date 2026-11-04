@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, useWindowDimensions } from '@/src/web/rea
 import { CalendarEvent } from '../../../services/eventsApi';
 import { EVENT_TYPE_META, isCancelledEvent } from '../scheduleShared';
 import { Skeleton } from '../../ui/Skeleton';
+import { useSession } from '../../../context/AuthContext';
 import { CalendarEventPill, calendarDayLabel } from '../CalendarEventPill';
 
 /*
@@ -21,6 +22,8 @@ import { CalendarEventPill, calendarDayLabel } from '../CalendarEventPill';
  */
 
 const WEEKDAY_LABELS = ['LUN', 'MAR', 'MIE', 'JOI', 'VIN', 'SÂM', 'DUM'];
+/** Player/parent accounts: sentence case, like the admin grid. */
+const WEEKDAY_LABELS_PLAIN = ['Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm', 'Dum'];
 
 export type PlayerCalendarDay = {
   key: string;
@@ -31,15 +34,19 @@ export type PlayerCalendarDay = {
   events: CalendarEvent[];
 };
 
-const WeekdayHeader = React.memo(() => (
-  <View className="flex-row border-b" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
-    {WEEKDAY_LABELS.map((day) => (
-      <View key={day} className="flex-1 py-2.5 items-center">
-        <Text className="text-[11px] font-bold uppercase tracking-[0.06em]" style={{ color: 'var(--c-muted)' }}>{day}</Text>
-      </View>
-    ))}
-  </View>
-));
+const WeekdayHeader = React.memo(() => {
+  const role = String(useSession().session?.role ?? '').toLowerCase();
+  const plain = role === 'player' || role === 'parent';
+  return (
+    <View className="flex-row border-b" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
+      {(plain ? WEEKDAY_LABELS_PLAIN : WEEKDAY_LABELS).map((day) => (
+        <View key={day} className="flex-1 py-2.5 items-center">
+          <Text className={plain ? 't-label' : 'text-[11px] font-bold uppercase tracking-[0.06em]'} style={{ color: 'var(--c-muted)' }}>{day}</Text>
+        </View>
+      ))}
+    </View>
+  );
+});
 WeekdayHeader.displayName = 'WeekdayHeader';
 
 /**

@@ -373,6 +373,9 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
     bg: 'var(--c-surface-3)',
   };
   const completion = getProfileCompletion(profile);
+  // Player/parent: no account-age tiles or completion score, no language
+  // option (Romanian only), the password form behind a button.
+  const familyAccount = role === 'player' || role === 'parent';
 
   return (
     <ScrollView
@@ -402,9 +405,9 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
           actions={showBackButton ? <Button label="Înapoi" icon="arrow-back" onPress={() => router.back()} /> : undefined}
         >
           <View className="flex-row flex-wrap items-center gap-2">
-            <View className="flex-row items-center gap-1 px-2.5 py-1 rounded-full" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-              <MaterialIcons name="badge" size={12} color="var(--c-brand-fg)" />
-              <Text className="text-[11.5px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{roleLabel}</Text>
+            <View className="flex-row items-center gap-1 px-2.5 py-1 rounded-full" style={{ backgroundColor: familyAccount ? 'var(--c-surface-3)' : 'var(--c-surface-tint)' }}>
+              <MaterialIcons name="badge" size={12} color={familyAccount ? 'var(--c-muted)' : 'var(--c-brand-fg)'} />
+              <Text className="text-[11.5px] font-bold" style={{ color: familyAccount ? 'var(--c-ink-soft)' : 'var(--c-brand-fg)' }}>{roleLabel}</Text>
             </View>
             <View className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ backgroundColor: statusMeta.bg }}>
               <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusMeta.fg }} />
@@ -418,6 +421,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
             ) : null}
           </View>
 
+          {familyAccount ? null : (
           <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
             <GlassStat dot="var(--c-purple)" value={formatShortDate(profile.createdAt)} label="Membru din" />
             <GlassStat dot="var(--c-sky)" value={formatShortDate(profile.lastLoginAt)} label="Ultima autentificare" />
@@ -430,6 +434,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
               />
             </View>
           </View>
+          )}
         </PageHero>
 
         {error ? (
@@ -447,7 +452,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
             column below lg. */}
         <View className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-8">
           <View className="lg:col-span-7 2xl:col-span-8 min-w-0">
-            <ProfileForm profile={profile} onSave={handleSaveProfile} />
+            <ProfileForm profile={profile} onSave={handleSaveProfile} showLanguage={!familyAccount} />
           </View>
 
           <View className="lg:col-span-5 2xl:col-span-4 min-w-0 gap-4">
@@ -467,7 +472,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
               </View>
             </ProfileCard>
 
-            <PasswordChangeForm onChangePassword={handlePasswordChange} />
+            <PasswordChangeForm onChangePassword={handlePasswordChange} collapsible={familyAccount} />
 
             <PrivacyCard />
 

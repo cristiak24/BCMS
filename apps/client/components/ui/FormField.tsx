@@ -67,7 +67,7 @@ export function FormField({
             onPress={() => setRevealed((value) => !value)}
             accessibilityRole="button"
             accessibilityLabel={revealed ? 'Ascunde parola' : 'Arată parola'}
-            className="w-8 h-8 -mr-1 rounded-[8px] items-center justify-center"
+            className="w-10 h-10 -mr-2 rounded-[8px] items-center justify-center"
           >
             <MaterialIcons name={revealed ? 'visibility' : 'visibility-off'} size={17} color="var(--c-muted)" />
           </Pressable>

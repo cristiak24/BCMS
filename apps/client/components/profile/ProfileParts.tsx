@@ -3,6 +3,7 @@ import { Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import type { StatTone } from '../ui/StatCard';
 import { STAT_TONES } from '../ui/StatCard';
+import { useSession } from '../../context/AuthContext';
 
 /**
  * Shared pieces for the profile screen.
@@ -31,7 +32,10 @@ export function ProfileCard({
   children: ReactNode;
   className?: string;
 }) {
-  const colors = STAT_TONES[tone];
+  // Player/parent: a neutral icon — a tinted tile per section only decorated.
+  const role = String(useSession().session?.role ?? '').toLowerCase();
+  const quiet = role === 'player' || role === 'parent';
+  const colors = quiet ? { bg: 'var(--c-surface-2)', fg: 'var(--c-muted)' } : STAT_TONES[tone];
   return (
     <View
       className={`ui-rise rounded-[16px] border ${className ?? ''}`}

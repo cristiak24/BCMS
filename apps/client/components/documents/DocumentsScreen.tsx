@@ -5,7 +5,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { clubDocumentsApi, type ClubDocument, type ClubDocumentList, type ClubDocumentVisibility } from '../../services/clubDocumentsApi';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../HeaderContext';
 import PageContainer from '../ui/PageContainer';
-import PageHero, { GlassStat } from '../admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../admin/PageHero';
 import Button from '../ui/Button';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { Skeleton } from '../ui/Skeleton';
@@ -341,7 +341,12 @@ export default function DocumentsScreen() {
             actions={canUpload ? <Button label="Încarcă PDF" icon="upload-file" variant="primary" onPress={pickFile} /> : undefined}
           >
             {/* Empty library: no "0 documente · 0 B din 150 MB" tiles, the empty state says it. */}
-            {data && data.documents.length > 0 ? (
+            {data && data.documents.length > 0 && !canUpload ? (
+              // Player/parent: one figure, a cell of the plain header's strip.
+              <StatStrip className="grid-cols-1 max-w-[220px]">
+                <GlassStat value={data.documents.length} label={pluralWord(data.documents.length, 'document', 'documente')} dot="var(--c-brand-fg)" />
+              </StatStrip>
+            ) : data && data.documents.length > 0 ? (
               <View className="grid grid-cols-2 gap-2 max-w-[440px] ui-stagger">
                 <GlassStat value={data.documents.length} label={pluralWord(data.documents.length, 'document', 'documente')} dot="var(--c-brand-fg)" />
                 {canUpload ? (

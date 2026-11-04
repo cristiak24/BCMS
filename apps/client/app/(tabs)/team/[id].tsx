@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../../components/ui/ScreenState';
 import PageContainer from '../../../components/ui/PageContainer';
-import PageHero, { GlassStat } from '../../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../../components/admin/PageHero';
 import { teamsApi, MyTeamDetail, MyTeamEvent, MyTeamPastEvent } from '../../../services/teamsApi';
 import { GENDER_LABELS, LEVEL_LABELS } from '../../../components/myclub/teamDisplay';
 import TeamStandingsCard from '../../../components/standings/TeamStandingsCard';
@@ -14,6 +14,7 @@ import {
   attendanceRateColor,
   attendanceStatusTone,
   eventTypeMeta,
+  formatEventDateTime,
   formatEventDay,
   formatEventTime,
   getInitials,
@@ -215,9 +216,9 @@ export default function PlayerTeamDetailScreen() {
                   mobile — kept in the same row at 375px they squeeze the coach
                   name down to a couple of characters. */}
               <View className="flex-col sm:flex-row sm:items-center gap-2.5">
-                <View className="glass rounded-[12px] px-3 py-2.5 flex-row items-center gap-2.5 flex-1 min-w-0" style={{ boxShadow: 'var(--e-sm)' } as any}>
-                  <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-                    <MaterialIcons name="sports" size={17} color="var(--c-brand-fg)" />
+                <View className="rounded-[12px] border px-3 py-2.5 flex-row items-center gap-2.5 flex-1 min-w-0" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
+                  <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+                    <MaterialIcons name="sports" size={17} color="var(--c-muted)" />
                   </View>
                   <View className="flex-1 min-w-0">
                     <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Antrenor</Text>
@@ -238,7 +239,7 @@ export default function PlayerTeamDetailScreen() {
               </View>
 
               {/* Three short numbers stay side by side even at 375px. */}
-              <View className="grid grid-cols-3 gap-2 sm:gap-2.5">
+              <StatStrip className="grid-cols-3">
                 <GlassStat value={team.playerCount} label={team.playerCount === 1 ? 'Jucător în lot' : 'Jucători în lot'} dot="var(--c-brand-surface)" />
                 <GlassStat
                   value={team.attendance.rate == null ? '—' : team.attendance.rate}
@@ -247,13 +248,15 @@ export default function PlayerTeamDetailScreen() {
                   dot={attendanceRateColor(team.attendance.rate)}
                   bar={team.attendance.rate == null ? undefined : team.attendance.rate}
                 />
+                {/* The hint is the date of the next one: under a count, a title read
+                    as if the count were that single event. */}
                 <GlassStat
                   value={team.upcomingEvents.length}
-                  label="Evenimente"
-                  hint={team.upcomingEvents[0] ? team.upcomingEvents[0].title : undefined}
+                  label={team.upcomingEvents.length === 1 ? 'Eveniment viitor' : 'Evenimente viitoare'}
+                  hint={team.upcomingEvents[0] ? `Următorul: ${formatEventDateTime(team.upcomingEvents[0].startTime)}` : undefined}
                   dot="var(--c-success)"
                 />
-              </View>
+              </StatStrip>
             </>
           ) : null}
         </PageHero>
@@ -284,7 +287,7 @@ export default function PlayerTeamDetailScreen() {
                     accessibilityRole="tab"
                     accessibilityState={{ selected: active }}
                     accessibilityLabel={item.label}
-                    className="flex-row items-center gap-1.5 h-9 px-3.5 rounded-[10px] border shrink-0"
+                    className="flex-row items-center gap-1.5 h-10 px-3.5 rounded-[10px] border shrink-0"
                     style={{
                       borderColor: active ? 'var(--c-brand-fg)' : 'var(--c-border)',
                       backgroundColor: active ? 'var(--c-surface-tint)' : 'var(--c-surface)',

@@ -13,6 +13,7 @@ import PageHero from '../../components/admin/PageHero';
 import Button from '../../components/ui/Button';
 import SectionHeader from '../../components/ui/SectionHeader';
 import Pagination, { usePagination } from '../../components/ui/Pagination';
+import { DenseList, DenseRow } from '../../components/ui/DenseList';
 import { useResponsive } from '../../hooks/useResponsive';
 import { useSession } from '../../context/AuthContext';
 import { openPaymentProof } from '../../utils/paymentProof';
@@ -79,12 +80,6 @@ async function openStripeUrl(url: string | null) {
   await WebBrowser.openBrowserAsync(url);
 }
 
-function feeIcon(icon: PlayerPaymentFee['icon']) {
-  if (icon === 'trophy') return 'emoji-events' as const;
-  if (icon === 'receipt') return 'receipt-long' as const;
-  return 'sports-basketball' as const;
-}
-
 function formatDueDate(value: string | null) {
   if (!value) return null;
   const date = parseApiDate(value);
@@ -93,75 +88,67 @@ function formatDueDate(value: string | null) {
 }
 
 /**
- * One fee as a compact row: icon · label/meta · amount + pay. It was a tall
- * card with a full-width button on phones — two fees filled the screen.
+ * One fee, a row of the „De plată” list. The title wraps to two lines: on a
+ * phone it was cut exactly where fees differ („Contribuție antrename…” × 2).
+ * `online` false (no online payment at the club): no pay button at all — seven
+ * disabled ones only said what can't be done.
  */
-function FeeCard({
+function FeeRow({
   fee,
   busy,
   onPay,
-  disabled,
+  online,
 }: {
   fee: PlayerPaymentFee;
   busy: boolean;
   onPay: () => void;
-  disabled?: boolean;
+  online: boolean;
 }) {
   const due = formatDueDate(fee.dueDate);
   const overdue = fee.status === 'overdue';
   // An older server sends 'failed' for a row whose Stripe attempt failed.
   const failed = fee.status === 'failed' || overdue;
-  const upcoming = fee.status === 'upcoming';
   // Still owed is `amount`; a partial payment already made is shown next to it.
   const partlyPaid = fee.paidAmount ? `achitat ${formatCurrency(fee.paidAmount, fee.currency)} din ${formatCurrency(fee.amount + fee.paidAmount, fee.currency)}` : null;
 
   return (
-    <View
-      className="ui-lift rounded-[14px] border px-3.5 py-3 flex-row items-center gap-3"
-      style={{
-        backgroundColor: 'var(--c-surface)',
-        borderColor: failed ? 'var(--c-danger-border)' : 'var(--c-border)',
-        boxShadow: 'var(--e-sm)',
-      } as any}
-    >
-      <View
-        className="h-10 w-10 rounded-[10px] items-center justify-center shrink-0"
-        style={{ backgroundColor: failed ? 'var(--c-danger-bg)' : 'var(--c-surface-tint)' }}
-      >
-        <MaterialIcons name={failed ? 'error-outline' : feeIcon(fee.icon)} size={19} color={failed ? 'var(--c-danger-fg)' : 'var(--c-brand-fg)'} />
-      </View>
-
+    <DenseRow>
       <View className="flex-1 min-w-0">
-        <Text className="text-[14.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{fee.label}</Text>
-        <Text className="t-meta mt-0.5" style={{ color: failed ? 'var(--c-danger-fg)' : 'var(--c-muted)' }} numberOfLines={1}>
+        <View className="flex-row items-start gap-1.5">
+          {failed ? <MaterialIcons name="error-outline" size={16} color="var(--c-danger-fg)" style={{ marginTop: 2 }} /> : null}
+          <Text className="text-[14.5px] font-bold leading-5 flex-1 min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{fee.label}</Text>
+        </View>
+        <Text className="t-meta mt-0.5" style={{ color: failed ? 'var(--c-danger-fg)' : 'var(--c-muted)' }} numberOfLines={2}>
           {overdue
             ? [`Restanță${due ? ` din ${due}` : ''}`, partlyPaid].filter(Boolean).join(' · ')
             : failed
               ? 'Plata a eșuat — încearcă din nou'
-              : [due ? `${upcoming ? 'Scadent' : 'Scadență'} ${due}` : null, partlyPaid ?? fee.description].filter(Boolean).join(' · ')}
+              : [due ? `Scadență ${due}` : null, partlyPaid ?? fee.description].filter(Boolean).join(' · ')}
         </Text>
       </View>
 
-      <View className="items-end gap-1.5 shrink-0">
+      <View className="items-end gap-1.5 md:flex-row md:items-center md:gap-3 shrink-0">
         <Text className="t-num text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>
           {formatCurrency(fee.amount, fee.currency)}
         </Text>
-        <Pressable
-          onPress={onPay}
-          disabled={busy || disabled}
-          accessibilityRole="button"
-          accessibilityLabel={`Plătește ${fee.label}`}
-          className="ui-press h-8 px-3.5 rounded-[9px] items-center justify-center"
-          style={{ backgroundColor: 'var(--c-brand-surface)', opacity: busy || disabled ? 0.55 : 1 } as any}
-        >
-          {busy ? (
-            <ActivityIndicator size="small" color="var(--c-on-brand)" />
-          ) : (
-            <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-on-brand)' }}>Plătește</Text>
-          )}
-        </Pressable>
+        {online ? (
+          <Pressable
+            onPress={onPay}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel={`Plătește ${fee.label}`}
+            className="ui-press h-10 px-3.5 rounded-[10px] items-center justify-center border"
+            style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border-strong)' } as any}
+          >
+            {busy ? (
+              <ActivityIndicator size="small" color="var(--c-brand-fg)" />
+            ) : (
+              <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Plătește</Text>
+            )}
+          </Pressable>
+        ) : null}
       </View>
-    </View>
+    </DenseRow>
   );
 }
 
@@ -181,7 +168,7 @@ function PaymentMethodCard({ method }: { method: PlayerPaymentMethod }) {
           className="h-9 w-12 rounded-[8px] items-center justify-center shrink-0"
           style={{ backgroundColor: 'var(--c-brand-surface)' }}
         >
-          <Text className="text-[10px] font-bold uppercase" style={{ color: 'var(--c-on-brand)' }}>{method.brand}</Text>
+          <Text className="text-[10px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{String(method.brand ?? '').toUpperCase()}</Text>
         </View>
         <View className="flex-1 min-w-0">
           <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
@@ -206,12 +193,14 @@ function TransactionRow({
   const isSuccess = transaction.status === 'success';
 
   return (
-    <View className="flex-row items-center gap-4 border-t px-4 py-3.5" style={{ borderColor: 'var(--c-border)' } as any}>
+    <View className="flex-row items-center gap-3 md:gap-4 border-t px-3 md:px-4 py-3" style={{ borderColor: 'var(--c-border)' } as any}>
       {/* Status-tinted: the "Status" column is hidden below md, so on a phone
           a failed payment was visually identical to a successful one. The icon
           carries that signal at every width. */}
+      {/* md+: on a phone the status word under the label carries it, and the
+          tile only squeezed the label into four lines. */}
       <View
-        className="h-9 w-9 rounded-[10px] items-center justify-center shrink-0"
+        className="hidden md:flex h-9 w-9 rounded-[10px] items-center justify-center shrink-0"
         style={{ backgroundColor: isSuccess ? 'var(--c-surface-3)' : 'var(--c-danger-bg)' }}
       >
         <MaterialIcons
@@ -226,7 +215,7 @@ function TransactionRow({
           ordinary-length labels mid-word ("May Traini..."). */}
       <View className="flex-[2] min-w-0">
         <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{transaction.label}</Text>
-        <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>{transaction.description}</Text>
+        <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{transaction.description}</Text>
         {/* Phones: date + status under the label (those columns are md+). */}
         <View className="flex-row items-center gap-1.5 mt-1 md:hidden">
           <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>{formatDate(transaction.date)}</Text>
@@ -258,7 +247,7 @@ function TransactionRow({
         </View>
       </View>
 
-      <Text className="min-w-[98px] text-right text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>
+      <Text className="md:min-w-[98px] text-right text-[14px] font-bold shrink-0 t-num" style={{ color: 'var(--c-ink)' }}>
         {formatCurrency(transaction.amount, transaction.currency)}
       </Text>
 
@@ -267,10 +256,10 @@ function TransactionRow({
           onPress={onOpenReceipt}
           accessibilityRole="button"
           accessibilityLabel="Dovada de plată"
-          className="ui-press h-9 w-9 rounded-[10px] items-center justify-center shrink-0"
-          style={{ backgroundColor: 'var(--c-surface-tint)' } as any}
+          className="ui-press h-10 w-10 rounded-[10px] items-center justify-center shrink-0 border"
+          style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
         >
-          <MaterialIcons name="receipt" size={17} color="var(--c-brand-fg)" />
+          <MaterialIcons name="receipt" size={17} color="var(--c-ink-soft)" />
         </Pressable>
       ) : null}
     </View>
@@ -437,6 +426,8 @@ function PlayerPaymentsScreen() {
     void WebBrowser.openBrowserAsync(url);
   };
 
+  const online = Boolean(summary?.stripe.configured);
+
   // The skeleton lives inside the real page container and mirrors the balance
   // panel / fees / history stack, so nothing shifts when the summary arrives.
   if (loading) {
@@ -497,7 +488,7 @@ function PlayerPaymentsScreen() {
         <PageHero
           eyebrow="Cotizații"
           title="Plăți"
-          subtitle="Cotizații, carduri salvate și istoricul plăților."
+          subtitle={online ? 'Cotizații, carduri salvate și istoricul plăților.' : 'Ce ai de plătit și ce ai plătit.'}
           actions={
             <Pressable
               onPress={() => loadSummary(true)}
@@ -510,7 +501,7 @@ function PlayerPaymentsScreen() {
             </Pressable>
           }
         >
-          <View className="glass rounded-[14px] px-4 py-3.5 flex-col md:flex-row md:items-center gap-3.5 md:gap-6" style={{ boxShadow: 'var(--e-md)' } as any}>
+          <View className="rounded-[14px] border px-4 py-3.5 flex-col md:flex-row md:items-center gap-3.5 md:gap-6" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
             <View className="flex-1 min-w-0">
               <View className="flex-row items-center gap-2.5">
                 <View
@@ -531,25 +522,36 @@ function PlayerPaymentsScreen() {
 
               {/* One accent on this page: ink for the figure, indigo only on
                   the action. */}
-              <Text className="t-eyebrow mt-3" style={{ color: 'var(--c-muted)' }}>Sold de plată</Text>
+              <Text className="t-label mt-3" style={{ color: 'var(--c-muted)' }}>Sold de plată</Text>
               <Text className="f-display t-num text-[28px] font-extrabold mt-0.5 leading-tight" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any}>
                 {formatCurrency(summary?.outstandingAmount ?? 0, summary?.currency ?? 'ron')}
               </Text>
             </View>
 
-            <View className="w-full md:w-[240px]">
-              <Button
-                variant="primary"
-                icon="payments"
-                label="Plătește tot"
-                loading={actionTarget === 'all'}
-                disabled={!payableFees.length || actionTarget === 'all' || !summary?.stripe.configured}
-                onPress={() => startCheckout()}
-              />
-              <Text className="t-meta mt-2 text-center" style={{ color: 'var(--c-muted)' }}>
-                {summary?.autoPayNote ?? 'Stripe Checkout'}
-              </Text>
-            </View>
+            {online ? (
+              <View className="w-full md:w-[240px]">
+                <Button
+                  variant="primary"
+                  icon="payments"
+                  label="Plătește tot"
+                  loading={actionTarget === 'all'}
+                  disabled={!payableFees.length || actionTarget === 'all'}
+                  onPress={() => startCheckout()}
+                />
+                <Text className="t-meta mt-2 text-center" style={{ color: 'var(--c-muted)' }}>
+                  {summary?.autoPayNote ?? 'Plăți procesate securizat prin Stripe.'}
+                </Text>
+              </View>
+            ) : (
+              // What the family can do instead — the old banner spoke of
+              // „cheile Stripe”, which only the club can act on.
+              <View className="w-full md:w-[300px] flex-row items-start gap-2.5 rounded-[12px] px-3.5 py-3" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+                <MaterialIcons name="info-outline" size={17} color="var(--c-muted)" style={{ marginTop: 1 }} />
+                <Text className="text-[13px] font-medium leading-5 flex-1" style={{ color: 'var(--c-ink-soft)' }}>
+                  Plata online nu e activă la club. Plătești cash sau prin transfer, la club; plata apare aici după ce clubul o înregistrează.
+                </Text>
+              </View>
+            )}
           </View>
         </PageHero>
 
@@ -567,28 +569,21 @@ function PlayerPaymentsScreen() {
           </View>
         ) : null}
 
-        {summary && !summary.stripe.configured ? (
-          <View className="mb-4 rounded-[14px] border px-4 py-3 flex-row items-center gap-3" style={{ backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-border)' } as any}>
-            <MaterialIcons name="warning-amber" size={19} color="var(--c-warning-fg)" />
-            <Text className="text-[13px] font-semibold flex-1" style={{ color: 'var(--c-warning-fg)' }}>
-              Stripe Checkout nu este configurat încă pentru club. Plățile vor fi disponibile după configurarea cheilor Stripe.
-            </Text>
-          </View>
-        ) : null}
-
+        {/* Saved cards only matter when the club takes online payments. */}
+        {online || summary?.paymentMethods.length ? (
         <View className="mb-6">
           <View className="w-full">
             <View className="flex-row items-center justify-between mb-3">
               <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any}>Metode de plată</Text>
-              <Pressable
-                onPress={addPaymentMethod}
-                disabled={actionTarget === 'setup' || !summary?.stripe.configured}
-                accessibilityRole="button"
-              >
-                <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
-                  {actionTarget === 'setup' ? 'Se deschide' : 'Adaugă'}
-                </Text>
-              </Pressable>
+              {online ? (
+                <Button
+                  icon="credit-card"
+                  label={actionTarget === 'setup' ? 'Se deschide' : 'Adaugă card'}
+                  loading={actionTarget === 'setup'}
+                  disabled={actionTarget === 'setup'}
+                  onPress={addPaymentMethod}
+                />
+              ) : null}
             </View>
 
             <View className="gap-2.5">
@@ -609,6 +604,7 @@ function PlayerPaymentsScreen() {
             </Text>
           </View>
         </View>
+        ) : null}
 
         <View className="mb-6">
           <SectionHeader
@@ -617,17 +613,17 @@ function PlayerPaymentsScreen() {
             isMobile={isMobile}
           />
           {payableFees.length ? (
-            <View className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 ui-stagger">
+            <DenseList label="De plată">
               {payableFees.map((fee) => (
-                <FeeCard
+                <FeeRow
                   key={fee.id}
                   fee={fee}
                   busy={actionTarget === fee.id}
-                  disabled={!summary?.stripe.configured}
+                  online={online}
                   onPay={() => startCheckout([fee.id])}
                 />
               ))}
-            </View>
+            </DenseList>
           ) : (
             <EmptyState
               icon="check-circle"
@@ -653,10 +649,12 @@ function PlayerPaymentsScreen() {
               className="hidden md:flex flex-row items-center gap-4 px-4 py-3"
               style={{ backgroundColor: 'var(--c-surface-2)' }}
             >
-              <Text className="flex-[2] text-[11px] font-bold uppercase tracking-[0.07em]" style={{ color: 'var(--c-faint)' }}>Tranzacție</Text>
-              <Text className="flex-1 text-[11px] font-bold uppercase tracking-[0.07em]" style={{ color: 'var(--c-faint)' }}>Dată</Text>
-              <Text className="flex-1 text-[11px] font-bold uppercase tracking-[0.07em]" style={{ color: 'var(--c-faint)' }}>Status</Text>
-              <Text className="min-w-[98px] text-right text-[11px] font-bold uppercase tracking-[0.07em]" style={{ color: 'var(--c-faint)' }}>Sumă</Text>
+              <Text className="flex-[2] t-label" style={{ color: 'var(--c-muted)' }}>Tranzacție</Text>
+              <Text className="flex-1 t-label" style={{ color: 'var(--c-muted)' }}>Dată</Text>
+              <Text className="flex-1 t-label" style={{ color: 'var(--c-muted)' }}>Status</Text>
+              <Text className="min-w-[98px] text-right t-label" style={{ color: 'var(--c-muted)' }}>Sumă</Text>
+              {/* Over the receipt buttons, so „Sumă” sits above the amounts. */}
+              {transactions.some((transaction) => transaction.receiptUrl || transaction.status === 'success') ? <View className="w-10 shrink-0" /> : null}
             </View>
 
             {transactions.length ? (

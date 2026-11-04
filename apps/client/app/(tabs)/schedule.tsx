@@ -13,7 +13,8 @@ import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../components/HeaderCo
 import { PlayerEventDetailModal } from '../../components/schedule/player/PlayerEventDetailModal';
 import { Skeleton } from '../../components/ui/Skeleton';
 import PageContainer from '../../components/ui/PageContainer';
-import PageHero, { GlassStat } from '../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../components/admin/PageHero';
+import { DenseList, DenseRow } from '../../components/ui/DenseList';
 import { EmptyState } from '../../components/ui/ScreenState';
 import { findNextUpcomingEvent } from '../../utils/scheduleLanding';
 import { PlayerDayScheduleModal } from '../../components/schedule/player/PlayerDayScheduleModal';
@@ -323,6 +324,61 @@ function DayCard({
   );
 }
 
+/**
+ * Player/parent: one day of the month as a row of one list — the day on the
+ * left, its sessions on the right. The day cards were a card per day, and a
+ * second card list („Evenimente viitoare”) beside the calendar repeated the
+ * same sessions.
+ */
+function MonthDayRow({
+  dateKey,
+  events,
+  isToday,
+  selected,
+  onSelectEvent,
+}: {
+  dateKey: string;
+  events: CalendarEvent[];
+  isToday: boolean;
+  selected: boolean;
+  onSelectEvent: (event: CalendarEvent) => void;
+}) {
+  const date = parseDateKey(dateKey);
+  const weekday = new Intl.DateTimeFormat(RO_LOCALE, { weekday: 'short' }).format(date).replace('.', '');
+
+  return (
+    <DenseRow selected={selected} className="items-start">
+      <View className="w-11 shrink-0 items-center pt-1">
+        <Text className="t-num text-[18px] font-bold leading-none" style={{ color: isToday ? 'var(--c-brand-fg)' : 'var(--c-ink-strong)' }}>{date.getDate()}</Text>
+        <Text className="t-label mt-1" style={{ color: isToday ? 'var(--c-brand-fg)' : 'var(--c-muted)' }}>{isToday ? 'Azi' : weekday.charAt(0).toUpperCase() + weekday.slice(1)}</Text>
+      </View>
+      <View className="flex-1 min-w-0 gap-0.5">
+        {events.map((event) => {
+          const meta = getEventTypeMeta(event.type);
+          return (
+            <Pressable
+              key={event.id}
+              onPress={() => onSelectEvent(event)}
+              accessibilityRole="button"
+              accessibilityLabel={`${meta.label}: ${event.title}, ${formatTimeRange(event.startTime, event.endTime)}`}
+              className="ui-press flex-row items-center gap-2.5 rounded-[10px] px-2 py-2 min-h-[44px] text-left hover:bg-[var(--c-surface-2)]"
+            >
+              <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: meta.solid }} />
+              <View className="flex-1 min-w-0">
+                <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{event.title}</Text>
+                <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+                  {[meta.label, formatTimeRange(event.startTime, event.endTime), event.location || 'Teren club'].join(' · ')}
+                </Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={18} color="var(--c-faint)" />
+            </Pressable>
+          );
+        })}
+      </View>
+    </DenseRow>
+  );
+}
+
 export default function ScheduleScreen() {
   const { session } = useSession();
   const { setSearchPlaceholder, searchValue, setSearchValue } = useHeader();
@@ -549,17 +605,22 @@ export default function ScheduleScreen() {
       contentContainerClassName="pb-32"
     >
       <PageContainer>
-        {isMobile ? null : (
+        {/* Player/parent: the title on phones too (it was the one screen
+            without an h1 there); the figures stay a desktop summary. */}
+        {isMobile && isCoach ? null : (
           <PageHero
             eyebrow="Program"
             title={isCoach ? 'Programul echipelor' : normalizeRole(session?.role) === 'parent' ? 'Programul copilului' : 'Programul meu'}
-            subtitle="Antrenamente, meciuri și cantonamente, într-un singur loc."
+            subtitle={isMobile ? undefined : 'Antrenamente, meciuri și cantonamente, într-un singur loc.'}
+            className={isMobile ? 'mb-3' : undefined}
           >
-            <View className="grid grid-cols-3 gap-2.5">
-              <GlassStat value={monthEventCount} label={`Evenimente în ${formatMonthName(viewDate)}`} dot="var(--c-brand-surface)" />
-              <GlassStat value={upcomingEvents.length} label="Evenimente viitoare" dot="var(--c-success)" />
-              <GlassStat value={getNextMatchLabel(nextMatch)} label="Următorul meci" dot="var(--c-purple)" />
-            </View>
+            {isMobile ? null : (
+              <StatStrip className="grid-cols-3">
+                <GlassStat value={monthEventCount} label={`Evenimente în ${formatMonthName(viewDate)}`} dot="var(--c-brand-surface)" />
+                <GlassStat value={upcomingEvents.length} label="Evenimente viitoare" dot="var(--c-success)" />
+                <GlassStat value={getNextMatchLabel(nextMatch)} label="Următorul meci" dot="var(--c-purple)" />
+              </StatStrip>
+            )}
           </PageHero>
         )}
         <View className="mb-4">
@@ -603,6 +664,7 @@ export default function ScheduleScreen() {
                 <PlayerCalendarGrid days={calendarDays} loading={loading} onSelectDay={handleSelectDay} />
               </View>
 
+              {isCoach ? (
               <View className={`${isMobile ? 'w-full' : 'shrink-0'} gap-3`} style={isMobile ? undefined : { width: width >= 1440 ? 380 : 340 }}>
                 <View className="flex-row items-center justify-between">
                   <Text className="f-display text-[17px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any}>Evenimente viitoare</Text>
@@ -625,6 +687,7 @@ export default function ScheduleScreen() {
                   <EmptyState icon="event-busy" compact title="Niciun eveniment viitor" message="Evenimentele programate apar aici." />
                 )}
               </View>
+              ) : null}
             </View>
 
             {/* Full width, month-scoped, grouped by day.
@@ -645,7 +708,7 @@ export default function ScheduleScreen() {
                     {plural(monthEventCount, 'eveniment', 'evenimente')} în {formatMonthName(viewDate)} {viewDate.getFullYear()}
                   </Text>
                 </View>
-                <Pressable onPress={() => setScheduleView('agenda')} accessibilityRole="button" className="h-8 justify-center px-1">
+                <Pressable onPress={() => setScheduleView('agenda')} accessibilityRole="button" className="h-10 lg:h-8 justify-center px-1">
                   <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Vezi toate lunile</Text>
                 </Pressable>
               </View>
@@ -656,6 +719,19 @@ export default function ScheduleScreen() {
                     <Skeleton key={index} className="h-[120px] w-full rounded-[14px]" />
                   ))}
                 </View>
+              ) : monthDayGroups.length && !isCoach ? (
+                <DenseList label="Evenimentele lunii">
+                  {monthDayGroups.map((day) => (
+                    <MonthDayRow
+                      key={day.dateKey}
+                      dateKey={day.dateKey as string}
+                      events={day.events}
+                      isToday={day.isToday}
+                      selected={day.dateKey === selectedDayKey && !day.isToday}
+                      onSelectEvent={setSelectedEvent}
+                    />
+                  ))}
+                </DenseList>
               ) : monthDayGroups.length ? (
                 <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
                   {monthDayGroups.map((day) => (

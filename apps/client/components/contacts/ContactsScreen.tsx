@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSession } from '../../context/AuthContext';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { contactsApi, type ContactsResponse, type PlayerContact, type PlayerContactUpdate, type StaffContact } from '../../services/contactsApi';
@@ -308,6 +309,7 @@ function StaffCard({ person, showMissing, wide = false }: { person: StaffContact
 export default function ContactsScreen() {
   // Admin: one-line rows with the numbers in their own column (other roles keep the stacked rows).
   const wide = usePathname().startsWith('/admin/');
+  const isParentAccount = String(useSession().session?.role ?? '').toLowerCase() === 'parent';
   const { searchValue, setSearchPlaceholder, setSearchValue, setHeaderActions, setMobileFab } = useHeader();
   const { toasts, showToast, dismissToast } = useToasts();
   const [data, setData] = useState<ContactsResponse | null>(null);
@@ -426,15 +428,15 @@ export default function ContactsScreen() {
                 <EmptyState
                   icon="contacts"
                   title={query ? 'Niciun contact găsit' : 'Niciun număr încă'}
-                  message={query ? `Nimic pentru „${searchValue.trim()}”.` : 'Antrenorii nu și-au adăugat încă numărul de telefon în profil.'}
+                  message={query ? `Nimic pentru „${searchValue.trim()}”.` : 'Niciun antrenor sau administrator al clubului nu și-a adăugat încă numărul de telefon în profil.'}
                 />
               </View>
             ) : (
               <View className="gap-5">
                 {staff.some((s) => s.ownTeam) ? (
                   <View>
-                    <Text className="f-display text-[15px] font-bold mb-2.5" style={{ color: 'var(--c-ink-strong)' }}>Antrenorii echipei tale</Text>
-                    <DenseList label="Antrenorii echipei tale">
+                    <Text className="f-display text-[15px] font-bold mb-2.5" style={{ color: 'var(--c-ink-strong)' }}>{isParentAccount ? 'Antrenorii echipei copilului' : 'Antrenorii echipei tale'}</Text>
+                    <DenseList label={isParentAccount ? 'Antrenorii echipei copilului' : 'Antrenorii echipei tale'}>
                       {staff.filter((s) => s.ownTeam).map((s) => <StaffCard key={s.id} person={s} />)}
                     </DenseList>
                   </View>

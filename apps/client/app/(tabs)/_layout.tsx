@@ -1,8 +1,8 @@
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { ContentLoading } from '../../components/ui/ScreenState';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
-import { HeaderProvider, useHeader } from '../../components/HeaderContext';
+import { HeaderProvider, useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../components/HeaderContext';
 import { useSession } from '../../context/AuthContext';
 import { normalizeRole } from '../../utils/authSession';
 import AppHeader from '../../components/AppHeader';
@@ -87,7 +87,23 @@ function PlayerTabsLayoutContent() {
     // Annotated so the two lists collapse into one element type — without it
     // the ternary is `PlayerItem[] | CoachItem[]`, which nothing downstream
     // (filter, the nav components) can take as a single array.
-    const menuItems: TabMenuItem[] = isCoach ? COACH_MENU_ITEMS : PLAYER_MENU_ITEMS;
+    // A parent is looking at their child's team, not their own.
+    const menuItems: TabMenuItem[] = isCoach
+        ? COACH_MENU_ITEMS
+        : isParent
+            ? PLAYER_MENU_ITEMS.map((item) => (item.match === 'team' ? { ...item, label: 'Echipa copilului' } : item))
+            : PLAYER_MENU_ITEMS;
+    // Player/parent: the header search shows only on pages that read it (they
+    // set their own placeholder); elsewhere it promised "jucători, meciuri sau
+    // rapoarte" and filtered nothing.
+    // Sentence-case labels on player/parent screens (global.css). On <html>,
+    // not this div: sheets and dialogs are portaled to <body>.
+    useEffect(() => {
+        if (isCoach || typeof document === 'undefined') return;
+        document.documentElement.dataset.ui = 'player';
+        return () => { delete document.documentElement.dataset.ui; };
+    }, [isCoach]);
+    const showHeaderSearch = isCoach || searchPlaceholder !== DEFAULT_SEARCH_PLACEHOLDER;
     const primaryMobileItems = menuItems.filter((item) => MOBILE_PRIMARY_MATCHES.includes(item.match));
     const activePlayerItem = getActivePlayerItem(pathname, menuItems);
     const moreIsActive = !MOBILE_PRIMARY_MATCHES.includes(activePlayerItem.match);
@@ -102,10 +118,10 @@ function PlayerTabsLayoutContent() {
     // and the user has a coach/player/parent role before this renders.
 
     return (
-        <div className="flex flex-1 min-h-screen bg-[#EAF1F8] lg:flex-row flex-col">
+        <div className="flex flex-1 min-h-screen bg-[var(--c-bg)] lg:flex-row flex-col">
             {/* Keyboard users skip the menu (12+ stops) straight to the page. */}
             <a href="#continut" className="skip-link">Sari la conținut</a>
-            <Sidebar items={menuItems} />
+            <Sidebar items={menuItems} plain={!isCoach} />
 
             <div className="flex flex-1 min-w-0 flex-col relative">
                 <div className="lg:hidden sticky top-0 z-30">
@@ -114,6 +130,7 @@ function PlayerTabsLayoutContent() {
                         title={activePlayerItem.label}
                         topInset={0}
                         searchPlaceholder={searchPlaceholder}
+                        showSearch={showHeaderSearch}
                         searchValue={searchValue}
                         onSearchChange={setSearchValue}
                         avatarUrl={session?.avatarUrl ?? undefined}
@@ -126,6 +143,7 @@ function PlayerTabsLayoutContent() {
                     <AppHeader
                         title={activePlayerItem.label}
                         searchPlaceholder={searchPlaceholder}
+                        showSearch={showHeaderSearch}
                         searchValue={searchValue}
                         onSearchChange={setSearchValue}
                         headerActions={headerActions}

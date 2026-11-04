@@ -180,13 +180,13 @@ export default function ChildSwitcher() {
             accessibilityRole="button"
             accessibilityLabel={children.length > 1 ? `Copil: ${active.firstName} ${active.lastName}. Schimbă copilul` : `Copil: ${active.firstName} ${active.lastName}`}
             accessibilityState={{ expanded: open }}
-            className="flex-1 min-w-0 flex-row items-center gap-3 text-left"
+            className="flex-1 min-w-0 flex-row items-center gap-3 min-h-[44px] text-left"
           >
             <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-purple-bg)' }}>
               <Text className="text-[12px] font-bold" style={{ color: 'var(--c-purple-fg)' }}>{getInitials(active.firstName, active.lastName)}</Text>
             </View>
             <View className="flex-1 min-w-0">
-              <Text className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--c-faint)' }}>Copilul tău</Text>
+              <Text className="t-label" style={{ color: 'var(--c-muted)' }}>Copilul tău</Text>
               <Text className="text-[14.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
                 {active.firstName} {active.lastName}
                 <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-muted)' }}>{active.teams.length ? ` · ${active.teams.join(', ')}` : ''}</Text>
@@ -198,7 +198,7 @@ export default function ChildSwitcher() {
             onPress={() => setAdding(true)}
             accessibilityRole="button"
             accessibilityLabel="Adaugă un copil"
-            className="ui-press h-9 px-2.5 rounded-[10px] border flex-row items-center gap-1 shrink-0"
+            className="ui-press h-10 min-w-[40px] px-2.5 rounded-[10px] border flex-row items-center justify-center gap-1 shrink-0"
             style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
           >
             <MaterialIcons name="add" size={16} color="var(--c-brand-fg)" />
@@ -232,7 +232,7 @@ export default function ChildSwitcher() {
               key={child.id}
               onPress={() => choose(child.id)}
               accessibilityRole={'menuitem' as any}
-              className="flex-row items-center gap-3 px-3.5 py-3 text-left"
+              className="flex-row items-center gap-3 px-3.5 py-3 min-h-[48px] text-left"
               style={{ backgroundColor: child.id === active?.id ? 'var(--c-surface-tint)' : 'transparent' }}
             >
               <Text className="flex-1 text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>

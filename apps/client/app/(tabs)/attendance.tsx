@@ -5,7 +5,9 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
 import PageContainer from '../../components/ui/PageContainer';
-import PageHero, { GlassStat } from '../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../components/admin/PageHero';
+import { DenseList, DenseRow } from '../../components/ui/DenseList';
+import { ATTENDANCE_MIN_SESSIONS, ATTENDANCE_PERIOD_DAYS, ATTENDANCE_PERIOD_LABEL } from '../../utils/attendanceRate';
 import Pagination, { usePagination } from '../../components/ui/Pagination';
 import ProgressRing from '../../components/ui/ProgressRing';
 import DateTile from '../../components/ui/DateTile';
@@ -57,7 +59,8 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 function formatTime(value: string) {
   const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat('ro-RO', { weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(date);
+  const text = new Intl.DateTimeFormat('ro-RO', { weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(date);
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function monthLabel(value: string) {
@@ -83,6 +86,8 @@ function currentStreak(records: PlayerAttendanceRecord[]) {
 
 function rateTone(rate: number | null, sessions: number) {
   if (rate == null) return { label: 'Încă nu există date', color: 'var(--c-muted)' };
+  // 1 of 1 is 100%, not a verdict.
+  if (sessions < ATTENDANCE_MIN_SESSIONS) return { label: 'Prea puține sesiuni pentru o concluzie', color: 'var(--c-muted)' };
   if (isEliteRhythm(rate, sessions)) return { label: 'Ritm de elită', color: 'var(--c-success-fg)' };
   if (rate >= 75) return { label: 'Pe drumul bun', color: 'var(--c-brand-fg)' };
   if (rate >= 50) return { label: 'Poate mai bine', color: 'var(--c-warning-fg)' };
@@ -101,20 +106,16 @@ function AttendanceRow({ record }: { record: PlayerAttendanceRecord }) {
   const note = record.attendance?.note?.trim();
 
   return (
-    <View
-      className="relative overflow-hidden rounded-[14px] border pl-4 pr-3.5 py-2.5"
-      style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any}
-    >
-      <View className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: meta?.bar ?? 'var(--c-border-strong)' }} />
+    <DenseRow stacked={Boolean(note)}>
       <View className="flex-row items-center gap-3">
-        <DateTile value={record.event.startTime} fg={type.fg} bg={type.bg} size={46} />
+        <DateTile value={record.event.startTime} fg="var(--c-muted)" bg="var(--c-surface-2)" size={44} dayFirst />
         <View className="flex-1 min-w-0">
-          <Text className="f-display text-[14.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
+          <Text className="text-[14.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
             {record.event.title}
           </Text>
           <View className="flex-row items-center gap-1.5 mt-1 min-w-0">
-            <MaterialIcons name={type.icon} size={13} color={type.fg} />
-            <Text className="t-meta flex-1 min-w-0 capitalize" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+            <MaterialIcons name={type.icon} size={13} color="var(--c-faint)" />
+            <Text className="t-meta flex-1 min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
               {[formatTime(record.event.startTime), record.event.location].filter(Boolean).join(' · ')}
             </Text>
           </View>
@@ -130,18 +131,15 @@ function AttendanceRow({ record }: { record: PlayerAttendanceRecord }) {
       {/* The coach's note on THIS player for the session. It was already sent
           to the player (as a notification) but never shown in their history. */}
       {note ? (
-        <View
-          className="flex-row items-start gap-2 mt-3 rounded-[10px] px-3 py-2.5"
-          style={{ backgroundColor: 'var(--c-surface-2)' }}
-        >
-          <MaterialIcons name="chat-bubble-outline" size={14} color="var(--c-brand-fg)" style={{ marginTop: 2 }} />
+        <View className="flex-row items-start gap-2 rounded-[10px] px-3 py-2.5" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+          <MaterialIcons name="chat-bubble-outline" size={14} color="var(--c-muted)" style={{ marginTop: 2 }} />
           <View className="flex-1 min-w-0">
-            <Text className="text-[11px] font-bold uppercase tracking-[0.06em]" style={{ color: 'var(--c-brand-fg)' }}>Feedback antrenor</Text>
+            <Text className="t-label" style={{ color: 'var(--c-muted)' }}>Feedback antrenor</Text>
             <Text className="text-[13px] font-medium mt-0.5 leading-5" style={{ color: 'var(--c-ink-soft)' }}>{note}</Text>
           </View>
         </View>
       ) : null}
-    </View>
+    </DenseRow>
   );
 }
 
@@ -159,6 +157,20 @@ function PlayerAttendanceScreen() {
   const counts = useMemo(() => {
     const result: Record<StatusKey | 'late', number> = { present: 0, absent: 0, excused: 0, late: 0 };
     markedRecords.forEach((record) => {
+      const key = statusKey(record.status);
+      if (key) result[key] += 1;
+      if (toAttendanceMark(record.status) === 'late') result.late += 1;
+    });
+    return result;
+  }, [markedRecords]);
+
+  // The figures in the header share the rate's window; the history below
+  // keeps every marked session.
+  const windowCounts = useMemo(() => {
+    const since = Date.now() - ATTENDANCE_PERIOD_DAYS * 86400000;
+    const result = { present: 0, absent: 0, excused: 0, late: 0 };
+    markedRecords.forEach((record) => {
+      if (parseApiDate(record.event.startTime).getTime() < since) return;
       const key = statusKey(record.status);
       if (key) result[key] += 1;
       if (toAttendanceMark(record.status) === 'late') result.late += 1;
@@ -197,12 +209,14 @@ function PlayerAttendanceScreen() {
     loadData();
   }, [loadData]);
 
-  // Month headers are inserted between rows of the current page.
-  const pageRows = pager.pageItems.map((record, index) => {
+  // The current page, one list per month.
+  const monthGroups = pager.pageItems.reduce<{ month: string; records: PlayerAttendanceRecord[] }[]>((groups, record) => {
     const month = monthLabel(record.event.startTime);
-    const previous = index > 0 ? monthLabel(pager.pageItems[index - 1].event.startTime) : null;
-    return { record, header: month !== previous ? month : null };
-  });
+    const last = groups[groups.length - 1];
+    if (last && last.month === month) last.records.push(record);
+    else groups.push({ month, records: [record] });
+    return groups;
+  }, []);
 
   return (
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
@@ -212,7 +226,7 @@ function PlayerAttendanceScreen() {
           title={isParent ? 'Prezența copilului' : 'Prezența mea'}
           subtitle={loading || error
             ? (isParent ? 'Istoricul sesiunilor la care antrenorul a marcat prezența copilului.' : 'Istoricul sesiunilor la care antrenorul ți-a marcat prezența.')
-            : `${tone.label} · ${summary.total ? `${summary.present} din ${plural(summary.total, 'sesiune', 'sesiuni')}` : 'nicio sesiune marcată încă'}`}
+            : `${tone.label} · ${summary.total ? `${summary.present} din ${plural(summary.total, 'sesiune', 'sesiuni')}` : 'nicio sesiune marcată'} · ${ATTENDANCE_PERIOD_LABEL.toLowerCase()}`}
           leading={loading || error ? undefined : (
             <ProgressRing
               value={summary.rate}
@@ -229,9 +243,9 @@ function PlayerAttendanceScreen() {
           actions={
             <>
               {!loading && !error && streak > 1 ? (
-                <View className="flex-row items-center gap-1 rounded-full px-2.5 py-1" style={{ backgroundColor: 'var(--c-success-bg)' }}>
+                <View className="flex-row items-center gap-1 rounded-full px-2.5 py-1 border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
                   <MaterialIcons name="bolt" size={13} color="var(--c-success-fg)" />
-                  <Text className="text-[12px] font-bold" style={{ color: 'var(--c-success-fg)' }}>{streak} la rând</Text>
+                  <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{plural(streak, 'prezență', 'prezențe')} la rând</Text>
                 </View>
               ) : null}
               <Pressable
@@ -247,11 +261,11 @@ function PlayerAttendanceScreen() {
           }
         >
           {loading || error ? null : (
-            <View className="grid grid-cols-3 gap-2 ui-stagger">
-              <GlassStat dot="var(--c-success)" label="Prezent" value={counts.present} hint={counts.late ? plural(counts.late, 'întârziere', 'întârzieri') : 'sesiuni'} />
-              <GlassStat dot="var(--c-danger)" label="Absent" value={counts.absent} hint="sesiuni" />
-              <GlassStat dot="var(--c-warning)" label="Motivat" value={counts.excused} hint="sesiuni" />
-            </View>
+            <StatStrip className="grid-cols-3">
+              <GlassStat dot="var(--c-success)" label="Prezent" value={windowCounts.present} hint={windowCounts.late ? plural(windowCounts.late, 'întârziere', 'întârzieri') : `${ATTENDANCE_PERIOD_DAYS} de zile`} />
+              <GlassStat dot="var(--c-danger)" label="Absent" value={windowCounts.absent} hint={`${ATTENDANCE_PERIOD_DAYS} de zile`} />
+              <GlassStat dot="var(--c-warning)" label="Motivat" value={windowCounts.excused} hint={`${ATTENDANCE_PERIOD_DAYS} de zile`} />
+            </StatStrip>
           )}
         </PageHero>
 
@@ -273,11 +287,15 @@ function PlayerAttendanceScreen() {
                 <View>
                   <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Istoric</Text>
                   <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
-                    {markedRecords.length === 1 ? 'Ultima sesiune marcată' : `Ultimele ${plural(markedRecords.length, 'sesiune marcată', 'sesiuni marcate')}`}
+                    {markedRecords.length === 0
+                      ? 'Nicio sesiune marcată încă'
+                      : markedRecords.length === 1 ? 'Ultima sesiune marcată' : `Ultimele ${plural(markedRecords.length, 'sesiune marcată', 'sesiuni marcate')}`}
                   </Text>
                 </View>
+                {/* Only statuses that occur: „Absent 0” was a button leading to an empty list. */}
+                {markedRecords.length ? (
                 <View className="flex-row flex-wrap gap-1.5" accessibilityRole="tablist">
-                  {FILTERS.map((option) => {
+                  {FILTERS.filter((option) => option.key === 'all' || option.key === filter || counts[option.key] > 0).map((option) => {
                     const active = filter === option.key;
                     const count = option.key === 'all' ? markedRecords.length : counts[option.key];
                     return (
@@ -287,20 +305,21 @@ function PlayerAttendanceScreen() {
                         accessibilityRole="tab"
                         accessibilityState={{ selected: active }}
                         accessibilityLabel={`${option.label}: ${count}`}
-                        className="ui-press h-9 rounded-full px-3.5 flex-row items-center gap-1.5 border"
+                        className="ui-press h-10 rounded-full px-3.5 flex-row items-center gap-1.5 border"
                         style={{
-                          backgroundColor: active ? 'var(--c-brand-surface)' : 'var(--c-surface)',
-                          borderColor: active ? 'var(--c-brand-surface)' : 'var(--c-border)',
+                          backgroundColor: active ? 'var(--c-surface-3)' : 'var(--c-surface)',
+                          borderColor: active ? 'var(--c-border-strong)' : 'var(--c-border)',
                         } as any}
                       >
-                        <Text className="text-[13px] font-semibold" style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>
+                        <Text className="text-[13px] font-semibold" style={{ color: active ? 'var(--c-ink-strong)' : 'var(--c-ink-soft)' }}>
                           {option.label}
                         </Text>
-                        <Text className="t-num text-[12px] font-bold" style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-faint)' }}>{count}</Text>
+                        <Text className="t-num text-[12px] font-bold" style={{ color: active ? 'var(--c-ink-soft)' : 'var(--c-faint)' }}>{count}</Text>
                       </Pressable>
                     );
                   })}
                 </View>
+                ) : null}
               </View>
 
               {filteredRecords.length === 0 ? (
@@ -313,13 +332,13 @@ function PlayerAttendanceScreen() {
                     : 'Sesiunile la care antrenorul îți marchează prezența apar aici.'}
                 />
               ) : (
-                <View className="gap-2.5 ui-stagger">
-                  {pageRows.map(({ record, header }) => (
-                    <View key={record.event.id} className="gap-2.5">
-                      {header ? (
-                        <Text className="t-eyebrow mt-2 first:mt-0" style={{ color: 'var(--c-faint)' }}>{header}</Text>
-                      ) : null}
-                      <AttendanceRow record={record} />
+                <View className="gap-4">
+                  {monthGroups.map((group) => (
+                    <View key={group.month} className="gap-2">
+                      <Text className="t-label" style={{ color: 'var(--c-muted)' }}>{group.month}</Text>
+                      <DenseList label={group.month}>
+                        {group.records.map((record) => <AttendanceRow key={record.event.id} record={record} />)}
+                      </DenseList>
                     </View>
                   ))}
                 </View>

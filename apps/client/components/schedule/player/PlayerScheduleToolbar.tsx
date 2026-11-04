@@ -151,7 +151,7 @@ export function PlayerScheduleToolbar({
             onPress={() => onViewChange(key)}
             accessibilityLabel={label}
             className={`flex-row items-center gap-1.5 rounded-[8px] justify-center ${
-              isMobile ? 'h-8 w-9' : 'h-[28px] px-2.5'
+              isMobile ? 'h-10 w-10' : 'h-[28px] px-2.5'
             }`}
             style={active ? { backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-xs)' } as any : undefined}
           >
@@ -175,7 +175,7 @@ export function PlayerScheduleToolbar({
     <View className="flex-row items-center gap-1.5">
       <TouchableOpacity
         onPress={() => onFilterChange('all')}
-        className={`h-8 px-3 rounded-[9px] justify-center border ${
+        className={`${isMobile ? 'h-10' : 'h-8'} px-3 rounded-[9px] justify-center border ${
           filter === 'all' ? 'border-transparent' : 'border-[var(--c-border)] bg-[var(--c-surface)]'
         }`}
         style={filter === 'all' ? { backgroundColor: 'var(--c-brand-surface)' } : undefined}
@@ -196,7 +196,7 @@ export function PlayerScheduleToolbar({
           <TouchableOpacity
             key={key}
             onPress={() => onFilterChange(active ? 'all' : key)}
-            className={`flex-row items-center gap-1.5 h-8 px-2.5 rounded-[9px] border ${
+            className={`flex-row items-center gap-1.5 ${isMobile ? 'h-10' : 'h-8'} px-2.5 rounded-[9px] border ${
               active ? 'border-transparent' : 'border-[var(--c-border)] bg-[var(--c-surface)]'
             }`}
             style={active ? { backgroundColor: meta.solid } : undefined}

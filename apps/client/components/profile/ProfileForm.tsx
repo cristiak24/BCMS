@@ -8,6 +8,11 @@ import { FormNotice, PrimaryButton, ProfileCard, ProfileField } from './ProfileP
 type ProfileFormProps = {
   profile: ProfileRecord;
   onSave: (payload: UpdateProfilePayload) => Promise<ProfileRecord>;
+  /**
+   * False on player/parent accounts: the app ships Romanian copy only and the
+   * server sends nothing per language, so „English” changed nothing.
+   */
+  showLanguage?: boolean;
 };
 
 const DEFAULT_NOTIFICATIONS: NotificationPreferences = { email: true, push: false, sms: false };
@@ -40,7 +45,7 @@ function sameNotifications(a: NotificationPreferences, b: NotificationPreference
   return Boolean(a.email) === Boolean(b.email) && Boolean(a.push) === Boolean(b.push) && Boolean(a.sms) === Boolean(b.sms);
 }
 
-export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
+export default function ProfileForm({ profile, onSave, showLanguage = true }: ProfileFormProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
@@ -146,6 +151,7 @@ export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
             error={phoneError}
           />
 
+          {showLanguage ? (
           <View className="min-w-0">
             <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Limbă preferată</Text>
             <View
@@ -176,6 +182,7 @@ export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
               })}
             </View>
           </View>
+          ) : null}
         </View>
       </ProfileCard>
 

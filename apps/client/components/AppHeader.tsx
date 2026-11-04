@@ -38,6 +38,14 @@ const ROLE_LABELS: Record<string, string> = {
   parent: 'Părinte',
 };
 
+/** Admin routes, and every screen of a player or parent account. */
+function useQuietHeader() {
+  const pathname = usePathname();
+  const { session } = useSession();
+  const role = String(session?.role ?? '').toLowerCase();
+  return pathname.startsWith('/admin/') || role === 'player' || role === 'parent';
+}
+
 const roleLabel = (role?: string | null) => (role ? ROLE_LABELS[role] ?? role : 'Cont');
 
 export default function AppHeader({
@@ -58,8 +66,8 @@ export default function AppHeader({
 }: AppHeaderProps) {
   const router = useRouter();
   const { signOut, session } = useSession();
-  // Admin screens: sentence-case role, neutral avatar, token colours (other roles unchanged).
-  const adminUi = usePathname().startsWith('/admin/');
+  // Admin, player and parent screens: sentence-case role, neutral avatar, token colours (coach unchanged).
+  const adminUi = useQuietHeader();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   // Mobile search is collapsed to an icon by default and expands to a full
@@ -370,7 +378,7 @@ function ProfileActionsMenu({
   mobile?: boolean;
   topInset?: number;
 }) {
-  const adminUi = usePathname().startsWith('/admin/');
+  const adminUi = useQuietHeader();
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <ModalBackdrop className="flex-1 bg-black/10" onDismiss={onClose} >

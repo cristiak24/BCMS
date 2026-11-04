@@ -12,6 +12,12 @@ export const ATTENDANCE_PERIOD_DAYS = 30;
 /** Short caption under a rate: the period. */
 export const ATTENDANCE_PERIOD_LABEL = `Ultimele ${ATTENDANCE_PERIOD_DAYS} de zile`;
 
+/**
+ * Below this many marked sessions a rate is shown without a verdict: 1 of 1 is
+ * 100%, not a trend.
+ */
+export const ATTENDANCE_MIN_SESSIONS = 3;
+
 /** The definition, for a tooltip / footnote. */
 export const ATTENDANCE_DEFINITION = `Prezenți (inclusiv întârziați) din sesiunile marcate în ultimele ${ATTENDANCE_PERIOD_DAYS} de zile; absențele motivate nu intră în calcul.`;
 

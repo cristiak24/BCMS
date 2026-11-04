@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { Text, View } from '@/src/web/reactNative';
+import Button from '../ui/Button';
 import { FormNotice, PrimaryButton, ProfileCard, ProfileField } from './ProfileParts';
 
 type PasswordChangeFormProps = {
+  /** Shows only a „Schimbă parola” button until it is pressed (player/parent profile). */
+  collapsible?: boolean;
   onChangePassword: (payload: {
     currentPassword: string;
     newPassword: string;
@@ -32,7 +35,8 @@ const STRENGTH_META = [
   { label: 'Puternică', color: 'var(--c-success)' },
 ];
 
-export default function PasswordChangeForm({ onChangePassword }: PasswordChangeFormProps) {
+export default function PasswordChangeForm({ onChangePassword, collapsible = false }: PasswordChangeFormProps) {
+  const [expanded, setExpanded] = useState(!collapsible);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -76,6 +80,7 @@ export default function PasswordChangeForm({ onChangePassword }: PasswordChangeF
       setNewPassword('');
       setConfirmPassword('');
       setSuccess('Parola a fost schimbată cu succes.');
+      if (collapsible) setExpanded(false);
     } catch (changeError) {
       setError(changeError instanceof Error ? changeError.message : 'Nu s-a putut schimba parola.');
     } finally {
@@ -85,6 +90,12 @@ export default function PasswordChangeForm({ onChangePassword }: PasswordChangeF
 
   return (
     <ProfileCard icon="lock" tone="warning" title="Securitate" description="Schimbă parola contului tău.">
+      {!expanded ? (
+        <View className="gap-3">
+          {success ? <FormNotice tone="success" message={success} /> : null}
+          <Button icon="key" label="Schimbă parola" onPress={() => { setExpanded(true); setSuccess(null); }} className="self-start" />
+        </View>
+      ) : (
       <View className="gap-4">
         <ProfileField
           label="Parola curentă"
@@ -138,7 +149,19 @@ export default function PasswordChangeForm({ onChangePassword }: PasswordChangeF
         {error ? <FormNotice tone="danger" message={error} /> : null}
         {success ? <FormNotice tone="success" message={success} /> : null}
 
-        <View className="flex-row justify-end">
+        <View className="flex-row justify-end gap-2">
+          {collapsible ? (
+            <Button
+              label="Renunță"
+              onPress={() => {
+                setExpanded(false);
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+                setError(null);
+              }}
+            />
+          ) : null}
           <PrimaryButton
             label="Schimbă parola"
             loadingLabel="Se actualizează…"
@@ -149,6 +172,7 @@ export default function PasswordChangeForm({ onChangePassword }: PasswordChangeF
           />
         </View>
       </View>
+      )}
     </ProfileCard>
   );
 }

@@ -1,4 +1,5 @@
-import { parseApiDate } from '@/utils/dates';
+import { toCalendarDay } from '@/utils/dates';
+import { medicalStatus } from '../../../utils/medicalVisa';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
@@ -22,12 +23,15 @@ import { plural } from '../../../utils/plural';
  * memberships server-side and returns nothing about other players.
  */
 
+/** Same rule as Conformitate in admin (utils/medicalVisa): valid through its expiry day, Romanian calendar. */
 function getMedicalStatus(expiry: string | null | undefined) {
-  if (!expiry) return { label: 'Necompletată', bg: 'var(--c-surface-3)', fg: 'var(--c-muted)', icon: 'help-outline' as const };
-  const days = Math.ceil((new Date(expiry).getTime() - Date.now()) / 86400000);
-  if (Number.isNaN(days)) return { label: 'Necompletată', bg: 'var(--c-surface-3)', fg: 'var(--c-muted)', icon: 'help-outline' as const };
-  if (days < 0) return { label: 'Expirată', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', icon: 'error-outline' as const };
-  if (days <= 30) return { label: `Expiră în ${plural(days, 'zi', 'zile')}`, bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', icon: 'schedule' as const };
+  const status = medicalStatus(expiry);
+  if (status === 'missing') return { label: 'Necompletată', bg: 'var(--c-surface-3)', fg: 'var(--c-muted)', icon: 'help-outline' as const };
+  if (status === 'expired') return { label: 'Expirată', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', icon: 'error-outline' as const };
+  if (status === 'soon') {
+    const days = Math.round((Date.parse(`${toCalendarDay(expiry)}T00:00:00Z`) - Date.parse(`${toCalendarDay(new Date())}T00:00:00Z`)) / 86400000);
+    return { label: days === 0 ? 'Expiră azi' : `Expiră în ${plural(days, 'zi', 'zile')}`, bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', icon: 'schedule' as const };
+  }
   return { label: 'Valabilă', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', icon: 'verified' as const };
 }
 
@@ -35,11 +39,11 @@ function getMedicalStatus(expiry: string | null | undefined) {
 function MyStatusCard({ player, isParent }: { player: Player; isParent: boolean }) {
   const status = getMedicalStatus(player.medicalCheckExpiry);
   const expiryLabel = player.medicalCheckExpiry
-    ? parseApiDate(player.medicalCheckExpiry).toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })
+    ? new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${toCalendarDay(player.medicalCheckExpiry)}T00:00:00Z`))
     : null;
 
   return (
-    <View className="glass rounded-[14px] px-3.5 py-3 flex-row items-center gap-3" style={{ boxShadow: 'var(--e-sm)' } as any}>
+    <View className="rounded-[14px] border px-3.5 py-3 flex-row items-center gap-3" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
       <View className="w-9 h-9 rounded-[11px] items-center justify-center shrink-0" style={{ backgroundColor: status.bg }}>
         <MaterialIcons name={status.icon} size={18} color={status.fg} />
       </View>
@@ -95,8 +99,8 @@ function TeamCard({ team, onOpen, isParent }: { team: MyTeamSummary; onOpen: () 
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
       <View className="flex-row items-start gap-3">
-        <View className="w-11 h-11 rounded-[13px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-          <MaterialIcons name="shield" size={21} color="var(--c-brand-fg)" />
+        <View className="w-11 h-11 rounded-[13px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+          <MaterialIcons name="shield" size={21} color="var(--c-muted)" />
         </View>
 
         <View className="flex-1 min-w-0">
