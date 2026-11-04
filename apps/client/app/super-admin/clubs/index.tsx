@@ -190,8 +190,8 @@ export default function ClubsScreen() {
                 style={{ borderTopWidth: index ? 1 : 0, borderTopColor: 'var(--c-border)' } as any}
               >
                 <View className="flex-1 md:flex-[2.4] min-w-0 flex-row items-center gap-3">
-                  <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-                    <MaterialIcons name="apartment" size={17} color="var(--c-brand-fg)" />
+                  <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-2)' }}>
+                    <MaterialIcons name="apartment" size={17} color="var(--c-muted)" />
                   </View>
                   <View className="flex-1 min-w-0">
                     <View className="flex-row items-center gap-1.5 min-w-0">

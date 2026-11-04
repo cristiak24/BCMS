@@ -11,7 +11,8 @@ import { ATTENDANCE_PERIOD_LABEL, formatAttendanceRate, pooledAttendanceRate } f
 import { useSession } from '../../context/AuthContext';
 import GlassCard from '../../components/ui/GlassCard';
 import Button from '../../components/ui/Button';
-import PageHero, { GlassStat } from '../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../components/admin/PageHero';
+import { DenseList } from '../../components/ui/DenseList';
 import PageContainer from '../../components/ui/PageContainer';
 import SectionHeader from '../../components/ui/SectionHeader';
 import ProgressRing from '../../components/ui/ProgressRing';
@@ -19,12 +20,10 @@ import TeamStandingsCard from '../../components/standings/TeamStandingsCard';
 import { formatToday, getGreeting } from '../../components/ui/HeroBanner';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
-import { AttendanceRate, Chip, CoachPlayerRow, SessionRow } from '../../components/coach/CoachPrimitives';
-import { attendanceRateColor, eventTypeMeta, formatRelativeDay } from '../../components/coach/coachDisplay';
+import { AttendanceRate, CoachPlayerRow, SessionRow } from '../../components/coach/CoachPrimitives';
+import { attendanceRateColor } from '../../components/coach/coachDisplay';
 import {
-  formatCoachTimeRange,
   getCoachScopedEvents,
-  getEventDate,
   getEventTimestamp,
   isUpcoming,
 } from '../../components/coach/coachUtils';
@@ -49,192 +48,40 @@ function getFirstName(name?: string | null, firstName?: string | null) {
   return firstName?.trim() || name?.trim().split(/\s+/)[0] || 'antrenor';
 }
 
-/** "în 2 zile" / "în 5 h" / "în 40 min" / "acum". */
-function formatCountdown(value: string, now = Date.now()) {
-  const date = getEventDate(value);
-  if (!date) return '';
-  const diff = date.getTime() - now;
-  if (diff <= 0) return 'acum';
-  const minutes = Math.round(diff / 60000);
-  if (minutes < 60) return `în ${minutes} min`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `în ${hours} h`;
-  const days = Math.round(hours / 24);
-  return `în ${plural(days, 'zi', 'zile')}`;
-}
-
-/** Glass tile inside the hero: what's next and when. */
-function NextSessionPanel({ event, onPress }: { event: CalendarEvent | null; onPress: () => void }) {
-  const panel = { boxShadow: 'var(--e-md)' } as any;
-  if (!event) {
-    return (
-      <View className="glass rounded-[14px] px-4 py-3.5 lg:w-[320px]" style={panel}>
-        <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Următoarea sesiune</Text>
-        <Text className="text-[14px] font-medium mt-2" style={{ color: 'var(--c-ink-soft)' }}>Nimic programat încă.</Text>
-      </View>
-    );
-  }
-
-  const meta = eventTypeMeta(event.type);
-  const relative = formatRelativeDay(event.startTime);
-
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`Următoarea sesiune: ${event.title}`}
-      className="glass ui-press ui-lift relative overflow-hidden rounded-[14px] pl-4 pr-3.5 py-3 lg:w-[320px] text-left"
-      style={panel}
-    >
-      <View pointerEvents="none" className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: meta.fg }} />
-      <View className="flex-row items-center justify-between gap-3">
-        <View className="flex-row items-center gap-2">
-          <View className="ui-ping w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--c-success)' }} />
-          <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Următoarea sesiune</Text>
-        </View>
-        <Text className="t-num text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{formatCountdown(event.startTime)}</Text>
-      </View>
-      <Text className="f-display text-[16px] font-bold mt-1.5 leading-snug" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
-        {event.title}
-      </Text>
-      <View className="flex-row items-center gap-1.5 mt-1">
-        <MaterialIcons name="schedule" size={13} color="var(--c-faint)" />
-        <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-          {[relative, formatCoachTimeRange(event.startTime, event.endTime)].filter(Boolean).join(' · ')}
-        </Text>
-      </View>
-      <View className="flex-row items-center gap-1.5 mt-0.5">
-        <MaterialIcons name={meta.icon} size={13} color={meta.fg} />
-        <Text className="t-meta flex-1 min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-          {[meta.label, event.teamName, event.location].filter(Boolean).join(' · ')}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
 /**
- * The next seven days as columns, one dot per session in the type's accent —
- * answers "how loaded is my week" without reading a list.
+ * Squad attendance: average ring, traffic-light buckets, and the players below
+ * 75% — the list used to take the five lowest whatever their rate, so
+ * „Necesită atenție” listed players at 100%.
  */
-function WeekStrip({ events }: { events: CalendarEvent[] }) {
-  const days = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return Array.from({ length: 7 }, (_, index) => {
-      // Calendar days, not 24h steps: across the clock change `+ index * 86400000`
-      // landed on the same date twice and skipped one.
-      const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() + index);
-      const next = new Date(today.getFullYear(), today.getMonth(), today.getDate() + index + 1).getTime();
-      const dayEvents = events.filter((event) => {
-        const time = getEventTimestamp(event);
-        return time >= day.getTime() && time < next;
-      });
-      return {
-        key: day.toISOString(),
-        weekday: new Intl.DateTimeFormat('ro-RO', { weekday: 'short' }).format(day).replace('.', ''),
-        date: day.getDate(),
-        isToday: index === 0,
-        events: dayEvents,
-      };
-    });
-  }, [events]);
-
-  const total = days.reduce((sum, day) => sum + day.events.length, 0);
-
-  return (
-    <GlassCard className="ui-rise gap-3.5">
-      <View className="flex-row items-center justify-between gap-3">
-        <View>
-          <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Săptămâna ta</Text>
-          <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
-            {total === 0 ? 'Nicio sesiune în următoarele 7 zile' : `${plural(total, 'sesiune', 'sesiuni')} în următoarele 7 zile`}
-          </Text>
-        </View>
-        <View className="w-9 h-9 rounded-[10px] items-center justify-center" style={{ backgroundColor: 'var(--c-sky-bg)' }}>
-          <MaterialIcons name="date-range" size={18} color="var(--c-sky-fg)" />
-        </View>
-      </View>
-
-      <View className="grid grid-cols-7 gap-1.5 sm:gap-2 ui-stagger">
-        {days.map((day) => (
-          <View
-            key={day.key}
-            className="items-center rounded-[12px] border py-2 gap-1"
-            style={{
-              backgroundColor: day.isToday ? 'var(--c-brand-surface)' : day.events.length ? 'var(--c-surface-2)' : 'transparent',
-              borderColor: day.isToday ? 'var(--c-brand-surface)' : 'var(--c-border-soft)',
-            } as any}
-            accessibilityLabel={`${day.weekday} ${day.date}: ${plural(day.events.length, 'sesiune', 'sesiuni')}`}
-          >
-            <Text className="text-[11px] font-semibold capitalize" style={{ color: day.isToday ? 'var(--c-on-brand)' : 'var(--c-muted)' }}>
-              {day.weekday}
-            </Text>
-            <Text className="f-display t-num text-[16px] font-extrabold leading-none" style={{ color: day.isToday ? 'var(--c-on-brand)' : 'var(--c-ink)' }}>
-              {day.date}
-            </Text>
-            <View className="flex-row gap-1 h-1.5 items-center">
-              {day.events.slice(0, 3).map((event) => (
-                <View
-                  key={event.id}
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ backgroundColor: day.isToday ? 'var(--c-on-brand)' : eventTypeMeta(event.type).fg }}
-                />
-              ))}
-            </View>
-          </View>
-        ))}
-      </View>
-
-      <View className="flex-row flex-wrap gap-x-4 gap-y-1.5">
-        {(['training', 'match', 'camp'] as const).map((type) => {
-          const meta = eventTypeMeta(type);
-          return (
-            <View key={type} className="flex-row items-center gap-1.5">
-              <View className="w-2 h-2 rounded-full" style={{ backgroundColor: meta.fg }} />
-              <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>{meta.label}</Text>
-            </View>
-          );
-        })}
-      </View>
-    </GlassCard>
-  );
-}
-
-/** Squad attendance: average ring, traffic-light buckets, and who needs a look. */
-function SquadHealth({ players, average, onManage }: { players: Player[]; average: number | null; onManage: () => void }) {
+function SquadHealth({ players, average }: { players: Player[]; average: number | null }) {
   const rated = players.filter((player) => player.attendanceRate != null);
   const buckets = [
     { label: 'Peste 75%', color: 'var(--c-success)', count: rated.filter((p) => (p.attendanceRate ?? 0) >= 75).length },
     { label: '50–74%', color: 'var(--c-warning)', count: rated.filter((p) => (p.attendanceRate ?? 0) >= 50 && (p.attendanceRate ?? 0) < 75).length },
     { label: 'Sub 50%', color: 'var(--c-danger)', count: rated.filter((p) => (p.attendanceRate ?? 0) < 50).length },
   ];
-  const focus = [...rated]
+  const focus = rated
+    .filter((player) => (player.attendanceRate ?? 100) < 75)
     .sort((a, b) => (a.attendanceRate ?? 100) - (b.attendanceRate ?? 100))
     .slice(0, FOCUS_LIMIT);
 
   return (
     <GlassCard className="ui-rise gap-3.5">
-      <View className="flex-row items-start justify-between gap-3">
-        <View className="flex-1 min-w-0">
-          <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Sănătate lot</Text>
-          <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Prezența jucătorilor tăi · {ATTENDANCE_PERIOD_LABEL.toLowerCase()}</Text>
-        </View>
-        <View className="w-9 h-9 rounded-[10px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-          <MaterialIcons name="monitor-heart" size={18} color="var(--c-brand-fg)" />
-        </View>
+      <View>
+        <Text accessibilityRole="header" className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Prezența lotului</Text>
+        <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Jucătorii tăi · {ATTENDANCE_PERIOD_LABEL.toLowerCase()}</Text>
       </View>
 
       {rated.length ? (
         <>
-          <View className="flex-row items-center gap-4 rounded-[12px] border p-3" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}>
-            <ProgressRing value={average} size={68} stroke={7} color={attendanceRateColor(average)} label={average == null ? 'Fără prezență marcată' : `Prezență ${average}%`}>
-              <Text className="f-display t-num text-[17px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>{formatAttendanceRate(average)}</Text>
+          <View className="flex-row items-center gap-4">
+            <ProgressRing value={average} size={64} stroke={7} color={attendanceRateColor(average)} label={average == null ? 'Fără prezență marcată' : `Prezență ${average}%`}>
+              <Text className="f-display t-num text-[16px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>{formatAttendanceRate(average)}</Text>
             </ProgressRing>
             <View className="flex-1 min-w-0 gap-1.5">
               {buckets.map((bucket) => (
                 <View key={bucket.label} className="flex-row items-center gap-2">
-                  <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: bucket.color }} />
+                  <View className="w-2 h-2 rounded-full" style={{ backgroundColor: bucket.color }} />
                   <Text className="text-[13px] font-medium flex-1" style={{ color: 'var(--c-ink-soft)' }}>{bucket.label}</Text>
                   <Text className="t-num text-[13px] font-bold" style={{ color: 'var(--c-ink)' }}>{bucket.count}</Text>
                 </View>
@@ -243,19 +90,23 @@ function SquadHealth({ players, average, onManage }: { players: Player[]; averag
           </View>
 
           <View className="gap-2">
-            <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Necesită atenție</Text>
-            <View className="gap-2 ui-stagger">
-              {focus.map((player) => (
-                <CoachPlayerRow
-                  key={player.id}
-                  firstName={player.firstName}
-                  lastName={player.lastName}
-                  meta={player.teamName || player.teamNames?.[0] || player.position || 'Jucător'}
-                  rate={player.attendanceRate ?? null}
-                  trailing={<AttendanceRate rate={player.attendanceRate} />}
-                />
-              ))}
-            </View>
+            <Text className="t-label" style={{ color: 'var(--c-muted)' }}>Sub 75%</Text>
+            {focus.length ? (
+              <DenseList label="Jucători sub 75%">
+                {focus.map((player) => (
+                  <CoachPlayerRow
+                    key={player.id}
+                    inList
+                    firstName={player.firstName}
+                    lastName={player.lastName}
+                    meta={player.teamName || player.teamNames?.[0] || player.position || 'Jucător'}
+                    trailing={<AttendanceRate rate={player.attendanceRate} />}
+                  />
+                ))}
+              </DenseList>
+            ) : (
+              <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Toți jucătorii cu prezență marcată sunt peste 75%.</Text>
+            )}
           </View>
         </>
       ) : (
@@ -266,8 +117,6 @@ function SquadHealth({ players, average, onManage }: { players: Player[]; averag
           message="Statistica apare după primele sesiuni marcate."
         />
       )}
-
-      <Button variant="primary" icon="fact-check" label="Gestionează prezența" onPress={onManage} />
     </GlassCard>
   );
 }
@@ -275,7 +124,7 @@ function SquadHealth({ players, average, onManage }: { players: Player[]; averag
 function HomeSkeleton() {
   return (
     <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă panoul">
-      <Skeleton className="h-[230px] w-full rounded-[16px]" />
+      <Skeleton className="h-[150px] w-full rounded-[16px]" />
       <View className="flex-col xl:flex-row gap-4">
         <View className="flex-1 gap-2.5">
           <Skeleton className="h-[170px] w-full rounded-[16px]" />
@@ -343,7 +192,6 @@ export default function CoachDashboardScreen() {
     [scopedEvents],
   );
   const nextEvents = upcomingEvents.slice(0, SESSION_LIMIT);
-  const nextEvent = upcomingEvents[0] ?? null;
   const thisWeekEvents = upcomingEvents.filter((event) => getEventTimestamp(event) - Date.now() <= WEEK_MS);
   const thisWeekMatches = thisWeekEvents.filter((event) => event.type === 'match').length;
 
@@ -382,6 +230,8 @@ export default function CoachDashboardScreen() {
           />
         ) : (
           <View className="gap-4">
+            {/* One way to each place: the hero chips, the next-session card and
+                the week strip repeated what the list below says. */}
             <PageHero
               className=""
               eyebrow={formatToday()}
@@ -392,9 +242,6 @@ export default function CoachDashboardScreen() {
               actions={
                 <>
                   <Button variant="primary" icon="fact-check" label="Marchează prezența" onPress={goToAttendance} />
-                  {/* Schedule is already a bottom-nav tab on phones; hiding it there
-                      keeps the hero actions on one line at 375px. */}
-                  <Button icon="calendar-today" label="Program" onPress={goToSchedule} className="hidden sm:flex" />
                   <Pressable
                     onPress={() => loadData(true)}
                     accessibilityRole="button"
@@ -407,48 +254,34 @@ export default function CoachDashboardScreen() {
                 </>
               }
             >
-              <View className="flex-row flex-wrap gap-1.5">
-                <Chip icon="event" label={`${plural(thisWeekEvents.length, 'sesiune', 'sesiuni')} săptămâna asta`} />
-                {thisWeekMatches ? <Chip icon="sports-basketball" label={`${plural(thisWeekMatches, 'meci', 'meciuri')}`} /> : null}
-                <Chip icon="groups" label={`${plural(visibleTeamsCount, 'echipă', 'echipe')}`} />
-              </View>
-
-              {/* Two columns at 375px rather than four: four tiles across a phone
-                  left ~80px each and ellipsised every label. */}
-              <View className="flex-col lg:flex-row gap-2.5">
-                <NextSessionPanel event={nextEvent} onPress={goToAttendance} />
-                <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 flex-1 min-w-0 ui-stagger">
-                  <GlassStat dot="var(--c-brand-fg)" label="Sesiuni" value={upcomingEvents.length} hint="programate" />
-                  <GlassStat dot="var(--c-sky-fg)" label="7 zile" value={thisWeekEvents.length} hint="săptămâna asta" />
-                  <GlassStat dot="var(--c-purple)" label="Jucători" value={playerCount} hint={`în ${plural(visibleTeamsCount, 'echipă', 'echipe')}`} />
-                  <GlassStat
-                    dot={averageAttendance == null ? 'var(--c-faint)' : averageAttendance >= 75 ? 'var(--c-success)' : averageAttendance >= 50 ? 'var(--c-warning)' : 'var(--c-danger)'}
-                    label="Prezență"
-                    hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()}
-                    value={averageAttendance ?? '—'}
-                    suffix={averageAttendance == null ? undefined : '%'}
-                    bar={averageAttendance ?? undefined}
-                  />
-                </View>
-              </View>
+              <StatStrip className="grid-cols-2 lg:grid-cols-4">
+                <GlassStat dot="var(--c-brand-fg)" label="Sesiuni în 7 zile" value={thisWeekEvents.length} />
+                <GlassStat dot="var(--c-sky-fg)" label="Meciuri în 7 zile" value={thisWeekMatches} />
+                <GlassStat dot="var(--c-purple)" label="Jucători" value={playerCount} hint={`în ${plural(visibleTeamsCount, 'echipă', 'echipe')}`} />
+                <GlassStat
+                  dot={averageAttendance == null ? 'var(--c-faint)' : averageAttendance >= 75 ? 'var(--c-success)' : averageAttendance >= 50 ? 'var(--c-warning)' : 'var(--c-danger)'}
+                  label="Prezență"
+                  hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()}
+                  value={averageAttendance ?? '—'}
+                  suffix={averageAttendance == null ? undefined : '%'}
+                  bar={averageAttendance ?? undefined}
+                />
+              </StatStrip>
             </PageHero>
 
             <View className="flex-col xl:flex-row gap-4">
               <View className="flex-1 min-w-0 gap-4">
-                <WeekStrip events={upcomingEvents} />
-
                 <View>
                   <SectionHeader
                     title="Sesiuni următoare"
-                    subtitle="Antrenamente, meciuri și cantonamente care îți cer atenția."
-                    actionLabel="Vezi programul"
-                    onAction={goToSchedule}
+                    subtitle={thisWeekEvents.length ? `${plural(thisWeekEvents.length, 'sesiune', 'sesiuni')} în următoarele 7 zile` : 'Nimic în următoarele 7 zile'}
+                    trailing={<Button icon="calendar-today" label="Tot programul" onPress={goToSchedule} className="self-start" />}
                   />
 
                   {nextEvents.length ? (
-                    <View className="gap-2.5 ui-stagger">
-                      {nextEvents.map((event) => <SessionRow key={event.id} event={event} />)}
-                    </View>
+                    <DenseList label="Sesiuni următoare">
+                      {nextEvents.map((event) => <SessionRow key={event.id} inList event={event} />)}
+                    </DenseList>
                   ) : (
                     <EmptyState
                       icon="event-busy"
@@ -463,7 +296,7 @@ export default function CoachDashboardScreen() {
               {/* Fixed rail from xl up, full width below — at 1280px a shared
                   row keeps both lists above the fold. */}
               <View className="w-full xl:w-[380px] shrink-0 gap-4">
-                <SquadHealth players={players} average={averageAttendance} onManage={goToAttendance} />
+                <SquadHealth players={players} average={averageAttendance} />
                 <TeamStandingsCard teams={coachTeams} onOpenTeam={(id) => router.push(`/coach/team/${id}` as any)} />
               </View>
             </View>

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import { usePathname } from '@/src/web/expoRouter';
 
 /**
  * One pagination implementation for every player list.
@@ -126,8 +125,8 @@ export default function Pagination({
   pageSize?: number;
   onPageSizeChange?: (size: number) => void;
 }) {
-  // Admin screens: a neutral selected page size; other roles keep the brand fill.
-  const neutral = usePathname().startsWith('/admin/');
+  // A neutral selected page size on every screen since 2026-11-05.
+  const neutral = true;
   const sizePicker = pageSize != null && onPageSizeChange != null;
   if (totalPages <= 1 && !(sizePicker && (total ?? 0) > PAGE_SIZE_OPTIONS[0])) return null;
 

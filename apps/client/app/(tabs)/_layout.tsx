@@ -93,17 +93,17 @@ function PlayerTabsLayoutContent() {
         : isParent
             ? PLAYER_MENU_ITEMS.map((item) => (item.match === 'team' ? { ...item, label: 'Echipa copilului' } : item))
             : PLAYER_MENU_ITEMS;
-    // Player/parent: the header search shows only on pages that read it (they
-    // set their own placeholder); elsewhere it promised "jucători, meciuri sau
-    // rapoarte" and filtered nothing.
-    // Sentence-case labels on player/parent screens (global.css). On <html>,
-    // not this div: sheets and dialogs are portaled to <body>.
+    // Sentence-case labels (global.css). On <html>, not this div: sheets and
+    // dialogs are portaled to <body>.
     useEffect(() => {
-        if (isCoach || typeof document === 'undefined') return;
-        document.documentElement.dataset.ui = 'player';
+        if (typeof document === 'undefined') return;
+        document.documentElement.dataset.ui = 'quiet';
         return () => { delete document.documentElement.dataset.ui; };
-    }, [isCoach]);
-    const showHeaderSearch = isCoach || searchPlaceholder !== DEFAULT_SEARCH_PLACEHOLDER;
+    }, []);
+    // The header search shows only on pages that read it (they set their own
+    // placeholder); elsewhere it promised "jucători, meciuri sau rapoarte" and
+    // filtered nothing.
+    const showHeaderSearch = searchPlaceholder !== DEFAULT_SEARCH_PLACEHOLDER;
     const primaryMobileItems = menuItems.filter((item) => MOBILE_PRIMARY_MATCHES.includes(item.match));
     const activePlayerItem = getActivePlayerItem(pathname, menuItems);
     const moreIsActive = !MOBILE_PRIMARY_MATCHES.includes(activePlayerItem.match);
@@ -121,7 +121,7 @@ function PlayerTabsLayoutContent() {
         <div className="flex flex-1 min-h-screen bg-[var(--c-bg)] lg:flex-row flex-col">
             {/* Keyboard users skip the menu (12+ stops) straight to the page. */}
             <a href="#continut" className="skip-link">Sari la conținut</a>
-            <Sidebar items={menuItems} plain={!isCoach} />
+            <Sidebar items={menuItems} plain />
 
             <div className="flex flex-1 min-w-0 flex-col relative">
                 <div className="lg:hidden sticky top-0 z-30">

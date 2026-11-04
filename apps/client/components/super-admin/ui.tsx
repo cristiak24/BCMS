@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, Text, TextInput, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import { initialsOf, monthLabel, roleLabel, roleVisual, statusVisual } from './format';
+import { initialsOf, monthLabel, roleLabel, statusVisual } from './format';
 
 /**
  * Small building blocks of the super admin console. Neutral surfaces, hairline
@@ -43,11 +43,14 @@ export function Panel({
   );
 }
 
+/**
+ * Neutral: a colour per role made six accents per list, and the indigo ones
+ * were 3.3:1 on their tint in dark mode.
+ */
 export function RolePill({ role }: { role: string }) {
-  const visual = roleVisual(role);
   return (
-    <View className="self-start rounded-full px-2.5 py-1" style={{ backgroundColor: visual.tint }}>
-      <Text className="text-[11.5px] font-semibold" style={{ color: visual.fg }} numberOfLines={1}>{roleLabel(role)}</Text>
+    <View className="self-start rounded-full px-2.5 py-1 border" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}>
+      <Text className="text-[11.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }} numberOfLines={1}>{roleLabel(role)}</Text>
     </View>
   );
 }
@@ -62,17 +65,17 @@ export function StatusLabel({ status }: { status: string }) {
   );
 }
 
-export function Avatar({ name, email, role, invite }: { name: string; email?: string; role: string; invite?: boolean }) {
-  const visual = roleVisual(role);
+// `role` is kept for callers; the disc is neutral like the pill.
+export function Avatar({ name, email, invite }: { name: string; email?: string; role: string; invite?: boolean }) {
   return (
     <View
-      className="w-9 h-9 rounded-full items-center justify-center shrink-0"
-      style={{ backgroundColor: invite ? 'var(--c-warning-bg)' : visual.tint }}
+      className="w-9 h-9 rounded-full items-center justify-center shrink-0 border"
+      style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
     >
       {invite ? (
-        <MaterialIcons name="mail-outline" size={17} color="var(--c-warning-fg)" />
+        <MaterialIcons name="mail-outline" size={17} color="var(--c-muted)" />
       ) : (
-        <Text className="text-[12px] font-bold" style={{ color: visual.fg }}>{initialsOf(name, email)}</Text>
+        <Text className="text-[12px] font-bold" style={{ color: 'var(--c-ink-soft)' }}>{initialsOf(name, email)}</Text>
       )}
     </View>
   );
@@ -138,7 +141,7 @@ export function MonthBars({
                 } as any}
               />
             </View>
-            <Text className="text-[11px] font-semibold uppercase" style={{ color: last ? 'var(--c-ink-soft)' : 'var(--c-faint)' }}>{monthLabel(point.month, true)}</Text>
+            <Text className="text-[11px] font-semibold" style={{ color: last ? 'var(--c-ink-soft)' : 'var(--c-faint)' }}>{monthLabel(point.month, true)}</Text>
           </View>
         );
       })}
@@ -162,7 +165,7 @@ export function ListShell({ header, children }: { header?: ReactNode; children: 
 
 export function HeaderCell({ children, flex = 1, align = 'left' }: { children: string; flex?: number; align?: 'left' | 'right' }) {
   return (
-    <Text className="t-eyebrow min-w-0" style={{ color: 'var(--c-faint)', flex, textAlign: align } as any} numberOfLines={1}>
+    <Text className="t-label min-w-0" style={{ color: 'var(--c-muted)', flex, textAlign: align } as any} numberOfLines={1}>
       {children}
     </Text>
   );
@@ -174,7 +177,7 @@ export function RowMenuButton({ label, onPress }: { label: string; onPress: () =
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      className="ui-press w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[var(--c-surface-3)]"
+      className="ui-press tap-40 w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[var(--c-surface-3)]"
     >
       <MaterialIcons name="more-horiz" size={20} color="var(--c-muted)" />
     </Pressable>
@@ -185,7 +188,8 @@ export function RowMenuButton({ label, onPress }: { label: string; onPress: () =
 export function Notice({ tone = 'info', icon, children }: { tone?: 'info' | 'warning'; icon?: string; children: ReactNode }) {
   const colors = tone === 'warning'
     ? { bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', border: 'var(--c-warning-border)' }
-    : { bg: 'var(--c-surface-tint)', fg: 'var(--c-brand-fg)', border: 'var(--c-brand-border)' };
+    // Info is neutral: an indigo box for a footnote outweighed the page.
+    : { bg: 'var(--c-surface-2)', fg: 'var(--c-muted)', border: 'var(--c-border)' };
   return (
     <View className="flex-row items-start gap-2.5 rounded-[12px] border px-3 py-2.5" style={{ backgroundColor: colors.bg, borderColor: colors.border }}>
       <MaterialIcons name={icon ?? (tone === 'warning' ? 'warning-amber' : 'info-outline')} size={17} color={colors.fg} />
@@ -198,7 +202,7 @@ export function Notice({ tone = 'info', icon, children }: { tone?: 'info' | 'war
 export function SearchInput({ value, onChange, placeholder, className }: { value: string; onChange: (value: string) => void; placeholder: string; className?: string }) {
   return (
     <View
-      className={`flex-row items-center gap-2 rounded-[10px] border px-3 h-9 ${className ?? ''}`}
+      className={`flex-row items-center gap-2 rounded-[10px] border px-3 h-9 [@media(pointer:coarse)]:h-10 ${className ?? ''}`}
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
     >
       <MaterialIcons name="search" size={16} color="var(--c-faint)" />

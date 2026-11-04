@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import { Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useCountUp } from '../../hooks/useCountUp';
@@ -23,6 +23,27 @@ export const STAT_TONES: Record<StatTone, { bg: string; fg: string }> = {
   neutral: { bg: 'var(--c-surface-3)', fg: 'var(--c-ink-soft)' },
 };
 
+/** Inside a StatCardStrip the cards are cells of one divided container. */
+const InStrip = createContext(false);
+
+/**
+ * The figures in one bordered container split by 1px dividers (the gap shows
+ * the divider colour), as on the admin screens — instead of a card per figure
+ * with a tinted icon tile. `className` carries the grid columns.
+ */
+export function StatCardStrip({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <InStrip.Provider value>
+      <View
+        className={`grid rounded-[14px] border overflow-hidden ${className ?? ''}`}
+        style={{ gap: 1, backgroundColor: 'var(--c-border-soft)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
+      >
+        {children}
+      </View>
+    </InStrip.Provider>
+  );
+}
+
 export default function StatCard({
   icon,
   label,
@@ -45,6 +66,27 @@ export default function StatCard({
   const animated = useCountUp(numeric);
   const display = numeric != null ? animated : value;
   const colors = STAT_TONES[tone];
+  const inStrip = useContext(InStrip);
+
+  if (inStrip) {
+    return (
+      <View className="px-4 py-3.5 min-w-0 h-full" style={{ backgroundColor: 'var(--c-surface)' }}>
+        <Text className="t-label" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
+        <View className="flex-row items-end gap-0.5 mt-1.5">
+          <Text className="t-num text-[24px] font-bold leading-none" style={{ color: tone === 'warning' && numeric ? 'var(--c-warning-fg)' : 'var(--c-ink-strong)' }} numberOfLines={1}>
+            {display == null || display === '' ? '—' : display}
+          </Text>
+          {suffix && display != null ? (
+            <Text className="text-[13px] font-bold mb-0.5" style={{ color: 'var(--c-muted)' }}>{suffix}</Text>
+          ) : null}
+        </View>
+        {hint ? (
+          <Text className="t-meta mt-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{hint}</Text>
+        ) : null}
+        {footer}
+      </View>
+    );
+  }
 
   return (
     <View

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import type { CalendarEvent } from '../../services/eventsApi';
-import { STAT_TONES, type StatTone } from '../ui/StatCard';
+import type { StatTone } from '../ui/StatCard';
 import DateTile from '../ui/DateTile';
 import { formatCoachTime, formatCoachTimeRange } from './coachUtils';
 import {
@@ -50,16 +50,15 @@ export function StatTile({
   hint,
   color,
   icon,
-  tone,
 }: {
   label: string;
   value: string | number;
   hint?: string;
   color?: string;
   icon?: string;
+  /** Kept for callers; the tile is neutral now (colour only as a small accent). */
   tone?: StatTone;
 }) {
-  const toneColors = tone ? STAT_TONES[tone] : null;
 
   return (
     <View
@@ -71,7 +70,7 @@ export function StatTile({
             the icon was what pushed "PREZENȚI" into an ellipsis. */}
         {icon ? (
           <View className="hidden sm:flex">
-            <MaterialIcons name={icon} size={14} color={toneColors?.fg ?? 'var(--c-muted)'} />
+            <MaterialIcons name={icon} size={14} color="var(--c-muted)" />
           </View>
         ) : null}
         <Text className="t-eyebrow flex-1 min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
@@ -80,7 +79,7 @@ export function StatTile({
       </View>
       <Text
         className="f-display t-num text-[19px] sm:text-[20px] font-extrabold mt-1 leading-tight"
-        style={{ color: color ?? toneColors?.fg ?? 'var(--c-ink-strong)' }}
+        style={{ color: color ?? 'var(--c-ink-strong)' }}
         numberOfLines={1}
       >
         {value}
@@ -110,6 +109,7 @@ export function SessionRow({
   trailing,
   subtitle,
   compact = false,
+  inList = false,
 }: {
   event: CalendarEvent;
   active?: boolean;
@@ -118,6 +118,8 @@ export function SessionRow({
   subtitle?: string;
   /** Tighter row for the narrow picker rail. */
   compact?: boolean;
+  /** A row of a DenseList: no border, radius or shadow of its own. */
+  inList?: boolean;
 }) {
   const meta = eventTypeMeta(event.type);
   const relative = formatRelativeDay(event.startTime);
@@ -125,7 +127,9 @@ export function SessionRow({
 
   const body = (
     <View className="flex-row items-center gap-3">
-      <DateTile value={event.startTime} fg={meta.fg} bg={meta.bg} size={compact ? 44 : 48} />
+      {/* Neutral tile: the type is the icon and word in the meta line; a
+          tinted „NOV” per type coded it a third time. */}
+      <DateTile value={event.startTime} fg="var(--c-muted)" bg="var(--c-surface-2)" size={compact ? 42 : 44} dayFirst />
 
       <View className="flex-1 min-w-0">
         <View className="flex-row items-center gap-2 min-w-0">
@@ -163,6 +167,23 @@ export function SessionRow({
       ) : null}
     </View>
   );
+
+  if (inList) {
+    const rowStyle = active ? ({ backgroundColor: 'var(--c-surface-tint)', boxShadow: 'inset 3px 0 0 var(--c-brand-fg)' } as any) : undefined;
+    if (!onPress) return <View className="px-3 py-2.5" style={rowStyle}>{body}</View>;
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={{ selected: active }}
+        accessibilityLabel={`${event.title}, ${formatCoachDay(event.startTime)} ${formatCoachTimeRange(event.startTime, event.endTime)}`}
+        className={`ui-press text-left w-full min-h-[56px] hover:bg-[var(--c-surface-2)] ${compact ? 'px-3 py-2' : 'px-3 py-2.5'}`}
+        style={rowStyle}
+      >
+        {body}
+      </Pressable>
+    );
+  }
 
   const style = {
     borderColor: active ? 'var(--c-brand-border)' : 'var(--c-border)',
@@ -213,6 +234,7 @@ export function CoachPlayerRow({
   trailing,
   bare = false,
   rate,
+  inList = false,
 }: {
   firstName?: string | null;
   lastName?: string | null;
@@ -221,17 +243,22 @@ export function CoachPlayerRow({
   trailing?: ReactNode;
   bare?: boolean;
   rate?: number | null;
+  /** A row of a DenseList: the list draws the dividers. */
+  inList?: boolean;
 }) {
+  const quiet = bare || inList;
   return (
     <View
-      className={`flex-row items-center gap-3 min-w-0 ${bare ? '' : 'rounded-[12px] border px-3 py-2'}`}
-      style={bare ? undefined : ({ borderColor: 'var(--c-border-soft)', backgroundColor: 'var(--c-surface-2)' } as any)}
+      className={`flex-row items-center gap-3 min-w-0 ${inList ? 'px-3 py-2.5 min-h-[56px]' : bare ? '' : 'rounded-[12px] border px-3 py-2'}`}
+      style={quiet ? undefined : ({ borderColor: 'var(--c-border-soft)', backgroundColor: 'var(--c-surface-2)' } as any)}
     >
       <View
         className="h-9 w-9 rounded-full items-center justify-center shrink-0 border"
-        style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'color-mix(in srgb, var(--c-brand-fg) 22%, transparent)' } as any}
+        style={(quiet
+          ? { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' }
+          : { backgroundColor: 'var(--c-surface-tint)', borderColor: 'color-mix(in srgb, var(--c-brand-fg) 22%, transparent)' }) as any}
       >
-        <Text className="text-[12.5px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>
+        <Text className="text-[12.5px] font-bold" style={{ color: quiet ? 'var(--c-ink-soft)' : 'var(--c-brand-fg)' }}>
           {badge ?? getInitials(firstName, lastName)}
         </Text>
       </View>

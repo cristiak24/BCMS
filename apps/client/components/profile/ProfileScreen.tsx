@@ -373,9 +373,9 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
     bg: 'var(--c-surface-3)',
   };
   const completion = getProfileCompletion(profile);
-  // Player/parent: no account-age tiles or completion score, no language
+  // Player/parent/coach/super admin: no account-age tiles or completion score, no language
   // option (Romanian only), the password form behind a button.
-  const familyAccount = role === 'player' || role === 'parent';
+  const familyAccount = ['player', 'parent', 'coach', 'superadmin'].includes(role);
 
   return (
     <ScrollView

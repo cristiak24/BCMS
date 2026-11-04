@@ -4,7 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
 import PageContainer from '../../components/ui/PageContainer';
 import PageHeader from '../../components/ui/PageHeader';
-import StatCard from '../../components/ui/StatCard';
+import StatCard, { StatCardStrip } from '../../components/ui/StatCard';
 import Button from '../../components/ui/Button';
 import FilterChips from '../../components/ui/FilterChips';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -20,7 +20,6 @@ import {
   formatRelative,
   monthLabel,
   plural,
-  roleVisual,
 } from '../../components/super-admin/format';
 import CreateClubDialog from '../../components/super-admin/CreateClubDialog';
 import { useSession } from '../../context/AuthContext';
@@ -122,7 +121,8 @@ export default function SuperAdminDashboard() {
     month: point.month,
     value: metric === 'amount' ? point.amount : point[metric],
   }));
-  const trendHasData = data.trend.some((point) => point.activeUsers > 0 || point.newAccounts > 0);
+  // Per indicator: six empty bars with „0” over each said nothing.
+  const trendHasData = trendPoints.some((point) => (point.value ?? 0) > 0);
   const rolesTotal = CLUB_ROLE_ORDER.reduce((sum, role) => sum + data.roles[role], 0);
   const topMax = Math.max(1, ...data.topClubs.map((club) => club.activeThisMonth));
 
@@ -140,7 +140,7 @@ export default function SuperAdminDashboard() {
           </Notice>
         ) : null}
 
-        <View className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        <StatCardStrip className="grid-cols-2 xl:grid-cols-4">
           <StatCard
             icon="insights"
             label="Activi luna asta"
@@ -175,7 +175,7 @@ export default function SuperAdminDashboard() {
             hint={`Luna trecută: ${formatMoney(data.revenue.lastMonth)}`}
             footer={<View className="mt-2"><DeltaPill value={revenueDelta} /></View>}
           />
-        </View>
+        </StatCardStrip>
 
         <View className="grid lg:grid-cols-3 gap-4">
           <Panel
@@ -192,7 +192,9 @@ export default function SuperAdminDashboard() {
                 />
               ) : (
                 <View className="h-[150px] items-center justify-center">
-                  <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Încă nu există activitate înregistrată.</Text>
+                  <Text className="t-meta text-center" style={{ color: 'var(--c-muted)' }}>
+                    {metric === 'amount' ? 'Nicio sumă de facturat în ultimele 6 luni.' : metric === 'newAccounts' ? 'Niciun cont nou în ultimele 6 luni.' : 'Încă nu există activitate înregistrată.'}
+                  </Text>
                 </View>
               )}
             </View>
@@ -235,7 +237,7 @@ export default function SuperAdminDashboard() {
           </Panel>
         </View>
 
-        <View className="grid lg:grid-cols-3 gap-4">
+        <View className="grid lg:grid-cols-3 gap-4 lg:items-start">
           <Panel
             className="lg:col-span-2"
             title="Cluburi după activitate"
@@ -287,7 +289,7 @@ export default function SuperAdminDashboard() {
                       <Text className="text-[13px] font-medium" style={{ color: 'var(--c-ink-soft)' }}>{ROLE_LABEL_PLURAL[role]}</Text>
                       <Text className="text-[13px] font-bold t-num" style={{ color: 'var(--c-ink)' }}>{formatNumber(data.roles[role])}</Text>
                     </View>
-                    <Meter value={data.roles[role]} max={rolesTotal} tone={roleVisual(role).fg} />
+                    <Meter value={data.roles[role]} max={rolesTotal} />
                   </View>
                 ))}
               </View>

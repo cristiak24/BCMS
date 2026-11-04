@@ -4,7 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import PageContainer from '../../../components/ui/PageContainer';
 import PageHeader from '../../../components/ui/PageHeader';
-import StatCard from '../../../components/ui/StatCard';
+import StatCard, { StatCardStrip } from '../../../components/ui/StatCard';
 import Button from '../../../components/ui/Button';
 import FilterChips from '../../../components/ui/FilterChips';
 import SelectField from '../../../components/ui/SelectField';
@@ -378,7 +378,7 @@ export default function ClubDetailScreen() {
           <Notice tone="warning" icon="admin-panel-settings">Clubul nu are niciun administrator activ. Invită unul ca să poată gestiona echipele, conturile și plățile.</Notice>
         ) : null}
 
-        <View className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        <StatCardStrip className="grid-cols-2 xl:grid-cols-4">
           <StatCard
             icon="insights"
             label="Activi luna asta"
@@ -407,7 +407,7 @@ export default function ClubDetailScreen() {
             value={formatMoney(club.estimatedAmount)}
             hint={club.billingPricePerUser != null ? `${formatMoney(club.billingPricePerUser)} / utilizator activ` : 'Setează prețul în Facturare'}
           />
-        </View>
+        </StatCardStrip>
 
         <FilterChips<Tab>
           value={tab}

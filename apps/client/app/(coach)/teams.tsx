@@ -6,7 +6,9 @@ import { CalendarEvent, eventsApi } from '../../services/eventsApi';
 import { teamsApi, type Player, type Team } from '../../services/teamsApi';
 import { useSession } from '../../context/AuthContext';
 import PageContainer from '../../components/ui/PageContainer';
-import PageHero, { GlassStat } from '../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../components/admin/PageHero';
+import { DenseList } from '../../components/ui/DenseList';
+import { coachManagedTeamIds } from '../../utils/coachEventScope';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
 import { GENDER_LABELS, LEVEL_LABELS } from '../../components/myclub/teamDisplay';
@@ -39,15 +41,18 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
     team.seasonName || null,
   ].filter(Boolean) as string[];
 
-  // Lowest attendance first: the reason to open a squad card is the players who
-  // are slipping, not an alphabetical roster.
-  const preview = useMemo(
-    () => [...team.players]
-      .sort((a, b) => (a.attendanceRate ?? 101) - (b.attendanceRate ?? 101))
-      .slice(0, ROSTER_PREVIEW),
+  // The players below 75%, lowest first: the reason to open a squad card is
+  // who is slipping. It took the five lowest whatever their rate, so the list
+  // „Prezența cea mai scăzută” showed players at 100%.
+  const slipping = useMemo(
+    () => team.players
+      .filter((player) => player.attendanceRate != null && player.attendanceRate < 75)
+      .sort((a, b) => (a.attendanceRate ?? 101) - (b.attendanceRate ?? 101)),
     [team.players],
   );
-  const hidden = team.players.length - preview.length;
+  const preview = slipping.slice(0, ROSTER_PREVIEW);
+  const hidden = slipping.length - preview.length;
+  const anyRated = team.players.some((player) => player.attendanceRate != null);
 
   // Last 30 days, pooled over the squad's marked sessions (utils/attendanceRate.ts).
   const average = pooledAttendanceRate(team.players);
@@ -60,19 +65,12 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
       className="ui-lift ui-press relative overflow-hidden rounded-[16px] border p-4 gap-3.5 min-w-0 text-left w-full"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
-      {/* Brand edge — a thin gradient cap so squads read as distinct objects
-          rather than another grey panel. */}
-      <View
-        className="absolute left-0 right-0 top-0 h-[3px]"
-        style={{ background: 'linear-gradient(90deg, var(--c-brand-surface), var(--c-sky-fg))', opacity: 0.85 } as any}
-      />
-
       <View className="flex-row items-center gap-3.5">
         <View
           className="w-11 h-11 rounded-[13px] border items-center justify-center shrink-0"
-          style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' } as any}
+          style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
         >
-          <MaterialIcons name="shield" size={21} color="var(--c-brand-fg)" />
+          <MaterialIcons name="shield" size={21} color="var(--c-muted)" />
         </View>
         <View className="flex-1 min-w-0">
           <Text className="f-display text-[17px] font-extrabold leading-tight" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any} numberOfLines={2}>{team.name}</Text>
@@ -104,25 +102,30 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
 
       {team.players.length ? (
         <View className="gap-2">
-          <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>
-            Prezența cea mai scăzută
-          </Text>
-          <View className="gap-1.5 ui-stagger">
-            {preview.map((player) => (
-              <CoachPlayerRow
-                key={player.id}
-                firstName={player.firstName}
-                lastName={player.lastName}
-                badge={getPlayerBadge(player)}
-                meta={player.position || playerStatusLabel(player.status)}
-                rate={player.attendanceRate ?? null}
-                trailing={<AttendanceRate rate={player.attendanceRate} />}
-              />
-            ))}
-          </View>
+          <Text className="t-label" style={{ color: 'var(--c-muted)' }}>Prezență sub 75%</Text>
+          {preview.length ? (
+            <DenseList label={`Jucători sub 75% în ${team.name}`}>
+              {preview.map((player) => (
+                <CoachPlayerRow
+                  key={player.id}
+                  inList
+                  firstName={player.firstName}
+                  lastName={player.lastName}
+                  badge={getPlayerBadge(player)}
+                  // „Activ” on every row said nothing; only another status does.
+                  meta={player.position || (player.status && player.status !== 'active' ? playerStatusLabel(player.status) : null)}
+                  trailing={<AttendanceRate rate={player.attendanceRate} />}
+                />
+              ))}
+            </DenseList>
+          ) : (
+            <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
+              {anyRated ? 'Toți jucătorii cu prezență marcată sunt peste 75%.' : 'Nicio prezență marcată în ultimele 30 de zile.'}
+            </Text>
+          )}
           {hidden > 0 ? (
             <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
-              +{plural(hidden, 'alt jucător', 'alți jucători')} în lot
+              +{plural(hidden, 'alt jucător', 'alți jucători')} sub 75%
             </Text>
           ) : null}
         </View>
@@ -197,7 +200,10 @@ export default function CoachTeamsScreen() {
     [scopedEvents],
   );
   const visibleTeams = useMemo<TeamWithPlayers[]>(() => {
-    const baseTeams = scopedTeamIds.size ? teams.filter((team) => scopedTeamIds.has(team.id)) : teams;
+    // The teams the coach manages, plus a team of a session they were assigned
+    // to. With no session ahead this used to fall back to the whole club.
+    const managed = coachManagedTeamIds(teams, session?.id);
+    const baseTeams = teams.filter((team) => managed.has(team.id) || scopedTeamIds.has(team.id));
 
     return baseTeams.map((team) => {
       const nextEvent = scopedEvents
@@ -210,7 +216,7 @@ export default function CoachTeamsScreen() {
         nextEvent,
       };
     });
-  }, [playersByTeam, scopedEvents, scopedTeamIds, teams]);
+  }, [playersByTeam, scopedEvents, scopedTeamIds, session?.id, teams]);
 
   const totalPlayers = visibleTeams.reduce((sum, team) => sum + team.players.length, 0);
   const teamsAverage = pooledAttendanceRate(visibleTeams.flatMap((team) => team.players));
@@ -239,7 +245,7 @@ export default function CoachTeamsScreen() {
           }
         >
           {!loading && !error && visibleTeams.length ? (
-            <View className="grid grid-cols-3 gap-2 ui-stagger">
+            <StatStrip className="grid-cols-3">
               <GlassStat dot="var(--c-brand-fg)" label="Echipe" value={visibleTeams.length} />
               <GlassStat dot="var(--c-purple)" label="Jucători" value={totalPlayers} />
               <GlassStat
@@ -250,7 +256,7 @@ export default function CoachTeamsScreen() {
                 suffix={teamsAverage == null ? undefined : '%'}
                 bar={teamsAverage ?? undefined}
               />
-            </View>
+            </StatStrip>
           ) : null}
         </PageHero>
 

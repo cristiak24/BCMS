@@ -3,7 +3,7 @@ import { Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import Button from '../ui/Button';
 import { DenseRow } from '../ui/DenseList';
-import PageHero, { GlassStat } from '../admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../admin/PageHero';
 import type { L12OverviewMatch } from '../../services/l12Api';
 import { plural } from '../../utils/plural';
 
@@ -306,16 +306,16 @@ export function L12Hero({
   // alone); the next match without a list stays one actionable row below it.
   return (
     <PageHero eyebrow="Liste de joc · L12" title={title} subtitle={subtitle} className="mb-0">
-      <View className="grid grid-cols-3 gap-2">
+      <StatStrip className="grid-cols-3">
         <GlassStat value={unset} label="Fără L12" dot="var(--c-warning)" />
         <GlassStat value={ready} label="Gata" dot="var(--c-success)" />
         <GlassStat value={`${teamsSet}/${teamsTotal}`} label="L12 constant" shortLabel="Constant" hint="echipe cu lista setată" dot="var(--c-brand-fg)" />
-      </View>
+      </StatStrip>
 
       {next ? (
         <View className="flex-col sm:flex-row sm:items-center gap-3 rounded-[14px] border px-3.5 py-3" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
           <View className="flex-1 min-w-0 gap-1">
-            <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{unset > 0 ? 'Următorul meci fără listă' : 'Următorul meci'}</Text>
+            <Text className="t-label" style={{ color: 'var(--c-muted)' }}>{unset > 0 ? 'Următorul meci fără listă' : 'Următorul meci'}</Text>
             <View className="flex-row items-center gap-2 min-w-0">
               <TeamAvatar name={next.home} mine={isOwnSide(next.home, next.match.teamName)} />
               <Text className="f-display text-[15px] font-semibold shrink min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>

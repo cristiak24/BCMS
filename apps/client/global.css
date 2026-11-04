@@ -591,18 +591,19 @@ body:has(.unsaved-bar) .toast-host {
   }
 }
 
-/* Player and parent screens (set on <html> by app/(tabs)/_layout.tsx, so
-   portaled sheets are covered too): sentence case instead of tracked caps,
-   the same pass the admin screens got. Unlayered, so it wins over the
-   `uppercase` / `tracking-*` utilities and the `.t-eyebrow` component. */
-html[data-ui="player"] .t-eyebrow {
+/* Player, parent, coach and super admin screens (set on <html> by
+   app/(tabs)/_layout.tsx and app/super-admin/_layout.tsx, so portaled sheets
+   are covered too): sentence case instead of tracked caps, the same pass the
+   admin screens got. Unlayered, so it wins over the `uppercase` / `tracking-*`
+   utilities and the `.t-eyebrow` component. */
+html[data-ui="quiet"] .t-eyebrow {
   font-size: 12px;
   line-height: 16px;
   font-weight: 600;
   letter-spacing: normal;
   text-transform: none;
 }
-html[data-ui="player"] .uppercase {
+html[data-ui="quiet"] .uppercase {
   text-transform: none;
   letter-spacing: normal;
 }

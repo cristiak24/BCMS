@@ -4,7 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useRouter } from '@/src/web/expoRouter';
 import PageContainer from '../../components/ui/PageContainer';
 import PageHeader from '../../components/ui/PageHeader';
-import StatCard from '../../components/ui/StatCard';
+import StatCard, { StatCardStrip } from '../../components/ui/StatCard';
 import Button from '../../components/ui/Button';
 import SelectField from '../../components/ui/SelectField';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -71,6 +71,10 @@ export default function BillingScreen() {
   }, [data, sort]);
 
   const isCurrent = data ? data.month === data.currentMonth : false;
+  // Every club without a price, not only those active this month: a club with
+  // no activity yet still has to be priced before it starts („Fără preț 0”
+  // sat above a row that said „Setează”).
+  const unpricedClubs = data ? data.clubs.filter((row) => row.pricePerUser == null).length : 0;
   const beforeTracking = data?.trackingSince ? data.month < data.trackingSince : Boolean(data && !data.trackingSince);
 
   const exportSummary = () => {
@@ -176,18 +180,20 @@ export default function BillingScreen() {
           </View>
         ) : (
           <View className="gap-4" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.15s ease' } as any}>
-            <View className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+            <StatCardStrip className="grid-cols-2 xl:grid-cols-4">
               <StatCard icon="groups" label="Facturabili" value={data.totals.billableUsers} hint={monthLabel(data.month)} />
               <StatCard icon="payments" tone="purple" label={isCurrent ? 'Estimat până acum' : 'Total de facturat'} value={formatMoney(data.totals.amount)} hint={`${plural(data.totals.pricedClubs, 'club cu preț', 'cluburi cu preț')}`} />
               <StatCard icon="apartment" tone="sky" label="Cluburi active" value={data.clubs.filter((row) => row.billableUsers > 0).length} hint={`din ${plural(data.clubs.length, 'club', 'cluburi')}`} />
               <StatCard
                 icon="warning-amber"
-                tone={data.totals.unpricedClubs ? 'warning' : 'neutral'}
+                tone={unpricedClubs ? 'warning' : 'neutral'}
                 label="Fără preț"
-                value={data.totals.unpricedClubs}
-                hint={data.totals.unpricedClubs ? 'Cluburi active nefacturate' : 'Toate cluburile active au preț'}
+                value={unpricedClubs}
+                hint={unpricedClubs
+                  ? (data.totals.unpricedClubs ? plural(data.totals.unpricedClubs, 'club activ nefacturat', 'cluburi active nefacturate') : 'Setează prețul înainte să aibă activitate')
+                  : 'Toate cluburile au preț'}
               />
-            </View>
+            </StatCardStrip>
 
             {rows.length === 0 ? (
               <EmptyState icon="payments" title="Niciun club" message="Creează un club ca să apară aici." />

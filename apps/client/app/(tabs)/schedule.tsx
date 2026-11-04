@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
-import { Clock, MapPin } from 'lucide-react';
 import { eventsApi, CalendarEvent } from '../../services/eventsApi';
 import { teamsApi, type Team } from '../../services/teamsApi';
 import { AddEventModal } from '../../components/schedule/admin/AddEventModal';
@@ -74,18 +73,6 @@ function isUpcoming(event: CalendarEvent) {
 
 function formatMonthName(value: Date) {
   return new Intl.DateTimeFormat(RO_LOCALE, { month: 'long' }).format(value);
-}
-
-function formatDayBlock(value: string) {
-  const date = getEventDate(value);
-  if (!date) {
-    return { month: 'DATA', day: '--' };
-  }
-
-  return {
-    month: new Intl.DateTimeFormat(RO_LOCALE, { month: 'short' }).format(date).toUpperCase().replace('.', ''),
-    day: String(date.getDate()),
-  };
 }
 
 function formatEventTime(value: string) {
@@ -187,145 +174,7 @@ function getNextMatchLabel(match: CalendarEvent | null) {
 
 
 /**
- * Right-rail event card — mirrors the admin ScheduleEventCard in its `compact`
- * (stacked) form: 48px date block, radius 20, 3px type-coloured left edge.
- * Read-only: pressing the card opens the detail sheet, nothing else.
- */
-function UpcomingEventCard({ event, onDetails }: { event: CalendarEvent; onDetails: () => void }) {
-  const meta = getEventTypeMeta(event.type);
-  const dateBlock = formatDayBlock(event.startTime);
-
-  return (
-    <Pressable
-      onPress={onDetails}
-      accessibilityRole="button"
-      className="bg-[var(--c-surface)] border border-[var(--c-border)] rounded-[14px] px-3.5 py-3 gap-3 ui-lift"
-      style={{ borderLeftWidth: 3, borderLeftColor: meta.solid }}
-    >
-      <View className="flex-row items-center gap-3">
-        <View
-          className="w-11 h-11 rounded-[12px] items-center justify-center border"
-          style={{ backgroundColor: meta.soft, borderColor: meta.soft }}
-        >
-          <Text className="text-[9px] font-black uppercase tracking-wider" style={{ color: meta.onSoft }}>
-            {dateBlock.month}
-          </Text>
-          <Text className="text-[17px] font-black leading-tight" style={{ color: 'var(--c-ink-strong)' }}>
-            {dateBlock.day}
-          </Text>
-        </View>
-
-        <View className="flex-1 min-w-0">
-          <View className="flex-row items-center gap-2">
-            <Text
-              numberOfLines={1}
-              className="f-display text-[14.5px] font-extrabold flex-1"
-              style={{ color: 'var(--c-ink-strong)' }}
-            >
-              {event.title}
-            </Text>
-            <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: meta.soft }}>
-              <Text className="text-[9px] font-black uppercase tracking-widest" style={{ color: meta.onSoft }}>
-                {meta.label}
-              </Text>
-            </View>
-          </View>
-
-          <View className="gap-1.5 mt-1.5">
-            <View className="flex-row items-center gap-1.5">
-              <Clock size={13} color="var(--c-faint)" />
-              <Text className="text-[12px] font-bold" style={{ color: 'var(--c-muted)' }}>
-                {formatTimeRange(event.startTime, event.endTime)}
-              </Text>
-            </View>
-            <View className="flex-row items-center gap-1.5 flex-1 min-w-0">
-              <MapPin size={13} color="var(--c-faint)" />
-              <Text numberOfLines={1} className="text-[12px] font-semibold flex-1" style={{ color: 'var(--c-muted)' }}>
-                {event.location || event.teamName || 'Teren club'}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-/** One event line inside a day card: type bar, title, time, place. */
-function DayEventLine({ event, onPress }: { event: CalendarEvent; onPress: () => void }) {
-  const meta = getEventTypeMeta(event.type);
-
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${meta.label}: ${event.title}`}
-      className="flex-row items-center gap-2.5 rounded-[10px] px-2.5 py-2 hover:opacity-90"
-      style={{ backgroundColor: 'var(--c-surface-2)' }}
-    >
-      <View style={{ width: 3, alignSelf: 'stretch', minHeight: 26, borderRadius: 2, backgroundColor: meta.solid }} />
-      <View className="flex-1 min-w-0">
-        <Text className="text-[12.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{event.title}</Text>
-        <View className="flex-row items-center gap-1.5 mt-0.5">
-          <Clock size={11} color="var(--c-faint)" />
-          <Text className="text-[11px] font-medium" style={{ color: 'var(--c-muted)' }}>{formatTimeRange(event.startTime, event.endTime)}</Text>
-          <MapPin size={11} color="var(--c-faint)" />
-          <Text className="text-[11px] font-medium flex-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-            {event.location || 'Teren club'}
-          </Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-/** A single day's events, as one card in the month grid. */
-function DayCard({
-  dateKey,
-  events,
-  isToday,
-  onSelectEvent,
-}: {
-  dateKey: string;
-  events: CalendarEvent[];
-  isToday: boolean;
-  onSelectEvent: (event: CalendarEvent) => void;
-}) {
-  const date = parseDateKey(dateKey);
-  const weekday = new Intl.DateTimeFormat(RO_LOCALE, { weekday: 'short' }).format(date).replace('.', '');
-
-  return (
-    <View
-      className="rounded-[14px] border p-3"
-      style={{
-        backgroundColor: 'var(--c-surface)',
-        borderColor: isToday ? 'var(--c-brand-border)' : 'var(--c-border)',
-        boxShadow: 'var(--e-sm)',
-      } as any}
-    >
-      <View className="flex-row items-center gap-2 mb-2">
-        <Text className="text-[16px] font-bold leading-none" style={{ color: isToday ? 'var(--c-brand-fg)' : 'var(--c-ink)' }}>
-          {date.getDate()}
-        </Text>
-        <Text className="text-[11px] font-bold uppercase tracking-[0.07em]" style={{ color: 'var(--c-faint)' }}>{weekday}</Text>
-        {isToday ? (
-          <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-            <Text className="text-[10px] font-bold uppercase" style={{ color: 'var(--c-brand-fg)' }}>Azi</Text>
-          </View>
-        ) : null}
-      </View>
-
-      <View className="gap-1.5">
-        {events.map((event) => (
-          <DayEventLine key={event.id} event={event} onPress={() => onSelectEvent(event)} />
-        ))}
-      </View>
-    </View>
-  );
-}
-
-/**
- * Player/parent: one day of the month as a row of one list — the day on the
+ * One day of the month as a row of one list — the day on the
  * left, its sessions on the right. The day cards were a card per day, and a
  * second card list („Evenimente viitoare”) beside the calendar repeated the
  * same sessions.
@@ -570,7 +419,6 @@ export default function ScheduleScreen() {
   }, [events, searchValue, viewDate]);
 
   const monthEventCount = calendarDays.reduce((total, day) => total + day.events.length, 0);
-  const visibleUpcomingCards = upcomingEvents.slice(0, 3);
 
   const handleSelectDay = (dateKey: string) => {
     setSelectedDayKey(dateKey);
@@ -605,9 +453,9 @@ export default function ScheduleScreen() {
       contentContainerClassName="pb-32"
     >
       <PageContainer>
-        {/* Player/parent: the title on phones too (it was the one screen
-            without an h1 there); the figures stay a desktop summary. */}
-        {isMobile && isCoach ? null : (
+        {/* The title on phones too (it was the one screen without an h1
+            there); the figures stay a desktop summary. */}
+        {(
           <PageHero
             eyebrow="Program"
             title={isCoach ? 'Programul echipelor' : normalizeRole(session?.role) === 'parent' ? 'Programul copilului' : 'Programul meu'}
@@ -664,30 +512,6 @@ export default function ScheduleScreen() {
                 <PlayerCalendarGrid days={calendarDays} loading={loading} onSelectDay={handleSelectDay} />
               </View>
 
-              {isCoach ? (
-              <View className={`${isMobile ? 'w-full' : 'shrink-0'} gap-3`} style={isMobile ? undefined : { width: width >= 1440 ? 380 : 340 }}>
-                <View className="flex-row items-center justify-between">
-                  <Text className="f-display text-[17px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any}>Evenimente viitoare</Text>
-                  <Pressable onPress={() => setScheduleView('agenda')} accessibilityRole="button" className="h-8 justify-center px-1">
-                    <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Vezi tot</Text>
-                  </Pressable>
-                </View>
-
-                {loading ? (
-                  <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă evenimentele viitoare">
-                    {Array.from({ length: 2 }).map((_, index) => (
-                      <Skeleton key={index} className="h-[96px] w-full rounded-[14px]" />
-                    ))}
-                  </View>
-                ) : visibleUpcomingCards.length ? (
-                  visibleUpcomingCards.map((event) => (
-                    <UpcomingEventCard key={event.id} event={event} onDetails={() => setSelectedEvent(event)} />
-                  ))
-                ) : (
-                  <EmptyState icon="event-busy" compact title="Niciun eveniment viitor" message="Evenimentele programate apar aici." />
-                )}
-              </View>
-              ) : null}
             </View>
 
             {/* Full width, month-scoped, grouped by day.
@@ -719,7 +543,7 @@ export default function ScheduleScreen() {
                     <Skeleton key={index} className="h-[120px] w-full rounded-[14px]" />
                   ))}
                 </View>
-              ) : monthDayGroups.length && !isCoach ? (
+              ) : monthDayGroups.length ? (
                 <DenseList label="Evenimentele lunii">
                   {monthDayGroups.map((day) => (
                     <MonthDayRow
@@ -732,18 +556,6 @@ export default function ScheduleScreen() {
                     />
                   ))}
                 </DenseList>
-              ) : monthDayGroups.length ? (
-                <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
-                  {monthDayGroups.map((day) => (
-                    <DayCard
-                      key={day.dateKey}
-                      dateKey={day.dateKey as string}
-                      events={day.events}
-                      isToday={day.isToday}
-                      onSelectEvent={setSelectedEvent}
-                    />
-                  ))}
-                </View>
               ) : (
                 <EmptyState
                   icon="event-busy"

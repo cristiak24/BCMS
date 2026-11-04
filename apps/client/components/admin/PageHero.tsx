@@ -1,7 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { View, Text } from '@/src/web/reactNative';
-import { usePathname } from '@/src/web/expoRouter';
-import { useSession } from '../../context/AuthContext';
 
 /** Stat tiles drop the glass effect when there is no artwork behind them. */
 const PlainHeader = createContext(false);
@@ -35,7 +33,8 @@ function CourtLines() {
  * only, and admin Acasă has its own). Coach and player/parent pages keep the
  * hero until they get their own review — so the default follows the route,
  * which also covers screens shared between roles (Contacte, Documente).
- * Player and parent accounts got theirs on 2026-11-05: plain everywhere.
+ * Player and parent accounts got theirs on 2026-11-05, coach right after:
+ * plain everywhere.
  */
 export default function PageHero({
     eyebrow,
@@ -56,11 +55,9 @@ export default function PageHero({
     className?: string;
     variant?: 'hero' | 'plain';
 }) {
-    const pathname = usePathname();
-    const { session } = useSession();
-    const role = String(session?.role ?? '').toLowerCase();
-    const plainByDefault = pathname.startsWith('/admin/') || role === 'player' || role === 'parent';
-    const plain = (variant ?? (plainByDefault ? 'plain' : 'hero')) === 'plain';
+    // Every role is plain since 2026-11-05 (coach and super admin last); the
+    // hero stays available by asking for it.
+    const plain = (variant ?? 'plain') === 'plain';
 
     const heading = (
         <View className="flex-col md:flex-row md:items-center md:justify-between gap-3.5">

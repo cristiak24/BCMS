@@ -29,7 +29,8 @@ type AppHeaderProps = {
 };
 
 const ROLE_LABELS: Record<string, string> = {
-  superadmin: 'Superadmin',
+  // Same spelling as the super admin menu and lists.
+  superadmin: 'Super admin',
   admin: 'Administrator',
   accountant: 'Contabil',
   staff: 'Staff',
@@ -38,12 +39,12 @@ const ROLE_LABELS: Record<string, string> = {
   parent: 'Părinte',
 };
 
-/** Admin routes, and every screen of a player or parent account. */
+/** Admin and super admin routes, and every screen of a player, parent or coach account. */
 function useQuietHeader() {
   const pathname = usePathname();
   const { session } = useSession();
   const role = String(session?.role ?? '').toLowerCase();
-  return pathname.startsWith('/admin/') || role === 'player' || role === 'parent';
+  return pathname.startsWith('/admin/') || pathname.startsWith('/super-admin') || ['player', 'parent', 'coach', 'superadmin'].includes(role);
 }
 
 const roleLabel = (role?: string | null) => (role ? ROLE_LABELS[role] ?? role : 'Cont');

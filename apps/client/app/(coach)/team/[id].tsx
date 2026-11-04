@@ -6,7 +6,8 @@ import { useSession } from '../../../context/AuthContext';
 import { CalendarEvent, eventsApi } from '../../../services/eventsApi';
 import { teamsApi, type Player, type Team } from '../../../services/teamsApi';
 import PageContainer from '../../../components/ui/PageContainer';
-import PageHero, { GlassStat } from '../../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../../components/admin/PageHero';
+import { DenseList } from '../../../components/ui/DenseList';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../../components/ui/ScreenState';
 import { GENDER_LABELS, LEVEL_LABELS } from '../../../components/myclub/teamDisplay';
@@ -136,9 +137,9 @@ export default function CoachTeamDetailScreen() {
           leading={
             <View
               className="w-12 h-12 rounded-[14px] border items-center justify-center shrink-0"
-              style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-brand-border)' } as any}
+              style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
             >
-              <MaterialIcons name="shield" size={22} color="var(--c-brand-fg)" />
+              <MaterialIcons name="shield" size={22} color="var(--c-muted)" />
             </View>
           }
           actions={
@@ -160,7 +161,7 @@ export default function CoachTeamDetailScreen() {
                   {chips.map((chip) => <Chip key={chip} label={chip} />)}
                 </View>
               ) : null}
-              <View className="grid grid-cols-3 gap-2 ui-stagger">
+              <StatStrip className="grid-cols-3">
                 <GlassStat dot="var(--c-purple)" label="Lot" value={players.length} hint={pluralWord(players.length, 'jucător', 'jucători')} />
                 <GlassStat
                   dot={attendanceRateColor(average)}
@@ -174,9 +175,9 @@ export default function CoachTeamDetailScreen() {
                   dot="var(--c-brand-fg)"
                   label="Urmează"
                   value={upcomingEvents.length}
-                  hint={upcomingEvents[0] ? formatCoachDate(upcomingEvents[0].startTime) : 'nimic programat'}
+                  hint={upcomingEvents[0] ? `Următoarea: ${formatCoachDate(upcomingEvents[0].startTime)}` : 'nimic programat'}
                 />
-              </View>
+              </StatStrip>
             </>
           ) : null}
         </PageHero>
@@ -196,13 +197,13 @@ export default function CoachTeamDetailScreen() {
           <View className="gap-5">
             <View className="gap-2.5">
               <View className="flex-row items-center gap-2">
-                <Text className="f-display flex-1 text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Lot complet</Text>
+                <Text accessibilityRole="header" className="f-display flex-1 text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Lot</Text>
                 {/* Adding players is the team's own coach's (server: bulk route). */}
                 {coachCoachesTeam(team, session?.id) ? (
                   <Pressable
                     onPress={() => setShowBulk(true)}
                     accessibilityRole="button"
-                    className="ui-press h-9 px-3 rounded-[10px] border flex-row items-center gap-1.5"
+                    className="ui-press h-10 px-3 rounded-[10px] border flex-row items-center gap-1.5"
                     style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
                   >
                     <MaterialIcons name="group-add" size={15} color="var(--c-brand-fg)" />
@@ -214,19 +215,20 @@ export default function CoachTeamDetailScreen() {
               {sortedPlayers.length === 0 ? (
                 <EmptyState icon="groups" compact title="Lotul este gol" message="Niciun jucător nu este alocat acestei echipe deocamdată." />
               ) : (
-                <View className="gap-1.5 ui-stagger">
+                <DenseList label="Lot">
                   {sortedPlayers.map((player) => (
                     <CoachPlayerRow
                       key={player.id}
+                      inList
                       firstName={player.firstName}
                       lastName={player.lastName}
                       badge={getPlayerBadge(player)}
-                      meta={player.position || playerStatusLabel(player.status)}
-                      rate={player.attendanceRate ?? null}
+                      // „Activ” on every row said nothing; only another status does.
+                      meta={player.position || (player.status && player.status !== 'active' ? playerStatusLabel(player.status) : null)}
                       trailing={<AttendanceRate rate={player.attendanceRate} />}
                     />
                   ))}
-                </View>
+                </DenseList>
               )}
             </View>
 
@@ -235,7 +237,9 @@ export default function CoachTeamDetailScreen() {
               {upcomingEvents.length === 0 ? (
                 <EmptyState icon="event-busy" compact title="Niciun eveniment programat" message="Antrenamentele și meciurile viitoare ale echipei apar aici." />
               ) : (
-                upcomingEvents.map((event) => <SessionRow key={event.id} event={event} />)
+                <DenseList label="Următoarele sesiuni">
+                  {upcomingEvents.map((event) => <SessionRow key={event.id} inList event={event} />)}
+                </DenseList>
               )}
             </View>
 

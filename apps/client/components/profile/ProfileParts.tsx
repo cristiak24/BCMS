@@ -34,7 +34,7 @@ export function ProfileCard({
 }) {
   // Player/parent: a neutral icon — a tinted tile per section only decorated.
   const role = String(useSession().session?.role ?? '').toLowerCase();
-  const quiet = role === 'player' || role === 'parent';
+  const quiet = ['player', 'parent', 'coach', 'superadmin'].includes(role);
   const colors = quiet ? { bg: 'var(--c-surface-2)', fg: 'var(--c-muted)' } : STAT_TONES[tone];
   return (
     <View

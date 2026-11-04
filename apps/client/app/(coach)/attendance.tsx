@@ -7,12 +7,12 @@ import { useSession } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import GlassCard from '../../components/ui/GlassCard';
 import PageContainer from '../../components/ui/PageContainer';
-import PageHero, { GlassStat } from '../../components/admin/PageHero';
+import PageHero, { GlassStat, StatStrip } from '../../components/admin/PageHero';
+import { DenseList } from '../../components/ui/DenseList';
 import Button from '../../components/ui/Button';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
 import { CoachPlayerRow, SessionRow } from '../../components/coach/CoachPrimitives';
-import ProgressRing from '../../components/ui/ProgressRing';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { attendanceRateColor, attendanceStatusTone, eventTypeMeta, getPlayerBadge, isPresentStatus } from '../../components/coach/coachDisplay';
 import { formatCoachDate, formatCoachTimeRange, getCoachScopedEvents } from '../../components/coach/coachUtils';
@@ -124,8 +124,7 @@ function AttendanceRow({
 
   return (
     <View
-      className="relative overflow-hidden rounded-[14px] border pl-4 pr-3.5 py-2.5 gap-2.5 flex-col md:flex-row md:flex-wrap md:items-center md:gap-4"
-      style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', boxShadow: 'var(--e-sm)' } as any}
+      className="relative overflow-hidden pl-4 pr-3.5 py-2.5 gap-2.5 flex-col md:flex-row md:flex-wrap md:items-center md:gap-4"
     >
       {/* Status rail: the row's state is readable from the left edge alone,
           so a coach scrolling a 15-player list sees the gaps at a glance. */}
@@ -145,7 +144,7 @@ function AttendanceRow({
             meta={unmarked ? attendanceStatusTone(null).label : null}
           />
         </View>
-        <AttendanceNoteToggle open={noteOpen} hasNote={Boolean(player.note.trim())} onPress={() => setNoteOpen((v) => !v)} />
+        <AttendanceNoteToggle open={noteOpen} hasNote={Boolean(player.note.trim())} playerName={`${player.firstName} ${player.lastName}`} onPress={() => setNoteOpen((v) => !v)} />
       </View>
 
       <AttendanceMarkButtons
@@ -366,7 +365,6 @@ export default function CoachAttendanceScreen() {
   const presentCount = players.filter((player) => isPresentStatus(player.status)).length;
   const presentRate = markedCount ? Math.round((presentCount / markedCount) * 100) : null;
   const unmarkedCount = players.length - markedCount;
-  const markedPercent = players.length ? Math.round((markedCount / players.length) * 100) : 0;
   const selectedMeta = selectedEvent ? eventTypeMeta(selectedEvent.type) : null;
 
   return (
@@ -378,28 +376,13 @@ export default function CoachAttendanceScreen() {
           subtitle={selectedEvent
             ? `${selectedEvent.teamName ?? 'Echipă'} · ${formatCoachDate(selectedEvent.startTime)} · ${formatCoachTimeRange(selectedEvent.startTime, selectedEvent.endTime)}`
             : 'Alege o sesiune și marchează disponibilitatea jucătorilor.'}
-          leading={
-            <ProgressRing
-              value={players.length ? markedPercent : null}
-              size={56}
-              stroke={6}
-              color={markedPercent === 100 ? 'var(--c-success)' : 'var(--c-brand-fg)'}
-              label={`Prezență marcată: ${markedCount} din ${players.length}`}
-            >
-              {markedPercent === 100 ? (
-                <MaterialIcons name="check" size={20} color="var(--c-success-fg)" />
-              ) : (
-                <Text className="t-num text-[13px] font-bold" style={{ color: 'var(--c-ink-strong)' }}>{markedPercent}%</Text>
-              )}
-            </ProgressRing>
-          }
           actions={
             <>
               {unmarkedCount > 0 && players.length > 0 && !selectedLocked ? (
                 <Button
                   variant="primary"
                   icon="check-circle"
-                  label={`Prezență pentru rest (${unmarkedCount})`}
+                  label={`Restul prezenți (${unmarkedCount})`}
                   loading={bulkSaving}
                   onPress={() => setBulkConfirmOpen(true)}
                 />
@@ -416,8 +399,8 @@ export default function CoachAttendanceScreen() {
             </>
           }
         >
-          <View className="grid grid-cols-3 gap-2 ui-stagger">
-            <GlassStat dot="var(--c-brand-fg)" label="Marcaj" value={`${markedCount}/${players.length}`} hint="din lot" />
+          <StatStrip className="grid-cols-3">
+            <GlassStat dot="var(--c-brand-fg)" label="Marcați" value={`${markedCount}/${players.length}`} hint="din lot" />
             <GlassStat dot="var(--c-success)" label="Prezențe" value={presentCount} hint="din lot" />
             <GlassStat
               dot={presentRate == null ? 'var(--c-faint)' : attendanceRateColor(presentRate)}
@@ -426,7 +409,7 @@ export default function CoachAttendanceScreen() {
               suffix={presentRate == null ? undefined : '%'}
               bar={presentRate ?? undefined}
             />
-          </View>
+          </StatStrip>
         </PageHero>
 
         {error ? (
@@ -465,11 +448,13 @@ export default function CoachAttendanceScreen() {
                     { key: 'past', title: 'Trecute', list: visibleGroups.past },
                   ] as const).map((group) => group.list.length ? (
                     <View key={group.key} className="gap-2">
-                      <Text className="t-eyebrow mt-1" style={{ color: 'var(--c-faint)' }} accessibilityRole="header">{group.title}</Text>
+                      <Text className="t-label mt-1" style={{ color: 'var(--c-muted)' }} accessibilityRole="header">{group.title}</Text>
+                      <DenseList label={group.title}>
                       {group.list.map((event) => (
                         <SessionRow
                           key={event.id}
                           compact
+                          inList
                           event={event}
                           active={event.id === selectedEventId}
                           onPress={() => {
@@ -478,6 +463,7 @@ export default function CoachAttendanceScreen() {
                           }}
                         />
                       ))}
+                      </DenseList>
                     </View>
                   ) : null)}
                   {hiddenSessionCount > 0 || (isMobile && showAllSessions) ? (
@@ -527,7 +513,7 @@ export default function CoachAttendanceScreen() {
                 ) : (
                   <AttendanceSaveStatus state={saveStatus.state} />
                 )}
-                <View className="gap-2.5 ui-stagger">
+                <DenseList label="Jucători">
                   {players.map((player) => (
                     <AttendanceRow
                       key={player.playerId}
@@ -538,7 +524,7 @@ export default function CoachAttendanceScreen() {
                       onSaveNote={(note) => saveNote(player.playerId, note)}
                     />
                   ))}
-                </View>
+                </DenseList>
               </View>
             ) : (
               <EmptyState

@@ -1,5 +1,4 @@
 import { View, Text, Pressable, ScrollView } from '@/src/web/reactNative';
-import { usePathname } from '@/src/web/expoRouter';
 
 /**
  * Admin's filter chip, extracted so the player screens stop inventing their own.
@@ -43,9 +42,9 @@ export default function FilterChips<T extends string>({
   scrollOnMobile?: boolean;
   label?: string;
 }) {
-  // Admin screens: a neutral selected chip (the brand fill on every active filter was
-  // accent on chrome). Other roles keep the brand fill.
-  const neutral = usePathname().startsWith('/admin/');
+  // A neutral selected chip on every screen since 2026-11-05 (the brand fill on
+  // every active filter was accent on chrome; admin first, then the others).
+  const neutral = true;
   const activeFg = neutral ? 'var(--c-ink-strong)' : 'var(--c-on-brand)';
   const row = (
     <View className={`flex-row items-center gap-1.5 ${scrollOnMobile ? '' : 'flex-wrap'}`} accessibilityRole={'group' as any} accessibilityLabel={label}>

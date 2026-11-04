@@ -36,7 +36,7 @@ export type PlayerCalendarDay = {
 
 const WeekdayHeader = React.memo(() => {
   const role = String(useSession().session?.role ?? '').toLowerCase();
-  const plain = role === 'player' || role === 'parent';
+  const plain = ['player', 'parent', 'coach'].includes(role);
   return (
     <View className="flex-row border-b" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
       {(plain ? WEEKDAY_LABELS_PLAIN : WEEKDAY_LABELS).map((day) => (

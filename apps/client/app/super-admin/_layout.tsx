@@ -65,6 +65,14 @@ function SuperAdminShell() {
     setSearchPlaceholder(SUPER_ADMIN_SEARCH_PLACEHOLDER);
   }, [setSearchPlaceholder]);
 
+  // Sentence-case labels, like every other console (global.css). On <html>:
+  // sheets and dialogs are portaled to <body>.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.dataset.ui = 'quiet';
+    return () => { delete document.documentElement.dataset.ui; };
+  }, []);
+
   // A new section starts with an empty search — unless the search itself
   // brought us here.
   useEffect(() => {
@@ -92,7 +100,7 @@ function SuperAdminShell() {
     <div className="flex flex-1 min-h-screen lg:flex-row flex-col" style={{ backgroundColor: 'var(--c-bg)' }}>
         {/* Keyboard users skip the menu (12+ stops) straight to the page. */}
         <a href="#continut" className="skip-link">Sari la conținut</a>
-      <Sidebar items={MENU_ITEMS} subtitle="Administrare platformă" />
+      <Sidebar items={MENU_ITEMS} subtitle="Administrare platformă" plain />
 
       <div className="flex flex-1 min-w-0 flex-col relative">
         <div className="lg:hidden sticky top-0 z-30">

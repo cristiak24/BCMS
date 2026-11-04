@@ -347,7 +347,7 @@ export default function DocumentsScreen() {
                 <GlassStat value={data.documents.length} label={pluralWord(data.documents.length, 'document', 'documente')} dot="var(--c-brand-fg)" />
               </StatStrip>
             ) : data && data.documents.length > 0 ? (
-              <View className="grid grid-cols-2 gap-2 max-w-[440px] ui-stagger">
+              <StatStrip className="grid-cols-2 max-w-[440px]">
                 <GlassStat value={data.documents.length} label={pluralWord(data.documents.length, 'document', 'documente')} dot="var(--c-brand-fg)" />
                 {canUpload ? (
                   <GlassStat
@@ -357,7 +357,7 @@ export default function DocumentsScreen() {
                     bar={usedPercent}
                   />
                 ) : null}
-              </View>
+              </StatStrip>
             ) : null}
           </PageHero>
 
