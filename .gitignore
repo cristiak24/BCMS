@@ -17,3 +17,7 @@ e2e-results/
 
 # Local instructions for Claude Code (kept private)
 CLAUDE.md
+
+# Local test output and editor history
+test-results/
+.Rhistory
