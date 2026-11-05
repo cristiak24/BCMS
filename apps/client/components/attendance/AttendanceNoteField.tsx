@@ -1,6 +1,7 @@
 import { Pressable, TextInput } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 
+import { tr } from '../../i18n';
 /**
  * The per-player feedback note of an attendance sheet: the chat toggle and the
  * text field. Shared by the admin sheet (app/(admin)/attendance/[id].tsx) and
@@ -26,7 +27,7 @@ export function AttendanceNoteToggle({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${open ? 'Ascunde nota' : hasNote ? 'Vezi nota' : 'Adaugă notă'}${playerName ? `: ${playerName}` : ''}`}
+      accessibilityLabel={`${open ? 'Ascunde nota' : hasNote ? 'Vezi nota' : tr('Adaugă notă')}${playerName ? `: ${playerName}` : ''}`}
       accessibilityState={{ expanded: open }}
       className={`ui-press tap-40 w-9 h-9 rounded-[10px] border items-center justify-center shrink-0 ${className}`}
       style={{
@@ -58,11 +59,11 @@ export function AttendanceNoteInput({
       onChangeText={onChange}
       onBlur={onBlur}
       editable={editable}
-      placeholder="Notă / feedback pentru jucător…"
+      placeholder={tr('Notă / feedback pentru jucător…')}
       placeholderTextColor="var(--c-faint)"
       multiline
       maxLength={2000}
-      accessibilityLabel={`Notă pentru ${playerName}`}
+      accessibilityLabel={tr('Notă pentru {playerName}', { playerName })}
       className="w-full min-h-[40px] max-h-[140px] rounded-[10px] border px-3 py-2.5 text-[13px] font-medium outline-none"
       style={{
         backgroundColor: 'var(--c-surface-2)',

@@ -42,6 +42,7 @@ import { plural, pluralWord } from '../../utils/plural';
 import { ATTENDANCE_MIN_SESSIONS, ATTENDANCE_PERIOD_LABEL } from '../../utils/attendanceRate';
 import { DenseList, DenseRow } from '../../components/ui/DenseList';
 
+import { tr, appLocale } from '../../i18n';
 type HubEvent = CalendarEvent & {
   source?: 'internal' | 'frb';
   frbMatch?: Match;
@@ -60,7 +61,7 @@ type HubEvent = CalendarEvent & {
 const SECTION_LIMIT = 4;
 /** How far back the home screen loads events (results, form, attendance). */
 const HISTORY_MONTHS = 6;
-const RO_LOCALE = 'ro-RO';
+const RO_LOCALE = appLocale();
 
 /** Accent per section — fg for text/icons, bg for the tinted chip behind it. */
 const palette = {
@@ -368,7 +369,7 @@ function getMatchSides(event: HubEvent) {
 function getStatusCopy(event: CalendarEvent) {
   const status = String(event.status ?? '').trim();
   if (!status) {
-    return 'Programat';
+    return tr('Programat');
   }
 
   return status.charAt(0).toUpperCase() + status.slice(1);
@@ -400,7 +401,7 @@ function sessionMatchesSearch(event: CalendarEvent, query: string) {
 
 function getFirstName(session: AuthUser | null) {
   const name = session?.name?.trim();
-  if (!name) return 'Panoul meu';
+  if (!name) return tr('Panoul meu');
   return name.split(/\s+/)[0];
 }
 
@@ -482,23 +483,23 @@ function getAttendanceTrend(countedDescending: PlayerAttendanceRecord[], chunkSi
 
 function getAttendanceTone(rate: number | null, sessions: number) {
   if (rate == null) {
-    return { label: 'În așteptare', color: 'var(--c-muted)' };
+    return { label: tr('În așteptare'), color: 'var(--c-muted)' };
   }
 
   // 1 of 1 is 100%, not a verdict.
   if (sessions < ATTENDANCE_MIN_SESSIONS) {
-    return { label: 'Prea puține sesiuni', color: 'var(--c-muted)' };
+    return { label: tr('Prea puține sesiuni'), color: 'var(--c-muted)' };
   }
 
   if (isEliteRhythm(rate, sessions)) {
-    return { label: 'Ritm de elită', color: palette.green };
+    return { label: tr('Ritm de elită'), color: palette.green };
   }
 
   if (rate >= 80) {
-    return { label: 'Pe drumul bun', color: 'var(--c-brand-fg)' };
+    return { label: tr('Pe drumul bun'), color: 'var(--c-brand-fg)' };
   }
 
-  return { label: 'Necesită atenție', color: 'var(--c-warning-fg)' };
+  return { label: tr('Necesită atenție'), color: 'var(--c-warning-fg)' };
 }
 
 /**
@@ -549,20 +550,20 @@ function HeroAttendance({
         size={60}
         stroke={7}
         color={tone.color}
-        label={attendanceRate == null ? 'Rată prezență indisponibilă' : `Rată prezență ${attendanceRate}%`}
+        label={attendanceRate == null ? tr('Rată prezență indisponibilă') : tr('Rată prezență {attendanceRate}%', { attendanceRate })}
       >
         <Text className="f-display t-num text-[15px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>
           {attendanceRate == null ? '--' : `${attendanceRate}%`}
         </Text>
       </ProgressRing>
       <View className="min-w-0 flex-1">
-        <Text className="t-label" style={{ color: 'var(--c-muted)' }}>Rată prezență</Text>
+        <Text className="t-label" style={{ color: 'var(--c-muted)' }}>{tr('Rată prezență')}</Text>
         <Text className="f-display text-[15px] font-bold mt-0.5" style={{ color: tone.color }}>{tone.label}</Text>
         {/* The same window as the coach and admin screens. */}
         <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
           {playerAttendance?.total
-            ? `${playerAttendance.present} din ${plural(playerAttendance.total, 'sesiune', 'sesiuni')} · ${ATTENDANCE_PERIOD_LABEL.toLowerCase()}`
-            : `Nicio prezență marcată · ${ATTENDANCE_PERIOD_LABEL.toLowerCase()}`}
+            ? tr('{0} din {1} · {2}', { '0': playerAttendance.present, '1': plural(playerAttendance.total, 'sesiune', 'sesiuni'), '2': ATTENDANCE_PERIOD_LABEL.toLowerCase() })
+            : tr('Nicio prezență marcată · {0}', { '0': ATTENDANCE_PERIOD_LABEL.toLowerCase() })}
         </Text>
       </View>
     </View>
@@ -575,11 +576,11 @@ function getRelativeLabel(value: string) {
   if (!date) return null;
   const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const diff = Math.round((startOf(date) - startOf(new Date())) / 86400000);
-  if (diff === 0) return 'Azi';
-  if (diff === 1) return 'Mâine';
-  if (diff === -1) return 'Ieri';
-  if (diff > 1 && diff <= 6) return `În ${diff} zile`;
-  if (diff < -1 && diff >= -6) return `Acum ${-diff} zile`;
+  if (diff === 0) return tr('Azi');
+  if (diff === 1) return tr('Mâine');
+  if (diff === -1) return tr('Ieri');
+  if (diff > 1 && diff <= 6) return tr('În {diff} zile', { diff });
+  if (diff < -1 && diff >= -6) return tr('Acum {0} zile', { '0': -diff });
   return null;
 }
 
@@ -590,7 +591,7 @@ function getRelativeLabel(value: string) {
  */
 function AgendaRow({ event, onDetails }: { event: HubEvent; onDetails: () => void }) {
   const meta = getEventTypeMeta(event.type);
-  const relative = isOngoing(event) ? 'În desfășurare' : getRelativeLabel(event.startTime);
+  const relative = isOngoing(event) ? tr('În desfășurare') : getRelativeLabel(event.startTime);
   const label = getEventCategory(event);
 
   return (
@@ -598,7 +599,7 @@ function AgendaRow({ event, onDetails }: { event: HubEvent; onDetails: () => voi
       <Pressable
         onPress={onDetails}
         accessibilityRole="button"
-        accessibilityLabel={`${label}${relative ? `, ${relative.toLowerCase()}` : ''}: ${event.title}${event.coachNote ? ', cu notă de la antrenor' : ''}`}
+        accessibilityLabel={`${label}${relative ? `, ${relative.toLowerCase()}` : ''}: ${event.title}${event.coachNote ? tr(', cu notă de la antrenor') : ''}`}
         className="ui-press flex-1 min-w-0 flex-row items-center gap-3 px-3 py-2.5 min-h-[60px] text-left hover:bg-[var(--c-surface-2)]"
       >
         <DateTile value={event.startTime} fg="var(--c-muted)" bg="var(--c-surface-2)" size={44} dayFirst />
@@ -607,7 +608,7 @@ function AgendaRow({ event, onDetails }: { event: HubEvent; onDetails: () => voi
             <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: meta.solid }} />
             <Text className="t-label shrink min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{label}</Text>
             {relative ? (
-              <Text className="t-label shrink-0" style={{ color: relative === 'Azi' || relative === 'În desfășurare' ? 'var(--c-brand-fg)' : 'var(--c-muted)' }}>· {relative}</Text>
+              <Text className="t-label shrink-0" style={{ color: relative === tr('Azi') || relative === tr('În desfășurare') ? 'var(--c-brand-fg)' : 'var(--c-muted)' }}>· {relative}</Text>
             ) : null}
             {event.coachNote ? (
               <MaterialIcons name="chat-bubble-outline" size={12} color="var(--c-brand-fg)" />
@@ -617,7 +618,7 @@ function AgendaRow({ event, onDetails }: { event: HubEvent; onDetails: () => voi
             {event.title}
           </Text>
           <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-            {[formatTimeRange(event.startTime, event.endTime), event.venueName || event.location || 'Teren club'].join(' · ')}
+            {[formatTimeRange(event.startTime, event.endTime), event.venueName || event.location || tr('Teren club')].join(' · ')}
           </Text>
         </View>
         <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
@@ -627,9 +628,9 @@ function AgendaRow({ event, onDetails }: { event: HubEvent; onDetails: () => voi
 }
 
 const OUTCOME_META: Record<MatchOutcome, { label: string; full: string; color: string; bg: string }> = {
-  win: { label: 'V', full: 'Victorie', color: 'var(--c-success-fg)', bg: 'var(--c-success-bg)' },
-  loss: { label: 'Î', full: 'Înfrângere', color: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)' },
-  draw: { label: 'E', full: 'Egal', color: 'var(--c-muted)', bg: 'var(--c-surface-3)' },
+  win: { label: tr('V'), full: 'Victorie', color: 'var(--c-success-fg)', bg: 'var(--c-success-bg)' },
+  loss: { label: tr('Î'), full: tr('Înfrângere'), color: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)' },
+  draw: { label: tr('E'), full: 'Egal', color: 'var(--c-muted)', bg: 'var(--c-surface-3)' },
 };
 
 function ResultCard({ event, outcome }: { event: HubEvent; outcome: MatchOutcome | null }) {
@@ -745,13 +746,13 @@ function PlayerFormStats({
     <GlassCard className="ui-rise">
       <View className="mb-4">
         <Text accessibilityRole="header" className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
-        <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Prezență, rezultate și luna în curs</Text>
+        <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>{tr('Prezență, rezultate și luna în curs')}</Text>
       </View>
       <View className={`${isMobile ? 'gap-5' : 'flex-row gap-8'}`}>
-        <FormColumn icon="event-available" label="Consistență">
+        <FormColumn icon="event-available" label={tr('Consistență')}>
           {hasAttendanceData ? (
             <>
-              <View className="flex-row items-end gap-1.5 mb-2.5 ui-stagger" accessibilityLabel={strip.length === 1 ? 'Ultima sesiune marcată' : `Ultimele ${plural(strip.length, 'sesiune marcată', 'sesiuni marcate')}`}>
+              <View className="flex-row items-end gap-1.5 mb-2.5 ui-stagger" accessibilityLabel={strip.length === 1 ? tr('Ultima sesiune marcată') : tr('Ultimele {0}', { '0': plural(strip.length, 'sesiune marcată', 'sesiuni marcate') })}>
                 {strip.slice().reverse().map((record) => (
                   <View
                     key={record.event.id}
@@ -760,20 +761,20 @@ function PlayerFormStats({
                 ))}
               </View>
               <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>
-                {streak > 0 ? `${plural(streak, 'sesiune', 'sesiuni')} la rând cu prezență` : 'Fără sesiuni consecutive momentan'}
+                {streak > 0 ? tr('{0} la rând cu prezență', { '0': plural(streak, 'sesiune', 'sesiuni') }) : tr('Fără sesiuni consecutive momentan')}
               </Text>
               {trendDelta != null ? (
                 <Text className="text-[12px] font-semibold mt-1" style={{ color: trendDelta >= 0 ? 'var(--c-success-fg)' : 'var(--c-danger-fg)' }}>
-                  {trendDelta === 0 ? 'Ritm constant' : `${trendDelta > 0 ? '▲' : '▼'} ${Math.abs(trendDelta)}% față de perioada anterioară`}
+                  {trendDelta === 0 ? tr('Ritm constant') : tr('{0} {1}% față de perioada anterioară', { '0': trendDelta > 0 ? '▲' : '▼', '1': Math.abs(trendDelta) })}
                 </Text>
               ) : null}
             </>
           ) : (
-            <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>Nicio prezență marcată încă.</Text>
+            <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>{tr('Nicio prezență marcată încă.')}</Text>
           )}
         </FormColumn>
 
-        <FormColumn icon="scoreboard" label="Bilanț meciuri">
+        <FormColumn icon="scoreboard" label={tr('Bilanț meciuri')}>
           {hasMatchData ? (
             <>
               <View className="flex-row items-center gap-1.5 mb-2.5 ui-stagger">
@@ -788,25 +789,23 @@ function PlayerFormStats({
                 ))}
               </View>
               <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>
-                {wins}V · {losses}Î{draws ? ` · ${draws}E` : ''} în ultimele {wins + losses + draws} meciuri
+                {wins}{tr('V ·')}{' '}{losses}{tr('Î')}{draws ? ` · ${draws}E` : ''}{' '}{tr('în ultimele')}{' '}{wins + losses + draws} meciuri
               </Text>
             </>
           ) : (
-            <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>Niciun rezultat cu scor încă.</Text>
+            <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>{tr('Niciun rezultat cu scor încă.')}</Text>
           )}
         </FormColumn>
 
         {/* Only sessions that already took place: counting the month's whole
             calendar, future ones included, read as work done. */}
-        <FormColumn icon="calendar-month" label="Luna aceasta">
+        <FormColumn icon="calendar-month" label={tr('Luna aceasta')}>
           <Text className="f-display t-num text-[28px] font-extrabold leading-none" style={{ color: 'var(--c-ink-strong)' }}>{monthHeld}</Text>
           <Text className="text-[13px] font-semibold mt-1.5" style={{ color: 'var(--c-ink-soft)' }}>
-            {pluralWord(monthHeld, 'sesiune ținută', 'sesiuni ținute')} până azi
-          </Text>
+            {tr('{0} până azi', { '0': pluralWord(monthHeld, tr('sesiune ținută'), tr('sesiuni ținute')) })}</Text>
           {monthMarked > 0 ? (
             <Text className="text-[12px] font-medium mt-1" style={{ color: 'var(--c-muted)' }}>
-              Prezent la {monthAttended} din {plural(monthMarked, 'sesiune marcată', 'sesiuni marcate')}
-            </Text>
+              {tr('Prezent la {monthAttended} din {1}', { monthAttended, '1': plural(monthMarked, tr('sesiune marcată'), tr('sesiuni marcate')) })}</Text>
           ) : null}
         </FormColumn>
       </View>
@@ -841,7 +840,7 @@ function PlayerHomeScreen() {
   const [selectedEvent, setSelectedEvent] = useState<HubEvent | null>(null);
 
   useEffect(() => {
-    setSearchPlaceholder('Caută sesiuni, echipe, locații...');
+    setSearchPlaceholder(tr('Caută sesiuni, echipe, locații...'));
     return () => {
       setSearchPlaceholder(DEFAULT_SEARCH_PLACEHOLDER);
       setSearchValue('');
@@ -920,10 +919,10 @@ function PlayerHomeScreen() {
       } catch (attendanceError) {
         setPlayerAttendance(null);
         setAttendanceRecords([]);
-        setAttendanceWarning(attendanceError instanceof Error ? attendanceError.message : 'Nu s-a putut încărca prezența.');
+        setAttendanceWarning(attendanceError instanceof Error ? attendanceError.message : tr('Nu s-a putut încărca prezența.'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nu s-a putut încărca panoul.');
+      setError(err instanceof Error ? err.message : tr('Nu s-a putut încărca panoul.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -1025,9 +1024,9 @@ function PlayerHomeScreen() {
   }, [allUpcomingActivities, allUpcomingGames]);
   const upcomingTotal = allUpcomingActivities.length + allUpcomingGames.length;
   const weekSummary = [
-    weekTrainingCount ? plural(weekTrainingCount, 'antrenament', 'antrenamente') : null,
-    weekMatchCount ? plural(weekMatchCount, 'meci', 'meciuri') : null,
-    weekCampCount ? plural(weekCampCount, 'cantonament', 'cantonamente') : null,
+    weekTrainingCount ? plural(weekTrainingCount, tr('antrenament'), tr('antrenamente')) : null,
+    weekMatchCount ? plural(weekMatchCount, tr('meci'), tr('meciuri')) : null,
+    weekCampCount ? plural(weekCampCount, tr('cantonament'), tr('cantonamente')) : null,
   ].filter(Boolean).join(', ');
 
   const goToSchedule = () => router.push('/schedule' as any);
@@ -1045,18 +1044,18 @@ function PlayerHomeScreen() {
           // A parent is greeted by their own name, but everything below is the
           // selected child's — say whose.
           subtitle={isParent
-            ? (activeChild ? [`Pentru ${activeChild.firstName}`, ...activeChild.teams].join(' · ') : 'Adaugă copilul ca să-i vezi programul')
-            : [session?.clubName, session?.teamName].filter(Boolean).join(' · ') || 'Spațiul tău de jucător'}
+            ? (activeChild ? [tr('Pentru {0}', { '0': activeChild.firstName }), ...activeChild.teams].join(' · ') : tr('Adaugă copilul ca să-i vezi programul'))
+            : [session?.clubName, session?.teamName].filter(Boolean).join(' · ') || tr('Spațiul tău de jucător')}
           className="mb-4"
           actions={
             <>
               {PLAYER_FEATURE_FLAGS.teammatesView ? (
-                <Button icon="groups" label={isParent ? 'Echipa copilului' : 'Echipa mea'} onPress={() => router.push('/team' as any)} className="hidden sm:flex" />
+                <Button icon="groups" label={isParent ? tr('Echipa copilului') : tr('Echipa mea')} onPress={() => router.push('/team' as any)} className="hidden sm:flex" />
               ) : null}
               <Pressable
                 onPress={() => loadData(true)}
                 accessibilityRole="button"
-                accessibilityLabel="Reîmprospătează"
+                accessibilityLabel={tr('Reîmprospătează')}
                 className="ui-press hidden sm:flex h-10 w-10 rounded-[11px] border items-center justify-center"
                 style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
               >
@@ -1069,7 +1068,7 @@ function PlayerHomeScreen() {
         </PageHero>
 
         {loading ? (
-          <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă panoul">
+          <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă panoul')}>
             <Skeleton className="h-[150px] w-full rounded-[16px]" />
             {Array.from({ length: 2 }).map((_, sectionIndex) => (
               <View key={sectionIndex}>
@@ -1087,9 +1086,9 @@ function PlayerHomeScreen() {
           </View>
         ) : error ? (
           <ErrorState
-            title="Nu am putut încărca panoul"
+            title={tr('Nu am putut încărca panoul')}
             message={error}
-            actionLabel="Reîncearcă"
+            actionLabel={tr('Reîncearcă')}
             onAction={() => loadData(true)}
           />
         ) : (
@@ -1106,11 +1105,11 @@ function PlayerHomeScreen() {
                 sessions three times. */}
             <View>
               <SectionHeader
-                title="Urmează"
-                subtitle={weekSummary ? `${weekSummary} în următoarele 7 zile` : 'Nimic programat în următoarele 7 zile'}
+                title={tr('Urmează')}
+                subtitle={weekSummary ? tr('{weekSummary} în următoarele 7 zile', { weekSummary }) : tr('Nimic programat în următoarele 7 zile')}
                 trailing={(
                   <Button
-                    label={upcomingTotal > agendaRows.length ? `Tot programul (${upcomingTotal})` : 'Tot programul'}
+                    label={upcomingTotal > agendaRows.length ? tr('Tot programul ({upcomingTotal})', { upcomingTotal }) : tr('Tot programul')}
                     icon="calendar-today"
                     onPress={goToSchedule}
                     className="self-start"
@@ -1119,13 +1118,13 @@ function PlayerHomeScreen() {
                 isMobile={isMobile}
               />
               {agendaRows.length ? (
-                <DenseList label="Urmează">
+                <DenseList label={tr('Urmează')}>
                   {agendaRows.map((event) => (
                     <AgendaRow key={event.id} event={event} onDetails={() => setSelectedEvent(event)} />
                   ))}
                 </DenseList>
               ) : (
-                <EmptyState icon="event-busy" compact title="Nimic programat" message={isParent ? 'Antrenamentele și meciurile echipei copilului apar aici.' : 'Antrenamentele și meciurile echipei tale apar aici.'} />
+                <EmptyState icon="event-busy" compact title={tr('Nimic programat')} message={isParent ? tr('Antrenamentele și meciurile echipei copilului apar aici.') : tr('Antrenamentele și meciurile echipei tale apar aici.')} />
               )}
             </View>
 
@@ -1141,14 +1140,14 @@ function PlayerHomeScreen() {
               monthMarked={monthSessions.marked}
               monthAttended={monthSessions.attended}
               isMobile={isMobile}
-              title={isParent ? 'Forma copilului' : 'Forma ta'}
+              title={isParent ? tr('Forma copilului') : tr('Forma ta')}
             />
 
             {gameResults.length ? (
               <View>
                 <SectionHeader
-                  title="Rezultate"
-                  subtitle={isParent ? 'Ultimele meciuri încheiate ale echipei copilului.' : 'Ultimele meciuri încheiate ale echipei tale.'}
+                  title={tr('Rezultate')}
+                  subtitle={isParent ? tr('Ultimele meciuri încheiate ale echipei copilului.') : tr('Ultimele meciuri încheiate ale echipei tale.')}
                   isMobile={isMobile}
                 />
                 <View className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 ui-stagger">

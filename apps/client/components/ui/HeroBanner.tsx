@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 
+import { tr, appLocale } from '../../i18n';
 /**
  * Greeting panel at the top of the coach and player home.
  *
@@ -12,14 +13,14 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 
 export function getGreeting(date = new Date()) {
   const hour = date.getHours();
-  if (hour < 5) return 'Noapte bună';
-  if (hour < 12) return 'Bună dimineața';
-  if (hour < 18) return 'Bună ziua';
-  return 'Bună seara';
+  if (hour < 5) return tr('Noapte bună');
+  if (hour < 12) return tr('Bună dimineața');
+  if (hour < 18) return tr('Bună ziua');
+  return tr('Bună seara');
 }
 
 export function formatToday(date = new Date()) {
-  const text = new Intl.DateTimeFormat('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
+  const text = new Intl.DateTimeFormat(appLocale(), { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 

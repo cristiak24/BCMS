@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 
+import { tr } from '../../i18n';
 /**
  * One pagination implementation for every player list.
  *
@@ -132,8 +133,8 @@ export default function Pagination({
 
   const summary =
     rangeStart != null && rangeEnd != null && total != null
-      ? `Se afișează ${rangeStart}-${rangeEnd} din ${total} ${itemNoun}`
-      : `Pagina ${page} din ${totalPages}`;
+      ? tr('Se afișează {rangeStart}-{rangeEnd} din {total} {itemNoun}', { rangeStart, rangeEnd, total, itemNoun })
+      : tr('Pagina {page} din {totalPages}', { page, totalPages });
 
   return (
     <View className="flex-row items-center justify-between flex-wrap gap-3 mt-4">
@@ -149,7 +150,7 @@ export default function Pagination({
 
       {sizePicker ? (
         <View className="flex-row items-center gap-1.5">
-          <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>Pe pagină</Text>
+          <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>{tr('Pe pagină')}</Text>
           {PAGE_SIZE_OPTIONS.map((size) => {
             const active = size === pageSize;
             return (
@@ -158,7 +159,7 @@ export default function Pagination({
                 onPress={() => onPageSizeChange(size)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-                accessibilityLabel={`${size} pe pagină`}
+                accessibilityLabel={tr('{size} pe pagină', { size })}
                 className="h-8 min-w-[36px] px-2 rounded-[9px] border items-center justify-center"
                 style={active
                   ? neutral
@@ -176,7 +177,7 @@ export default function Pagination({
       <View className="flex-row items-center gap-2">
         <PageButton
           icon="chevron-left"
-          label="Pagina anterioară"
+          label={tr('Pagina anterioară')}
           disabled={page <= 1}
           onPress={() => onPageChange((current) => Math.max(1, current - 1))}
         />
@@ -190,7 +191,7 @@ export default function Pagination({
         </View>
         <PageButton
           icon="chevron-right"
-          label="Pagina următoare"
+          label={tr('Pagina următoare')}
           disabled={page >= totalPages}
           onPress={() => onPageChange((current) => Math.min(totalPages, current + 1))}
         />

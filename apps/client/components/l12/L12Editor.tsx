@@ -9,6 +9,7 @@ import { plural } from '../../utils/plural';
 import Button from '../ui/Button';
 import { defaultU22 } from '../../utils/l12Export';
 
+import { tr } from '../../i18n';
 /**
  * The L-12 sheet editor shared by the match screen and the team's "L12
  * constant" screen. Pure UI: the parent owns loading, saving and exporting.
@@ -51,12 +52,12 @@ export function lineupForRoster(lineup: L12Lineup, roster: Player[]): L12Lineup 
 
 /** Hard errors only — things the federation form cannot carry. */
 export function validateLineup(lineup: L12Lineup): string | null {
-  if (lineup.players.length > L12_MAX_PLAYERS) return `Maxim ${L12_MAX_PLAYERS} jucători.`;
+  if (lineup.players.length > L12_MAX_PLAYERS) return tr('Maxim {L12_MAX_PLAYERS} jucători.', { L12_MAX_PLAYERS });
   const numbers = new Map<string, string>();
   for (const player of lineup.players) {
-    if (player.shirtNumber && !/^\d{1,2}$/.test(player.shirtNumber)) return `Număr invalid la ${player.firstName} ${player.lastName}.`;
+    if (player.shirtNumber && !/^\d{1,2}$/.test(player.shirtNumber)) return tr('Număr invalid la {0} {1}.', { '0': player.firstName, '1': player.lastName });
     if (player.shirtNumber && numbers.has(player.shirtNumber)) {
-      return `Numărul ${player.shirtNumber} apare de două ori (${numbers.get(player.shirtNumber)}, ${player.lastName}).`;
+      return tr('Numărul {0} apare de două ori ({1}, {2}).', { '0': player.shirtNumber, '1': numbers.get(player.shirtNumber), '2': player.lastName });
     }
     if (player.shirtNumber) numbers.set(player.shirtNumber, player.lastName ?? '');
   }
@@ -176,14 +177,14 @@ function CaptainToggle({ captain, onPress, name }: { captain: boolean; onPress: 
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: captain }}
-      accessibilityLabel={captain ? `Scoate banderola lui ${name}` : `Căpitan: ${name}`}
+      accessibilityLabel={captain ? tr('Scoate banderola lui {name}', { name }) : tr('Căpitan: {name}', { name })}
       className="ui-press w-9 h-9 rounded-[9px] border items-center justify-center shrink-0"
       style={{
         borderColor: captain ? 'var(--c-warning)' : 'var(--c-border)',
         backgroundColor: captain ? 'var(--c-warning-bg)' : 'transparent',
       } as any}
     >
-      <Text className="text-[13px] font-black" style={{ color: captain ? 'var(--c-warning-fg)' : 'var(--c-faint)' }}>C</Text>
+      <Text className="text-[13px] font-black" style={{ color: captain ? 'var(--c-warning-fg)' : 'var(--c-faint)' }}>{tr('C')}</Text>
     </Pressable>
   );
 }
@@ -192,11 +193,11 @@ type RowFlags = { duplicate: boolean; noNumber: boolean; noLicense: boolean; vis
 
 function Flags({ flags }: { flags: RowFlags }) {
   const items: { label: string; tone: string }[] = [];
-  if (flags.visa === 'expired') items.push({ label: 'Viză expirată', tone: 'var(--c-danger-fg)' });
-  else if (flags.visa === 'missing') items.push({ label: 'Fără viză', tone: 'var(--c-warning-fg)' });
-  else if (flags.visa === 'soon') items.push({ label: 'Viza expiră curând', tone: 'var(--c-warning-fg)' });
-  if (flags.inactive) items.push({ label: 'Inactiv', tone: 'var(--c-muted)' });
-  if (flags.duplicate) items.push({ label: 'Număr dublat', tone: 'var(--c-danger-fg)' });
+  if (flags.visa === 'expired') items.push({ label: tr('Viză expirată'), tone: 'var(--c-danger-fg)' });
+  else if (flags.visa === 'missing') items.push({ label: tr('Fără viză'), tone: 'var(--c-warning-fg)' });
+  else if (flags.visa === 'soon') items.push({ label: tr('Viza expiră curând'), tone: 'var(--c-warning-fg)' });
+  if (flags.inactive) items.push({ label: tr('Inactiv'), tone: 'var(--c-muted)' });
+  if (flags.duplicate) items.push({ label: tr('Număr dublat'), tone: 'var(--c-danger-fg)' });
   if (items.length === 0) return null;
   return (
     <Text className="text-[11.5px] font-semibold" numberOfLines={1}>
@@ -244,13 +245,13 @@ function SheetRow({
   onRemove: () => void;
 }) {
   // First name first, as everywhere else on screen; the printed FRB sheet keeps NUME PRENUME (l12Document).
-  const name = `${player.firstName ?? ''} ${player.lastName ?? ''}`.trim() || 'Jucător';
+  const name = `${player.firstName ?? ''} ${player.lastName ?? ''}`.trim() || tr('Jucător');
   const slot = (
     // Row number on the paper form (rows run 4–15). It looked exactly like the
     // shirt number next to it; now it is a small, faint "rând" marker with no
     // box, while the shirt number stays a bold input.
-    <View className={`${COL.slot} h-8 items-center justify-center shrink-0`} accessibilityLabel={`Rândul ${index + 4} din formular`}>
-      <Text className="text-[10px] font-semibold leading-none" style={{ color: 'var(--c-faint)' }}>rând</Text>
+    <View className={`${COL.slot} h-8 items-center justify-center shrink-0`} accessibilityLabel={tr('Rândul {0} din formular', { '0': index + 4 })}>
+      <Text className="text-[10px] font-semibold leading-none" style={{ color: 'var(--c-faint)' }}>{tr('rând')}</Text>
       <Text className="t-num text-[11px] font-medium leading-tight" style={{ color: 'var(--c-faint)' }}>{index + 4}</Text>
     </View>
   );
@@ -262,7 +263,7 @@ function SheetRow({
         <Text className="text-[14px] font-semibold shrink" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{name}</Text>
         {captain ? (
           <View className="rounded-[5px] px-1.5 py-[1px]" style={{ backgroundColor: 'var(--c-warning-bg)' }}>
-            <Text className="text-[10.5px] font-bold" style={{ color: 'var(--c-warning-fg)' }}>Căpitan</Text>
+            <Text className="text-[10.5px] font-bold" style={{ color: 'var(--c-warning-fg)' }}>{tr('Căpitan')}</Text>
           </View>
         ) : null}
       </View>
@@ -271,15 +272,15 @@ function SheetRow({
     </View>
   );
   const remove = (
-    <Pressable onPress={onRemove} accessibilityRole="button" accessibilityLabel={`Scoate ${name} de pe foaie`} className={`ui-press ${COL.remove} h-8 rounded-[8px] items-center justify-center shrink-0 hover:bg-[var(--c-surface-3)]`}>
+    <Pressable onPress={onRemove} accessibilityRole="button" accessibilityLabel={tr('Scoate {name} de pe foaie', { name })} className={`ui-press ${COL.remove} h-8 rounded-[8px] items-center justify-center shrink-0 hover:bg-[var(--c-surface-3)]`}>
       <MaterialIcons name="close" size={17} color="var(--c-faint)" />
     </Pressable>
   );
-  const number = <Input label={`Număr echipament ${name}`} placeholder="—" numeric value={player.shirtNumber} onChange={(shirtNumber) => onChange({ shirtNumber })} invalid={flags.duplicate} />;
-  const license = <Input label={`Licență ${name}`} placeholder="Nr. licență" maxLength={40} value={player.license} onChange={(license) => onChange({ license })} />;
-  const citizenship = <Input label={`Cetățenie ${name}`} placeholder="ROU" maxLength={3} upper value={player.citizenship} onChange={(citizenship) => onChange({ citizenship })} className="text-center" />;
+  const number = <Input label={tr('Număr echipament {name}', { name })} placeholder="—" numeric value={player.shirtNumber} onChange={(shirtNumber) => onChange({ shirtNumber })} invalid={flags.duplicate} />;
+  const license = <Input label={tr('Licență {name}', { name })} placeholder={tr('Nr. licență')} maxLength={40} value={player.license} onChange={(license) => onChange({ license })} />;
+  const citizenship = <Input label={tr('Cetățenie {name}', { name })} placeholder="ROU" maxLength={3} upper value={player.citizenship} onChange={(citizenship) => onChange({ citizenship })} className="text-center" />;
   const u22 = <CheckToggle label={`U22/23: ${name}`} checked={player.u22} onPress={() => onChange({ u22: !player.u22 })} />;
-  const nat = <CheckToggle label={`Naturalizat: ${name}`} checked={player.naturalized} onPress={() => onChange({ naturalized: !player.naturalized })} />;
+  const nat = <CheckToggle label={tr('Naturalizat: {name}', { name })} checked={player.naturalized} onPress={() => onChange({ naturalized: !player.naturalized })} />;
   const cap = <CaptainToggle captain={captain} onPress={onCaptain} name={name} />;
 
   return (
@@ -315,7 +316,7 @@ function SheetRow({
         </View>
         <View className="flex-row items-center gap-1.5">
           <MiniToggle text="U22/23" label={`U22/23: ${name}`} checked={player.u22} onPress={() => onChange({ u22: !player.u22 })} />
-          <MiniToggle text="Naturalizat" label={`Naturalizat: ${name}`} checked={player.naturalized} onPress={() => onChange({ naturalized: !player.naturalized })} />
+          <MiniToggle text={tr('Naturalizat')} label={tr('Naturalizat: {name}', { name })} checked={player.naturalized} onPress={() => onChange({ naturalized: !player.naturalized })} />
         </View>
       </View>
     </View>
@@ -465,22 +466,22 @@ export default function L12Editor({
   const staffHidden = L12_STAFF_ROLES.length - staffShown.length;
 
   const checks: { key: string; ok: boolean; label: string; detail?: string; severity: 'error' | 'warn' }[] = [
-    { key: 'count', ok: count >= L12_MIN_PLAYERS, severity: 'error', label: `${count}/${L12_MAX_PLAYERS} jucători`, detail: count < L12_MIN_PLAYERS ? `Minimum ${L12_MIN_PLAYERS} pentru joc` : undefined },
-    { key: 'captain', ok: lineup.captainPlayerId != null, severity: 'warn', label: lineup.captainPlayerId != null ? 'Căpitan ales' : 'Niciun căpitan', detail: lineup.captainPlayerId != null ? undefined : 'Apasă „C” pe un rând' },
+    { key: 'count', ok: count >= L12_MIN_PLAYERS, severity: 'error', label: tr('{count}/{L12_MAX_PLAYERS} jucători', { count, L12_MAX_PLAYERS }), detail: count < L12_MIN_PLAYERS ? tr('Minimum {L12_MIN_PLAYERS} pentru joc', { L12_MIN_PLAYERS }) : undefined },
+    { key: 'captain', ok: lineup.captainPlayerId != null, severity: 'warn', label: lineup.captainPlayerId != null ? tr('Căpitan ales') : tr('Niciun căpitan'), detail: lineup.captainPlayerId != null ? undefined : tr('Apasă „C” pe un rând') },
     {
       key: 'numbers',
       ok: count > 0 && missingNumbers === 0 && duplicates === 0,
       severity: 'error',
-      label: count === 0 ? 'Numere de echipament' : duplicates > 0 ? 'Numere dublate' : missingNumbers > 0 ? `${plural(missingNumbers, 'număr lipsă', 'numere lipsă')}` : 'Numere complete',
-      detail: count === 0 ? 'Se completează din lot' : duplicates > 0 ? 'Corectează rândurile marcate cu roșu' : undefined,
+      label: count === 0 ? tr('Numere de echipament') : duplicates > 0 ? tr('Numere dublate') : missingNumbers > 0 ? `${plural(missingNumbers, tr('număr lipsă'), tr('numere lipsă'))}` : tr('Numere complete'),
+      detail: count === 0 ? tr('Se completează din lot') : duplicates > 0 ? tr('Corectează rândurile marcate cu roșu') : undefined,
     },
     {
       key: 'licenses',
       ok: count > 0 && missingLicenses === 0,
       severity: 'warn',
-      label: count === 0 ? 'Licențe' : missingLicenses > 0 ? `${plural(missingLicenses, 'licență lipsă', 'licențe lipsă')}` : 'Licențe complete',
+      label: count === 0 ? tr('Licențe') : missingLicenses > 0 ? `${plural(missingLicenses, tr('licență lipsă'), tr('licențe lipsă'))}` : tr('Licențe complete'),
     },
-    { key: 'coach', ok: Boolean(headCoach), severity: 'warn', label: headCoach ? 'Antrenor principal' : 'Fără antrenor principal', detail: headCoach || undefined },
+    { key: 'coach', ok: Boolean(headCoach), severity: 'warn', label: headCoach ? tr('Antrenor principal') : tr('Fără antrenor principal'), detail: headCoach || undefined },
     // An expired visa can't play, so it blocks the sheet; a visa not on file only
     // nags. Nothing is „valid” on an empty sheet, so it doesn't count as passed.
     {
@@ -488,14 +489,14 @@ export default function L12Editor({
       ok: count > 0 && expiredVisas.length === 0 && missingVisas.length === 0,
       severity: expiredVisas.length ? 'error' : 'warn',
       label: count === 0
-        ? 'Vize medicale'
+        ? tr('Vize medicale')
         : expiredVisas.length
-          ? `${plural(expiredVisas.length, 'jucător cu viza expirată', 'jucători cu viza expirată')}`
-          : missingVisas.length ? `${plural(missingVisas.length, 'jucător fără viză', 'jucători fără viză')}` : 'Vize medicale valabile',
-      detail: expiredVisas.length ? `Nu pot juca: ${namesOf(expiredVisas)}` : missingVisas.length ? namesOf(missingVisas) : undefined,
+          ? `${plural(expiredVisas.length, tr('jucător cu viza expirată'), tr('jucători cu viza expirată'))}`
+          : missingVisas.length ? `${plural(missingVisas.length, tr('jucător fără viză'), tr('jucători fără viză'))}` : tr('Vize medicale valabile'),
+      detail: expiredVisas.length ? tr('Nu pot juca: {0}', { '0': namesOf(expiredVisas) }) : missingVisas.length ? namesOf(missingVisas) : undefined,
     },
     // The opponent belongs on the sheet too; it used to show only as a red field.
-    ...(opponentMissing == null ? [] : [{ key: 'opponent', ok: !opponentMissing, severity: 'warn' as const, label: opponentMissing ? 'Adversar lipsă' : 'Adversar completat', detail: opponentMissing ? 'Se completează sus, sub titlu' : undefined }]),
+    ...(opponentMissing == null ? [] : [{ key: 'opponent', ok: !opponentMissing, severity: 'warn' as const, label: opponentMissing ? tr('Adversar lipsă') : tr('Adversar completat'), detail: opponentMissing ? tr('Se completează sus, sub titlu') : undefined }]),
   ];
   const passed = checks.filter((c) => c.ok).length;
   // Errors block a usable sheet; warnings only nag.
@@ -503,19 +504,19 @@ export default function L12Editor({
   // Nothing picked yet: a to-do list, not a page of red errors the sheet hasn't earned.
   const pristine = count === 0;
   const pill = pristine
-    ? { bg: 'var(--c-surface-3)', fg: 'var(--c-ink-soft)', label: 'De completat' }
+    ? { bg: 'var(--c-surface-3)', fg: 'var(--c-ink-soft)', label: tr('De completat') }
     : expiredVisas.length
-      ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', label: 'Viză expirată' }
+      ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', label: tr('Viză expirată') }
       : !ready
-      ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', label: 'Incompletă' }
+      ? { bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', label: tr('Incompletă') }
       : passed === checks.length
-        ? { bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', label: 'Gata de joc' }
-        : { bg: 'var(--c-surface-tint)', fg: 'var(--c-brand-fg)', label: 'Se poate printa' };
+        ? { bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', label: tr('Gata de joc') }
+        : { bg: 'var(--c-surface-tint)', fg: 'var(--c-brand-fg)', label: tr('Se poate printa') };
 
   // `compact` (phones): only what is still open, no counters.
   const renderChecklist = (compact: boolean) => (
     <Card
-      title="Verificare foaie"
+      title={tr('Verificare foaie')}
       meta={<Text className="t-num text-[13px] font-semibold" style={{ color: 'var(--c-faint)' }}>{passed}/{checks.length}</Text>}
       actions={(
         <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: pill.bg }}>
@@ -543,10 +544,10 @@ export default function L12Editor({
       </View>
       {compact ? null : <View className="flex-row flex-wrap gap-1.5 mt-3.5 pt-3 border-t" style={{ borderColor: 'var(--c-border)' }}>
         {[
-          { label: 'U22/23', value: u22Count },
-          { label: 'Străini', value: foreignCount },
-          { label: 'Naturalizați', value: naturalizedCount },
-          { label: 'Staff', value: staffFilled },
+          { label: tr('U22/23'), value: u22Count },
+          { label: tr('Străini'), value: foreignCount },
+          { label: tr('Naturalizați'), value: naturalizedCount },
+          { label: tr('Staff'), value: staffFilled },
         ].map((chip) => (
           <View key={chip.label} className="flex-row items-center gap-1 rounded-[8px] px-2 py-1" style={{ backgroundColor: 'var(--c-surface-2)' }}>
             <Text className="text-[11.5px] font-medium" style={{ color: 'var(--c-muted)' }}>{chip.label}</Text>
@@ -559,39 +560,37 @@ export default function L12Editor({
 
   const rosterPanel = (
     <Card
-      title="Lotul echipei"
+      title={tr('Lotul echipei')}
       meta={rosterLoading ? undefined : <Text className="t-num text-[13px] font-semibold" style={{ color: 'var(--c-faint)' }}>{available.length}</Text>}
       actions={!rosterLoading && !full && roster.some((p) => !chosen.has(p.id)) ? (
         <Pressable onPress={autoFill} accessibilityRole="button" className="ui-press h-8 [@media(pointer:coarse)]:h-10 px-2.5 rounded-[9px] flex-row items-center gap-1" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
           <MaterialIcons name="auto-awesome" size={14} color="var(--c-brand-fg)" />
-          <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Completează automat</Text>
+          <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{tr('Completează automat')}</Text>
         </Pressable>
       ) : null}
     >
       {roster.length > 6 ? (
         <View className="mb-2.5">
-          <Input label="Caută în lot" placeholder="Caută după nume sau număr…" value={rosterQuery} onChange={setRosterQuery} />
+          <Input label={tr('Caută în lot')} placeholder={tr('Caută după nume sau număr…')} value={rosterQuery} onChange={setRosterQuery} />
         </View>
       ) : null}
       {rosterLoading ? (
         <View className="py-6 items-center"><ActivityIndicator color="var(--c-brand-fg)" /></View>
       ) : roster.length === 0 ? (
-        <Text className="text-[13px]" style={{ color: 'var(--c-muted)' }}>Echipa nu are jucători în lot.</Text>
+        <Text className="text-[13px]" style={{ color: 'var(--c-muted)' }}>{tr('Echipa nu are jucători în lot.')}</Text>
       ) : available.length === 0 ? (
         <Text className="text-[13px]" style={{ color: 'var(--c-muted)' }}>
-          {rosterQuery.trim() ? 'Niciun jucător găsit.' : 'Toți jucătorii din lot sunt pe foaie.'}
+          {rosterQuery.trim() ? tr('Niciun jucător găsit.') : tr('Toți jucătorii din lot sunt pe foaie.')}
         </Text>
       ) : (
         <View className="gap-1">
           {full ? (
-            <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-warning-fg)' }}>
-              Foaia e plină (12). Scoate un jucător ca să adaugi altul.
-            </Text>
+            <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-warning-fg)' }}>{tr('Foaia e plină (12). Scoate un jucător ca să adaugi altul.')}</Text>
           ) : null}
           {available.map((player) => {
             const visa = medicalStatus(player.medicalCheckExpiry);
             const inactive = Boolean(player.status) && player.status!.toLowerCase() !== 'active';
-            const note = inactive ? 'Inactiv' : visa === 'expired' ? 'Viză expirată' : visa === 'missing' ? 'Fără viză' : player.position;
+            const note = inactive ? tr('Inactiv') : visa === 'expired' ? tr('Viză expirată') : visa === 'missing' ? tr('Fără viză') : player.position;
             const noteTone = inactive ? 'var(--c-muted)' : visa === 'expired' ? 'var(--c-danger-fg)' : visa === 'missing' ? 'var(--c-warning-fg)' : 'var(--c-muted)';
             return (
               <Pressable
@@ -599,7 +598,7 @@ export default function L12Editor({
                 onPress={() => addPlayer(player)}
                 disabled={full}
                 accessibilityRole="button"
-                accessibilityLabel={`Adaugă ${player.firstName} ${player.lastName}`}
+                accessibilityLabel={tr('Adaugă {0} {1}', { '0': player.firstName, '1': player.lastName })}
                 className="ui-press rounded-[10px] px-2.5 py-2 flex-row items-center gap-2.5 hover:bg-[var(--c-surface-2)] text-left"
                 style={{ opacity: full ? 0.45 : 1 } as any}
               >
@@ -630,13 +629,13 @@ export default function L12Editor({
         <View className="2xl:hidden">{renderChecklist(true)}</View>
 
         {showMatchDetails ? (
-          <Card title="Detalii joc">
+          <Card title={tr('Detalii joc')}>
             <View>
               <View className="min-w-0">
-                <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Competiția</Text>
+                <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>{tr('Competiția')}</Text>
                 <Input
-                  label="Competiția"
-                  placeholder="ex. Campionatul Național 2026/2027"
+                  label={tr('Competiția')}
+                  placeholder={tr('ex. Campionatul Național 2026/2027')}
                   maxLength={255}
                   value={lineup.competition ?? ''}
                   onChange={(competition) => onChange({ ...lineup, competition })}
@@ -647,7 +646,7 @@ export default function L12Editor({
         ) : null}
 
         <Card
-          title="Jucători"
+          title={tr('Jucători')}
           padded={false}
           meta={<Text className="t-num text-[13px] font-semibold" style={{ color: count > L12_MAX_PLAYERS ? 'var(--c-danger-fg)' : 'var(--c-faint)' }}>{count}/{L12_MAX_PLAYERS}</Text>}
           actions={count > 0 ? (
@@ -655,12 +654,12 @@ export default function L12Editor({
               {count > 1 ? (
                 <Pressable onPress={() => onChange({ ...lineup, players: sortLineupPlayers(lineup.players) })} accessibilityRole="button" className="ui-press h-8 px-2 rounded-[9px] flex-row items-center gap-1 hover:bg-[var(--c-surface-2)]">
                   <MaterialIcons name="sort" size={15} color="var(--c-brand-fg)" />
-                  <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Ordonează</Text>
+                  <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{tr('Ordonează')}</Text>
                 </Pressable>
               ) : null}
               <Pressable onPress={clearSheet} accessibilityRole="button" className="ui-press h-8 px-2 rounded-[9px] flex-row items-center gap-1 hover:bg-[var(--c-surface-2)]">
                 <MaterialIcons name="delete-outline" size={15} color="var(--c-muted)" />
-                <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Golește</Text>
+                <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>{tr('Golește')}</Text>
               </Pressable>
             </View>
           ) : null}
@@ -668,14 +667,14 @@ export default function L12Editor({
           {count > 0 ? (
             <>
               <View className="hidden md:flex flex-row items-center gap-2.5 px-4 py-2" style={{ backgroundColor: 'var(--c-surface-2)', borderTopWidth: 1, borderTopColor: 'var(--c-border)' } as any}>
-                <Text className={`t-eyebrow ${COL.slot} text-center`} style={{ color: 'var(--c-faint)' }}>Rd.</Text>
-                <Text className={`t-eyebrow ${COL.number} text-center`} style={{ color: 'var(--c-faint)' }}>Tricou</Text>
-                <Text className="t-eyebrow flex-[1.4] min-w-[140px]" style={{ color: 'var(--c-faint)' }}>Jucător</Text>
-                <Text className={`t-eyebrow ${COL.license}`} style={{ color: 'var(--c-faint)' }}>Licență</Text>
-                <Text className={`t-eyebrow ${COL.citizenship} text-center`} style={{ color: 'var(--c-faint)' }}>Cetăț.</Text>
+                <Text className={`t-eyebrow ${COL.slot} text-center`} style={{ color: 'var(--c-faint)' }}>{tr('Rd.')}</Text>
+                <Text className={`t-eyebrow ${COL.number} text-center`} style={{ color: 'var(--c-faint)' }}>{tr('Tricou')}</Text>
+                <Text className="t-eyebrow flex-[1.4] min-w-[140px]" style={{ color: 'var(--c-faint)' }}>{tr('Jucător')}</Text>
+                <Text className={`t-eyebrow ${COL.license}`} style={{ color: 'var(--c-faint)' }}>{tr('Licență')}</Text>
+                <Text className={`t-eyebrow ${COL.citizenship} text-center`} style={{ color: 'var(--c-faint)' }}>{tr('Cetăț.')}</Text>
                 <Text className={`t-eyebrow ${COL.flag} text-center`} style={{ color: 'var(--c-faint)' }}>U22</Text>
-                <Text className={`t-eyebrow ${COL.flag} text-center`} style={{ color: 'var(--c-faint)' }}>Nat.</Text>
-                <Text className={`t-eyebrow ${COL.captain} text-center`} style={{ color: 'var(--c-faint)' }}>Căp.</Text>
+                <Text className={`t-eyebrow ${COL.flag} text-center`} style={{ color: 'var(--c-faint)' }}>{tr('Nat.')}</Text>
+                <Text className={`t-eyebrow ${COL.captain} text-center`} style={{ color: 'var(--c-faint)' }}>{tr('Căp.')}</Text>
                 <View className={COL.remove} />
               </View>
               {rows.map(({ player, flags }, index) => (
@@ -700,16 +699,16 @@ export default function L12Editor({
                 </View>
                 <View className="flex-1 min-w-0">
                   <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>
-                    {count === 0 ? 'Niciun jucător pe listă' : `${plural(emptySlots, 'loc liber', 'locuri libere')}`}
+                    {count === 0 ? tr('Niciun jucător pe listă') : `${plural(emptySlots, tr('loc liber'), tr('locuri libere'))}`}
                   </Text>
                   <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
-                    {count === 0 ? 'Apasă pe cei din lot sau lasă „Completează automat” să o facă.' : 'Adaugă din lotul echipei.'}
+                    {count === 0 ? tr('Apasă pe cei din lot sau lasă „Completează automat” să o facă.') : tr('Adaugă din lotul echipei.')}
                   </Text>
                 </View>
                 {!rosterLoading && roster.some((p) => !chosen.has(p.id)) ? (
                   // The Button primitive keeps its name on a phone; the hand-built one went
                   // icon-only below 640px with nothing for a screen reader to read.
-                  <Button size="sm" variant="primary" icon="auto-awesome" label="Completează" iconOnlyOnMobile accessibilityLabel="Completează automat" onPress={autoFill} />
+                  <Button size="sm" variant="primary" icon="auto-awesome" label={tr('Completează')} iconOnlyOnMobile accessibilityLabel={tr('Completează automat')} onPress={autoFill} />
 
                 ) : null}
               </View>
@@ -720,7 +719,7 @@ export default function L12Editor({
         {/* Phones/tablets: the picker sits right under the sheet it fills. */}
         <View className="2xl:hidden">{rosterPanel}</View>
 
-        <Card title="Staff tehnic" meta={<Text className="t-num text-[13px] font-semibold" style={{ color: 'var(--c-faint)' }}>{staffFilled}/{L12_STAFF_ROLES.length}</Text>}>
+        <Card title={tr('Staff tehnic')} meta={<Text className="t-num text-[13px] font-semibold" style={{ color: 'var(--c-faint)' }}>{staffFilled}/{L12_STAFF_ROLES.length}</Text>}>
           <View className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3">
             {staffShown.map(({ key, label }) => {
               const entry = lineup.staff[key] ?? { name: '', license: '' };
@@ -728,15 +727,15 @@ export default function L12Editor({
               return (
                 <View key={key} className="min-w-0">
                   <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>
-                    {label}{key === 'doctor' ? ' / kineto' : ''}
+                    {label}{key === 'doctor' ? tr(' / kineto') : ''}
                     {required ? <Text style={{ color: 'var(--c-danger-fg)' }}> *</Text> : null}
                   </Text>
                   <View className="flex-row gap-2">
                     <View className="flex-1 min-w-0">
-                      <Input label={`${label} — nume`} placeholder="Nume și prenume" maxLength={120} value={entry.name} onChange={(name) => setStaff(key, { name })} />
+                      <Input label={`${label} — nume`} placeholder={tr('Nume și prenume')} maxLength={120} value={entry.name} onChange={(name) => setStaff(key, { name })} />
                     </View>
                     <View className="w-[112px] shrink-0">
-                      <Input label={`${label} — licență`} placeholder="Licență" maxLength={40} value={entry.license} onChange={(license) => setStaff(key, { license })} />
+                      <Input label={tr('{label} — licență', { label })} placeholder={tr('Licență')} maxLength={40} value={entry.license} onChange={(license) => setStaff(key, { license })} />
                     </View>
                   </View>
                 </View>
@@ -752,7 +751,7 @@ export default function L12Editor({
             >
               <MaterialIcons name={allStaff ? 'expand-less' : 'expand-more'} size={18} color="var(--c-brand-fg)" />
               <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
-                {allStaff ? 'Doar rolurile completate' : `Alte roluri (${staffHidden})`}
+                {allStaff ? tr('Doar rolurile completate') : tr('Alte roluri ({staffHidden})', { staffHidden })}
               </Text>
             </Pressable>
           ) : null}

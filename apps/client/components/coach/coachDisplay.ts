@@ -13,6 +13,7 @@
 import type { CalendarEvent } from '../../services/eventsApi';
 import { eventTypeLabel, getEventDate } from './coachUtils';
 
+import { tr, appLocale } from '../../i18n';
 /**
  * `fg`/`bg` are the event type's accent — a match is amber, a camp sky, admin
  * purple, a training the brand indigo — so a list of sessions can be scanned
@@ -39,7 +40,7 @@ export function eventTypeMeta(type: CalendarEvent['type']): EventTypeMeta {
 export function formatCoachDay(value: string) {
   const date = getEventDate(value);
   if (!date) return value;
-  return new Intl.DateTimeFormat('ro-RO', { day: '2-digit', month: 'short' }).format(date);
+  return new Intl.DateTimeFormat(appLocale(), { day: '2-digit', month: 'short' }).format(date);
 }
 
 /**
@@ -50,18 +51,18 @@ export function attendanceStatusTone(status?: string | null) {
   const normalized = String(status ?? '').trim().toLowerCase();
 
   if (normalized === 'present' || normalized === 'prezent') {
-    return { label: 'Prezent', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', icon: 'check-circle' as const };
+    return { label: tr('Prezent'), bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', icon: 'check-circle' as const };
   }
   if (normalized === 'late') {
-    return { label: 'Întârziat', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', icon: 'check-circle' as const };
+    return { label: tr('Întârziat'), bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', icon: 'check-circle' as const };
   }
   if (normalized === 'absent') {
-    return { label: 'Absent', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', icon: 'cancel' as const };
+    return { label: tr('Absent'), bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', icon: 'cancel' as const };
   }
   if (normalized === 'medical' || normalized === 'excused') {
-    return { label: 'Motivat', bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', icon: 'medical-services' as const };
+    return { label: tr('Motivat'), bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', icon: 'medical-services' as const };
   }
-  return { label: 'Fără marcaj', bg: 'var(--c-surface-3)', fg: 'var(--c-muted)', icon: 'radio-button-unchecked' as const };
+  return { label: tr('Fără marcaj'), bg: 'var(--c-surface-3)', fg: 'var(--c-muted)', icon: 'radio-button-unchecked' as const };
 }
 
 export function isPresentStatus(status?: string | null) {
@@ -81,10 +82,10 @@ export function formatRelativeDay(value: string, now = new Date()) {
   const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const diff = Math.round((startOf(date) - startOf(now)) / 86400000);
 
-  if (diff === 0) return 'Azi';
-  if (diff === 1) return 'Mâine';
-  if (diff === -1) return 'Ieri';
-  if (diff > 1 && diff <= 6) return `În ${diff} zile`;
+  if (diff === 0) return tr('Azi');
+  if (diff === 1) return tr('Mâine');
+  if (diff === -1) return tr('Ieri');
+  if (diff > 1 && diff <= 6) return tr('În {diff} zile', { diff });
   return null;
 }
 

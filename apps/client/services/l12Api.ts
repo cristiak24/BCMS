@@ -1,5 +1,6 @@
 import { apiClient } from './apiClient';
 
+import { tr } from '../i18n';
 /**
  * Formular L-12 ("Lista oficială a echipei pentru joc") — see
  * apps/server/src/routes/l12.ts. One sheet per match plus a per-team
@@ -9,15 +10,15 @@ import { apiClient } from './apiClient';
 export const L12_MAX_PLAYERS = 12;
 
 export const L12_STAFF_ROLES = [
-    { key: 'headCoach', label: 'Antrenor principal' },
-    { key: 'assistantCoach1', label: 'Antrenor secund 1' },
-    { key: 'assistantCoach2', label: 'Antrenor secund 2' },
-    { key: 'technicalDirector', label: 'Director tehnic' },
-    { key: 'sportsDirector', label: 'Director sportiv' },
-    { key: 'manager', label: 'Manager' },
-    { key: 'doctor', label: 'Medic' },
-    { key: 'trainer', label: 'Preparator' },
-    { key: 'statistician', label: 'Statistician' },
+    { key: 'headCoach', label: tr('Antrenor principal') },
+    { key: 'assistantCoach1', label: tr('Antrenor secund 1') },
+    { key: 'assistantCoach2', label: tr('Antrenor secund 2') },
+    { key: 'technicalDirector', label: tr('Director tehnic') },
+    { key: 'sportsDirector', label: tr('Director sportiv') },
+    { key: 'manager', label: tr('Manager') },
+    { key: 'doctor', label: tr('Medic') },
+    { key: 'trainer', label: tr('Preparator') },
+    { key: 'statistician', label: tr('Statistician') },
 ] as const;
 
 export type L12StaffRole = (typeof L12_STAFF_ROLES)[number]['key'];

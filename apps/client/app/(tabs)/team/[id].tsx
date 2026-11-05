@@ -22,6 +22,7 @@ import {
 import { pluralWord } from '../../../utils/plural';
 import { useSession } from '../../../context/AuthContext';
 
+import { tr } from '../../../i18n';
 /**
  * One of the player's own teams: squad, coach, schedule and their own
  * attendance record for that squad.
@@ -35,11 +36,11 @@ import { useSession } from '../../../context/AuthContext';
 type TabKey = 'roster' | 'events' | 'attendance' | 'stats' | 'standings';
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'roster', label: 'Lot', icon: 'groups' },
-  { key: 'events', label: 'Evenimente', icon: 'event' },
-  { key: 'attendance', label: 'Prezența mea', icon: 'fact-check' },
-  { key: 'stats', label: 'Statistici', icon: 'sports-basketball' },
-  { key: 'standings', label: 'Clasament', icon: 'leaderboard' },
+  { key: 'roster', label: tr('Lot'), icon: 'groups' },
+  { key: 'events', label: tr('Evenimente'), icon: 'event' },
+  { key: 'attendance', label: tr('Prezența mea'), icon: 'fact-check' },
+  { key: 'stats', label: tr('Statistici'), icon: 'sports-basketball' },
+  { key: 'standings', label: tr('Clasament'), icon: 'leaderboard' },
 ];
 
 function EventRow({ event, trailing, note }: { event: MyTeamEvent; trailing?: React.ReactNode; note?: string | null }) {
@@ -109,7 +110,7 @@ function TeammateTile({ player }: { player: MyTeamDetail['roster'][number] }) {
         </Text>
         {player.isMe ? (
           <View className="rounded-full px-2 py-0.5 shrink-0" style={{ backgroundColor: 'var(--c-brand-fg)' }}>
-            <Text className="text-[10px] font-bold uppercase tracking-[0.06em]" style={{ color: 'var(--c-surface)' }}>Tu</Text>
+            <Text className="text-[10px] font-bold uppercase tracking-[0.06em]" style={{ color: 'var(--c-surface)' }}>{tr('Tu')}</Text>
           </View>
         ) : null}
       </View>
@@ -125,7 +126,7 @@ function TeammateTile({ player }: { player: MyTeamDetail['roster'][number] }) {
 
 function DetailSkeleton() {
   return (
-    <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă echipa">
+    <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă echipa')}>
             <Skeleton className="h-11 w-full rounded-[12px]" />
       <View className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
         {Array.from({ length: 6 }).map((_, index) => (
@@ -142,7 +143,7 @@ export default function PlayerTeamDetailScreen() {
   const teamId = Number(id);
   // A parent is looking at their child's squad, not their own.
   const isParent = useSession().session?.role === 'parent';
-  const ownAttendanceLabel = isParent ? 'Prezența copilului' : 'Prezența mea';
+  const ownAttendanceLabel = isParent ? tr('Prezența copilului') : tr('Prezența mea');
 
   const [team, setTeam] = useState<MyTeamDetail | null>(null);
   const [tab, setTab] = useState<TabKey>('roster');
@@ -156,7 +157,7 @@ export default function PlayerTeamDetailScreen() {
     try {
       setTeam(await teamsApi.getMyTeamDetail(teamId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Echipa nu a putut fi încărcată.');
+      setError(err instanceof Error ? err.message : tr('Echipa nu a putut fi încărcată.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -187,24 +188,24 @@ export default function PlayerTeamDetailScreen() {
         <Pressable
           onPress={() => router.push('/team')}
           accessibilityRole="button"
-          accessibilityLabel={isParent ? 'Înapoi la echipele copilului' : 'Înapoi la echipele mele'}
+          accessibilityLabel={isParent ? tr('Înapoi la echipele copilului') : tr('Înapoi la echipele mele')}
           className="flex-row items-center gap-1.5 self-start mb-3 min-h-[44px] lg:h-8 px-2 -ml-2 rounded-[9px]"
         >
           <MaterialIcons name="arrow-back" size={17} color="var(--c-muted)" />
-          <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>{isParent ? 'Echipele copilului' : 'Echipele mele'}</Text>
+          <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>{isParent ? tr('Echipele copilului') : tr('Echipele mele')}</Text>
         </Pressable>
 
         <PageHero
-          eyebrow="Echipa mea"
-          title={team?.name || 'Echipă'}
-          subtitle={team ? team.leagueName || (isParent ? 'Echipa copilului' : 'Echipa ta') : 'Se încarcă...'}
+          eyebrow={tr('Echipa mea')}
+          title={team?.name || tr('Echipă')}
+          subtitle={team ? team.leagueName || (isParent ? tr('Echipa copilului') : tr('Echipa ta')) : tr('Se încarcă...')}
           actions={
             <Pressable
               onPress={() => loadData(true)}
               className="ui-press hidden sm:flex w-10 h-10 rounded-[11px] border items-center justify-center"
               style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
               accessibilityRole="button"
-              accessibilityLabel="Reîmprospătează"
+              accessibilityLabel={tr('Reîmprospătează')}
             >
               {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
             </Pressable>
@@ -221,9 +222,9 @@ export default function PlayerTeamDetailScreen() {
                     <MaterialIcons name="sports" size={17} color="var(--c-muted)" />
                   </View>
                   <View className="flex-1 min-w-0">
-                    <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Antrenor</Text>
+                    <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{tr('Antrenor')}</Text>
                     <Text className="f-display text-[14.5px] font-bold mt-0.5" style={{ color: 'var(--c-ink-strong)' }} numberOfLines={1}>
-                      {team.coach?.name || 'Nealocat'}
+                      {team.coach?.name || tr('Nealocat')}
                     </Text>
                   </View>
                 </View>
@@ -240,7 +241,7 @@ export default function PlayerTeamDetailScreen() {
 
               {/* Three short numbers stay side by side even at 375px. */}
               <StatStrip className="grid-cols-3">
-                <GlassStat value={team.playerCount} label={team.playerCount === 1 ? 'Jucător în lot' : 'Jucători în lot'} dot="var(--c-brand-surface)" />
+                <GlassStat value={team.playerCount} label={team.playerCount === 1 ? tr('Jucător în lot') : tr('Jucători în lot')} dot="var(--c-brand-surface)" />
                 <GlassStat
                   value={team.attendance.rate == null ? '—' : team.attendance.rate}
                   suffix={team.attendance.rate == null ? undefined : '%'}
@@ -252,8 +253,8 @@ export default function PlayerTeamDetailScreen() {
                     as if the count were that single event. */}
                 <GlassStat
                   value={team.upcomingEvents.length}
-                  label={team.upcomingEvents.length === 1 ? 'Eveniment viitor' : 'Evenimente viitoare'}
-                  hint={team.upcomingEvents[0] ? `Următorul: ${formatEventDateTime(team.upcomingEvents[0].startTime)}` : undefined}
+                  label={team.upcomingEvents.length === 1 ? tr('Eveniment viitor') : tr('Evenimente viitoare')}
+                  hint={team.upcomingEvents[0] ? tr('Următorul: {0}', { '0': formatEventDateTime(team.upcomingEvents[0].startTime) }) : undefined}
                   dot="var(--c-success)"
                 />
               </StatStrip>
@@ -265,13 +266,13 @@ export default function PlayerTeamDetailScreen() {
           <DetailSkeleton />
         ) : error ? (
           <ErrorState
-            title="Nu am putut încărca echipa"
+            title={tr('Nu am putut încărca echipa')}
             message={error}
-            actionLabel="Reîncearcă"
+            actionLabel={tr('Reîncearcă')}
             onAction={() => loadData(true)}
           />
         ) : !team ? (
-          <EmptyState icon="groups" title="Echipa nu este disponibilă" message={isParent ? 'Întoarce-te la lista echipelor copilului.' : 'Întoarce-te la lista echipelor tale.'} />
+          <EmptyState icon="groups" title={tr('Echipa nu este disponibilă')} message={isParent ? tr('Întoarce-te la lista echipelor copilului.') : tr('Întoarce-te la lista echipelor tale.')} />
         ) : (
           <View className="gap-4">
             {/* Segmented control: scrolls horizontally on a 375px viewport
@@ -304,7 +305,7 @@ export default function PlayerTeamDetailScreen() {
 
             {tab === 'roster' ? (
               team.roster.length === 0 ? (
-                <EmptyState icon="groups" compact title="Lotul este gol" message="Niciun jucător nu este alocat acestei echipe deocamdată." />
+                <EmptyState icon="groups" compact title={tr('Lotul este gol')} message={tr('Niciun jucător nu este alocat acestei echipe deocamdată.')} />
               ) : (
                 <View className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
                   {team.roster.map((player) => <TeammateTile key={player.id} player={player} />)}
@@ -315,18 +316,18 @@ export default function PlayerTeamDetailScreen() {
             {tab === 'events' ? (
               <View className="gap-4">
                 <View className="gap-2.5">
-                  <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Urmează</Text>
+                  <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{tr('Urmează')}</Text>
                   {team.upcomingEvents.length === 0 ? (
-                    <EmptyState icon="event-busy" compact title="Niciun eveniment programat" message="Antrenamentele și meciurile viitoare apar aici." />
+                    <EmptyState icon="event-busy" compact title={tr('Niciun eveniment programat')} message={tr('Antrenamentele și meciurile viitoare apar aici.')} />
                   ) : (
                     team.upcomingEvents.map((event) => <EventRow key={event.id} event={event} />)
                   )}
                 </View>
 
                 <View className="gap-2.5">
-                  <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Recente</Text>
+                  <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{tr('Recente')}</Text>
                   {team.recentEvents.length === 0 ? (
-                    <EmptyState icon="history" compact title="Niciun eveniment trecut" message="Istoricul echipei apare aici după primele sesiuni." />
+                    <EmptyState icon="history" compact title={tr('Niciun eveniment trecut')} message={tr('Istoricul echipei apare aici după primele sesiuni.')} />
                   ) : (
                     team.recentEvents.map((event) => (
                       <EventRow
@@ -347,11 +348,11 @@ export default function PlayerTeamDetailScreen() {
                     rate above covers every session ever marked — say so, or a
                     player whose history is longer reads the two as a mismatch. */}
                 <View className="flex-row items-center justify-between gap-3 flex-wrap">
-                  <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Sesiuni recente marcate</Text>
+                  <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{tr('Sesiuni recente marcate')}</Text>
                   <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>
                     {team.attendance.total
-                      ? `${team.attendance.present}/${team.attendance.total} ${pluralWord(team.attendance.total, 'sesiune marcată', 'sesiuni marcate')} în total`
-                      : 'nicio sesiune marcată'}
+                      ? tr('{0}/{1} {2} în total', { '0': team.attendance.present, '1': team.attendance.total, '2': pluralWord(team.attendance.total, 'sesiune marcată', 'sesiuni marcate') })
+                      : tr('nicio sesiune marcată')}
                   </Text>
                 </View>
 
@@ -359,8 +360,8 @@ export default function PlayerTeamDetailScreen() {
                   <EmptyState
                     icon="fact-check"
                     compact
-                    title="Nicio prezență marcată"
-                    message="Sesiunile la care antrenorul îți marchează prezența în această echipă apar aici."
+                    title={tr('Nicio prezență marcată')}
+                    message={tr('Sesiunile la care antrenorul îți marchează prezența în această echipă apar aici.')}
                   />
                 ) : (
                   markedEvents.map((event) => (

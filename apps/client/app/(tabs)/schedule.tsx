@@ -39,10 +39,11 @@ import {
 } from '../../components/schedule/scheduleShared';
 import { plural } from '../../utils/plural';
 
+import { tr, appLocale } from '../../i18n';
 type EventFilter = 'all' | 'training' | 'match' | 'camp';
 type ScheduleView = 'month' | 'week' | 'agenda';
 
-const RO_LOCALE = 'ro-RO';
+const RO_LOCALE = appLocale();
 
 function getSessionTeamIds(user: AuthUser | null) {
   return new Set(
@@ -159,17 +160,17 @@ function getNextMatchLabel(match: CalendarEvent | null) {
 
   const diffMs = getEventTimestamp(match) - Date.now();
   if (diffMs <= 0) {
-    return 'Acum';
+    return tr('Acum');
   }
 
   // Readable, not "5z" / "40h".
   const hours = Math.ceil(diffMs / 3600000);
   if (hours < 24) {
-    return `în ${plural(hours, 'oră', 'ore')}`;
+    return tr('în {0}', { '0': plural(hours, 'oră', 'ore') });
   }
 
   const days = Math.ceil(hours / 24);
-  return days === 1 ? 'mâine' : `în ${plural(days, 'zi', 'zile')}`;
+  return days === 1 ? tr('mâine') : tr('în {0}', { '0': plural(days, 'zi', 'zile') });
 }
 
 
@@ -199,7 +200,7 @@ function MonthDayRow({
     <DenseRow selected={selected} className="items-start">
       <View className="w-11 shrink-0 items-center pt-1">
         <Text className="t-num text-[18px] font-bold leading-none" style={{ color: isToday ? 'var(--c-brand-fg)' : 'var(--c-ink-strong)' }}>{date.getDate()}</Text>
-        <Text className="t-label mt-1" style={{ color: isToday ? 'var(--c-brand-fg)' : 'var(--c-muted)' }}>{isToday ? 'Azi' : weekday.charAt(0).toUpperCase() + weekday.slice(1)}</Text>
+        <Text className="t-label mt-1" style={{ color: isToday ? 'var(--c-brand-fg)' : 'var(--c-muted)' }}>{isToday ? tr('Azi') : weekday.charAt(0).toUpperCase() + weekday.slice(1)}</Text>
       </View>
       <View className="flex-1 min-w-0 gap-0.5">
         {events.map((event) => {
@@ -216,7 +217,7 @@ function MonthDayRow({
               <View className="flex-1 min-w-0">
                 <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{event.title}</Text>
                 <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-                  {[meta.label, formatTimeRange(event.startTime, event.endTime), event.location || 'Teren club'].join(' · ')}
+                  {[meta.label, formatTimeRange(event.startTime, event.endTime), event.location || tr('Teren club')].join(' · ')}
                 </Text>
               </View>
               <MaterialIcons name="chevron-right" size={18} color="var(--c-faint)" />
@@ -251,7 +252,7 @@ export default function ScheduleScreen() {
 
   // Global header search box drives the schedule search, same as admin.
   useEffect(() => {
-    setSearchPlaceholder('Caută evenimente...');
+    setSearchPlaceholder(tr('Caută evenimente...'));
     return () => {
       setSearchPlaceholder(DEFAULT_SEARCH_PLACEHOLDER);
       setSearchValue('');
@@ -340,7 +341,7 @@ export default function ScheduleScreen() {
       // like "signal is aborted without reason", which rendered verbatim in the
       // error banner. Log the real error, show the user a stable one.
       console.error('[schedule] Failed to load events:', err);
-      setError('Programul nu a putut fi încărcat. Verifică conexiunea și încearcă din nou.');
+      setError(tr('Programul nu a putut fi încărcat. Verifică conexiunea și încearcă din nou.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -360,7 +361,7 @@ export default function ScheduleScreen() {
     if (loadedFromRef.current && from < loadedFromRef.current) {
       ensureHistory(from).catch((err) => {
         console.error('[schedule] Failed to load older events:', err);
-        setError('Programul nu a putut fi încărcat. Verifică conexiunea și încearcă din nou.');
+        setError(tr('Programul nu a putut fi încărcat. Verifică conexiunea și încearcă din nou.'));
       });
     }
   }, [ensureHistory, loading, scheduleView, viewDate]);
@@ -435,7 +436,7 @@ export default function ScheduleScreen() {
       all = await ensureHistory(historyLimit());
     } catch (err) {
       console.error('[schedule] Failed to load events for export:', err);
-      setError('Programul nu a putut fi încărcat. Verifică conexiunea și încearcă din nou.');
+      setError(tr('Programul nu a putut fi încărcat. Verifică conexiunea și încearcă din nou.'));
       return;
     }
     const exported = all
@@ -443,7 +444,7 @@ export default function ScheduleScreen() {
       .filter((event) => eventMatchesSearch(event, searchValue));
     const ok = triggerFileDownload(filename, buildICSCalendar(exported), 'text/calendar;charset=utf-8;');
     if (!ok) {
-      setError('Exportul calendarului este disponibil momentan doar pe web.');
+      setError(tr('Exportul calendarului este disponibil momentan doar pe web.'));
     }
   };
 
@@ -457,16 +458,16 @@ export default function ScheduleScreen() {
             there); the figures stay a desktop summary. */}
         {(
           <PageHero
-            eyebrow="Program"
-            title={isCoach ? 'Programul echipelor' : normalizeRole(session?.role) === 'parent' ? 'Programul copilului' : 'Programul meu'}
-            subtitle={isMobile ? undefined : 'Antrenamente, meciuri și cantonamente, într-un singur loc.'}
+            eyebrow={tr('Program')}
+            title={isCoach ? tr('Programul echipelor') : normalizeRole(session?.role) === 'parent' ? tr('Programul copilului') : tr('Programul meu')}
+            subtitle={isMobile ? undefined : tr('Antrenamente, meciuri și cantonamente, într-un singur loc.')}
             className={isMobile ? 'mb-3' : undefined}
           >
             {isMobile ? null : (
               <StatStrip className="grid-cols-3">
-                <GlassStat value={monthEventCount} label={`Evenimente în ${formatMonthName(viewDate)}`} dot="var(--c-brand-surface)" />
-                <GlassStat value={upcomingEvents.length} label="Evenimente viitoare" dot="var(--c-success)" />
-                <GlassStat value={getNextMatchLabel(nextMatch)} label="Următorul meci" dot="var(--c-purple)" />
+                <GlassStat value={monthEventCount} label={tr('Evenimente în {0}', { '0': formatMonthName(viewDate) })} dot="var(--c-brand-surface)" />
+                <GlassStat value={upcomingEvents.length} label={tr('Evenimente viitoare')} dot="var(--c-success)" />
+                <GlassStat value={getNextMatchLabel(nextMatch)} label={tr('Următorul meci')} dot="var(--c-purple)" />
               </StatStrip>
             )}
           </PageHero>
@@ -525,26 +526,23 @@ export default function ScheduleScreen() {
             <View>
               <View className="mb-3 flex-row flex-wrap items-end justify-between gap-3">
                 <View>
-                  <Text className="f-display text-[17px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any}>
-                    Evenimentele lunii
-                  </Text>
+                  <Text className="f-display text-[17px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any}>{tr('Evenimentele lunii')}</Text>
                   <Text className="mt-0.5 text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>
-                    {plural(monthEventCount, 'eveniment', 'evenimente')} în {formatMonthName(viewDate)} {viewDate.getFullYear()}
-                  </Text>
+                    {tr('{0} în {1} {2}', { '0': plural(monthEventCount, tr('eveniment'), tr('evenimente')), '1': formatMonthName(viewDate), '2': viewDate.getFullYear() })}</Text>
                 </View>
                 <Pressable onPress={() => setScheduleView('agenda')} accessibilityRole="button" className="h-10 lg:h-8 justify-center px-1">
-                  <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Vezi toate lunile</Text>
+                  <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{tr('Vezi toate lunile')}</Text>
                 </Pressable>
               </View>
 
               {loading ? (
-                <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start" accessibilityRole="progressbar" accessibilityLabel="Se încarcă evenimentele">
+                <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă evenimentele')}>
                   {Array.from({ length: 6 }).map((_, index) => (
                     <Skeleton key={index} className="h-[120px] w-full rounded-[14px]" />
                   ))}
                 </View>
               ) : monthDayGroups.length ? (
-                <DenseList label="Evenimentele lunii">
+                <DenseList label={tr('Evenimentele lunii')}>
                   {monthDayGroups.map((day) => (
                     <MonthDayRow
                       key={day.dateKey}
@@ -560,8 +558,8 @@ export default function ScheduleScreen() {
                 <EmptyState
                   icon="event-busy"
                   compact
-                  title="Nicio zi cu evenimente în această lună"
-                  message="Schimbă luna din bara de sus sau încearcă alt filtru."
+                  title={tr('Nicio zi cu evenimente în această lună')}
+                  message={tr('Schimbă luna din bara de sus sau încearcă alt filtru.')}
                 />
               )}
             </View>

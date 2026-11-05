@@ -17,7 +17,7 @@ import './theme/palette.css';
 import './theme/density.css';
 import './theme/dark.css';
 import './theme/dark-extras.css';
-import App from './App';
+import { initI18n } from '../i18n';
 import { captureInstallPrompt } from './pwa/installApp';
 import { wakeServer } from '../services/apiClient';
 
@@ -28,11 +28,16 @@ captureInstallPrompt();
 // and the user types their password.
 void wakeServer();
 
-createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// The English dictionary (when chosen) loads before any screen module runs, so
+// labels built at module level are translated too.
+void initI18n().then(async () => {
+  const { default: App } = await import('./App');
+  createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+});
 
 if (!import.meta.env.DEV && 'serviceWorker' in navigator && window.location.protocol !== 'file:') {
   window.addEventListener('load', () => {

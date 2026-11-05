@@ -8,6 +8,7 @@ import BoxScoreView from './BoxScoreView';
 import { useScorer } from './useScorer';
 import { plural } from '../../utils/plural';
 
+import { tr } from '../../i18n';
 /**
  * The live scorer. One rule everywhere: tap the player, then what they did —
  * two taps per action. The selection clears after each action so a nervous
@@ -22,37 +23,37 @@ const BONUS_AT = 4;
 const OUR_ACTIONS_SIMPLE: { type: EventType; label: string; tone: 'score' | 'foul' | 'plain' }[] = [
   { type: 'p2', label: '+2', tone: 'score' },
   { type: 'p3', label: '+3', tone: 'score' },
-  { type: 'p1', label: '+1 liber', tone: 'score' },
-  { type: 'foul', label: 'Fault', tone: 'foul' },
+  { type: 'p1', label: tr('+1 liber'), tone: 'score' },
+  { type: 'foul', label: tr('Fault'), tone: 'foul' },
 ];
 
 const OUR_ACTIONS_FULL: typeof OUR_ACTIONS_SIMPLE = [
   { type: 'p2', label: '+2', tone: 'score' },
   { type: 'p3', label: '+3', tone: 'score' },
-  { type: 'p1', label: '+1 liber', tone: 'score' },
-  { type: 'm2', label: 'Ratat 2', tone: 'plain' },
-  { type: 'm3', label: 'Ratat 3', tone: 'plain' },
-  { type: 'm1', label: 'Ratat liber', tone: 'plain' },
-  { type: 'reb_d', label: 'Rec. apărare', tone: 'plain' },
-  { type: 'reb_o', label: 'Rec. atac', tone: 'plain' },
-  { type: 'ast', label: 'Pasă decisivă', tone: 'plain' },
-  { type: 'stl', label: 'Furt', tone: 'plain' },
-  { type: 'blk', label: 'Capac', tone: 'plain' },
-  { type: 'tov', label: 'Pierdere', tone: 'plain' },
-  { type: 'foul', label: 'Fault', tone: 'foul' },
+  { type: 'p1', label: tr('+1 liber'), tone: 'score' },
+  { type: 'm2', label: tr('Ratat 2'), tone: 'plain' },
+  { type: 'm3', label: tr('Ratat 3'), tone: 'plain' },
+  { type: 'm1', label: tr('Ratat liber'), tone: 'plain' },
+  { type: 'reb_d', label: tr('Rec. apărare'), tone: 'plain' },
+  { type: 'reb_o', label: tr('Rec. atac'), tone: 'plain' },
+  { type: 'ast', label: tr('Pasă decisivă'), tone: 'plain' },
+  { type: 'stl', label: tr('Furt'), tone: 'plain' },
+  { type: 'blk', label: tr('Capac'), tone: 'plain' },
+  { type: 'tov', label: tr('Pierdere'), tone: 'plain' },
+  { type: 'foul', label: tr('Fault'), tone: 'foul' },
 ];
 
 const THEIR_ACTIONS: { type: EventType; label: string }[] = [
   { type: 'p1', label: '+1' },
   { type: 'p2', label: '+2' },
   { type: 'p3', label: '+3' },
-  { type: 'foul', label: 'Fault' },
+  { type: 'foul', label: tr('Fault') },
 ];
 
 const TYPE_LABEL: Partial<Record<EventType, string>> = {
-  p1: '+1', p2: '+2', p3: '+3', m1: 'ratat liber', m2: 'ratat 2', m3: 'ratat 3', reb_o: 'rec. atac', reb_d: 'rec. apărare',
-  ast: 'pasă decisivă', stl: 'furt', blk: 'capac', tov: 'pierdere', foul: 'fault', sub: 'schimbare',
-  period_start: 'început sfert', period_end: 'final sfert',
+  p1: '+1', p2: '+2', p3: '+3', m1: tr('ratat liber'), m2: tr('ratat 2'), m3: tr('ratat 3'), reb_o: tr('rec. atac'), reb_d: tr('rec. apărare'),
+  ast: tr('pasă decisivă'), stl: tr('furt'), blk: tr('capac'), tov: tr('pierdere'), foul: tr('fault'), sub: tr('schimbare'),
+  period_start: tr('început sfert'), period_end: tr('final sfert'),
 };
 
 function mmss(ms: number) {
@@ -72,7 +73,7 @@ function initials(p: { firstName?: string; lastName?: string } | null | undefine
 }
 
 function periodName(p: number) {
-  return p > 4 ? `Prelungirea ${p - 4}` : `Sfertul ${p}`;
+  return p > 4 ? tr('Prelungirea {0}', { '0': p - 4 }) : tr('Sfertul {p}', { p });
 }
 
 const TONE_STYLE = {
@@ -128,7 +129,7 @@ export default function Scorer({
   const [fouledOutAction, setFouledOutAction] = useState<{ kind: 'action'; type: EventType } | { kind: 'sub'; playerId: number } | null>(null);
   const [finishing, setFinishing] = useState(false);
 
-  const opponentName = game.opponentName || 'Adversar';
+  const opponentName = game.opponentName || tr('Adversar');
   const rosterById = useMemo(() => new Map(game.roster.map((p) => [p.playerId, p])), [game.roster]);
   const period = s.clock.period;
   const fouls = s.box.teamFouls[period] ?? { us: 0, them: 0 };
@@ -188,7 +189,7 @@ export default function Scorer({
       : e.oppNumber ? `${opponentName} #${e.oppNumber}` : opponentName;
     if (e.type === 'sub') {
       const out = e.otherPlayerId != null ? rosterById.get(e.otherPlayerId) : null;
-      return `Schimbare: intră ${who}, iese ${playerTag(out)}`.trim();
+      return tr('Schimbare: intră {who}, iese {1}', { who, '1': playerTag(out) }).trim();
     }
     if (e.type === 'period_start' || e.type === 'period_end') return `${TYPE_LABEL[e.type]} ${e.period}`;
     return `${who} ${TYPE_LABEL[e.type] ?? e.type}`;
@@ -208,7 +209,7 @@ export default function Scorer({
     const left = await s.flush();
     setFinishing(false);
     if (left > 0) {
-      setFinishError('Mai sunt acțiuni netrimise. Conectează-te la internet și apasă din nou „Încheie meciul”.');
+      setFinishError(tr('Mai sunt acțiuni netrimise. Conectează-te la internet și apasă din nou „Încheie meciul”.'));
       return;
     }
     onFinished();
@@ -223,7 +224,7 @@ export default function Scorer({
             <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{teamName}</Text>
             <Text className="t-num text-[38px] font-bold leading-tight" style={{ color: 'var(--c-ink-strong)' }}>{s.box.us}</Text>
             <Text className="text-[11.5px] font-semibold" style={{ color: fouls.us >= BONUS_AT ? 'var(--c-danger-fg)' : 'var(--c-faint)' }}>
-              {plural(fouls.us, 'fault', 'faulturi')}{fouls.us >= BONUS_AT ? ' · bonus' : ''}
+              {plural(fouls.us, tr('fault'), tr('faulturi'))}{fouls.us >= BONUS_AT ? tr(' · bonus') : ''}
             </Text>
           </View>
           <View className="items-center gap-1 pt-1">
@@ -232,7 +233,7 @@ export default function Scorer({
               <Pressable
                 onPress={s.toggleClock}
                 accessibilityRole="button"
-                accessibilityLabel={s.clock.running ? 'Oprește cronometrul' : 'Pornește cronometrul'}
+                accessibilityLabel={s.clock.running ? tr('Oprește cronometrul') : tr('Pornește cronometrul')}
                 className="ui-press items-center rounded-[12px] px-3 py-1"
                 style={{ backgroundColor: s.clock.running ? 'var(--c-success-bg)' : 'var(--c-surface-3)' }}
               >
@@ -241,20 +242,20 @@ export default function Scorer({
                 </Text>
                 <View className="flex-row items-center gap-1">
                   <MaterialIcons name={s.clock.running ? 'pause' : 'play-arrow'} size={12} color={s.clock.running ? 'var(--c-success-fg)' : 'var(--c-muted)'} />
-                  <Text className="text-[11px] font-bold" style={{ color: s.clock.running ? 'var(--c-success-fg)' : 'var(--c-muted)' }}>{s.clock.running ? 'Oprește' : 'Pornește'}</Text>
+                  <Text className="text-[11px] font-bold" style={{ color: s.clock.running ? 'var(--c-success-fg)' : 'var(--c-muted)' }}>{s.clock.running ? tr('Oprește') : tr('Pornește')}</Text>
                 </View>
               </Pressable>
             ) : null}
             <Pressable onPress={() => setConfirm('period')} accessibilityRole="button" className="ui-press h-8 px-2.5 rounded-[9px] border flex-row items-center gap-1" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
               <MaterialIcons name="skip-next" size={14} color="var(--c-ink-soft)" />
-              <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{period >= 4 ? 'Prelungire' : 'Sfertul următor'}</Text>
+              <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{period >= 4 ? tr('Prelungire') : tr('Sfertul următor')}</Text>
             </Pressable>
           </View>
           <View className="flex-1 items-center min-w-0">
             <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{opponentName}</Text>
             <Text className="t-num text-[38px] font-bold leading-tight" style={{ color: 'var(--c-ink-strong)' }}>{s.box.them}</Text>
             <Text className="text-[11.5px] font-semibold" style={{ color: fouls.them >= BONUS_AT ? 'var(--c-danger-fg)' : 'var(--c-faint)' }}>
-              {plural(fouls.them, 'fault', 'faulturi')}{fouls.them >= BONUS_AT ? ' · bonus' : ''}
+              {plural(fouls.them, tr('fault'), tr('faulturi'))}{fouls.them >= BONUS_AT ? tr(' · bonus') : ''}
             </Text>
           </View>
         </View>
@@ -262,10 +263,10 @@ export default function Scorer({
           {!s.online ? <MaterialIcons name="cloud-off" size={13} color="var(--c-warning-fg)" /> : s.syncing ? <ActivityIndicator size="small" color="var(--c-faint)" /> : null}
           <Text className="text-[11.5px] font-semibold" style={{ color: s.pendingActions ? 'var(--c-warning-fg)' : 'var(--c-faint)' }}>
             {s.pendingActions
-              ? `${plural(s.pendingActions, 'acțiune salvată', 'acțiuni salvate')} pe telefon${s.online ? ', se trimit…' : ' — se trimit când revine internetul'}`
+              ? tr('{0} pe telefon{1}', { '0': plural(s.pendingActions, 'acțiune salvată', 'acțiuni salvate'), '1': s.online ? tr(', se trimit…') : tr(' — se trimit când revine internetul') })
               : s.pendingCount
-                ? (s.online ? 'Se sincronizează…' : 'Fără internet — se sincronizează când revine')
-                : 'Totul e salvat'}
+                ? (s.online ? tr('Se sincronizează…') : tr('Fără internet — se sincronizează când revine'))
+                : tr('Totul e salvat')}
           </Text>
         </View>
         {s.lastError && !s.pendingCount ? <Text className="text-[11.5px] text-center mt-1" style={{ color: 'var(--c-danger-fg)' }}>{s.lastError}</Text> : null}
@@ -274,7 +275,7 @@ export default function Scorer({
       {/* Opponent */}
       <View className="rounded-[14px] border p-3 gap-2" style={{ backgroundColor: 'var(--c-surface)', borderColor: selected?.side === 'them' ? 'var(--c-brand-fg)' : 'var(--c-border)' } as any}>
         <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>
-          {opponentName}{game.opponentRoster.length ? (selected?.side === 'them' && selected.number ? ` · #${selected.number}` : ' · alege numărul sau apasă direct') : ''}
+          {opponentName}{game.opponentRoster.length ? (selected?.side === 'them' && selected.number ? ` · #${selected.number}` : tr(' · alege numărul sau apasă direct')) : ''}
         </Text>
         {game.opponentRoster.length ? (
           <View className="flex-row flex-wrap gap-1.5">
@@ -302,8 +303,8 @@ export default function Scorer({
       <View className="gap-2">
         <Text className="text-[12.5px] font-semibold px-0.5" style={{ color: subMode ? 'var(--c-brand-fg)' : 'var(--c-muted)' }}>
           {subMode
-            ? subOut == null ? 'Schimbare: apasă cine iese' : 'Acum apasă cine intră (de pe bancă)'
-            : selectedPlayer ? `Ce a făcut ${playerTag(selectedPlayer)}?` : '1. Apasă jucătorul · 2. Apasă ce a făcut'}
+            ? subOut == null ? tr('Schimbare: apasă cine iese') : tr('Acum apasă cine intră (de pe bancă)')
+            : selectedPlayer ? tr('Ce a făcut {0}?', { '0': playerTag(selectedPlayer) }) : tr('1. Apasă jucătorul · 2. Apasă ce a făcut')}
         </Text>
         <View className="grid grid-cols-5 gap-1.5">
           {s.box.onCourt.map((id) => {
@@ -312,7 +313,7 @@ export default function Scorer({
             const active = (selected?.side === 'us' && selected.playerId === id) || subOut === id;
             const out = (line?.pf ?? 0) >= MAX_FOULS;
             return (
-              <Pressable key={id} onPress={() => tapOnCourt(id)} accessibilityRole="button" accessibilityState={{ selected: active }} accessibilityLabel={`${playerTag(p)}, ${plural(line?.pts ?? 0, 'punct', 'puncte')}, ${plural(line?.pf ?? 0, 'fault', 'faulturi')}${out ? ', eliminat' : ''}`}
+              <Pressable key={id} onPress={() => tapOnCourt(id)} accessibilityRole="button" accessibilityState={{ selected: active }} accessibilityLabel={`${playerTag(p)}, ${plural(line?.pts ?? 0, tr('punct'), tr('puncte'))}, ${plural(line?.pf ?? 0, tr('fault'), tr('faulturi'))}${out ? ', eliminat' : ''}`}
                 className="ui-press rounded-[12px] border px-1 py-2 items-center gap-0.5"
                 style={{
                   borderColor: active ? 'var(--c-brand-fg)' : out ? 'var(--c-danger)' : 'var(--c-border)',
@@ -336,14 +337,14 @@ export default function Scorer({
         {subMode && subOut != null ? (
           <View className="flex-row flex-wrap gap-1.5">
             {bench.map((p) => (
-              <Pressable key={p.playerId} onPress={() => tapBench(p.playerId)} accessibilityRole="button" accessibilityLabel={`Intră ${playerTag(p)}`}
+              <Pressable key={p.playerId} onPress={() => tapBench(p.playerId)} accessibilityRole="button" accessibilityLabel={tr('Intră {0}', { '0': playerTag(p) })}
                 className="ui-press h-11 px-3 rounded-[11px] border flex-row items-center gap-1.5"
                 style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)', opacity: (s.box.players[p.playerId]?.pf ?? 0) >= MAX_FOULS ? 0.45 : 1 } as any}>
                 {p.number ? <Text className="t-num text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>#{p.number}</Text> : null}
                 <Text className="text-[13px]" style={{ color: 'var(--c-ink-soft)' }}>{p.number ? p.lastName : `${p.firstName} ${p.lastName}`}</Text>
               </Pressable>
             ))}
-            {bench.length === 0 ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Nu ai jucători pe bancă.</Text> : null}
+            {bench.length === 0 ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{tr('Nu ai jucători pe bancă.')}</Text> : null}
           </View>
         ) : null}
       </View>
@@ -352,9 +353,7 @@ export default function Scorer({
       {selected?.side === 'us' ? (
         <View ref={actionsRef as any} className="gap-1.5" style={{ scrollMarginBottom: 104, scrollMarginTop: 72 } as any}>
           {selectedFouledOut ? (
-            <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>
-              Are 5 faulturi — eliminat. Folosește „Schimbare”; o acțiune pentru el cere confirmare.
-            </Text>
+            <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>{tr('Are 5 faulturi — eliminat. Folosește „Schimbare”; o acțiune pentru el cere confirmare.')}</Text>
           ) : null}
           <View className={`grid ${game.mode === 'full' ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5`}>
             {ourActions.map((a) => (
@@ -369,13 +368,13 @@ export default function Scorer({
           className="ui-press flex-1 h-11 rounded-[11px] border flex-row items-center justify-center gap-1.5"
           style={{ borderColor: subMode ? 'var(--c-brand-fg)' : 'var(--c-border)', backgroundColor: subMode ? 'var(--c-surface-tint)' : 'var(--c-surface)' } as any}>
           <MaterialIcons name="swap-horiz" size={16} color={subMode ? 'var(--c-brand-fg)' : 'var(--c-ink-soft)'} />
-          <Text className="text-[13.5px] font-semibold" style={{ color: subMode ? 'var(--c-brand-fg)' : 'var(--c-ink)' }}>{subMode ? 'Renunță' : 'Schimbare'}</Text>
+          <Text className="text-[13.5px] font-semibold" style={{ color: subMode ? 'var(--c-brand-fg)' : 'var(--c-ink)' }}>{subMode ? tr('Renunță') : tr('Schimbare')}</Text>
         </Pressable>
-        <Pressable onPress={s.undo} accessibilityRole="button" accessibilityLabel="Anulează ultima acțiune"
+        <Pressable onPress={s.undo} accessibilityRole="button" accessibilityLabel={tr('Anulează ultima acțiune')}
           className="ui-press flex-1 h-11 rounded-[11px] border flex-row items-center justify-center gap-1.5"
           style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}>
           <MaterialIcons name="undo" size={16} color="var(--c-ink-soft)" />
-          <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>Anulează</Text>
+          <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>{tr('Anulează')}</Text>
         </Pressable>
       </View>
 
@@ -388,19 +387,19 @@ export default function Scorer({
             </Text>
             <Text className="flex-1 text-[12.5px]" style={{ color: 'var(--c-ink-soft)' }} numberOfLines={1}>{describe(e)}</Text>
           </View>
-        )) : <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>Ultimele acțiuni apar aici.</Text>}
+        )) : <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>{tr('Ultimele acțiuni apar aici.')}</Text>}
       </View>
 
       <View className="flex-row gap-2">
         <Pressable onPress={() => setShowBox((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showBox }}
           className="ui-press flex-1 h-11 rounded-[11px] border flex-row items-center justify-center gap-1.5" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}>
           <MaterialIcons name="leaderboard" size={16} color="var(--c-ink-soft)" />
-          <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>{showBox ? 'Ascunde fișa' : 'Fișa meciului'}</Text>
+          <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>{showBox ? tr('Ascunde fișa') : tr('Fișa meciului')}</Text>
         </Pressable>
         <Pressable onPress={() => setConfirm('finish')} accessibilityRole="button"
           className="ui-press flex-1 h-11 rounded-[11px] border flex-row items-center justify-center gap-1.5" style={{ borderColor: 'var(--c-danger-border)', backgroundColor: 'var(--c-danger-bg)' } as any}>
           {finishing ? <ActivityIndicator size="small" color="var(--c-danger-fg)" /> : <MaterialIcons name="flag" size={16} color="var(--c-danger-fg)" />}
-          <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>Încheie meciul</Text>
+          <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>{tr('Încheie meciul')}</Text>
         </Pressable>
       </View>
 
@@ -413,12 +412,12 @@ export default function Scorer({
       <ConfirmDialog
         visible={fouledOutAction != null}
         icon="warning"
-        title={fouledOutAction?.kind === 'sub' ? 'Intră un jucător eliminat?' : 'Jucătorul e eliminat'}
+        title={fouledOutAction?.kind === 'sub' ? tr('Intră un jucător eliminat?') : tr('Jucătorul e eliminat')}
         message={fouledOutAction?.kind === 'sub'
-          ? `${playerTag(rosterById.get(fouledOutAction.playerId))} are 5 faulturi și nu mai poate juca. Îl treci totuși pe teren?`
-          : `${playerTag(selectedPlayer)} are 5 faulturi și nu mai poate juca. Înregistrezi totuși „${TYPE_LABEL[fouledOutAction?.type ?? 'p2'] ?? ''}”?`}
-        confirmLabel={fouledOutAction?.kind === 'sub' ? 'Da, intră' : 'Da, înregistrează'}
-        cancelLabel="Renunță"
+          ? tr('{0} are 5 faulturi și nu mai poate juca. Îl treci totuși pe teren?', { '0': playerTag(rosterById.get(fouledOutAction.playerId)) })
+          : tr('{0} are 5 faulturi și nu mai poate juca. Înregistrezi totuși „{1}”?', { '0': playerTag(selectedPlayer), '1': TYPE_LABEL[fouledOutAction?.type ?? 'p2'] ?? '' })}
+        confirmLabel={fouledOutAction?.kind === 'sub' ? tr('Da, intră') : tr('Da, înregistrează')}
+        cancelLabel={tr('Renunță')}
         onConfirm={() => {
           const pending = fouledOutAction;
           setFouledOutAction(null);
@@ -432,12 +431,12 @@ export default function Scorer({
         visible={confirm != null}
         destructive={confirm === 'finish'}
         icon={confirm === 'finish' ? 'flag' : 'skip-next'}
-        title={confirm === 'finish' ? 'Închei meciul?' : `Închei ${periodName(period).toLowerCase()}?`}
+        title={confirm === 'finish' ? tr('Închei meciul?') : tr('Închei {0}?', { '0': periodName(period).toLowerCase() })}
         message={confirm === 'finish'
-          ? `Scor final ${teamName} ${s.box.us} – ${s.box.them} ${opponentName}. După încheiere, fișa rămâne de citit; acțiunile nu se mai pot modifica.`
-          : 'Faulturile de echipă se resetează. Jucătorii de pe teren rămân aceiași.'}
-        confirmLabel={confirm === 'finish' ? 'Încheie meciul' : 'Începe sfertul următor'}
-        cancelLabel="Renunță"
+          ? tr('Scor final {teamName} {1} – {2} {opponentName}. După încheiere, fișa rămâne de citit; acțiunile nu se mai pot modifica.', { teamName, '1': s.box.us, '2': s.box.them, opponentName })
+          : tr('Faulturile de echipă se resetează. Jucătorii de pe teren rămân aceiași.')}
+        confirmLabel={confirm === 'finish' ? tr('Încheie meciul') : tr('Începe sfertul următor')}
+        cancelLabel={tr('Renunță')}
         onConfirm={() => {
           const action = confirm;
           setConfirm(null);

@@ -1,3 +1,4 @@
+import { tr, appLocale } from '../i18n';
 /**
  * Attendance rate on every screen (Dashboard, Lot, Echipă, Acasă antrenor) —
  * the client half of apps/server/src/lib/attendanceRate.ts: the last 30 days,
@@ -10,7 +11,7 @@
 export const ATTENDANCE_PERIOD_DAYS = 30;
 
 /** Short caption under a rate: the period. */
-export const ATTENDANCE_PERIOD_LABEL = `Ultimele ${ATTENDANCE_PERIOD_DAYS} de zile`;
+export const ATTENDANCE_PERIOD_LABEL = tr('Ultimele {ATTENDANCE_PERIOD_DAYS} de zile', { ATTENDANCE_PERIOD_DAYS });
 
 /**
  * Below this many marked sessions a rate is shown without a verdict: 1 of 1 is
@@ -19,7 +20,7 @@ export const ATTENDANCE_PERIOD_LABEL = `Ultimele ${ATTENDANCE_PERIOD_DAYS} de zi
 export const ATTENDANCE_MIN_SESSIONS = 3;
 
 /** The definition, for a tooltip / footnote. */
-export const ATTENDANCE_DEFINITION = `Prezenți (inclusiv întârziați) din sesiunile marcate în ultimele ${ATTENDANCE_PERIOD_DAYS} de zile; absențele motivate nu intră în calcul.`;
+export const ATTENDANCE_DEFINITION = tr('Prezenți (inclusiv întârziați) din sesiunile marcate în ultimele {ATTENDANCE_PERIOD_DAYS} de zile; absențele motivate nu intră în calcul.', { ATTENDANCE_PERIOD_DAYS });
 
 type Counts = { attendanceAttended?: number | null; attendanceCounted?: number | null };
 
@@ -45,5 +46,5 @@ export function formatAttendanceRate(rate: number | null | undefined) {
 
 /** One decimal, Romanian style: „66,7%”, not „66.7%”. */
 export function formatPercent1(value: number) {
-  return `${value.toLocaleString('ro-RO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+  return `${value.toLocaleString(appLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }

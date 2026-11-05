@@ -6,6 +6,7 @@ import { useRouter } from '@/src/web/expoRouter';
 import { useLocation } from 'react-router-dom';
 import { gamesApi } from '../../services/gamesApi';
 
+import { tr, appLocale } from '../../i18n';
 /**
  * For a parent (or player) a coach asked to keep the stats sheet: the open
  * matches, one tap from the scorer. Renders nothing for everyone else.
@@ -38,10 +39,10 @@ export default function AssignedGamesBanner() {
           </View>
           <View className="flex-1 min-w-0">
             <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
-              {g.status === 'live' ? 'Meci în desfășurare — ții statistica' : 'Ții statistica la meci'}
+              {g.status === 'live' ? tr('Meci în desfășurare — ții statistica') : tr('Ții statistica la meci')}
             </Text>
             <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-              {g.title} · {parseApiDate(g.startTime).toLocaleString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              {g.title} · {parseApiDate(g.startTime).toLocaleString(appLocale(), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
             </Text>
           </View>
           <MaterialIcons name="chevron-right" size={20} color="var(--c-brand-fg)" />

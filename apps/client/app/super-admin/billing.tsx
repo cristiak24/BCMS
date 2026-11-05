@@ -244,7 +244,7 @@ export default function BillingScreen() {
                         disabled={!row.billableUsers || exportingId != null}
                         accessibilityRole="button"
                         accessibilityLabel={`Descarcă lista utilizatorilor activi din ${row.name}`}
-                        className="ui-press w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[var(--c-surface-3)]"
+                        className="ui-press tap-40 w-8 h-8 rounded-[9px] items-center justify-center hover:bg-[var(--c-surface-3)]"
                         style={{ opacity: row.billableUsers ? 1 : 0.35 } as any}
                       >
                         {exportingId === row.clubId

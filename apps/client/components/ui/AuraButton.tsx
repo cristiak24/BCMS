@@ -2,6 +2,7 @@ import { View, Text, Pressable, PressableProps, ActivityIndicator } from '@/src/
 import { LinearGradient } from '@/src/web/linearGradient';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 
+import { tr } from '../../i18n';
 interface AuraButtonProps extends PressableProps {
     label: string;
     loading?: boolean;
@@ -31,7 +32,7 @@ export default function AuraButton({ label, loading, variant = 'primary', classN
                     {loading ? (
                         <View className="flex-row items-center gap-3">
                             <ActivityIndicator color="white" size="small" />
-                            <Text className="font-bold text-base text-white">Se încarcă…</Text>
+                            <Text className="font-bold text-base text-white">{tr('Se încarcă…')}</Text>
                         </View>
                     ) : (
                         <View className="flex-row items-center justify-center gap-2">

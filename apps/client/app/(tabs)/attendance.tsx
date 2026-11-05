@@ -26,6 +26,7 @@ import { isEliteRhythm } from '../../utils/attendanceBadge';
 import { plural } from '../../utils/plural';
 import { attendanceMarkMeta, toAttendanceMark } from '../../utils/attendanceStatus';
 
+import { tr, appLocale } from '../../i18n';
 /** How many recent marked sessions the history covers. */
 const HISTORY_LIMIT = 60;
 const PAGE_SIZE = 10;
@@ -44,29 +45,29 @@ function statusKey(status?: string | null): StatusKey | null {
 // Token pairs — the previous version used named Tailwind utilities
 // (bg-emerald-50 / text-emerald-700) that had to be patched for dark mode.
 const STATUS_META: Record<StatusKey, { label: string; fg: string; bg: string; bar: string; icon: string }> = {
-  present: { label: 'Prezent', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)', bar: 'var(--c-success)', icon: 'check-circle' },
-  absent: { label: 'Absent', fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)', bar: 'var(--c-danger)', icon: 'cancel' },
-  excused: { label: 'Motivat', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)', bar: 'var(--c-warning)', icon: 'medical-services' },
+  present: { label: tr('Prezent'), fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)', bar: 'var(--c-success)', icon: 'check-circle' },
+  absent: { label: tr('Absent'), fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)', bar: 'var(--c-danger)', icon: 'cancel' },
+  excused: { label: tr('Motivat'), fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)', bar: 'var(--c-warning)', icon: 'medical-services' },
 };
 
 const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'Toate' },
-  { key: 'present', label: 'Prezent' },
-  { key: 'absent', label: 'Absent' },
-  { key: 'excused', label: 'Motivat' },
+  { key: 'all', label: tr('Toate') },
+  { key: 'present', label: tr('Prezent') },
+  { key: 'absent', label: tr('Absent') },
+  { key: 'excused', label: tr('Motivat') },
 ];
 
 function formatTime(value: string) {
   const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return '';
-  const text = new Intl.DateTimeFormat('ro-RO', { weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(date);
+  const text = new Intl.DateTimeFormat(appLocale(), { weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(date);
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function monthLabel(value: string) {
   const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return '—';
-  const text = new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric' }).format(date);
+  const text = new Intl.DateTimeFormat(appLocale(), { month: 'long', year: 'numeric' }).format(date);
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
@@ -85,13 +86,13 @@ function currentStreak(records: PlayerAttendanceRecord[]) {
 }
 
 function rateTone(rate: number | null, sessions: number) {
-  if (rate == null) return { label: 'Încă nu există date', color: 'var(--c-muted)' };
+  if (rate == null) return { label: tr('Încă nu există date'), color: 'var(--c-muted)' };
   // 1 of 1 is 100%, not a verdict.
-  if (sessions < ATTENDANCE_MIN_SESSIONS) return { label: 'Prea puține sesiuni pentru o concluzie', color: 'var(--c-muted)' };
-  if (isEliteRhythm(rate, sessions)) return { label: 'Ritm de elită', color: 'var(--c-success-fg)' };
-  if (rate >= 75) return { label: 'Pe drumul bun', color: 'var(--c-brand-fg)' };
-  if (rate >= 50) return { label: 'Poate mai bine', color: 'var(--c-warning-fg)' };
-  return { label: 'Necesită atenție', color: 'var(--c-danger-fg)' };
+  if (sessions < ATTENDANCE_MIN_SESSIONS) return { label: tr('Prea puține sesiuni pentru o concluzie'), color: 'var(--c-muted)' };
+  if (isEliteRhythm(rate, sessions)) return { label: tr('Ritm de elită'), color: 'var(--c-success-fg)' };
+  if (rate >= 75) return { label: tr('Pe drumul bun'), color: 'var(--c-brand-fg)' };
+  if (rate >= 50) return { label: tr('Poate mai bine'), color: 'var(--c-warning-fg)' };
+  return { label: tr('Necesită atenție'), color: 'var(--c-danger-fg)' };
 }
 
 function AttendanceRow({ record }: { record: PlayerAttendanceRecord }) {
@@ -134,7 +135,7 @@ function AttendanceRow({ record }: { record: PlayerAttendanceRecord }) {
         <View className="flex-row items-start gap-2 rounded-[10px] px-3 py-2.5" style={{ backgroundColor: 'var(--c-surface-2)' }}>
           <MaterialIcons name="chat-bubble-outline" size={14} color="var(--c-muted)" style={{ marginTop: 2 }} />
           <View className="flex-1 min-w-0">
-            <Text className="t-label" style={{ color: 'var(--c-muted)' }}>Feedback antrenor</Text>
+            <Text className="t-label" style={{ color: 'var(--c-muted)' }}>{tr('Feedback antrenor')}</Text>
             <Text className="text-[13px] font-medium mt-0.5 leading-5" style={{ color: 'var(--c-ink-soft)' }}>{note}</Text>
           </View>
         </View>
@@ -198,7 +199,7 @@ function PlayerAttendanceScreen() {
       setSummary(details.summary);
       setRecords(details.records);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nu s-a putut încărca prezența.');
+      setError(err instanceof Error ? err.message : tr('Nu s-a putut încărca prezența.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -222,18 +223,18 @@ function PlayerAttendanceScreen() {
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
       <PageContainer>
         <PageHero
-          eyebrow="Prezență"
-          title={isParent ? 'Prezența copilului' : 'Prezența mea'}
+          eyebrow={tr('Prezență')}
+          title={isParent ? tr('Prezența copilului') : tr('Prezența mea')}
           subtitle={loading || error
-            ? (isParent ? 'Istoricul sesiunilor la care antrenorul a marcat prezența copilului.' : 'Istoricul sesiunilor la care antrenorul ți-a marcat prezența.')
-            : `${tone.label} · ${summary.total ? `${summary.present} din ${plural(summary.total, 'sesiune', 'sesiuni')}` : 'nicio sesiune marcată'} · ${ATTENDANCE_PERIOD_LABEL.toLowerCase()}`}
+            ? (isParent ? tr('Istoricul sesiunilor la care antrenorul a marcat prezența copilului.') : tr('Istoricul sesiunilor la care antrenorul ți-a marcat prezența.'))
+            : `${tone.label} · ${summary.total ? tr('{0} din {1}', { '0': summary.present, '1': plural(summary.total, 'sesiune', 'sesiuni') }) : tr('nicio sesiune marcată')} · ${ATTENDANCE_PERIOD_LABEL.toLowerCase()}`}
           leading={loading || error ? undefined : (
             <ProgressRing
               value={summary.rate}
               size={60}
               stroke={7}
               color={tone.color}
-              label={summary.rate == null ? 'Rată prezență indisponibilă' : `Rată prezență ${summary.rate}%`}
+              label={summary.rate == null ? tr('Rată prezență indisponibilă') : tr('Rată prezență {0}%', { '0': summary.rate })}
             >
               <Text className="f-display t-num text-[15px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>
                 {summary.rate == null ? '—' : `${summary.rate}%`}
@@ -245,13 +246,13 @@ function PlayerAttendanceScreen() {
               {!loading && !error && streak > 1 ? (
                 <View className="flex-row items-center gap-1 rounded-full px-2.5 py-1 border" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}>
                   <MaterialIcons name="bolt" size={13} color="var(--c-success-fg)" />
-                  <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{plural(streak, 'prezență', 'prezențe')} la rând</Text>
+                  <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{tr('{0} la rând', { '0': plural(streak, tr('prezență'), tr('prezențe')) })}</Text>
                 </View>
               ) : null}
               <Pressable
                 onPress={() => loadData(true)}
                 accessibilityRole="button"
-                accessibilityLabel="Reîmprospătează"
+                accessibilityLabel={tr('Reîmprospătează')}
                 className="ui-press hidden sm:flex w-10 h-10 rounded-[11px] border items-center justify-center"
                 style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
               >
@@ -262,22 +263,22 @@ function PlayerAttendanceScreen() {
         >
           {loading || error ? null : (
             <StatStrip className="grid-cols-3">
-              <GlassStat dot="var(--c-success)" label="Prezent" value={windowCounts.present} hint={windowCounts.late ? plural(windowCounts.late, 'întârziere', 'întârzieri') : `${ATTENDANCE_PERIOD_DAYS} de zile`} />
-              <GlassStat dot="var(--c-danger)" label="Absent" value={windowCounts.absent} hint={`${ATTENDANCE_PERIOD_DAYS} de zile`} />
-              <GlassStat dot="var(--c-warning)" label="Motivat" value={windowCounts.excused} hint={`${ATTENDANCE_PERIOD_DAYS} de zile`} />
+              <GlassStat dot="var(--c-success)" label={tr('Prezent')} value={windowCounts.present} hint={windowCounts.late ? plural(windowCounts.late, tr('întârziere'), tr('întârzieri')) : tr('{ATTENDANCE_PERIOD_DAYS} de zile', { ATTENDANCE_PERIOD_DAYS })} />
+              <GlassStat dot="var(--c-danger)" label={tr('Absent')} value={windowCounts.absent} hint={tr('{ATTENDANCE_PERIOD_DAYS} de zile', { ATTENDANCE_PERIOD_DAYS })} />
+              <GlassStat dot="var(--c-warning)" label={tr('Motivat')} value={windowCounts.excused} hint={tr('{ATTENDANCE_PERIOD_DAYS} de zile', { ATTENDANCE_PERIOD_DAYS })} />
             </StatStrip>
           )}
         </PageHero>
 
         {loading ? (
-          <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă prezența">
+          <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă prezența')}>
             {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-[72px] w-full rounded-[14px]" />)}
           </View>
         ) : error ? (
           <ErrorState
-            title="Nu am putut încărca prezența"
+            title={tr('Nu am putut încărca prezența')}
             message={error}
-            actionLabel="Reîncearcă"
+            actionLabel={tr('Reîncearcă')}
             onAction={() => loadData(true)}
           />
         ) : (
@@ -285,11 +286,11 @@ function PlayerAttendanceScreen() {
             <View>
               <View className="flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
                 <View>
-                  <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Istoric</Text>
+                  <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Istoric')}</Text>
                   <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
                     {markedRecords.length === 0
-                      ? 'Nicio sesiune marcată încă'
-                      : markedRecords.length === 1 ? 'Ultima sesiune marcată' : `Ultimele ${plural(markedRecords.length, 'sesiune marcată', 'sesiuni marcate')}`}
+                      ? tr('Nicio sesiune marcată încă')
+                      : markedRecords.length === 1 ? tr('Ultima sesiune marcată') : tr('Ultimele {0}', { '0': plural(markedRecords.length, 'sesiune marcată', 'sesiuni marcate') })}
                   </Text>
                 </View>
                 {/* Only statuses that occur: „Absent 0” was a button leading to an empty list. */}
@@ -326,10 +327,10 @@ function PlayerAttendanceScreen() {
                 <EmptyState
                   icon="event-busy"
                   compact
-                  title={markedRecords.length ? 'Nicio sesiune cu acest status' : 'Nicio prezență marcată încă'}
+                  title={markedRecords.length ? tr('Nicio sesiune cu acest status') : tr('Nicio prezență marcată încă')}
                   message={markedRecords.length
-                    ? 'Alege alt filtru pentru a vedea restul istoricului.'
-                    : 'Sesiunile la care antrenorul îți marchează prezența apar aici.'}
+                    ? tr('Alege alt filtru pentru a vedea restul istoricului.')
+                    : tr('Sesiunile la care antrenorul îți marchează prezența apar aici.')}
                 />
               ) : (
                 <View className="gap-4">

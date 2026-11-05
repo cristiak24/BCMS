@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 /**
  * The four marks a coach or admin can give a player for one session, shared by
  * the coach "Prezență" screen, the admin sheet and the player's history.
@@ -18,10 +19,10 @@ export type AttendanceMarkMeta = {
 };
 
 export const ATTENDANCE_MARKS: AttendanceMarkMeta[] = [
-  { status: 'present', label: 'Prezent', icon: 'check-circle', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)', solid: 'var(--c-success)' },
-  { status: 'late', label: 'Întârziat', icon: 'access-time', fg: 'var(--c-brand-fg)', bg: 'var(--c-surface-tint)', solid: 'var(--c-brand-fg)' },
-  { status: 'absent', label: 'Absent', icon: 'cancel', fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)', solid: 'var(--c-danger)' },
-  { status: 'medical', label: 'Motivat', icon: 'medical-services', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)', solid: 'var(--c-warning)' },
+  { status: 'present', label: tr('Prezent'), icon: 'check-circle', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)', solid: 'var(--c-success)' },
+  { status: 'late', label: tr('Întârziat'), icon: 'access-time', fg: 'var(--c-brand-fg)', bg: 'var(--c-surface-tint)', solid: 'var(--c-brand-fg)' },
+  { status: 'absent', label: tr('Absent'), icon: 'cancel', fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)', solid: 'var(--c-danger)' },
+  { status: 'medical', label: tr('Motivat'), icon: 'medical-services', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)', solid: 'var(--c-warning)' },
 ];
 
 const META_BY_MARK = Object.fromEntries(ATTENDANCE_MARKS.map((meta) => [meta.status, meta])) as Record<AttendanceMark, AttendanceMarkMeta>;

@@ -7,6 +7,7 @@ import { plural } from '../../utils/plural';
 import { formatStat, sortSeasonRows, type SeasonSortKey } from '../../utils/seasonStats';
 import { Skeleton } from '../ui/Skeleton';
 
+import { tr } from '../../i18n';
 /**
  * The team's season, one row per player who was on a finished match sheet
  * (server GET /api/games/season/teams/:id). Sortable by tapping a column
@@ -14,11 +15,11 @@ import { Skeleton } from '../ui/Skeleton';
  */
 
 const COLUMNS: { key: SeasonSortKey; label: string; full: string }[] = [
-  { key: 'games', label: 'M', full: 'Meciuri' },
-  { key: 'pts', label: 'Pct/m', full: 'Puncte pe meci' },
-  { key: 'reb', label: 'Rec/m', full: 'Recuperări pe meci' },
-  { key: 'ast', label: 'Pase/m', full: 'Pase decisive pe meci' },
-  { key: 'ptsTotal', label: 'Total', full: 'Total puncte' },
+  { key: 'games', label: tr('M'), full: tr('Meciuri') },
+  { key: 'pts', label: tr('Pct/m'), full: tr('Puncte pe meci') },
+  { key: 'reb', label: tr('Rec/m'), full: tr('Recuperări pe meci') },
+  { key: 'ast', label: tr('Pase/m'), full: tr('Pase decisive pe meci') },
+  { key: 'ptsTotal', label: tr('Total'), full: tr('Total puncte') },
 ];
 
 function cell(row: TeamSeasonRow, key: SeasonSortKey) {
@@ -27,7 +28,7 @@ function cell(row: TeamSeasonRow, key: SeasonSortKey) {
   return formatStat(row.averages[key]);
 }
 
-export default function TeamSeasonTable({ teamId, title = 'Statistici de sezon' }: { teamId: number; title?: string }) {
+export default function TeamSeasonTable({ teamId, title = tr('Statistici de sezon') }: { teamId: number; title?: string }) {
   const { width } = useResponsive();
   const compact = width < 640;
   const [data, setData] = useState<TeamSeason | null>(null);
@@ -41,7 +42,7 @@ export default function TeamSeasonTable({ teamId, title = 'Statistici de sezon' 
     setError(null);
     gamesApi.teamSeason(teamId)
       .then((season) => { if (alive) setData(season); })
-      .catch((err) => { if (alive) setError(err instanceof Error ? err.message : 'Nu am putut încărca statisticile.'); });
+      .catch((err) => { if (alive) setError(err instanceof Error ? err.message : tr('Nu am putut încărca statisticile.')); });
     return () => { alive = false; };
   }, [teamId]);
 
@@ -61,8 +62,7 @@ export default function TeamSeasonTable({ teamId, title = 'Statistici de sezon' 
         <View className="flex-1 min-w-0">
           <Text className="f-display text-[15px] font-bold" style={{ color: 'var(--c-ink-strong)' }} accessibilityRole="header">{title}</Text>
           {data ? (
-            <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
-              Sezonul {data.season.label} · {data.games ? plural(data.games, 'meci încheiat', 'meciuri încheiate') : 'niciun meci încheiat'}
+            <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{tr('Sezonul')}{' '}{data.season.label} · {data.games ? plural(data.games, tr('meci încheiat'), tr('meciuri încheiate')) : tr('niciun meci încheiat')}
             </Text>
           ) : null}
         </View>
@@ -73,11 +73,11 @@ export default function TeamSeasonTable({ teamId, title = 'Statistici de sezon' 
       ) : !data ? (
         <Skeleton className="h-[140px] w-full rounded-[12px]" />
       ) : !rows.length ? (
-        <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Statisticile apar după primul meci încheiat cu foaia de statistică.</Text>
+        <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{tr('Statisticile apar după primul meci încheiat cu foaia de statistică.')}</Text>
       ) : (
         <View>
           <View className="flex-row items-center gap-2 px-2 pb-2" style={{ borderBottomWidth: 1, borderBottomColor: 'var(--c-border)' } as any}>
-            <Text className="flex-1 text-[11.5px] font-bold uppercase tracking-[0.06em]" style={{ color: 'var(--c-faint)' }}>Jucător</Text>
+            <Text className="flex-1 text-[11.5px] font-bold uppercase tracking-[0.06em]" style={{ color: 'var(--c-faint)' }}>{tr('Jucător')}</Text>
             {columns.map((column) => {
               const active = sortKey === column.key;
               return (
@@ -85,7 +85,7 @@ export default function TeamSeasonTable({ teamId, title = 'Statistici de sezon' 
                   key={column.key}
                   onPress={() => setSortKey(column.key)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Sortează după ${column.full.toLowerCase()}`}
+                  accessibilityLabel={tr('Sortează după {0}', { '0': column.full.toLowerCase() })}
                   accessibilityState={{ selected: active }}
                   className={`ui-press ${colWidth} flex-row items-center justify-end gap-0.5`}
                 >
@@ -147,9 +147,7 @@ export default function TeamSeasonTable({ teamId, title = 'Statistici de sezon' 
           })}
 
           {anyFull && data.players.some((row) => row.fullGames < row.games) ? (
-            <Text className="t-meta mt-3" style={{ color: 'var(--c-muted)' }}>
-              Recuperările și pasele vin doar din meciurile ținute în modul complet; „—” = niciun astfel de meci.
-            </Text>
+            <Text className="t-meta mt-3" style={{ color: 'var(--c-muted)' }}>{tr('Recuperările și pasele vin doar din meciurile ținute în modul complet; „—” = niciun astfel de meci.')}</Text>
           ) : null}
         </View>
       )}

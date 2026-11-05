@@ -13,6 +13,7 @@ import { EmptyState, ErrorState } from '../ui/ScreenState';
 import { ToastHost, useToasts } from '../ui/Toast';
 import { pluralWord } from '../../utils/plural';
 
+import { tr, appLocale } from '../../i18n';
 /**
  * "Documente" — the club's PDF library, one screen for every role (admin
  * /admin/documents, coach + player + parent /documents). Admins and coaches
@@ -29,7 +30,7 @@ function formatBytes(bytes: number) {
 function formatDate(iso: string | null) {
   if (!iso) return '';
   const date = parseApiDate(iso);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' });
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(appLocale(), { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function titleFromFileName(name: string) {
@@ -37,8 +38,8 @@ function titleFromFileName(name: string) {
 }
 
 const VISIBILITY_OPTIONS: { key: ClubDocumentVisibility; label: string; hint: string }[] = [
-  { key: 'all', label: 'Toți membrii', hint: 'Jucători, părinți, antrenori' },
-  { key: 'staff', label: 'Doar staff', hint: 'Admini și antrenori' },
+  { key: 'all', label: tr('Toți membrii'), hint: tr('Jucători, părinți, antrenori') },
+  { key: 'staff', label: tr('Doar staff'), hint: tr('Admini și antrenori') },
 ];
 
 function UploadPanel({
@@ -68,7 +69,7 @@ function UploadPanel({
     try {
       onUploaded(await clubDocumentsApi.upload(file, title.trim(), visibility));
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Încărcarea a eșuat.');
+      onError(err instanceof Error ? err.message : tr('Încărcarea a eșuat.'));
     } finally {
       setUploading(false);
     }
@@ -86,7 +87,7 @@ function UploadPanel({
         <View className="flex-1 min-w-0">
           <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{file.name}</Text>
           <Text className="t-meta" style={{ color: tooBig ? 'var(--c-danger-fg)' : 'var(--c-muted)' }}>
-            {formatBytes(file.size)}{tooBig ? ` — depășește limita de ${formatBytes(maxFileBytes)}` : ''}
+            {formatBytes(file.size)}{tooBig ? tr(' — depășește limita de {0}', { '0': formatBytes(maxFileBytes) }) : ''}
           </Text>
         </View>
       </View>
@@ -98,28 +99,26 @@ function UploadPanel({
           accessibilityRole="alert"
         >
           <MaterialIcons name="warning-amber" size={17} color="var(--c-warning-fg)" />
-          <Text className="flex-1 min-w-0 text-[13px] font-medium leading-5" style={{ color: 'var(--c-warning-fg)' }}>
-            Fișierul pare deja încărcat, ca „{duplicateOf.title}”{duplicateOf.createdAt ? ` (${formatDate(duplicateOf.createdAt)})` : ''}. Îl poți încărca din nou, dar membrii îl vor vedea de două ori.
-          </Text>
+          <Text className="flex-1 min-w-0 text-[13px] font-medium leading-5" style={{ color: 'var(--c-warning-fg)' }}>{tr('Fișierul pare deja încărcat, ca „')}{duplicateOf.title}”{duplicateOf.createdAt ? ` (${formatDate(duplicateOf.createdAt)})` : ''}{tr('. Îl poți încărca din nou, dar membrii îl vor vedea de două ori.')}</Text>
         </View>
       ) : null}
 
       <View className="flex-col md:flex-row gap-4">
         <View className="flex-1 min-w-0">
-          <Text className="t-eyebrow mb-1.5" style={{ color: 'var(--c-faint)' }}>Titlu</Text>
+          <Text className="t-eyebrow mb-1.5" style={{ color: 'var(--c-faint)' }}>{tr('Titlu')}</Text>
           <TextInput
             value={title}
             onChangeText={setTitle}
             maxLength={200}
-            accessibilityLabel="Titlul documentului"
-            placeholder="ex. Regulament intern 2026"
+            accessibilityLabel={tr('Titlul documentului')}
+            placeholder={tr('ex. Regulament intern 2026')}
             placeholderTextColor="var(--c-faint)"
             className="h-11 rounded-[11px] border px-3 text-[14px] font-medium outline-none w-full"
             style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}
           />
         </View>
         <View>
-          <Text className="t-eyebrow mb-1.5" style={{ color: 'var(--c-faint)' }}>Cine îl vede</Text>
+          <Text className="t-eyebrow mb-1.5" style={{ color: 'var(--c-faint)' }}>{tr('Cine îl vede')}</Text>
           <View className="flex-row p-[3px] rounded-[11px]" style={{ backgroundColor: 'var(--c-surface-3)' }}>
             {VISIBILITY_OPTIONS.map((option) => {
               const active = visibility === option.key;
@@ -143,7 +142,7 @@ function UploadPanel({
 
       <View className="flex-row justify-end gap-2">
         <Pressable onPress={onCancel} disabled={uploading} accessibilityRole="button" className="ui-press h-10 px-4 rounded-[10px] items-center justify-center">
-          <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Renunță</Text>
+          <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>{tr('Renunță')}</Text>
         </Pressable>
         <Pressable
           onPress={submit}
@@ -153,7 +152,7 @@ function UploadPanel({
           style={{ backgroundColor: 'var(--c-brand-surface)', opacity: tooBig || uploading ? 0.6 : 1 } as any}
         >
           {uploading ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : <MaterialIcons name="upload-file" size={16} color="var(--c-on-brand)" />}
-          <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{duplicateOf ? 'Încarcă oricum' : 'Încarcă'}</Text>
+          <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{duplicateOf ? tr('Încarcă oricum') : tr('Încarcă')}</Text>
         </Pressable>
       </View>
     </View>
@@ -182,7 +181,7 @@ function DocumentCard({
       <Pressable
         onPress={onOpen}
         accessibilityRole="button"
-        accessibilityLabel={`Deschide ${doc.title}`}
+        accessibilityLabel={tr('Deschide {0}', { '0': doc.title })}
         className="ui-press flex-1 min-w-0 flex-row items-center gap-3 text-left"
       >
         <View className="w-11 h-11 rounded-[11px] items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-danger-bg)' }}>
@@ -193,7 +192,7 @@ function DocumentCard({
           <View className="flex-row items-center gap-2 mt-0.5 min-w-0">
             {doc.visibility === 'staff' ? (
               <View className="rounded-full px-2 py-px shrink-0" style={{ backgroundColor: 'var(--c-purple-bg)' }}>
-                <Text className="text-[11px] font-bold" style={{ color: 'var(--c-purple-fg)' }}>Doar staff</Text>
+                <Text className="text-[11px] font-bold" style={{ color: 'var(--c-purple-fg)' }}>{tr('Doar staff')}</Text>
               </View>
             ) : null}
             <Text className="t-meta flex-1 min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{meta}</Text>
@@ -203,7 +202,7 @@ function DocumentCard({
       <Pressable
         onPress={onDownload}
         accessibilityRole="button"
-        accessibilityLabel={`Descarcă ${doc.title}`}
+        accessibilityLabel={tr('Descarcă {0}', { '0': doc.title })}
         className="ui-press w-9 h-9 rounded-[10px] border items-center justify-center shrink-0"
         style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
       >
@@ -213,7 +212,7 @@ function DocumentCard({
         <Pressable
           onPress={onDelete}
           accessibilityRole="button"
-          accessibilityLabel={`Șterge ${doc.title}`}
+          accessibilityLabel={tr('Șterge {0}', { '0': doc.title })}
           className="ui-press w-9 h-9 rounded-[10px] items-center justify-center shrink-0"
         >
           <MaterialIcons name="delete-outline" size={17} color="var(--c-faint)" />
@@ -234,7 +233,7 @@ export default function DocumentsScreen() {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    setSearchPlaceholder('Caută documente…');
+    setSearchPlaceholder(tr('Caută documente…'));
     setHeaderActions(null);
     setMobileFab(null);
     return () => {
@@ -250,7 +249,7 @@ export default function DocumentsScreen() {
       setError(null);
       setData(await clubDocumentsApi.list());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nu am putut încărca documentele.');
+      setError(err instanceof Error ? err.message : tr('Nu am putut încărca documentele.'));
     }
   }, []);
 
@@ -271,7 +270,7 @@ export default function DocumentsScreen() {
     event.target.value = '';
     if (!file) return;
     if (file.type && file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
-      showToast({ variant: 'error', message: 'Sunt acceptate doar fișiere PDF.' });
+      showToast({ variant: 'error', message: tr('Sunt acceptate doar fișiere PDF.') });
       return;
     }
     setPending(file);
@@ -289,7 +288,7 @@ export default function DocumentsScreen() {
       else window.location.assign(url);
     } catch (err) {
       tab?.close();
-      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Nu am putut deschide documentul.' });
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : tr('Nu am putut deschide documentul.') });
     } finally {
       setBusyId(null);
     }
@@ -307,7 +306,7 @@ export default function DocumentsScreen() {
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 5_000);
     } catch (err) {
-      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Descărcarea a eșuat.' });
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : tr('Descărcarea a eșuat.') });
     } finally {
       setBusyId(null);
     }
@@ -321,9 +320,9 @@ export default function DocumentsScreen() {
         documents: current.documents.filter((item) => item.id !== doc.id),
         usedBytes: Math.max(0, current.usedBytes - doc.sizeBytes),
       });
-      showToast({ variant: 'success', message: `„${doc.title}” a fost șters.` });
+      showToast({ variant: 'success', message: tr('„{0}” a fost șters.', { '0': doc.title }) });
     } catch (err) {
-      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Nu am putut șterge documentul.' });
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : tr('Nu am putut șterge documentul.') });
     }
   };
 
@@ -335,20 +334,20 @@ export default function DocumentsScreen() {
       <ScrollView className="flex-1" contentContainerClassName="pb-32" showsVerticalScrollIndicator={false}>
         <PageContainer>
           <PageHero
-            eyebrow="Documente"
-            title="Biblioteca clubului"
-            subtitle="Regulamente, formulare și alte PDF-uri ale clubului."
-            actions={canUpload ? <Button label="Încarcă PDF" icon="upload-file" variant="primary" onPress={pickFile} /> : undefined}
+            eyebrow={tr('Documente')}
+            title={tr('Biblioteca clubului')}
+            subtitle={tr('Regulamente, formulare și alte PDF-uri ale clubului.')}
+            actions={canUpload ? <Button label={tr('Încarcă PDF')} icon="upload-file" variant="primary" onPress={pickFile} /> : undefined}
           >
             {/* Empty library: no "0 documente · 0 B din 150 MB" tiles, the empty state says it. */}
             {data && data.documents.length > 0 && !canUpload ? (
               // Player/parent: one figure, a cell of the plain header's strip.
               <StatStrip className="grid-cols-1 max-w-[220px]">
-                <GlassStat value={data.documents.length} label={pluralWord(data.documents.length, 'document', 'documente')} dot="var(--c-brand-fg)" />
+                <GlassStat value={data.documents.length} label={pluralWord(data.documents.length, tr('document'), tr('documente'))} dot="var(--c-brand-fg)" />
               </StatStrip>
             ) : data && data.documents.length > 0 ? (
               <StatStrip className="grid-cols-2 max-w-[440px]">
-                <GlassStat value={data.documents.length} label={pluralWord(data.documents.length, 'document', 'documente')} dot="var(--c-brand-fg)" />
+                <GlassStat value={data.documents.length} label={pluralWord(data.documents.length, tr('document'), tr('documente'))} dot="var(--c-brand-fg)" />
                 {canUpload ? (
                   <GlassStat
                     value={formatBytes(data.usedBytes)}
@@ -376,15 +375,15 @@ export default function DocumentsScreen() {
               onUploaded={(doc) => {
                 setPending(null);
                 setData((current) => current && { ...current, documents: [doc, ...current.documents], usedBytes: current.usedBytes + doc.sizeBytes });
-                showToast({ variant: 'success', message: `„${doc.title}” a fost încărcat.` });
+                showToast({ variant: 'success', message: tr('„{0}” a fost încărcat.', { '0': doc.title }) });
               }}
             />
           ) : null}
 
           {error ? (
-            <ErrorState title="Nu am putut încărca documentele" message={error} actionLabel="Reîncearcă" onAction={load} />
+            <ErrorState title={tr('Nu am putut încărca documentele')} message={error} actionLabel={tr('Reîncearcă')} onAction={load} />
           ) : !data ? (
-            <View className="grid grid-cols-1 lg:grid-cols-2 gap-2.5" accessibilityRole="progressbar" accessibilityLabel="Se încarcă documentele">
+            <View className="grid grid-cols-1 lg:grid-cols-2 gap-2.5" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă documentele')}>
               {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-[72px] w-full rounded-[14px]" />)}
             </View>
           ) : (
@@ -393,13 +392,13 @@ export default function DocumentsScreen() {
                 <EmptyState
                   compact
                   icon="folder"
-                  title="Niciun document încă"
-                  message={canUpload ? 'Încarcă regulamentul, formularele sau orice PDF util membrilor clubului.' : 'Documentele publicate de club vor apărea aici.'}
-                  actionLabel={canUpload ? 'Încarcă PDF' : undefined}
+                  title={tr('Niciun document încă')}
+                  message={canUpload ? tr('Încarcă regulamentul, formularele sau orice PDF util membrilor clubului.') : tr('Documentele publicate de club vor apărea aici.')}
+                  actionLabel={canUpload ? tr('Încarcă PDF') : undefined}
                   onAction={canUpload ? pickFile : undefined}
                 />
               ) : visible.length === 0 ? (
-                <EmptyState compact icon="search-off" title="Niciun document găsit" message={`Nimic pentru „${searchValue.trim()}”.`} actionLabel="Arată toate" onAction={() => setSearchValue('')} />
+                <EmptyState compact icon="search-off" title={tr('Niciun document găsit')} message={tr('Nimic pentru „{0}”.', { '0': searchValue.trim() })} actionLabel={tr('Arată toate')} onAction={() => setSearchValue('')} />
               ) : (
                 <View className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-2.5 ui-stagger">
                   {visible.map((doc) => (
@@ -423,10 +422,10 @@ export default function DocumentsScreen() {
         visible={confirmDelete != null}
         destructive
         icon="delete-outline"
-        title={confirmDelete ? `Ștergi „${confirmDelete.title}”?` : ''}
-        message="Documentul dispare pentru toți membrii clubului."
-        confirmLabel="Șterge"
-        cancelLabel="Renunță"
+        title={confirmDelete ? tr('Ștergi „{0}”?', { '0': confirmDelete.title }) : ''}
+        message={tr('Documentul dispare pentru toți membrii clubului.')}
+        confirmLabel={tr('Șterge')}
+        cancelLabel={tr('Renunță')}
         onConfirm={() => {
           if (confirmDelete) void remove(confirmDelete);
           setConfirmDelete(null);

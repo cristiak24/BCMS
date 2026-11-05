@@ -2,6 +2,7 @@ import { getClerk } from '../config/clerk';
 import { apiFetch } from './apiClient';
 import type { AuthUser, NotificationPreferences } from '../utils/authSession';
 
+import { tr } from '../i18n';
 export type ProfileRecord = AuthUser & {
   fullName: string;
   clubName: string | null;
@@ -55,7 +56,7 @@ export const profileApi = {
         currentPassword: payload.currentPassword,
         newPassword: payload.newPassword,
       });
-      return { success: true, message: 'Password updated successfully' };
+      return { success: true, message: tr('Password updated successfully') };
     })();
   },
 

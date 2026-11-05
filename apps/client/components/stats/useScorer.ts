@@ -3,6 +3,7 @@ import { gamesApi, type Game } from '../../services/gamesApi';
 import { computeBoxScore, type EventType, type GameEvent, type Side } from '../../utils/gameStats';
 import { pendingActionCount } from '../../utils/scorerStatus';
 
+import { tr } from '../../i18n';
 /**
  * The scorer's engine. Events are kept on the device first (localStorage) and
  * pushed in small batches — a gym's signal comes and goes, and a closed tab or
@@ -111,7 +112,7 @@ export function useScorer(eventId: number, game: Game, serverEvents: GameEvent[]
       setLastError(result.rejected[0]?.error ?? null);
       return next.pending.length;
     } catch (err) {
-      setLastError(err instanceof Error ? err.message : 'Fără conexiune');
+      setLastError(err instanceof Error ? err.message : tr('Fără conexiune'));
       return stateRef.current.pending.length;
     } finally {
       flushing.current = false;

@@ -14,6 +14,7 @@ import { useSession } from '../../../context/AuthContext';
 import { attendanceRateColor, eventTypeMeta, formatEventDateTime } from '../../../components/team/playerTeamDisplay';
 import { plural } from '../../../utils/plural';
 
+import { tr, appLocale } from '../../../i18n';
 /**
  * "Echipa mea" — team picker. A player can belong to several squads, so this
  * screen lists the *teams* (never their rosters) and each one opens its own
@@ -26,20 +27,20 @@ import { plural } from '../../../utils/plural';
 /** Same rule as Conformitate in admin (utils/medicalVisa): valid through its expiry day, Romanian calendar. */
 function getMedicalStatus(expiry: string | null | undefined) {
   const status = medicalStatus(expiry);
-  if (status === 'missing') return { label: 'Necompletată', bg: 'var(--c-surface-3)', fg: 'var(--c-muted)', icon: 'help-outline' as const };
-  if (status === 'expired') return { label: 'Expirată', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', icon: 'error-outline' as const };
+  if (status === 'missing') return { label: tr('Necompletată'), bg: 'var(--c-surface-3)', fg: 'var(--c-muted)', icon: 'help-outline' as const };
+  if (status === 'expired') return { label: tr('Expirată'), bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)', icon: 'error-outline' as const };
   if (status === 'soon') {
     const days = Math.round((Date.parse(`${toCalendarDay(expiry)}T00:00:00Z`) - Date.parse(`${toCalendarDay(new Date())}T00:00:00Z`)) / 86400000);
-    return { label: days === 0 ? 'Expiră azi' : `Expiră în ${plural(days, 'zi', 'zile')}`, bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', icon: 'schedule' as const };
+    return { label: days === 0 ? tr('Expiră azi') : tr('Expiră în {0}', { '0': plural(days, 'zi', 'zile') }), bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)', icon: 'schedule' as const };
   }
-  return { label: 'Valabilă', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', icon: 'verified' as const };
+  return { label: tr('Valabilă'), bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)', icon: 'verified' as const };
 }
 
 /** Own medical/compliance status — sourced from GET /players/me (self only, never a teammate's). */
 function MyStatusCard({ player, isParent }: { player: Player; isParent: boolean }) {
   const status = getMedicalStatus(player.medicalCheckExpiry);
   const expiryLabel = player.medicalCheckExpiry
-    ? new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${toCalendarDay(player.medicalCheckExpiry)}T00:00:00Z`))
+    ? new Intl.DateTimeFormat(appLocale(), { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${toCalendarDay(player.medicalCheckExpiry)}T00:00:00Z`))
     : null;
 
   return (
@@ -48,10 +49,10 @@ function MyStatusCard({ player, isParent }: { player: Player; isParent: boolean 
         <MaterialIcons name={status.icon} size={18} color={status.fg} />
       </View>
       <View className="flex-1 min-w-0">
-        <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{isParent ? 'Statusul copilului' : 'Statusul meu'}</Text>
-        <Text className="f-display text-[14.5px] font-bold mt-0.5" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.015em' } as any}>Vizită medicală</Text>
+        <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{isParent ? tr('Statusul copilului') : tr('Statusul meu')}</Text>
+        <Text className="f-display text-[14.5px] font-bold mt-0.5" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.015em' } as any}>{tr('Vizită medicală')}</Text>
         {expiryLabel ? (
-          <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }}>Valabilă până la {expiryLabel}</Text>
+          <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }}>{tr('Valabilă până la {expiryLabel}', { expiryLabel })}</Text>
         ) : null}
       </View>
       <View className="rounded-full px-2.5 py-1 shrink-0" style={{ backgroundColor: status.bg }}>
@@ -94,7 +95,7 @@ function TeamCard({ team, onOpen, isParent }: { team: MyTeamSummary; onOpen: () 
     <Pressable
       onPress={onOpen}
       accessibilityRole="button"
-      accessibilityLabel={`Deschide echipa ${team.name}`}
+      accessibilityLabel={tr('Deschide echipa {0}', { '0': team.name })}
       className="ui-lift rounded-[16px] border p-4 gap-3 text-left w-full"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
@@ -124,17 +125,17 @@ function TeamCard({ team, onOpen, isParent }: { team: MyTeamSummary; onOpen: () 
       ) : null}
 
       <View className="gap-1.5">
-        <MetaRow icon="sports">{team.coachName ? `Antrenor: ${team.coachName}` : 'Antrenor nealocat'}</MetaRow>
-        <MetaRow icon="groups">{`${plural(team.playerCount, 'jucător în lot', 'jucători în lot')}`}</MetaRow>
+        <MetaRow icon="sports">{team.coachName ? tr('Antrenor: {0}', { '0': team.coachName }) : tr('Antrenor nealocat')}</MetaRow>
+        <MetaRow icon="groups">{`${plural(team.playerCount, tr('jucător în lot'), tr('jucători în lot'))}`}</MetaRow>
         <MetaRow icon={nextMeta ? nextMeta.icon : 'event-busy'}>
-          {next ? `Urmează: ${next.title} · ${formatEventDateTime(next.startTime)}` : 'Niciun eveniment programat'}
+          {next ? tr('Urmează: {0} · {1}', { '0': next.title, '1': formatEventDateTime(next.startTime) }) : tr('Niciun eveniment programat')}
         </MetaRow>
       </View>
 
       {/* Own attendance for this squad — the only number on the card that is
           about the player rather than the team. */}
       <View className="flex-row items-center justify-between gap-3 pt-3 border-t" style={{ borderColor: 'var(--c-border)' } as any}>
-        <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{isParent ? 'Prezența copilului' : 'Prezența mea'}</Text>
+        <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{isParent ? tr('Prezența copilului') : tr('Prezența mea')}</Text>
         <View className="flex-row items-baseline gap-1.5">
           <Text className="f-display t-num text-[18px] font-extrabold" style={{ color: attendanceRateColor(team.attendance.rate) }}>
             {team.attendance.rate == null ? '—' : `${team.attendance.rate}%`}
@@ -152,7 +153,7 @@ function TeamCard({ team, onOpen, isParent }: { team: MyTeamSummary; onOpen: () 
 
 function TeamListSkeleton() {
   return (
-    <View className="grid grid-cols-1 lg:grid-cols-2 gap-3" accessibilityRole="progressbar" accessibilityLabel="Se încarcă echipele">
+    <View className="grid grid-cols-1 lg:grid-cols-2 gap-3" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă echipele')}>
       {Array.from({ length: 2 }).map((_, index) => (
         <Skeleton key={index} className="h-[210px] w-full rounded-[16px]" />
       ))}
@@ -181,7 +182,7 @@ export default function TeamScreen() {
       setTeams(myTeams);
       setMyRecord(self);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Echipele nu au putut fi încărcate.');
+      setError(err instanceof Error ? err.message : tr('Echipele nu au putut fi încărcate.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -193,15 +194,15 @@ export default function TeamScreen() {
   }, [loadData]);
 
   const subtitle = teams.length
-    ? `${plural(teams.length, 'echipă', 'echipe')} · ${session?.clubName || 'Clubul tău'}`
-    : session?.clubName || (isParent ? 'Echipele copilului' : 'Echipele tale');
+    ? `${plural(teams.length, tr('echipă'), tr('echipe'))} · ${session?.clubName || tr('Clubul tău')}`
+    : session?.clubName || (isParent ? tr('Echipele copilului') : tr('Echipele tale'));
 
   return (
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
       <PageContainer>
         <PageHero
-          eyebrow="Echipa mea"
-          title={isParent ? 'Echipele copilului' : 'Echipele mele'}
+          eyebrow={tr('Echipa mea')}
+          title={isParent ? tr('Echipele copilului') : tr('Echipele mele')}
           subtitle={subtitle}
           actions={
             <Pressable
@@ -209,7 +210,7 @@ export default function TeamScreen() {
               className="ui-press hidden sm:flex w-10 h-10 rounded-[11px] border items-center justify-center"
               style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
               accessibilityRole="button"
-              accessibilityLabel="Reîmprospătează"
+              accessibilityLabel={tr('Reîmprospătează')}
             >
               {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
             </Pressable>
@@ -223,18 +224,18 @@ export default function TeamScreen() {
             <TeamListSkeleton />
           ) : error ? (
             <ErrorState
-              title="Nu am putut încărca echipele"
+              title={tr('Nu am putut încărca echipele')}
               message={error}
-              actionLabel="Reîncearcă"
+              actionLabel={tr('Reîncearcă')}
               onAction={() => loadData(true)}
             />
           ) : teams.length === 0 ? (
             <EmptyState
               icon="groups"
-              title={isParent ? 'Copilul nu e încă într-o echipă' : 'Nu ai încă o echipă'}
+              title={isParent ? tr('Copilul nu e încă într-o echipă') : tr('Nu ai încă o echipă')}
               message={isParent
-                ? 'Când antrenorul adaugă copilul într-o echipă, aceasta apare aici cu lotul, programul și prezența.'
-                : 'Când antrenorul te adaugă într-o echipă, aceasta apare aici cu lotul, programul și prezența ta.'}
+                ? tr('Când antrenorul adaugă copilul într-o echipă, aceasta apare aici cu lotul, programul și prezența.')
+                : tr('Când antrenorul te adaugă într-o echipă, aceasta apare aici cu lotul, programul și prezența ta.')}
             />
           ) : (
             // Two columns from lg up: a player is on one or two squads, so a

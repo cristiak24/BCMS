@@ -1,6 +1,7 @@
 // Basketball API service — wraps /api/basketball/* endpoints on the backend server.
 import { apiFetch as requestApi } from './apiClient';
 
+import { tr } from '../i18n';
 export interface League {
     id: string;
     name: string;
@@ -100,8 +101,8 @@ export function normalizeMatch(raw: MatchRaw): Match {
     return {
         date: raw.date?.trim() || '',
         time: raw.time?.trim() || '',
-        homeTeam: raw.homeTeam?.trim() || 'Echipă necunoscută',
-        awayTeam: raw.awayTeam?.trim() || 'Echipă necunoscută',
+        homeTeam: raw.homeTeam?.trim() || tr('Echipă necunoscută'),
+        awayTeam: raw.awayTeam?.trim() || tr('Echipă necunoscută'),
         homeScore,
         awayScore,
         result,

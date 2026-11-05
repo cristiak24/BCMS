@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 
+import { tr } from '../../i18n';
 export type SaveState = 'idle' | 'saving' | 'saved';
 
 /**
@@ -37,7 +38,7 @@ export function useSaveStatus() {
 
 export function waitingLabel(waiting: number, reason: 'offline' | 'server') {
   const marks = waiting === 1 ? '1 marcaj' : `${waiting} marcaje`;
-  return reason === 'server' ? `Serverul nu răspunde: ${marks} în așteptare` : `${marks} așteaptă conexiunea`;
+  return reason === 'server' ? tr('Serverul nu răspunde: {marks} în așteptare', { marks }) : tr('{marks} așteaptă conexiunea', { marks });
 }
 
 export default function AttendanceSaveStatus({ state, waiting = 0, reason = 'offline', onSendNow }: {
@@ -54,11 +55,11 @@ export default function AttendanceSaveStatus({ state, waiting = 0, reason = 'off
         <MaterialIcons name="cloud-off" size={14} color="var(--c-warning-fg)" />
         <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>
           {waitingLabel(waiting, reason)}
-          <Text className="font-medium" style={{ color: 'var(--c-muted)' }}>{reason === 'server' ? ' · reîncercăm' : ' · se trimit singure'}</Text>
+          <Text className="font-medium" style={{ color: 'var(--c-muted)' }}>{reason === 'server' ? tr(' · reîncercăm') : tr(' · se trimit singure')}</Text>
         </Text>
         {onSendNow ? (
           <Pressable onPress={onSendNow} accessibilityRole="button" className="tap-40 ui-press px-1">
-            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Trimite acum</Text>
+            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{tr('Trimite acum')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -69,15 +70,15 @@ export default function AttendanceSaveStatus({ state, waiting = 0, reason = 'off
       {state === 'saving' ? (
         <>
           <ActivityIndicator size="small" color="var(--c-muted)" />
-          <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>Se salvează…</Text>
+          <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>{tr('Se salvează…')}</Text>
         </>
       ) : state === 'saved' ? (
         <>
           <MaterialIcons name="check-circle" size={14} color="var(--c-success-fg)" />
-          <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>Salvat automat</Text>
+          <Text className="text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>{tr('Salvat automat')}</Text>
         </>
       ) : (
-        <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>Se salvează la fiecare apăsare.</Text>
+        <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>{tr('Se salvează la fiecare apăsare.')}</Text>
       )}
     </View>
   );

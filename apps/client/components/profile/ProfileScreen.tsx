@@ -22,10 +22,11 @@ import { ProfileCard } from './ProfileParts';
 import PrivacyCard from './PrivacyCard';
 import { InstallAppCard } from '../pwa/InstallApp';
 
+import { tr, appLocale, roleCanChooseLanguage } from '../../i18n';
 const THEME_OPTIONS: { mode: ThemeMode; label: string; icon: string }[] = [
-  { mode: 'light', label: 'Luminos', icon: 'wb-sunny' },
-  { mode: 'dark', label: 'Întunecat', icon: 'nightlight' },
-  { mode: 'system', label: 'Sistem', icon: 'settings-brightness' },
+  { mode: 'light', label: tr('Luminos'), icon: 'wb-sunny' },
+  { mode: 'dark', label: tr('Întunecat'), icon: 'nightlight' },
+  { mode: 'system', label: tr('Sistem'), icon: 'settings-brightness' },
 ];
 
 /**
@@ -59,8 +60,8 @@ function ThemePreview({ mode }: { mode: ThemeMode }) {
 function AppearanceCard() {
   const { mode, setMode } = useTheme();
   return (
-    <ProfileCard icon="palette" tone="purple" title="Aspect" description="Alege cum arată BCMS pe acest dispozitiv.">
-      <View className="flex-row gap-2.5" accessibilityRole="radiogroup" accessibilityLabel="Temă">
+    <ProfileCard icon="palette" tone="purple" title={tr('Aspect')} description={tr('Alege cum arată BCMS pe acest dispozitiv.')}>
+      <View className="flex-row gap-2.5" accessibilityRole="radiogroup" accessibilityLabel={tr('Temă')}>
         {THEME_OPTIONS.map((opt) => {
           const active = mode === opt.mode;
           return (
@@ -68,7 +69,7 @@ function AppearanceCard() {
               key={opt.mode}
               onPress={() => setMode(opt.mode)}
               accessibilityRole="radio"
-              accessibilityLabel={`Folosește tema ${opt.label}`}
+              accessibilityLabel={tr('Folosește tema {0}', { '0': opt.label })}
               accessibilityState={{ selected: active }}
               className="ui-press flex-1 rounded-[12px] p-2 border gap-2 text-left"
               style={{
@@ -95,26 +96,26 @@ function AppearanceCard() {
 const ROLE_LABELS: Record<string, string> = {
   superadmin: 'Super admin',
   admin: 'Administrator',
-  coach: 'Antrenor',
-  player: 'Jucător',
-  parent: 'Părinte',
+  coach: tr('Antrenor'),
+  player: tr('Jucător'),
+  parent: tr('Părinte'),
   staff: 'Staff',
   accountant: 'Contabil',
 };
 
 const STATUS_META: Record<string, { label: string; fg: string; bg: string }> = {
-  active: { label: 'Activ', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)' },
-  pending: { label: 'În așteptare', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)' },
-  disabled: { label: 'Dezactivat', fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)' },
+  active: { label: tr('Activ'), fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)' },
+  pending: { label: tr('În așteptare'), fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)' },
+  disabled: { label: tr('Dezactivat'), fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)' },
 };
 
 /** What's still missing from the profile, in the order worth fixing. */
 function getProfileCompletion(profile: ProfileRecord) {
   const checks = [
-    { done: Boolean(profile.firstName?.trim() && profile.lastName?.trim()), label: 'nume complet' },
+    { done: Boolean(profile.firstName?.trim() && profile.lastName?.trim()), label: tr('nume complet') },
     { done: Boolean(profile.avatarUrl), label: 'fotografie' },
     { done: Boolean(profile.phone?.trim()), label: 'telefon' },
-    { done: Boolean(profile.preferredLanguage?.trim()), label: 'limbă' },
+    { done: Boolean(profile.preferredLanguage?.trim()), label: tr('limbă') },
   ];
   const done = checks.filter((check) => check.done).length;
   return {
@@ -152,7 +153,7 @@ function sessionToProfile(session: AuthUser): ProfileRecord {
 
 function formatDate(value?: string | null) {
   if (!value) {
-    return 'Indisponibil';
+    return tr('Indisponibil');
   }
 
   const date = parseApiDate(value);
@@ -160,7 +161,7 @@ function formatDate(value?: string | null) {
     return value;
   }
 
-  return new Intl.DateTimeFormat('ro-RO', {
+  return new Intl.DateTimeFormat(appLocale(), {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -171,7 +172,7 @@ function formatShortDate(value?: string | null) {
   if (!value) return '—';
   const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return '—';
-  return new Intl.DateTimeFormat('ro-RO', { month: '2-digit', day: '2-digit', year: 'numeric' }).format(date);
+  return new Intl.DateTimeFormat(appLocale(), { month: '2-digit', day: '2-digit', year: 'numeric' }).format(date);
 }
 
 function getInitials(profile?: ProfileRecord | null) {
@@ -237,7 +238,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
           return;
         }
 
-        setError(fetchError instanceof Error ? fetchError.message : 'Nu s-a putut încărca profilul.');
+        setError(fetchError instanceof Error ? fetchError.message : tr('Nu s-a putut încărca profilul.'));
       } finally {
         if (active) {
           setLoading(false);
@@ -267,7 +268,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
         setProfile(data);
         setError(null);
       } catch (refreshError) {
-        setError(refreshError instanceof Error ? refreshError.message : 'Nu s-a putut reîmprospăta profilul.');
+        setError(refreshError instanceof Error ? refreshError.message : tr('Nu s-a putut reîmprospăta profilul.'));
       } finally {
         setLoading(false);
       }
@@ -340,11 +341,11 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
     return (
       <View className="flex-1" style={{ backgroundColor: 'var(--c-bg)' }}>
         <PageContainer>
-          <PageHeader title="Profilul meu" subtitle="Datele contului, preferințele și securitatea." />
+          <PageHeader title={tr('Profilul meu')} subtitle={tr('Datele contului, preferințele și securitatea.')} />
           <ErrorState
-            title="Profil indisponibil"
+            title={tr('Profil indisponibil')}
             message={error}
-            actionLabel="Reîncearcă"
+            actionLabel={tr('Reîncearcă')}
             onAction={handleRefresh}
           />
         </PageContainer>
@@ -360,21 +361,21 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
   const role = String(profile.role ?? '').toLowerCase();
   const teamNames = profile.teamNames?.length ? profile.teamNames : profile.teamName ? [profile.teamName] : [];
   const teamsLabel = role === 'coach'
-    ? (teamNames.length === 1 ? 'Echipa antrenată' : 'Echipe antrenate')
+    ? (teamNames.length === 1 ? tr('Echipa antrenată') : tr('Echipe antrenate'))
     : role === 'parent'
-      ? (teamNames.length === 1 ? 'Echipa copilului' : 'Echipele copiilor')
-      : teamNames.length > 1 ? 'Echipe' : 'Echipă';
+      ? (teamNames.length === 1 ? tr('Echipa copilului') : tr('Echipele copiilor'))
+      : teamNames.length > 1 ? tr('Echipe') : tr('Echipă');
   const teamsValue = teamNames.length
     ? teamNames.join(', ')
-    : role === 'coach' ? 'Nicio echipă alocată' : role === 'parent' ? 'Niciun copil într-o echipă' : 'Neatribuit';
+    : role === 'coach' ? tr('Nicio echipă alocată') : role === 'parent' ? tr('Niciun copil într-o echipă') : 'Neatribuit';
   const statusMeta = STATUS_META[String(profile.status ?? '').toLowerCase()] ?? {
     label: profile.status ?? '—',
     fg: 'var(--c-muted)',
     bg: 'var(--c-surface-3)',
   };
   const completion = getProfileCompletion(profile);
-  // Player/parent/coach/super admin: no account-age tiles or completion score, no language
-  // option (Romanian only), the password form behind a button.
+  // Player/parent/coach/super admin: no account-age tiles or completion score,
+  // the password form behind a button. Only player/parent/coach choose a language.
   const familyAccount = ['player', 'parent', 'coach', 'superadmin'].includes(role);
 
   return (
@@ -391,7 +392,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
             the back button is route-conditional. Sign-out lives in its own
             "Sesiune" card, not next to the title. */}
         <PageHero
-          eyebrow="Profilul meu"
+          eyebrow={tr('Profilul meu')}
           title={profile.fullName || profile.name}
           subtitle={profile.email}
           leading={(
@@ -399,10 +400,10 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
               avatarUrl={profile.avatarUrl}
               initials={getInitials(profile)}
               onUploaded={handleAvatarUploaded}
-              onError={(message) => Alert.alert('Încărcare avatar', message)}
+              onError={(message) => Alert.alert(tr('Încărcare avatar'), message)}
             />
           )}
-          actions={showBackButton ? <Button label="Înapoi" icon="arrow-back" onPress={() => router.back()} /> : undefined}
+          actions={showBackButton ? <Button label={tr('Înapoi')} icon="arrow-back" onPress={() => router.back()} /> : undefined}
         >
           <View className="flex-row flex-wrap items-center gap-2">
             <View className="flex-row items-center gap-1 px-2.5 py-1 rounded-full" style={{ backgroundColor: familyAccount ? 'var(--c-surface-3)' : 'var(--c-surface-tint)' }}>
@@ -423,13 +424,13 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
 
           {familyAccount ? null : (
           <View className="grid grid-cols-2 lg:grid-cols-4 gap-2 ui-stagger">
-            <GlassStat dot="var(--c-purple)" value={formatShortDate(profile.createdAt)} label="Membru din" />
-            <GlassStat dot="var(--c-sky)" value={formatShortDate(profile.lastLoginAt)} label="Ultima autentificare" />
+            <GlassStat dot="var(--c-purple)" value={formatShortDate(profile.createdAt)} label={tr('Membru din')} />
+            <GlassStat dot="var(--c-sky)" value={formatShortDate(profile.lastLoginAt)} label={tr('Ultima autentificare')} />
             <View className="col-span-2">
               <GlassStat
                 dot={completion.percent < 100 ? 'var(--c-warning)' : 'var(--c-success)'}
                 value={`${completion.percent}%`}
-                label={completion.percent < 100 ? `Profil completat · mai adaugă: ${completion.missing.join(', ')}` : 'Profil completat'}
+                label={completion.percent < 100 ? tr('Profil completat · mai adaugă: {0}', { '0': completion.missing.join(', ') }) : tr('Profil completat')}
                 bar={completion.percent}
               />
             </View>
@@ -441,8 +442,8 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
           <View className="mb-4 rounded-[12px] border px-4 py-3 flex-row items-center gap-3" style={{ backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-border)' } as any}>
             <MaterialIcons name="info-outline" size={17} color="var(--c-warning-fg)" />
             <Text className="text-[13px] font-semibold flex-1" style={{ color: 'var(--c-warning-fg)' }}>{error}</Text>
-            <Pressable onPress={handleRefresh} accessibilityRole="button" accessibilityLabel="Reîncearcă" className="ui-press px-2 py-1">
-              <Text className="text-[13px] font-bold" style={{ color: 'var(--c-warning-fg)' }}>Reîncearcă</Text>
+            <Pressable onPress={handleRefresh} accessibilityRole="button" accessibilityLabel={tr('Reîncearcă')} className="ui-press px-2 py-1">
+              <Text className="text-[13px] font-bold" style={{ color: 'var(--c-warning-fg)' }}>{tr('Reîncearcă')}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -452,7 +453,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
             column below lg. */}
         <View className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-8">
           <View className="lg:col-span-7 2xl:col-span-8 min-w-0">
-            <ProfileForm profile={profile} onSave={handleSaveProfile} showLanguage={!familyAccount} />
+            <ProfileForm profile={profile} onSave={handleSaveProfile} showLanguage={roleCanChooseLanguage(role)} />
           </View>
 
           <View className="lg:col-span-5 2xl:col-span-4 min-w-0 gap-4">
@@ -460,15 +461,15 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
 
             <AppearanceCard />
 
-            <ProfileCard icon="account-circle" tone="neutral" title="Cont" description="Datele gestionate de clubul tău.">
+            <ProfileCard icon="account-circle" tone="neutral" title={tr('Cont')} description={tr('Datele gestionate de clubul tău.')}>
               <View className="-my-2.5">
-                <InfoRow icon="mail" label="Email" value={profile.email} />
+                <InfoRow icon="mail" label={tr('Email')} value={profile.email} />
                 <View className="h-px" style={{ backgroundColor: 'var(--c-border-soft)' }} />
-                <InfoRow icon="apartment" label="Club" value={profile.clubName ?? 'Neatribuit'} />
+                <InfoRow icon="apartment" label={tr('Club')} value={profile.clubName ?? 'Neatribuit'} />
                 <View className="h-px" style={{ backgroundColor: 'var(--c-border-soft)' }} />
                 <InfoRow icon="groups" label={teamsLabel} value={teamsValue} />
                 <View className="h-px" style={{ backgroundColor: 'var(--c-border-soft)' }} />
-                <InfoRow icon="badge" label="Rol" value={roleLabel} />
+                <InfoRow icon="badge" label={tr('Rol')} value={roleLabel} />
               </View>
             </ProfileCard>
 
@@ -476,16 +477,16 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
 
             <PrivacyCard />
 
-            <ProfileCard icon="logout" tone="danger" title="Sesiune" description="Ieși din cont pe acest dispozitiv.">
+            <ProfileCard icon="logout" tone="danger" title={tr('Sesiune')} description={tr('Ieși din cont pe acest dispozitiv.')}>
               <Pressable
                 onPress={handleLogout}
                 className="ui-press h-11 rounded-[11px] border flex-row items-center justify-center gap-2"
                 style={{ backgroundColor: 'var(--c-danger-bg)', borderColor: 'var(--c-danger-border)' } as any}
                 accessibilityRole="button"
-                accessibilityLabel="Deconectare"
+                accessibilityLabel={tr('Deconectare')}
               >
                 <MaterialIcons name="logout" size={17} color="var(--c-danger-fg)" />
-                <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-danger-fg)' }}>Deconectare</Text>
+                <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-danger-fg)' }}>{tr('Deconectare')}</Text>
               </Pressable>
             </ProfileCard>
           </View>

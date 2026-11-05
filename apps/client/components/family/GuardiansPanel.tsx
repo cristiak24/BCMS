@@ -5,6 +5,7 @@ import { familyApi, type GuardianAccount } from '../../services/familyApi';
 import { getPublicAppUrl } from '../../config/serverUrl';
 import ConfirmDialog from '../ui/ConfirmDialog';
 
+import { tr } from '../../i18n';
 /**
  * A player's parents with an account, plus "Invită părinte": a personal,
  * single-use link (7 days) that creates the parent's account already linked to
@@ -34,7 +35,7 @@ export default function GuardiansPanel({ playerId, playerName, onNotify, bare = 
       const { token } = await familyApi.createInvite(playerId);
       setLink(`${getPublicAppUrl()}/signup?inviteToken=${token}`);
     } catch (err) {
-      onNotify({ variant: 'error', message: err instanceof Error ? err.message : 'Nu am putut crea invitația.' });
+      onNotify({ variant: 'error', message: err instanceof Error ? err.message : tr('Nu am putut crea invitația.') });
     } finally {
       setInviting(false);
     }
@@ -42,14 +43,14 @@ export default function GuardiansPanel({ playerId, playerName, onNotify, bare = 
 
   const share = async () => {
     if (!link) return;
-    const text = `Cont BCMS pentru părintele lui ${playerName}: ${link}\nLinkul e personal, valabil 7 zile, se folosește o singură dată.`;
+    const text = tr('Cont BCMS pentru părintele lui {playerName}: {link}\nLinkul e personal, valabil 7 zile, se folosește o singură dată.', { playerName, link });
     try {
       if (navigator.share) {
-        await navigator.share({ title: `Invitație părinte — ${playerName}`, text });
+        await navigator.share({ title: tr('Invitație părinte — {playerName}', { playerName }), text });
         return;
       }
       await navigator.clipboard.writeText(text);
-      onNotify({ variant: 'success', message: 'Invitația a fost copiată.' });
+      onNotify({ variant: 'success', message: tr('Invitația a fost copiată.') });
     } catch {
       // Share sheet dismissed.
     }
@@ -59,9 +60,9 @@ export default function GuardiansPanel({ playerId, playerName, onNotify, bare = 
     try {
       await familyApi.unlink(playerId, guardian.userId);
       setGuardians((list) => (list ?? []).filter((g) => g.userId !== guardian.userId));
-      onNotify({ variant: 'success', message: `${guardian.name} nu mai e legat de ${playerName}.` });
+      onNotify({ variant: 'success', message: tr('{0} nu mai e legat de {playerName}.', { '0': guardian.name, playerName }) });
     } catch (err) {
-      onNotify({ variant: 'error', message: err instanceof Error ? err.message : 'Nu am putut dezlega părintele.' });
+      onNotify({ variant: 'error', message: err instanceof Error ? err.message : tr('Nu am putut dezlega părintele.') });
     }
   };
 
@@ -74,8 +75,8 @@ export default function GuardiansPanel({ playerId, playerName, onNotify, bare = 
         <View className="flex-row items-center gap-2.5">
           <MaterialIcons name="family-restroom" size={18} color="var(--c-muted)" />
           <View className="flex-1 min-w-0">
-            <Text accessibilityRole="header" className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>Părinți</Text>
-            <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Conturi legate de {playerName}</Text>
+            <Text accessibilityRole="header" className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Părinți')}</Text>
+            <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{tr('Conturi legate de {playerName}', { playerName })}</Text>
           </View>
         </View>
       ) : null}
@@ -83,20 +84,20 @@ export default function GuardiansPanel({ playerId, playerName, onNotify, bare = 
       {guardians == null ? (
         <ActivityIndicator size="small" color="var(--c-brand-fg)" />
       ) : guardians.length === 0 ? (
-        <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Niciun părinte cu cont încă.</Text>
+        <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{tr('Niciun părinte cu cont încă.')}</Text>
       ) : (
         <View className="gap-1.5">
           {guardians.map((guardian) => (
             <View key={guardian.userId} className="flex-row items-center gap-2.5 rounded-[11px] px-3 py-2.5" style={{ backgroundColor: 'var(--c-surface-2)' }}>
               <View className="flex-1 min-w-0">
                 <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
-                  {guardian.name}{guardian.status === 'pending' ? ' · în așteptare' : ''}
+                  {guardian.name}{guardian.status === 'pending' ? tr(' · în așteptare') : ''}
                 </Text>
                 <Text className="text-[12px]" style={{ color: 'var(--c-muted)', userSelect: 'text' } as any} numberOfLines={1}>
                   {[guardian.phone, guardian.email].filter(Boolean).join(' · ')}
                 </Text>
               </View>
-              <Pressable onPress={() => setUnlinking(guardian)} accessibilityRole="button" accessibilityLabel={`Dezleagă ${guardian.name}`} className="ui-press w-8 h-8 rounded-[9px] items-center justify-center">
+              <Pressable onPress={() => setUnlinking(guardian)} accessibilityRole="button" accessibilityLabel={tr('Dezleagă {0}', { '0': guardian.name })} className="ui-press w-8 h-8 rounded-[9px] items-center justify-center">
                 <MaterialIcons name="link-off" size={16} color="var(--c-faint)" />
               </Pressable>
             </View>
@@ -106,13 +107,11 @@ export default function GuardiansPanel({ playerId, playerName, onNotify, bare = 
 
       {link ? (
         <View className="rounded-[11px] border p-3 gap-2" style={{ borderColor: 'var(--c-brand-fg)', backgroundColor: 'var(--c-surface-tint)' } as any}>
-          <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>
-            Link personal pentru un părinte — valabil 7 zile, o singură folosire.
-          </Text>
+          <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{tr('Link personal pentru un părinte — valabil 7 zile, o singură folosire.')}</Text>
           <Text className="text-[12px] break-anywhere" style={{ color: 'var(--c-muted)', userSelect: 'all' } as any} numberOfLines={2}>{link}</Text>
           <Pressable onPress={share} accessibilityRole="button" className="ui-press self-start h-9 px-3 rounded-[10px] flex-row items-center gap-1.5" style={{ backgroundColor: 'var(--c-brand-surface)' }}>
             <MaterialIcons name="share" size={15} color="var(--c-on-brand)" />
-            <Text className="text-[13px] font-bold" style={{ color: 'var(--c-on-brand)' }}>Trimite părintelui</Text>
+            <Text className="text-[13px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{tr('Trimite părintelui')}</Text>
           </Pressable>
         </View>
       ) : (
@@ -124,7 +123,7 @@ export default function GuardiansPanel({ playerId, playerName, onNotify, bare = 
           style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
         >
           {inviting ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="person-add" size={15} color="var(--c-brand-fg)" />}
-          <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Invită părinte</Text>
+          <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{tr('Invită părinte')}</Text>
         </Pressable>
       )}
 
@@ -132,10 +131,10 @@ export default function GuardiansPanel({ playerId, playerName, onNotify, bare = 
         visible={unlinking != null}
         destructive
         icon="link-off"
-        title={unlinking ? `Dezlegi ${unlinking.name} de ${playerName}?` : ''}
-        message="Părintele nu mai vede programul, prezența și plățile copilului. Contul lui rămâne."
-        confirmLabel="Dezleagă"
-        cancelLabel="Renunță"
+        title={unlinking ? tr('Dezlegi {0} de {playerName}?', { '0': unlinking.name, playerName }) : ''}
+        message={tr('Părintele nu mai vede programul, prezența și plățile copilului. Contul lui rămâne.')}
+        confirmLabel={tr('Dezleagă')}
+        cancelLabel={tr('Renunță')}
         onConfirm={() => {
           if (unlinking) void unlink(unlinking);
           setUnlinking(null);

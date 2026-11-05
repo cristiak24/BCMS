@@ -5,6 +5,7 @@ import { CalendarEvent } from '../../../services/eventsApi';
 import { sortByStartTime, isUpcomingEvent } from '../scheduleShared';
 import { PlayerScheduleEventCard } from './PlayerScheduleEventCard';
 
+import { tr } from '../../../i18n';
 const PAGE_SIZE = 12;
 
 function usePaginated(items: CalendarEvent[], resetKey: string) {
@@ -19,14 +20,14 @@ function usePaginated(items: CalendarEvent[], resetKey: string) {
 function Pagination({ page, totalPages, setPage }: { page: number; totalPages: number; setPage: (updater: (p: number) => number) => void }) {
   return (
     <View className="flex-row items-center justify-between rounded-[20px] border p-3 mb-4" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}>
-      <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>Pagina {page + 1} din {totalPages}</Text>
+      <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>{tr('Pagina {page} din {totalPages}', { page: page + 1, totalPages })}</Text>
       <View className="flex-row gap-1.5">
         <TouchableOpacity
           disabled={page === 0}
           onPress={() => setPage((p) => Math.max(p - 1, 0))}
           className={`h-8 px-3 items-center justify-center rounded-[9px] border border-[var(--c-border)] bg-[var(--c-surface)] ${page === 0 ? 'opacity-40' : ''}`}
         >
-          <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Înapoi</Text>
+          <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{tr('Înapoi')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           disabled={page >= totalPages - 1}
@@ -39,9 +40,7 @@ function Pagination({ page, totalPages, setPage }: { page: number; totalPages: n
           <Text
             className="text-[12px] font-semibold"
             style={{ color: page >= totalPages - 1 ? 'var(--c-ink-soft)' : 'var(--c-on-brand)' }}
-          >
-            Înainte
-          </Text>
+          >{tr('Înainte')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -74,14 +73,14 @@ export function PlayerScheduleAgendaList({
   return (
     <View>
       <View className="mb-3">
-        <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Evenimente viitoare</Text>
+        <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Evenimente viitoare')}</Text>
         <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-faint)' }}>{upcomingEvents.length} programate</Text>
       </View>
 
       {upcomingEvents.length === 0 ? (
         <View className="rounded-[24px] border p-8 items-center mb-6" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' }}>
           <CalendarIcon size={28} color="var(--c-faint)" />
-          <Text className="font-bold mt-3 text-center" style={{ color: 'var(--c-muted)' }}>Niciun eveniment viitor în această vedere.</Text>
+          <Text className="font-bold mt-3 text-center" style={{ color: 'var(--c-muted)' }}>{tr('Niciun eveniment viitor în această vedere.')}</Text>
         </View>
       ) : (
         <View className="gap-2.5 mb-2">
@@ -96,14 +95,14 @@ export function PlayerScheduleAgendaList({
       ) : null}
 
       <View className="mt-4 mb-3">
-        <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Evenimente trecute</Text>
+        <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Evenimente trecute')}</Text>
         <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-faint)' }}>{pastEvents.length} finalizate</Text>
       </View>
 
       {pastEvents.length === 0 ? (
         <View className="rounded-[24px] border border-dashed p-8 items-center mb-6" style={{ borderColor: 'var(--c-border)' }}>
           <Clock size={28} color="var(--c-faint)" />
-          <Text className="font-bold mt-3 text-center" style={{ color: 'var(--c-muted)' }}>Niciun eveniment trecut în această vedere.</Text>
+          <Text className="font-bold mt-3 text-center" style={{ color: 'var(--c-muted)' }}>{tr('Niciun eveniment trecut în această vedere.')}</Text>
         </View>
       ) : (
         <View className="gap-2.5">

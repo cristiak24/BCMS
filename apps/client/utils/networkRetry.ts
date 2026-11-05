@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 /**
  * Network failures (no answer at all, as opposed to an HTTP error). The API
  * sleeps on Render's free plan and takes up to a minute to boot, and it is
@@ -7,7 +8,7 @@
  * reached the login screen right after a successful Clerk sign-in.
  */
 export const NETWORK_ERROR_MESSAGE =
-  'Nu ne-am putut conecta la server. Dacă aplicația n-a fost folosită de ceva vreme, serverul pornește în până la un minut — încearcă din nou.';
+  tr('Nu ne-am putut conecta la server. Dacă aplicația n-a fost folosită de ceva vreme, serverul pornește în până la un minut — încearcă din nou.');
 
 const NETWORK_TEXT = /failed to fetch|load failed|networkerror|network request failed|network connection was lost|the internet connection appears to be offline|signal is aborted|aborted/i;
 

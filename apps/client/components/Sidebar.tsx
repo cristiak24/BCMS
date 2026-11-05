@@ -8,6 +8,7 @@ import { theme } from '../constants/designSystem';
 import { useResponsive } from '../hooks/useResponsive';
 import { navSectionPath } from '../utils/navSection';
 
+import { tr } from '../i18n';
 export type AdminMenuIconName = keyof typeof MaterialIcons.glyphMap;
 
 export type MenuGroup = 'Club' | 'Oameni' | 'Activitate' | 'Bani' | 'Conformitate';
@@ -18,27 +19,27 @@ export type MenuGroup = 'Club' | 'Oameni' | 'Activitate' | 'Bani' | 'Conformitat
  * where the group changes.
  */
 export const ADMIN_MENU_ITEMS: { label: string; icon: AdminMenuIconName; href: string; superadminOnly?: boolean; badge?: number; group?: MenuGroup }[] = [
-    { label: 'Acasă', icon: 'grid-view', href: '/admin/dashboard', group: 'Club' },
+    { label: tr('Acasă'), icon: 'grid-view', href: '/admin/dashboard', group: 'Club' },
     // One distinct glyph per entry: three shields (club, access, compliance)
     // and one silhouette for both Conturi and Lot read as the same item.
-    { label: 'Clubul meu', icon: 'domain', href: '/admin/my-club-admin', group: 'Club' },
-    { label: 'Documente', icon: 'folder', href: '/admin/documents', group: 'Club' },
-    { label: 'Lot', icon: 'groups', href: '/admin/roster', group: 'Oameni' },
+    { label: tr('Clubul meu'), icon: 'domain', href: '/admin/my-club-admin', group: 'Club' },
+    { label: tr('Documente'), icon: 'folder', href: '/admin/documents', group: 'Club' },
+    { label: tr('Lot'), icon: 'groups', href: '/admin/roster', group: 'Oameni' },
     // "Contacte", not "Agendă": Program has an "Agendă" view (the event list).
-    { label: 'Contacte', icon: 'contacts', href: '/admin/contacts', group: 'Oameni' },
-    { label: 'Acces & invitații', icon: 'vpn-key', href: '/admin/manage-access', group: 'Oameni' },
-    { label: 'Conturi', icon: 'manage-accounts', href: '/admin/manage-accounts', group: 'Oameni' },
-    { label: 'Admin club nou', icon: 'person-add', href: '/admin/create-club-admin', superadminOnly: true, group: 'Oameni' },
-    { label: 'Utilizatori', icon: 'person-search', href: '/admin/users', superadminOnly: true, group: 'Oameni' },
-    { label: 'Program', icon: 'calendar-today', href: '/admin/schedule', group: 'Activitate' },
+    { label: tr('Contacte'), icon: 'contacts', href: '/admin/contacts', group: 'Oameni' },
+    { label: tr('Acces & invitații'), icon: 'vpn-key', href: '/admin/manage-access', group: 'Oameni' },
+    { label: tr('Conturi'), icon: 'manage-accounts', href: '/admin/manage-accounts', group: 'Oameni' },
+    { label: tr('Admin club nou'), icon: 'person-add', href: '/admin/create-club-admin', superadminOnly: true, group: 'Oameni' },
+    { label: tr('Utilizatori'), icon: 'person-search', href: '/admin/users', superadminOnly: true, group: 'Oameni' },
+    { label: tr('Program'), icon: 'calendar-today', href: '/admin/schedule', group: 'Activitate' },
     { label: 'L12', icon: 'assignment', href: '/admin/l12', group: 'Activitate' },
-    { label: 'Finanțe', icon: 'payments', href: '/admin/finance', group: 'Bani' },
+    { label: tr('Finanțe'), icon: 'payments', href: '/admin/finance', group: 'Bani' },
     // Compliance and Users were reachable only by typing the URL: with no menu
     // entry the header title also fell back to the first item ("Dashboard").
-    { label: 'Conformitate', icon: 'medical-services', href: '/admin/compliance', group: 'Conformitate' },
+    { label: tr('Conformitate'), icon: 'medical-services', href: '/admin/compliance', group: 'Conformitate' },
     // GDPR requests have a 30-day legal deadline; they were reachable only from a notification.
-    { label: 'Date personale', icon: 'security', href: '/admin/privacy', group: 'Conformitate' },
-    { label: 'Jurnal', icon: 'history', href: '/admin/audit-log', group: 'Conformitate' },
+    { label: tr('Date personale'), icon: 'security', href: '/admin/privacy', group: 'Conformitate' },
+    { label: tr('Jurnal'), icon: 'history', href: '/admin/audit-log', group: 'Conformitate' },
 ];
 
 type SidebarProps = {
@@ -90,12 +91,12 @@ export default function Sidebar({ items = ADMIN_MENU_ITEMS, subtitle, plain = fa
                 </View>
                 <View className="flex-col">
                     <Text className="text-[17px] font-black tracking-tight leading-tight" style={{ color: 'var(--c-ink-strong)' }}>BCMS</Text>
-                    <Text className="text-[11.5px] font-semibold mt-0.5 max-w-[160px]" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{subtitle ?? session?.clubName ?? 'Clubul tău'}</Text>
+                    <Text className="text-[11.5px] font-semibold mt-0.5 max-w-[160px]" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{subtitle ?? session?.clubName ?? tr('Clubul tău')}</Text>
                 </View>
             </View>
 
             {/* Navigation Links */}
-            <View role="navigation" aria-label="Meniu principal" className="flex-1 py-1 px-2.5 gap-1 relative">
+            <View role="navigation" aria-label={tr('Meniu principal')} className="flex-1 py-1 px-2.5 gap-1 relative">
                 {items.filter((item) => !item.superadminOnly || isSuperadmin(session)).map((item, index, shown) => {
                     const cleanHref = item.href;
                     const groupStart = item.group && item.group !== shown[index - 1]?.group;

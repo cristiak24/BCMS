@@ -4,6 +4,7 @@ import { isContinuationDay } from '../../utils/eventDays';
 import { plural } from '../../utils/plural';
 import { EVENT_TYPE_META, formatEventTime } from './scheduleShared';
 
+import { tr, appLocale } from '../../i18n';
 /**
  * One event inside a month-grid day (admin and member calendars). It starts
  * with the time ("18:00 Antrenament U12"); the grid used to show only the
@@ -19,7 +20,7 @@ export function CalendarEventPill({ event, dateKey, onPress }: { event: Calendar
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.75}
-      accessibilityLabel={continued ? `${event.title}, continuă` : `${time}, ${event.title}`}
+      accessibilityLabel={continued ? tr('{0}, continuă', { '0': event.title }) : `${time}, ${event.title}`}
       className="hover:opacity-80"
       style={{
         borderRadius: 7,
@@ -48,6 +49,6 @@ export function CalendarEventPill({ event, dateKey, onPress }: { event: Calendar
 
 /** "21 octombrie: 2 evenimente" — the name of a day button in the grid. */
 export function calendarDayLabel(date: Date | null, dayNumber: number, count: number) {
-  const day = date ? date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'long' }) : String(dayNumber);
-  return count ? `${day}: ${plural(count, 'eveniment', 'evenimente')}` : `${day}: nimic programat`;
+  const day = date ? date.toLocaleDateString(appLocale(), { day: 'numeric', month: 'long' }) : String(dayNumber);
+  return count ? `${day}: ${plural(count, tr('eveniment'), tr('evenimente'))}` : `${day}: nimic programat`;
 }

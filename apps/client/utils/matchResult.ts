@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 /**
  * Matches kept with the club's own scorer (GET /events attaches `game`, from
  * game_stats). FRB fixtures carry their score in the description instead;
@@ -70,8 +71,8 @@ export function internalMatchResult(event: MatchLike): InternalResult | null {
   return {
     us,
     them,
-    ourName: event.teamName?.trim() || 'Echipa noastră',
-    theirName: opponentOf(event) ?? 'Adversar',
+    ourName: event.teamName?.trim() || tr('Echipa noastră'),
+    theirName: opponentOf(event) ?? tr('Adversar'),
     outcome: us === them ? 'draw' : us > them ? 'win' : 'loss',
     label: `${us} - ${them}`,
   };

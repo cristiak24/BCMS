@@ -20,6 +20,7 @@ import { ATTENDANCE_PERIOD_LABEL, pooledAttendanceRate } from '../../utils/atten
 import { plural, pluralWord } from '../../utils/plural';
 import { playerStatusLabel } from '../../utils/playerStatus';
 
+import { tr } from '../../i18n';
 /**
  * "Echipe" — the coach's squads, each card carrying the three things a coach
  * opens the screen for: how many players, what's next, and who is drifting on
@@ -61,7 +62,7 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Vezi echipa ${team.name}`}
+      accessibilityLabel={tr('Vezi echipa {0}', { '0': team.name })}
       className="ui-lift ui-press relative overflow-hidden rounded-[16px] border p-4 gap-3.5 min-w-0 text-left w-full"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}
     >
@@ -78,7 +79,7 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
             <Text className="t-meta mt-1" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{team.leagueName}</Text>
           ) : null}
         </View>
-        <ProgressRing value={average} size={52} stroke={6} color={attendanceRateColor(average)} label={average == null ? 'Fără prezență marcată în ultimele 30 de zile' : `Prezență ${average}% în ultimele 30 de zile`}>
+        <ProgressRing value={average} size={52} stroke={6} color={attendanceRateColor(average)} label={average == null ? tr('Fără prezență marcată în ultimele 30 de zile') : tr('Prezență {average}% în ultimele 30 de zile', { average })}>
           <Text className="f-display t-num text-[12.5px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>{average == null ? '—' : `${average}%`}</Text>
         </ProgressRing>
       </View>
@@ -90,21 +91,21 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
       ) : null}
 
       <View className="flex-row gap-2 sm:gap-2.5">
-        <StatTile icon="groups" tone="purple" label="Lot" value={team.players.length} hint={pluralWord(team.players.length, 'jucător', 'jucători')} />
+        <StatTile icon="groups" tone="purple" label={tr('Lot')} value={team.players.length} hint={pluralWord(team.players.length, tr('jucător'), tr('jucători'))} />
         <StatTile
           icon="event"
           tone="brand"
-          label="Urmează"
+          label={tr('Urmează')}
           value={team.nextEvent ? formatCoachDate(team.nextEvent.startTime) : '—'}
-          hint={team.nextEvent ? team.nextEvent.title : 'nimic programat'}
+          hint={team.nextEvent ? team.nextEvent.title : tr('nimic programat')}
         />
       </View>
 
       {team.players.length ? (
         <View className="gap-2">
-          <Text className="t-label" style={{ color: 'var(--c-muted)' }}>Prezență sub 75%</Text>
+          <Text className="t-label" style={{ color: 'var(--c-muted)' }}>{tr('Prezență sub 75%')}</Text>
           {preview.length ? (
-            <DenseList label={`Jucători sub 75% în ${team.name}`}>
+            <DenseList label={tr('Jucători sub 75% în {0}', { '0': team.name })}>
               {preview.map((player) => (
                 <CoachPlayerRow
                   key={player.id}
@@ -120,17 +121,16 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
             </DenseList>
           ) : (
             <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
-              {anyRated ? 'Toți jucătorii cu prezență marcată sunt peste 75%.' : 'Nicio prezență marcată în ultimele 30 de zile.'}
+              {anyRated ? tr('Toți jucătorii cu prezență marcată sunt peste 75%.') : tr('Nicio prezență marcată în ultimele 30 de zile.')}
             </Text>
           )}
           {hidden > 0 ? (
             <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
-              +{plural(hidden, 'alt jucător', 'alți jucători')} sub 75%
-            </Text>
+              {tr('+{0} sub 75%', { '0': plural(hidden, tr('alt jucător'), tr('alți jucători')) })}</Text>
           ) : null}
         </View>
       ) : (
-        <EmptyState icon="groups" compact title="Lot gol" message="Niciun jucător alocat acestei echipe încă." />
+        <EmptyState icon="groups" compact title={tr('Lot gol')} message={tr('Niciun jucător alocat acestei echipe încă.')} />
       )}
     </Pressable>
   );
@@ -138,7 +138,7 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
 
 function TeamsSkeleton() {
   return (
-    <View className="grid grid-cols-1 xl:grid-cols-2 gap-3" accessibilityRole="progressbar" accessibilityLabel="Se încarcă echipele">
+    <View className="grid grid-cols-1 xl:grid-cols-2 gap-3" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă echipele')}>
       {Array.from({ length: 2 }).map((_, index) => (
         <Skeleton key={index} className="h-[380px] w-full rounded-[16px]" />
       ))}
@@ -183,7 +183,7 @@ export default function CoachTeamsScreen() {
       setEvents(eventRows);
       setPlayersByTeam(playersByTeamId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nu s-au putut încărca echipele.');
+      setError(err instanceof Error ? err.message : tr('Nu s-au putut încărca echipele.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -222,15 +222,15 @@ export default function CoachTeamsScreen() {
   const teamsAverage = pooledAttendanceRate(visibleTeams.flatMap((team) => team.players));
 
   const subtitle = visibleTeams.length
-    ? `${plural(visibleTeams.length, 'echipă', 'echipe')} · ${session?.clubName ?? 'Clubul tău'}`
-    : 'Loturile și activitatea lor viitoare.';
+    ? `${plural(visibleTeams.length, tr('echipă'), tr('echipe'))} · ${session?.clubName ?? tr('Clubul tău')}`
+    : tr('Loturile și activitatea lor viitoare.');
 
   return (
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
       <PageContainer>
         <PageHero
-          eyebrow="Echipe"
-          title="Echipele mele"
+          eyebrow={tr('Echipe')}
+          title={tr('Echipele mele')}
           subtitle={subtitle}
           actions={
             <Pressable
@@ -238,7 +238,7 @@ export default function CoachTeamsScreen() {
               className="ui-press hidden sm:flex w-10 h-10 rounded-[11px] border items-center justify-center"
               style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
               accessibilityRole="button"
-              accessibilityLabel="Reîmprospătează"
+              accessibilityLabel={tr('Reîmprospătează')}
             >
               {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
             </Pressable>
@@ -246,11 +246,11 @@ export default function CoachTeamsScreen() {
         >
           {!loading && !error && visibleTeams.length ? (
             <StatStrip className="grid-cols-3">
-              <GlassStat dot="var(--c-brand-fg)" label="Echipe" value={visibleTeams.length} />
-              <GlassStat dot="var(--c-purple)" label="Jucători" value={totalPlayers} />
+              <GlassStat dot="var(--c-brand-fg)" label={tr('Echipe')} value={visibleTeams.length} />
+              <GlassStat dot="var(--c-purple)" label={tr('Jucători')} value={totalPlayers} />
               <GlassStat
                 dot={teamsAverage == null ? 'var(--c-faint)' : attendanceRateColor(teamsAverage)}
-                label="Prezență"
+                label={tr('Prezență')}
                 hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()}
                 value={teamsAverage ?? '—'}
                 suffix={teamsAverage == null ? undefined : '%'}
@@ -264,16 +264,16 @@ export default function CoachTeamsScreen() {
           <TeamsSkeleton />
         ) : error ? (
           <ErrorState
-            title="Nu am putut încărca echipele"
+            title={tr('Nu am putut încărca echipele')}
             message={error}
-            actionLabel="Reîncearcă"
+            actionLabel={tr('Reîncearcă')}
             onAction={() => loadData(true)}
           />
         ) : visibleTeams.length === 0 ? (
           <EmptyState
             icon="groups"
-            title="Nicio echipă alocată"
-            message="Când clubul îți atribuie o echipă, lotul și programul ei apar aici."
+            title={tr('Nicio echipă alocată')}
+            message={tr('Când clubul îți atribuie o echipă, lotul și programul ei apar aici.')}
           />
         ) : (
           // Two columns only from xl: the cards carry a roster list, so at 1024px

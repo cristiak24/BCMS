@@ -3,6 +3,7 @@ import { Pressable, Text, TextInput, View, type TextInputProps } from '@/src/web
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { announce } from './LiveRegion';
 
+import { tr } from '../../i18n';
 /**
  * Labelled text field at admin density (44px control, 12.5px label), fully
  * token-driven. Shared by the profile forms and the schedule's event form.
@@ -66,7 +67,7 @@ export function FormField({
           <Pressable
             onPress={() => setRevealed((value) => !value)}
             accessibilityRole="button"
-            accessibilityLabel={revealed ? 'Ascunde parola' : 'Arată parola'}
+            accessibilityLabel={revealed ? tr('Ascunde parola') : tr('Arată parola')}
             className="w-10 h-10 -mr-2 rounded-[8px] items-center justify-center"
           >
             <MaterialIcons name={revealed ? 'visibility' : 'visibility-off'} size={17} color="var(--c-muted)" />

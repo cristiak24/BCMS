@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, Text, View } from '@/src/web/reactNative'
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import Button from './Button';
 
+import { tr } from '../../i18n';
 type LoadingScreenProps = {
   message?: string;
   backgroundColor?: string;
@@ -40,7 +41,7 @@ export function ContentLoading() {
     <View
       className="flex-1 items-center justify-center py-24"
       accessibilityRole="progressbar"
-      accessibilityLabel="Se încarcă…"
+      accessibilityLabel={tr('Se încarcă…')}
     >
       <ActivityIndicator size="small" color="var(--c-brand-fg)" />
     </View>
@@ -48,7 +49,7 @@ export function ContentLoading() {
 }
 
 export function LoadingScreen({
-  message = 'Se încarcă…',
+  message = tr('Se încarcă…'),
   backgroundColor = 'var(--c-bg)',
   color = 'var(--c-brand-fg)',
 }: LoadingScreenProps) {
@@ -77,7 +78,7 @@ export function LoadingScreen({
 }
 
 export function ErrorState({
-  title = 'Ceva nu a funcționat',
+  title = tr('Ceva nu a funcționat'),
   message,
   actionLabel,
   onAction,
@@ -199,7 +200,7 @@ export function LoadError({ title, message, onRetry }: { title: string; message:
         <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>{title}</Text>
         <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{message}</Text>
       </View>
-      <Button size="sm" icon="refresh" label="Reîncearcă" onPress={onRetry} />
+      <Button size="sm" icon="refresh" label={tr('Reîncearcă')} onPress={onRetry} />
     </View>
   );
 }

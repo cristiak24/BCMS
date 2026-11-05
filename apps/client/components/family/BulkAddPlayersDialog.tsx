@@ -6,6 +6,7 @@ import { familyApi } from '../../services/familyApi';
 import { birthYearRange, ignoredBirthYears, parseRosterLines, type RosterOrder } from '../../utils/rosterParse';
 import { plural } from '../../utils/plural';
 
+import { tr } from '../../i18n';
 /**
  * Paste a roster ("Popescu Matei 2016", one per line — straight from Excel or
  * a WhatsApp message) and add everyone to the team at once. The preview shows
@@ -49,7 +50,7 @@ export default function BulkAddPlayersDialog({
       const result = await familyApi.bulkAddPlayers(teamId, rows);
       onDone({ created: result.created.length, skipped: result.skipped });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nu am putut adăuga jucătorii.');
+      setError(err instanceof Error ? err.message : tr('Nu am putut adăuga jucătorii.'));
     } finally {
       setSaving(false);
     }
@@ -64,31 +65,30 @@ export default function BulkAddPlayersDialog({
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Adaugă jucători din listă"
+          aria-label={tr('Adaugă jucători din listă')}
           className="w-full max-w-[560px] max-h-[90vh] overflow-y-auto rounded-3xl p-5"
           style={{ backgroundColor: 'var(--c-surface)', border: '1px solid var(--c-border)', boxShadow: '0 28px 70px rgba(2, 8, 23, 0.35)' }}
         >
           <View>
-            <Text className="text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>Adaugă jucători din listă</Text>
+            <Text className="text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Adaugă jucători din listă')}</Text>
             <Text className="t-meta mt-1 mb-3" style={{ color: 'var(--c-muted)' }}>
-              Câte un jucător pe rând, anul nașterii opțional — ex. „Popescu Matei 2016”. Intră în {teamName}.
-            </Text>
+              {tr('Câte un jucător pe rând, anul nașterii opțional — ex. „Popescu Matei 2016”. Intră în {teamName}.', { teamName })}</Text>
           </View>
 
           <textarea
             value={text}
             onChange={(event) => setText(event.target.value)}
-            aria-label="Lista de jucători"
-            placeholder={'Popescu Matei 2016\nIonescu Andrei 2016\nStan Radu'}
+            aria-label={tr('Lista de jucători')}
+            placeholder={tr('Popescu Matei 2016\nIonescu Andrei 2016\nStan Radu')}
             rows={7}
             className="w-full rounded-[12px] border px-3 py-2.5 text-[14px] font-medium outline-none"
             style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', borderStyle: 'solid', borderWidth: 1, color: 'var(--c-ink)', resize: 'vertical', lineHeight: '20px' }}
           />
 
           <View className="flex-row items-center gap-2 mt-3">
-            <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Ordinea:</Text>
+            <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>{tr('Ordinea:')}</Text>
             <View className="flex-row p-[3px] rounded-[10px]" style={{ backgroundColor: 'var(--c-surface-3)' }}>
-              {([['last-first', 'Nume Prenume'], ['first-last', 'Prenume Nume']] as const).map(([key, label]) => {
+              {([['last-first', tr('Nume Prenume')], ['first-last', tr('Prenume Nume')]] as const).map(([key, label]) => {
                 const active = order === key;
                 return (
                   <Pressable
@@ -109,9 +109,9 @@ export default function BulkAddPlayersDialog({
           {rows.length ? (
             <View className="mt-3 rounded-[12px] border overflow-hidden" style={{ borderColor: 'var(--c-border)' } as any}>
               <View className="flex-row px-3 py-2" style={{ backgroundColor: 'var(--c-surface-2)' }}>
-                <Text className="flex-1 t-eyebrow" style={{ color: 'var(--c-faint)' }}>Nume</Text>
-                <Text className="flex-1 t-eyebrow" style={{ color: 'var(--c-faint)' }}>Prenume</Text>
-                <Text className="w-14 t-eyebrow text-right" style={{ color: 'var(--c-faint)' }}>An</Text>
+                <Text className="flex-1 t-eyebrow" style={{ color: 'var(--c-faint)' }}>{tr('Nume')}</Text>
+                <Text className="flex-1 t-eyebrow" style={{ color: 'var(--c-faint)' }}>{tr('Prenume')}</Text>
+                <Text className="w-14 t-eyebrow text-right" style={{ color: 'var(--c-faint)' }}>{tr('An')}</Text>
               </View>
               {rows.slice(0, 8).map((row, index) => (
                 <View key={index} className="flex-row px-3 py-2 border-t" style={{ borderColor: 'var(--c-border)' } as any}>
@@ -121,16 +121,14 @@ export default function BulkAddPlayersDialog({
                 </View>
               ))}
               {rows.length > 8 ? (
-                <Text className="px-3 py-2 border-t text-[12px]" style={{ color: 'var(--c-muted)', borderColor: 'var(--c-border)' } as any}>
-                  … și încă {rows.length - 8}
+                <Text className="px-3 py-2 border-t text-[12px]" style={{ color: 'var(--c-muted)', borderColor: 'var(--c-border)' } as any}>{tr('… și încă')}{' '}{rows.length - 8}
                 </Text>
               ) : null}
             </View>
           ) : null}
           {ignored > 0 ? (
             <Text className="text-[12px] mt-2" style={{ color: 'var(--c-warning-fg)' }}>
-              {plural(ignored, 'rând ignorat', 'rânduri ignorate')} (lipsește numele sau prenumele).
-            </Text>
+              {tr('{0} (lipsește numele sau prenumele).', { '0': plural(ignored, tr('rând ignorat'), tr('rânduri ignorate')) })}</Text>
           ) : null}
           {droppedYears.length ? (
             <View
@@ -139,8 +137,7 @@ export default function BulkAddPlayersDialog({
               style={{ backgroundColor: 'var(--c-warning-bg)', borderColor: 'var(--c-warning-border)' } as any}
             >
               <MaterialIcons name="warning-amber" size={15} color="var(--c-warning-fg)" style={{ marginTop: 1 }} />
-              <Text className="flex-1 text-[12px] font-medium leading-[17px]" style={{ color: 'var(--c-warning-fg)' }}>
-                Anul nașterii trebuie să fie între {yearRange.min} și {yearRange.max}. Se salvează fără an:{' '}
+              <Text className="flex-1 text-[12px] font-medium leading-[17px]" style={{ color: 'var(--c-warning-fg)' }}>{tr('Anul nașterii trebuie să fie între')}{' '}{yearRange.min}{' '}{tr('și')}{' '}{yearRange.max}{tr('. Se salvează fără an:')}{' '}
                 {droppedYears.map((row) => `${row.name} (${row.year})`).join(', ')}.
               </Text>
             </View>
@@ -149,7 +146,7 @@ export default function BulkAddPlayersDialog({
 
           <View className="flex-row justify-end gap-2 mt-5">
             <Pressable onPress={onClose} disabled={saving} accessibilityRole="button" className="ui-press h-11 px-4 rounded-[11px] items-center justify-center">
-              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Renunță</Text>
+              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>{tr('Renunță')}</Text>
             </Pressable>
             <Pressable
               onPress={save}
@@ -160,7 +157,7 @@ export default function BulkAddPlayersDialog({
             >
               {saving ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : <MaterialIcons name="group-add" size={16} color="var(--c-on-brand)" />}
               <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-on-brand)' }}>
-                {rows.length ? `Adaugă ${plural(rows.length, 'jucător', 'jucători')}` : 'Adaugă'}
+                {rows.length ? tr('Adaugă {0}', { '0': plural(rows.length, 'jucător', 'jucători') }) : tr('Adaugă')}
               </Text>
             </Pressable>
           </View>

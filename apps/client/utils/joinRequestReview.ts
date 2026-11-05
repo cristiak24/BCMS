@@ -1,6 +1,7 @@
 import type { FamilyJoinRequest, JoinSuggestion } from '../services/familyRequestsApi';
 import { plural } from './plural';
 
+import { tr } from '../i18n';
 /**
  * How a club reviews a team-code join request (components/family/
  * FamilyRequestsPanel.tsx). A same-name child already in the club is shown,
@@ -31,21 +32,21 @@ export function autoApprovableIds(requests: FamilyJoinRequest[]) {
 }
 
 function playerName(s: JoinSuggestion) {
-  return `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || 'Jucătorul';
+  return `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || tr('Jucătorul');
 }
 
 /** Reasons to look twice before linking this request to `s`, in plain Romanian. */
 export function matchWarnings(request: FamilyJoinRequest, s: JoinSuggestion) {
   const warnings: string[] = [];
   if (request.kind === 'parent' && s.guardians > 0) {
-    warnings.push(`${playerName(s)} are deja ${s.guardians === 1 ? 'un părinte legat' : plural(s.guardians, 'părinte legat', 'părinți legați')}.`);
+    warnings.push(`${playerName(s)} are deja ${s.guardians === 1 ? tr('un părinte legat') : plural(s.guardians, tr('părinte legat'), tr('părinți legați'))}.`);
   }
   if (request.kind === 'player' && s.hasAccount) {
-    warnings.push(`${playerName(s)} are deja un cont de jucător.`);
+    warnings.push(tr('{0} are deja un cont de jucător.', { '0': playerName(s) }));
   }
   if (s.birthMismatch) {
     const onFile = s.birthDate ? formatBirth(s.birthDate) : s.birthYear != null ? String(s.birthYear) : '';
-    warnings.push(`Data nașterii diferă: în cerere ${formatBirth(request.child.birthDate) || '—'}, în club ${onFile || '—'}.`);
+    warnings.push(tr('Data nașterii diferă: în cerere {0}, în club {1}.', { '0': formatBirth(request.child.birthDate) || '—', '1': onFile || '—' }));
   }
   return warnings;
 }
@@ -54,9 +55,9 @@ export function matchWarnings(request: FamilyJoinRequest, s: JoinSuggestion) {
 export function denyMessage(request: FamilyJoinRequest) {
   const child = `${request.child.firstName} ${request.child.lastName}`;
   if (request.requester.status === 'pending') {
-    return 'Contul rămâne în așteptare, fără acces la echipă.';
+    return tr('Contul rămâne în așteptare, fără acces la echipă.');
   }
   return request.kind === 'parent'
-    ? `${request.requester.name} nu va fi legat de ${child}. Contul rămâne activ, cu accesul pe care îl are deja.`
-    : `${request.requester.name} nu intră în ${request.team.name}. Contul rămâne activ, cu accesul pe care îl are deja.`;
+    ? tr('{0} nu va fi legat de {child}. Contul rămâne activ, cu accesul pe care îl are deja.', { '0': request.requester.name, child })
+    : tr('{0} nu intră în {1}. Contul rămâne activ, cu accesul pe care îl are deja.', { '0': request.requester.name, '1': request.team.name });
 }

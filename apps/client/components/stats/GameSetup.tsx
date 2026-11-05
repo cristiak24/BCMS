@@ -5,6 +5,7 @@ import { gamesApi, type Game, type GamePayload, type OpponentEntry } from '../..
 import type { GameMode } from '../../utils/gameStats';
 import { plural } from '../../utils/plural';
 
+import { tr } from '../../i18n';
 /**
  * Before the tip-off: how detailed, who plays, who starts, the opponent, and
  * who keeps the sheet. Everything has a sensible default so a coach can press
@@ -12,10 +13,10 @@ import { plural } from '../../utils/plural';
  */
 
 const PERIOD_OPTIONS = [
-  { label: '10 min', sec: 600 },
-  { label: '8 min', sec: 480 },
-  { label: '6 min', sec: 360 },
-  { label: 'Fără cronometru', sec: null },
+  { label: tr('10 min'), sec: 600 },
+  { label: tr('8 min'), sec: 480 },
+  { label: tr('6 min'), sec: 360 },
+  { label: tr('Fără cronometru'), sec: null },
 ] as const;
 
 function Card({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
@@ -99,16 +100,16 @@ export default function GameSetup({
   // What still blocks the start, said on the button itself. The button used to
   // be enabled at (0/5) and only then show an error above it, far from the list.
   const blocker = fromL12 && lineup.length < 5
-    ? `Lista L12 are doar ${plural(lineup.length, 'jucător', 'jucători')}: completeaz-o în L12`
+    ? tr('Lista L12 are doar {0}: completeaz-o în L12', { '0': plural(lineup.length, 'jucător', 'jucători') })
     : roster.length < 5
-    ? `Bifează încă ${plural(5 - roster.length, 'jucător', 'jucători')} care joacă`
+    ? tr('Bifează încă {0} care joacă', { '0': plural(5 - roster.length, 'jucător', 'jucători') })
     : starters.length !== 5
-      ? `Alege încă ${plural(5 - starters.length, 'titular', 'titulari')}`
+      ? tr('Alege încă {0}', { '0': plural(5 - starters.length, 'titular', 'titulari') })
       : null;
 
   const start = async () => {
-    if (roster.length < 5) return setError('Alege cel puțin 5 jucători pentru meci.');
-    if (starters.length !== 5) return setError('Alege exact 5 jucători care încep (apasă pe „Titular”).');
+    if (roster.length < 5) return setError(tr('Alege cel puțin 5 jucători pentru meci.'));
+    if (starters.length !== 5) return setError(tr('Alege exact 5 jucători care încep (apasă pe „Titular”).'));
     setSaving(true);
     setError(null);
     try {
@@ -123,7 +124,7 @@ export default function GameSetup({
       });
       onReady(game);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nu am putut pregăti meciul.');
+      setError(err instanceof Error ? err.message : tr('Nu am putut pregăti meciul.'));
     } finally {
       setSaving(false);
     }
@@ -150,14 +151,14 @@ export default function GameSetup({
 
   return (
     <View className="gap-3 max-w-[760px] w-full">
-      <Card title="Cum ții statistica?">
+      <Card title={tr('Cum ții statistica?')}>
         <View className="flex-row flex-wrap gap-2">
-          {modeCard('simple', 'Simplu', 'Puncte, faulturi și schimbări. Pentru oricine.', 'bolt')}
-          {modeCard('full', 'Complet', 'Plus recuperări, pase, furturi, capace, pierderi, ratări și cronometru.', 'insights')}
+          {modeCard('simple', 'Simplu', tr('Puncte, faulturi și schimbări. Pentru oricine.'), 'bolt')}
+          {modeCard('full', 'Complet', tr('Plus recuperări, pase, furturi, capace, pierderi, ratări și cronometru.'), 'insights')}
         </View>
         {mode === 'full' ? (
           <View className="flex-row flex-wrap items-center gap-1.5">
-            <Text className="text-[12.5px] font-semibold mr-1" style={{ color: 'var(--c-muted)' }}>Sfertul:</Text>
+            <Text className="text-[12.5px] font-semibold mr-1" style={{ color: 'var(--c-muted)' }}>{tr('Sfertul:')}</Text>
             {PERIOD_OPTIONS.map((option) => {
               const active = periodSec === option.sec;
               return (
@@ -173,10 +174,10 @@ export default function GameSetup({
       </Card>
 
       <Card
-        title={`Jucători · ${roster.length}`}
+        title={tr('Jucători · {0}', { '0': roster.length })}
         hint={fromL12
-          ? `Din lista L12 a meciului (${plural(lineup.length, 'jucător', 'jucători')}); lista se schimbă din L12. Alege cei 5 titulari (${starters.length}/5).`
-          : `Bifează cine joacă și alege cei 5 titulari (${starters.length}/5).`}
+          ? tr('Din lista L12 a meciului ({0}); lista se schimbă din L12. Alege cei 5 titulari ({1}/5).', { '0': plural(lineup.length, 'jucător', 'jucători'), '1': starters.length })
+          : tr('Bifează cine joacă și alege cei 5 titulari ({0}/5).', { '0': starters.length })}
       >
         {/* One list with dividers (it was a tinted block per player); who sits out reads quieter by colour, not opacity. */}
         <View className={lineup.length ? 'rounded-[12px] border overflow-hidden' : ''} style={{ borderColor: 'var(--c-border)' }}>
@@ -186,46 +187,46 @@ export default function GameSetup({
             return (
               <View key={p.playerId} className={`flex-row items-center gap-2.5 px-3 ${index > 0 ? 'border-t' : ''}`} style={{ borderColor: 'var(--c-border-soft)' }}>
                 {/* The whole line is the target (44px), not just the 20px of text. */}
-                <Pressable onPress={() => toggleRoster(p.playerId)} disabled={p.visaExpired} accessibilityRole={'checkbox' as any} accessibilityState={{ checked: playing, disabled: !!p.visaExpired } as any} accessibilityLabel={p.visaExpired ? `${p.firstName} ${p.lastName}: nu poate juca, viză expirată` : `${p.firstName} ${p.lastName} joacă`} className="flex-1 min-w-0 min-h-11 flex-row items-center gap-2.5 text-left">
+                <Pressable onPress={() => toggleRoster(p.playerId)} disabled={p.visaExpired} accessibilityRole={'checkbox' as any} accessibilityState={{ checked: playing, disabled: !!p.visaExpired } as any} accessibilityLabel={p.visaExpired ? tr('{0} {1}: nu poate juca, viză expirată', { '0': p.firstName, '1': p.lastName }) : tr('{0} {1} joacă', { '0': p.firstName, '1': p.lastName })} className="flex-1 min-w-0 min-h-11 flex-row items-center gap-2.5 text-left">
                   <MaterialIcons name={playing ? 'check-box' : 'check-box-outline-blank'} size={18} color={playing ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
                   <Text className="t-num w-8 text-[13px] font-bold" style={{ color: 'var(--c-muted)' }}>{p.number ? `#${p.number}` : '—'}</Text>
                   {/* The visa note under the name: beside it, on a phone the name was cut to „Andrei …”. */}
                   <View className="flex-1 min-w-0 py-1">
                     <Text className="text-[14px] font-semibold" style={{ color: playing ? 'var(--c-ink)' : 'var(--c-muted)' }} numberOfLines={1}>{p.firstName} {p.lastName}</Text>
                     {p.visaExpired ? (
-                      <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>Nu poate juca: viză expirată</Text>
+                      <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-danger-fg)' }}>{tr('Nu poate juca: viză expirată')}</Text>
                     ) : p.visaMissing ? (
-                      <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-warning-fg)' }}>Fără viză</Text>
+                      <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-warning-fg)' }}>{tr('Fără viză')}</Text>
                     ) : null}
                   </View>
                 </Pressable>
                 {playing && !p.visaExpired ? (
-                  <Pressable onPress={() => toggleStarter(p.playerId)} accessibilityRole="button" accessibilityState={{ selected: starter }} accessibilityLabel={`Titular: ${p.firstName} ${p.lastName}`}
+                  <Pressable onPress={() => toggleStarter(p.playerId)} accessibilityRole="button" accessibilityState={{ selected: starter }} accessibilityLabel={tr('Titular: {0} {1}', { '0': p.firstName, '1': p.lastName })}
                     className="h-10 px-3 rounded-[10px] border items-center justify-center"
                     style={{ borderColor: starter ? 'var(--c-success)' : 'var(--c-border)', backgroundColor: starter ? 'var(--c-success-bg)' : 'var(--c-surface)', opacity: !starter && starters.length >= 5 ? 0.5 : 1 } as any}>
-                    <Text className="text-[12px] font-bold" style={{ color: starter ? 'var(--c-success-fg)' : 'var(--c-muted)' }}>Titular</Text>
+                    <Text className="text-[12px] font-bold" style={{ color: starter ? 'var(--c-success-fg)' : 'var(--c-muted)' }}>{tr('Titular')}</Text>
                   </Pressable>
                 ) : null}
               </View>
             );
           })}
-          {lineup.length === 0 ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Echipa nu are jucători în lot.</Text> : null}
+          {lineup.length === 0 ? <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{tr('Echipa nu are jucători în lot.')}</Text> : null}
         </View>
       </Card>
 
-      <Card title="Adversarul" hint="Implicit ții doar scorul și faulturile lor pe echipă.">
+      <Card title={tr('Adversarul')} hint={tr('Implicit ții doar scorul și faulturile lor pe echipă.')}>
         <TextInput
           value={opponentName}
           onChangeText={setOpponentName}
-          placeholder="Numele echipei adverse"
+          placeholder={tr('Numele echipei adverse')}
           placeholderTextColor="var(--c-faint)"
-          accessibilityLabel="Numele echipei adverse"
+          accessibilityLabel={tr('Numele echipei adverse')}
           className="h-11 rounded-[10px] border px-3 text-[14px] font-medium outline-none"
           style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}
         />
         <Pressable onPress={() => setTrackOpponents((v) => !v)} accessibilityRole={'checkbox' as any} accessibilityState={{ checked: trackOpponents } as any} className="min-h-11 flex-row items-center gap-2 text-left">
           <MaterialIcons name={trackOpponents ? 'check-box' : 'check-box-outline-blank'} size={18} color={trackOpponents ? 'var(--c-brand-fg)' : 'var(--c-faint)'} />
-          <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>Țin punctele și faulturile pe jucătorii lor</Text>
+          <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>{tr('Țin punctele și faulturile pe jucătorii lor')}</Text>
         </Pressable>
         {trackOpponents ? (
           <View className="gap-2">
@@ -234,14 +235,14 @@ export default function GameSetup({
                 value={numbersInput}
                 onChangeText={setNumbersInput}
                 onSubmitEditing={addNumbers}
-                placeholder="Numere, ex. 4 7 9 12"
+                placeholder={tr('Numere, ex. 4 7 9 12')}
                 placeholderTextColor="var(--c-faint)"
-                accessibilityLabel="Numerele jucătorilor adverși"
+                accessibilityLabel={tr('Numerele jucătorilor adverși')}
                 className="flex-1 h-10 rounded-[10px] border px-3 text-[14px] font-medium outline-none"
                 style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}
               />
               <Pressable onPress={addNumbers} accessibilityRole="button" className="ui-press h-10 px-3.5 rounded-[10px] items-center justify-center" style={{ backgroundColor: 'var(--c-surface-3)' }}>
-                <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink)' }}>Adaugă</Text>
+                <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink)' }}>{tr('Adaugă')}</Text>
               </Pressable>
             </View>
             {opponents.map((o) => (
@@ -250,13 +251,13 @@ export default function GameSetup({
                 <TextInput
                   value={o.name}
                   onChangeText={(name: string) => setOpponents((list) => list.map((x) => (x.number === o.number ? { ...x, name } : x)))}
-                  placeholder="Nume (opțional)"
+                  placeholder={tr('Nume (opțional)')}
                   placeholderTextColor="var(--c-faint)"
-                  accessibilityLabel={`Numele jucătorului advers #${o.number}`}
+                  accessibilityLabel={tr('Numele jucătorului advers #{0}', { '0': o.number })}
                   className="flex-1 h-9 rounded-[9px] border px-3 text-[13px] outline-none"
                   style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}
                 />
-                <Pressable onPress={() => setOpponents((list) => list.filter((x) => x.number !== o.number))} accessibilityRole="button" accessibilityLabel={`Scoate #${o.number}`} className="w-8 h-8 items-center justify-center">
+                <Pressable onPress={() => setOpponents((list) => list.filter((x) => x.number !== o.number))} accessibilityRole="button" accessibilityLabel={tr('Scoate #{0}', { '0': o.number })} className="w-8 h-8 items-center justify-center">
                   <MaterialIcons name="close" size={16} color="var(--c-faint)" />
                 </Pressable>
               </View>
@@ -265,7 +266,7 @@ export default function GameSetup({
         ) : null}
       </Card>
 
-      <Card title="Cine ține statistica?" hint="Poți lăsa un antrenor secund, cineva din staff sau un părinte. Doar persoana aleasă (și staff-ul) poate introduce acțiuni.">
+      <Card title={tr('Cine ține statistica?')} hint={tr('Poți lăsa un antrenor secund, cineva din staff sau un părinte. Doar persoana aleasă (și staff-ul) poate introduce acțiuni.')}>
         <View className="flex-row flex-wrap gap-1.5">
           {[{ id: myUserId ?? -1, name: 'Eu', role: '' }, ...keepers.filter((k) => k.id !== myUserId)].map((person) => {
             const active = (keeper ?? myUserId) === person.id;
@@ -274,7 +275,7 @@ export default function GameSetup({
                 className="h-9 [@media(pointer:coarse)]:h-10 px-3 rounded-[10px] border items-center justify-center"
                 style={{ borderColor: active ? 'transparent' : 'var(--c-border)', backgroundColor: active ? 'var(--c-brand-surface)' : 'var(--c-surface)' } as any}>
                 <Text className="text-[13px] font-semibold" style={{ color: active ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}>
-                  {person.name}{person.role === 'parent' ? ' (părinte)' : person.role === 'staff' ? ' (staff)' : ''}
+                  {person.name}{person.role === 'parent' ? tr(' (părinte)') : person.role === 'staff' ? tr(' (staff)') : ''}
                 </Text>
               </Pressable>
             );
@@ -285,7 +286,7 @@ export default function GameSetup({
       {error ? <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-danger-fg)' }} accessibilityRole="alert">{error}</Text> : null}
       {/* Read out as the count changes, next to the button it unlocks. */}
       <Text className="t-meta text-center" style={{ color: 'var(--c-muted)' }} aria-live="polite">
-        {`${plural(roster.length, 'jucător', 'jucători')} în meci · ${starters.length}/5 titulari`}
+        {tr('{0} în meci · {1}/5 titulari', { '0': plural(roster.length, 'jucător', 'jucători'), '1': starters.length })}
       </Text>
       <Pressable
         onPress={start}
@@ -297,7 +298,7 @@ export default function GameSetup({
       >
         {saving ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : <MaterialIcons name="sports-basketball" size={18} color="var(--c-on-brand)" />}
         <Text className="text-[15px] font-bold" style={{ color: 'var(--c-on-brand)' }}>
-          {blocker ?? (keeper && keeper !== myUserId ? 'Salvează și trimite statisticianului' : 'Începe meciul')}
+          {blocker ?? (keeper && keeper !== myUserId ? tr('Salvează și trimite statisticianului') : tr('Începe meciul'))}
         </Text>
       </Pressable>
     </View>

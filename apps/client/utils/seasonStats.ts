@@ -1,3 +1,4 @@
+import { appLocale } from '../i18n';
 /**
  * Display helpers for season statistics (server lib/seasonStats.ts computes
  * them). Romanian decimals ("8,5"), "—" for nothing to show.
@@ -5,7 +6,7 @@
 
 export function formatStat(value: number | null | undefined) {
   if (value == null || Number.isNaN(value)) return '—';
-  return Number.isInteger(value) ? String(value) : value.toLocaleString('ro-RO', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return Number.isInteger(value) ? String(value) : value.toLocaleString(appLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
 export function formatPct(value: number | null | undefined) {

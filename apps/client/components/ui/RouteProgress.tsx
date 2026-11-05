@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouteLoading } from '../../src/lazyRoute';
 
+import { tr } from '../../i18n';
 /**
  * Thin indeterminate bar at the very top while a screen's code is loading.
  *
@@ -28,7 +29,7 @@ export default function RouteProgress() {
       className={`route-progress ${visible ? 'is-visible' : ''}`}
       role="progressbar"
       aria-hidden={!visible}
-      aria-label="Se încarcă pagina"
+      aria-label={tr('Se încarcă pagina')}
     >
       <div className="route-progress-bar" />
     </div>

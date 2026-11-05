@@ -1,6 +1,7 @@
 import { ActivityIndicator, Pressable, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 
+import { tr } from '../../i18n';
 /**
  * Floating "N modificări nesalvate · Renunță · Salvează" bar for draft-and-save
  * screens. Render it as a sibling of the page's ScrollView, inside a
@@ -16,7 +17,7 @@ export default function UnsavedBar({
   saving,
   onSave,
   onDiscard,
-  saveLabel = 'Salvează',
+  saveLabel = tr('Salvează'),
 }: {
   /** Keep it short — it shares a 375px row with two buttons. */
   label: string;
@@ -44,10 +45,10 @@ export default function UnsavedBar({
             onPress={onDiscard}
             disabled={saving}
             accessibilityRole="button"
-            accessibilityLabel="Renunță la modificări"
+            accessibilityLabel={tr('Renunță la modificări')}
             className="ui-press h-10 px-3 rounded-[10px] items-center justify-center"
           >
-            <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-muted)' }}>Renunță</Text>
+            <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-muted)' }}>{tr('Renunță')}</Text>
           </Pressable>
         ) : null}
         <Pressable

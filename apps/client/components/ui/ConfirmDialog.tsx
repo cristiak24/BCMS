@@ -4,6 +4,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import ModalBackdrop from './ModalBackdrop';
 import Button, { type ButtonVariant } from './Button';
 
+import { tr } from '../../i18n';
 type IconName = string;
 
 type ConfirmDialogProps = {
@@ -71,8 +72,8 @@ export default function ConfirmDialog({
     visible,
     title,
     message,
-    confirmLabel = 'Confirmă',
-    cancelLabel = 'Renunță',
+    confirmLabel = tr('Confirmă'),
+    cancelLabel = tr('Renunță'),
     destructive = false,
     loading = false,
     icon,
@@ -218,15 +219,13 @@ export default function ConfirmDialog({
 
                         {requireTypedConfirmation ? (
                             <View className="mt-5 gap-1.5">
-                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>
-                                    Scrie <Text className="font-bold" style={{ color: 'var(--c-ink)' }}>{requireTypedConfirmation}</Text> ca să confirmi
-                                </Text>
+                                <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-muted)' }}>{tr('Scrie')}{' '}<Text className="font-bold" style={{ color: 'var(--c-ink)' }}>{requireTypedConfirmation}</Text>{' '}{tr('ca să confirmi')}</Text>
                                 <TextInput
                                     value={typed}
                                     onChangeText={setTyped}
                                     autoCapitalize="characters"
                                     autoCorrect={false}
-                                    accessibilityLabel={`Scrie ${requireTypedConfirmation} ca să confirmi`}
+                                    accessibilityLabel={tr('Scrie {requireTypedConfirmation} ca să confirmi', { requireTypedConfirmation })}
                                     onSubmitEditing={() => { if (!confirmBlocked && !loading) onConfirm(); }}
                                     className="rounded-[10px] border px-3.5 h-11 text-[14px]"
                                     style={{ backgroundColor: 'var(--c-surface-2)', borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--c-border)', color: 'var(--c-ink)' } as any}

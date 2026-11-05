@@ -3,9 +3,9 @@ import type { TeamGender, TeamLevel } from '../../services/teamsApi';
 import { plural } from '../../utils/plural';
 
 export const LEVEL_LABELS: Record<TeamLevel, string> = {
-    national: 'Național',
+    national: tr('Național'),
     municipal: 'Municipal',
-    initiere: 'Inițiere',
+    initiere: tr('Inițiere'),
 };
 
 export const GENDER_LABELS: Record<TeamGender, string> = {
@@ -25,11 +25,12 @@ export function computeAge(birthYear: number | null | undefined) {
 export { medicalStatus, type MedicalStatus } from '../../utils/medicalVisa';
 import type { MedicalStatus } from '../../utils/medicalVisa';
 
+import { tr, appLocale } from '../../i18n';
 export const MEDICAL_META: Record<MedicalStatus, { label: string; bg: string; fg: string }> = {
-    valid: { label: 'Viză valabilă', bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },
-    soon: { label: 'Expiră curând', bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' },
-    expired: { label: 'Viză expirată', bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)' },
-    missing: { label: 'Fără viză', bg: 'var(--c-surface-3)', fg: 'var(--c-muted)' },
+    valid: { label: tr('Viză valabilă'), bg: 'var(--c-success-bg)', fg: 'var(--c-success-fg)' },
+    soon: { label: tr('Expiră curând'), bg: 'var(--c-warning-bg)', fg: 'var(--c-warning-fg)' },
+    expired: { label: tr('Viză expirată'), bg: 'var(--c-danger-bg)', fg: 'var(--c-danger-fg)' },
+    missing: { label: tr('Fără viză'), bg: 'var(--c-surface-3)', fg: 'var(--c-muted)' },
 };
 
 /**
@@ -39,8 +40,8 @@ export const MEDICAL_META: Record<MedicalStatus, { label: string; bg: string; fg
  */
 export function clearanceSummary(expired: number, missing: number) {
     const parts = [
-        expired > 0 ? plural(expired, 'viză expirată', 'vize expirate') : null,
-        missing > 0 ? `${missing.toLocaleString('ro-RO')} fără viză` : null,
+        expired > 0 ? plural(expired, tr('viză expirată'), tr('vize expirate')) : null,
+        missing > 0 ? tr('{0} fără viză', { '0': missing.toLocaleString(appLocale()) }) : null,
     ].filter(Boolean);
     return parts.length ? parts.join(' · ') : null;
 }
@@ -56,7 +57,7 @@ export function formatDate(iso: string | null | undefined) {
     if (!iso) return '—';
     const date = parseApiDate(iso);
     if (Number.isNaN(date.getTime())) return '—';
-    return date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' });
+    return date.toLocaleDateString(appLocale(), { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export function formatRelativeDate(iso: string | null | undefined) {
@@ -66,11 +67,11 @@ export function formatRelativeDate(iso: string | null | undefined) {
 
     const diffMs = Date.now() - date.getTime();
     const diffMinutes = Math.round(diffMs / 60000);
-    if (diffMinutes < 1) return 'acum câteva secunde';
+    if (diffMinutes < 1) return tr('acum câteva secunde');
     if (diffMinutes < 60) return `acum ${diffMinutes} min`;
     const diffHours = Math.round(diffMinutes / 60);
-    if (diffHours < 24) return `acum ${plural(diffHours, 'oră', 'ore')}`;
+    if (diffHours < 24) return `acum ${plural(diffHours, tr('oră'), tr('ore'))}`;
     const diffDays = Math.round(diffHours / 24);
-    if (diffDays < 7) return `acum ${plural(diffDays, 'zi', 'zile')}`;
-    return date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' });
+    if (diffDays < 7) return `acum ${plural(diffDays, tr('zi'), tr('zile'))}`;
+    return date.toLocaleDateString(appLocale(), { day: 'numeric', month: 'short', year: 'numeric' });
 }

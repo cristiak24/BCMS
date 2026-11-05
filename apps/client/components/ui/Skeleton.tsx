@@ -1,6 +1,7 @@
 import { View } from '@/src/web/reactNative';
 import GlassCard from './GlassCard';
 
+import { tr } from '../../i18n';
 /**
  * Lightweight shimmer placeholders. Rendering these while data loads keeps the
  * layout stable (no full-screen spinner → no content jump) and signals progress.
@@ -51,7 +52,7 @@ export function SkeletonCard() {
 /** Renders `count` card skeletons with consistent spacing. */
 export function SkeletonList({ count = 3 }: { count?: number }) {
     return (
-        <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă...">
+        <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă...')}>
             {Array.from({ length: count }).map((_, index) => (
                 <SkeletonCard key={index} />
             ))}

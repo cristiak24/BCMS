@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from '@/src/web/reactNative'
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { ATTENDANCE_MARKS, toAttendanceMark, type AttendanceMark } from '../../utils/attendanceStatus';
 
+import { tr } from '../../i18n';
 /**
  * The four marks as one segmented control, shared by the coach "Prezență"
  * screen and the admin sheet. The filled segment is the row's only status
@@ -52,7 +53,7 @@ export default function AttendanceMarkButtons({
       ref={groupRef}
       className="flex-row gap-1.5 shrink-0"
       accessibilityRole={'radiogroup' as any}
-      accessibilityLabel={`Prezență ${playerName}`}
+      accessibilityLabel={tr('Prezență {playerName}', { playerName })}
       onKeyDown={onKeyDown}
     >
       {ATTENDANCE_MARKS.map((option, index) => {

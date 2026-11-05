@@ -2,6 +2,7 @@ import ConfirmDialog from './ConfirmDialog';
 import Button from './Button';
 import type { useLeaveGuard } from '../../hooks/useLeaveGuard';
 
+import { tr } from '../../i18n';
 /**
  * The question `useLeaveGuard` asks when a page with unsaved changes is left
  * (the sidebar, the bottom bar, „Înapoi”): save and go, stay, or go without
@@ -18,15 +19,15 @@ export default function LeaveGuardDialog({ guard, saving, what, onSave }: {
     <ConfirmDialog
       visible={guard.pending}
       icon="save"
-      title="Salvezi modificările?"
-      message={`Ai modificări nesalvate în ${what}. Dacă pleci fără să le salvezi, se pierd.`}
-      confirmLabel="Salvează și pleacă"
-      cancelLabel="Rămân pe pagină"
+      title={tr('Salvezi modificările?')}
+      message={tr('Ai modificări nesalvate în {what}. Dacă pleci fără să le salvezi, se pierd.', { what })}
+      confirmLabel={tr('Salvează și pleacă')}
+      cancelLabel={tr('Rămân pe pagină')}
       loading={saving}
       onConfirm={() => { void onSave().then((ok) => { if (ok) guard.leave(); }); }}
       onCancel={guard.stay}
     >
-      <Button variant="ghost" label="Pleacă fără salvare" disabled={saving} onPress={guard.leave} className="self-start" />
+      <Button variant="ghost" label={tr('Pleacă fără salvare')} disabled={saving} onPress={guard.leave} className="self-start" />
     </ConfirmDialog>
   );
 }

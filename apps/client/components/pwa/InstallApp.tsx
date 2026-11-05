@@ -10,6 +10,7 @@ import {
     type InstallPlatform, type IosBrowser,
 } from '../../src/pwa/installApp';
 
+import { tr } from '../../i18n';
 type Step = { icon: ReactNode; text: ReactNode };
 
 function Strong({ children }: { children: ReactNode }) {
@@ -24,11 +25,11 @@ function stepsFor(platform: InstallPlatform, iosBrowser: IosBrowser | null): { i
     if (platform === 'ios') {
         if (iosBrowser === 'in-app') {
             return {
-                intro: 'Ești într-un browser din altă aplicație, care nu poate instala BCMS.',
+                intro: tr('Ești într-un browser din altă aplicație, care nu poate instala BCMS.'),
                 steps: [
-                    { icon: <Compass size={17} color="var(--c-brand-fg)" />, text: <>Deschide <Strong>bcms.ro</Strong> în <Strong>Safari</Strong>.</> },
-                    { icon: shareIcon, text: <>Apasă <Strong>Partajează</Strong> în bara de jos.</> },
-                    { icon: addIcon, text: <>Alege <Strong>Adaugă pe ecranul principal</Strong>, apoi <Strong>Adaugă</Strong>.</> },
+                    { icon: <Compass size={17} color="var(--c-brand-fg)" />, text: <>Deschide <Strong>{tr('bcms.ro')}</Strong> în <Strong>{tr('Safari')}</Strong>.</> },
+                    { icon: shareIcon, text: <>Apasă <Strong>{tr('Partajează')}</Strong> în bara de jos.</> },
+                    { icon: addIcon, text: <>Alege <Strong>{tr('Adaugă pe ecranul principal')}</Strong>, apoi <Strong>{tr('Adaugă')}</Strong>.</> },
                 ],
             };
         }
@@ -36,11 +37,11 @@ function stepsFor(platform: InstallPlatform, iosBrowser: IosBrowser | null): { i
             ? <>în bara de adresă, sus în dreapta</>
             : <>în bara de jos a Safari</>;
         return {
-            intro: 'Pe iPhone aplicația se instalează din meniul Partajează — iOS nu afișează un buton de instalare.',
+            intro: tr('Pe iPhone aplicația se instalează din meniul Partajează — iOS nu afișează un buton de instalare.'),
             steps: [
-                { icon: shareIcon, text: <>Apasă butonul <Strong>Partajează</Strong> {where}.</> },
-                { icon: addIcon, text: <>Derulează și alege <Strong>Adaugă pe ecranul principal</Strong>. Dacă nu apare, apasă <Strong>Editează acțiunile</Strong> și adaug-o.</> },
-                { icon: doneIcon, text: <>Apasă <Strong>Adaugă</Strong>. BCMS apare pe ecran ca o aplicație.</> },
+                { icon: shareIcon, text: <>Apasă butonul <Strong>{tr('Partajează')}</Strong> {where}.</> },
+                { icon: addIcon, text: <>Derulează și alege <Strong>{tr('Adaugă pe ecranul principal')}</Strong>. Dacă nu apare, apasă <Strong>{tr('Editează acțiunile')}</Strong> și adaug-o.</> },
+                { icon: doneIcon, text: <>Apasă <Strong>{tr('Adaugă')}</Strong>. BCMS apare pe ecran ca o aplicație.</> },
             ],
         };
     }
@@ -48,7 +49,7 @@ function stepsFor(platform: InstallPlatform, iosBrowser: IosBrowser | null): { i
     return {
         steps: [
             { icon: <EllipsisVertical size={17} color="var(--c-brand-fg)" />, text: <>Deschide meniul browserului <Strong>⋮</Strong>.</> },
-            { icon: addIcon, text: <>Alege <Strong>Instalează aplicația</Strong> sau <Strong>Adaugă pe ecranul principal</Strong>.</> },
+            { icon: addIcon, text: <>Alege <Strong>{tr('Instalează aplicația')}</Strong> sau <Strong>{tr('Adaugă pe ecranul principal')}</Strong>.</> },
             { icon: doneIcon, text: <>Confirmă. BCMS se deschide apoi ca o aplicație separată.</> },
         ],
     };
@@ -75,13 +76,13 @@ export function InstallInstructionsSheet({ visible, onClose }: { visible: boolea
                     <View className="flex-row items-center gap-3 mb-3">
                         <img src="/apple-touch-icon.png" alt="" width={44} height={44} style={{ borderRadius: 11 }} />
                         <View className="flex-1 min-w-0">
-                            <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>Instalează BCMS</Text>
-                            <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Pe ecranul principal, pe tot ecranul, fără bara browserului.</Text>
+                            <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Instalează BCMS')}</Text>
+                            <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{tr('Pe ecranul principal, pe tot ecranul, fără bara browserului.')}</Text>
                         </View>
                         <Pressable
                             onPress={onClose}
                             accessibilityRole="button"
-                            accessibilityLabel="Închide"
+                            accessibilityLabel={tr('Închide')}
                             className="ui-press w-9 h-9 rounded-full items-center justify-center shrink-0"
                             style={{ backgroundColor: 'var(--c-surface-2)' }}
                         >
@@ -134,19 +135,19 @@ export function InstallAppCard() {
         >
             <img src="/apple-touch-icon.png" alt="" width={40} height={40} style={{ borderRadius: 10, flexShrink: 0 }} />
             <View className="flex-1 min-w-0">
-                <Text className="text-[14.5px] font-bold" style={{ color: 'var(--c-ink)' }}>Instalează aplicația</Text>
+                <Text className="text-[14.5px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Instalează aplicația')}</Text>
                 <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
-                    {install.platform === 'desktop' ? 'Deschide BCMS într-o fereastră proprie.' : 'Adaug-o pe ecranul principal al telefonului.'}
+                    {install.platform === 'desktop' ? tr('Deschide BCMS într-o fereastră proprie.') : tr('Adaug-o pe ecranul principal al telefonului.')}
                 </Text>
             </View>
             <Pressable
                 onPress={() => void onPress()}
                 accessibilityRole="button"
-                className="ui-press h-9 px-3.5 rounded-[10px] items-center justify-center shrink-0"
+                className="ui-press h-9 [@media(pointer:coarse)]:h-10 px-3.5 rounded-[10px] items-center justify-center shrink-0"
                 style={{ backgroundColor: 'var(--c-brand-surface)' }}
             >
                 <Text className="text-[13px] font-bold" style={{ color: 'var(--c-on-brand)' }}>
-                    {install.canPrompt ? 'Instalează' : 'Cum?'}
+                    {install.canPrompt ? tr('Instalează') : tr('Cum?')}
                 </Text>
             </Pressable>
             <InstallInstructionsSheet visible={open} onClose={() => setOpen(false)} />
@@ -230,8 +231,8 @@ export function InstallBanner({ placement = 'fixed' }: { placement?: 'fixed' | '
                 >
                     <img src="/apple-touch-icon.png" alt="" width={36} height={36} style={{ borderRadius: 9, flexShrink: 0 }} />
                     <View className="flex-1 min-w-0">
-                        <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-ink)' }}>Instalează BCMS</Text>
-                        <Text className="text-[12px]" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>Deschide-l direct de pe ecranul principal.</Text>
+                        <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Instalează BCMS')}</Text>
+                        <Text className="text-[12px]" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{tr('Deschide-l direct de pe ecranul principal.')}</Text>
                     </View>
                     <Pressable
                         onPress={() => void onInstall()}
@@ -239,12 +240,12 @@ export function InstallBanner({ placement = 'fixed' }: { placement?: 'fixed' | '
                         className="ui-press h-9 px-3 rounded-[10px] items-center justify-center shrink-0"
                         style={{ backgroundColor: 'var(--c-brand-surface)' }}
                     >
-                        <Text className="text-[13px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{install.canPrompt ? 'Instalează' : 'Arată-mi'}</Text>
+                        <Text className="text-[13px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{install.canPrompt ? tr('Instalează') : tr('Arată-mi')}</Text>
                     </Pressable>
                     <Pressable
                         onPress={close}
                         accessibilityRole="button"
-                        accessibilityLabel="Nu acum"
+                        accessibilityLabel={tr('Nu acum')}
                         className="ui-press w-8 h-8 rounded-full items-center justify-center shrink-0"
                     >
                         <MaterialIcons name="close" size={17} color="var(--c-faint)" />

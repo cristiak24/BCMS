@@ -3,6 +3,7 @@ import type { CalendarEvent } from '../../services/eventsApi';
 import type { AuthUser } from '../../utils/authSession';
 import { filterCoachEvents } from '../../utils/coachEventScope';
 
+import { tr, appLocale } from '../../i18n';
 export function getEventDate(value: string) {
   const date = parseApiDate(value);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -39,7 +40,7 @@ export function formatCoachDate(value: string) {
     return value;
   }
 
-  return new Intl.DateTimeFormat('ro-RO', {
+  return new Intl.DateTimeFormat(appLocale(), {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
@@ -52,7 +53,7 @@ export function formatCoachTime(value: string) {
     return value;
   }
 
-  return new Intl.DateTimeFormat('ro-RO', {
+  return new Intl.DateTimeFormat(appLocale(), {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
@@ -63,8 +64,8 @@ export function formatCoachTimeRange(start: string, end: string) {
 }
 
 export function eventTypeLabel(type: CalendarEvent['type']) {
-  if (type === 'match') return 'Meci';
-  if (type === 'camp') return 'Cantonament';
-  if (type === 'admin') return 'Info';
-  return 'Antrenament';
+  if (type === 'match') return tr('Meci');
+  if (type === 'camp') return tr('Cantonament');
+  if (type === 'admin') return tr('Info');
+  return tr('Antrenament');
 }

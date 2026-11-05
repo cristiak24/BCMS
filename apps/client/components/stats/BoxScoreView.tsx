@@ -2,6 +2,7 @@ import { Text, View } from '@/src/web/reactNative';
 import type { BoxScore, GameMode, PlayerLine } from '../../utils/gameStats';
 import type { GameRosterEntry, OpponentEntry } from '../../services/gamesApi';
 
+import { tr } from '../../i18n';
 /**
  * The box score. Simple mode shows points and fouls; full mode adds shooting
  * (made/attempted), rebounds, assists, steals, blocks, turnovers and minutes.
@@ -22,18 +23,18 @@ function minutes(sec: number | null) {
 type Column = { key: string; label: string; get: (l: PlayerLine) => string | number; full?: boolean };
 
 const COLUMNS: Column[] = [
-  { key: 'pts', label: 'Pct', get: (l) => l.pts },
-  { key: 'min', label: 'Min', get: (l) => minutes(l.secondsPlayed), full: true },
+  { key: 'pts', label: tr('Pct'), get: (l) => l.pts },
+  { key: 'min', label: tr('Min'), get: (l) => minutes(l.secondsPlayed), full: true },
   { key: '2p', label: '2P', get: (l) => `${l.fgm2}/${l.fga2}`, full: true },
   { key: '3p', label: '3P', get: (l) => `${l.fgm3}/${l.fga3}`, full: true },
   { key: 'll', label: 'LL', get: (l) => `${l.ftm}/${l.fta}`, full: true },
-  { key: 'fg', label: 'Arunc. %', get: (l) => pct(l.fgm2 + l.fgm3, l.fga2 + l.fga3), full: true },
-  { key: 'reb', label: 'Rec', get: (l) => l.rebO + l.rebD, full: true },
-  { key: 'ast', label: 'As', get: (l) => l.ast, full: true },
-  { key: 'stl', label: 'Fu', get: (l) => l.stl, full: true },
-  { key: 'blk', label: 'Ca', get: (l) => l.blk, full: true },
-  { key: 'tov', label: 'Pi', get: (l) => l.tov, full: true },
-  { key: 'pf', label: 'F', get: (l) => l.pf },
+  { key: 'fg', label: tr('Arunc. %'), get: (l) => pct(l.fgm2 + l.fgm3, l.fga2 + l.fga3), full: true },
+  { key: 'reb', label: tr('Rec'), get: (l) => l.rebO + l.rebD, full: true },
+  { key: 'ast', label: tr('As'), get: (l) => l.ast, full: true },
+  { key: 'stl', label: tr('Fu'), get: (l) => l.stl, full: true },
+  { key: 'blk', label: tr('Ca'), get: (l) => l.blk, full: true },
+  { key: 'tov', label: tr('Pi'), get: (l) => l.tov, full: true },
+  { key: 'pf', label: tr('F'), get: (l) => l.pf },
 ];
 
 function Table({ rows, mode, totalLabel }: { rows: { key: string; number: string; name: string; line: PlayerLine }[]; mode: GameMode; totalLabel: string }) {
@@ -52,7 +53,7 @@ function Table({ rows, mode, totalLabel }: { rows: { key: string; number: string
       <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: mode === 'full' ? 640 : 0 }}>
         <thead>
           <tr style={{ backgroundColor: 'var(--c-surface-2)' }}>
-            <th className="px-2 py-2 text-left text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--c-faint)' }}>Jucător</th>
+            <th className="px-2 py-2 text-left text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--c-faint)' }}>{tr('Jucător')}</th>
             {columns.map((c) => (
               <th key={c.key} className="px-2 py-2 text-right text-[11px] font-bold uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--c-faint)' }}>{c.label}</th>
             ))}
@@ -114,11 +115,11 @@ export default function BoxScoreView({
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: 'var(--c-surface-2)' }}>
-              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--c-faint)' }}>Echipa</th>
+              <th className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--c-faint)' }}>{tr('Echipa')}</th>
               {box.byPeriod.map((p) => (
                 <th key={p.period} className="px-2 py-2 text-right text-[11px] font-bold" style={{ color: 'var(--c-faint)' }}>{p.period > 4 ? `P${p.period - 4}` : `S${p.period}`}</th>
               ))}
-              <th className="px-3 py-2 text-right text-[11px] font-bold uppercase" style={{ color: 'var(--c-faint)' }}>Total</th>
+              <th className="px-3 py-2 text-right text-[11px] font-bold uppercase" style={{ color: 'var(--c-faint)' }}>{tr('Total')}</th>
             </tr>
           </thead>
           <tbody>
@@ -137,20 +138,18 @@ export default function BoxScoreView({
 
       <View className="gap-2">
         <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>{teamName}</Text>
-        <Table rows={ours} mode={mode} totalLabel="Echipa" />
+        <Table rows={ours} mode={mode} totalLabel={tr('Echipa')} />
       </View>
 
       {theirs.length ? (
         <View className="gap-2">
           <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }}>{opponentName}</Text>
-          <Table rows={theirs} mode="simple" totalLabel="Pe jucători" />
+          <Table rows={theirs} mode="simple" totalLabel={tr('Pe jucători')} />
         </View>
       ) : null}
 
       {mode === 'full' ? (
-        <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>
-          Min = minute jucate · 2P/3P/LL = reușite/încercate · Rec = recuperări · As = pase decisive · Fu = furturi · Ca = capace · Pi = pierderi · F = faulturi
-        </Text>
+        <Text className="t-meta" style={{ color: 'var(--c-faint)' }}>{tr('Min = minute jucate · 2P/3P/LL = reușite/încercate · Rec = recuperări · As = pase decisive · Fu = furturi · Ca = capace · Pi = pierderi · F = faulturi')}</Text>
       ) : null}
     </View>
   );

@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 /**
  * What a person sees from a server error. Older routes still answer in
  * English ("Event not found", "Invalid ID") and that text reached the screen
@@ -8,15 +9,15 @@
 
 /** A plain Romanian sentence for an HTTP status, when the server's own text can't be shown. */
 export function messageForStatus(status: number) {
-  if (status === 400 || status === 422) return 'Datele trimise nu sunt valide. Verifică-le și încearcă din nou.';
-  if (status === 401) return 'Sesiunea a expirat. Autentifică-te din nou.';
-  if (status === 403) return 'Nu ai acces la această acțiune.';
-  if (status === 404) return 'Nu am găsit ce cauți. Poate a fost șters între timp.';
-  if (status === 409) return 'Între timp s-a schimbat ceva. Reîncarcă pagina și încearcă din nou.';
-  if (status === 413) return 'Fișierul este prea mare.';
-  if (status === 429) return 'Prea multe încercări într-un timp scurt. Mai încearcă peste un minut.';
-  if (status >= 500) return 'A apărut o problemă pe server. Încearcă din nou peste câteva momente.';
-  return 'Nu am putut finaliza acțiunea. Încearcă din nou.';
+  if (status === 400 || status === 422) return tr('Datele trimise nu sunt valide. Verifică-le și încearcă din nou.');
+  if (status === 401) return tr('Sesiunea a expirat. Autentifică-te din nou.');
+  if (status === 403) return tr('Nu ai acces la această acțiune.');
+  if (status === 404) return tr('Nu am găsit ce cauți. Poate a fost șters între timp.');
+  if (status === 409) return tr('Între timp s-a schimbat ceva. Reîncarcă pagina și încearcă din nou.');
+  if (status === 413) return tr('Fișierul este prea mare.');
+  if (status === 429) return tr('Prea multe încercări într-un timp scurt. Mai încearcă peste un minut.');
+  if (status >= 500) return tr('A apărut o problemă pe server. Încearcă din nou peste câteva momente.');
+  return tr('Nu am putut finaliza acțiunea. Încearcă din nou.');
 }
 
 // Diacritics, or a common Romanian word, mean the server wrote it for people.

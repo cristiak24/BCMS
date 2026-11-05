@@ -1,5 +1,6 @@
 import { parseApiDate } from './dates';
 
+import { tr } from '../i18n';
 /**
  * Acasă (player / parent): what the "next activities" list holds. It used to
  * keep trainings only, so a camp in the club's Program never reached a
@@ -39,13 +40,13 @@ export function upcomingActivities<T extends AgendaEvent>(events: T[], now = Dat
 }
 
 const LABELS: Record<string, string> = {
-  training: 'Antrenament',
-  camp: 'Cantonament',
-  medical: 'Vizită medicală',
-  admin: 'Administrativ',
-  match: 'Meci',
+  training: tr('Antrenament'),
+  camp: tr('Cantonament'),
+  medical: tr('Vizită medicală'),
+  admin: tr('Administrativ'),
+  match: tr('Meci'),
 };
 
 export function activityLabel(type: string) {
-  return LABELS[type] ?? 'Activitate';
+  return LABELS[type] ?? tr('Activitate');
 }

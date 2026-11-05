@@ -22,6 +22,7 @@ import { ATTENDANCE_PERIOD_LABEL, pooledAttendanceRate } from '../../../utils/at
 import { plural, pluralWord } from '../../../utils/plural';
 import { playerStatusLabel } from '../../../utils/playerStatus';
 
+import { tr } from '../../../i18n';
 /**
  * A coach's own squad in full — the roster TeamCard on /coach/teams only
  * previews (5 rows + "+N others"), plus the team's upcoming sessions.
@@ -29,7 +30,7 @@ import { playerStatusLabel } from '../../../utils/playerStatus';
 
 function DetailSkeleton() {
   return (
-    <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă echipa">
+    <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă echipa')}>
       <View className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {Array.from({ length: 6 }).map((_, index) => (
           <Skeleton key={index} className="h-[68px] w-full rounded-[12px]" />
@@ -80,7 +81,7 @@ export default function CoachTeamDetailScreen() {
       }));
       setEvents(eventRows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Echipa nu a putut fi încărcată.');
+      setError(err instanceof Error ? err.message : tr('Echipa nu a putut fi încărcată.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -123,17 +124,17 @@ export default function CoachTeamDetailScreen() {
         <Pressable
           onPress={() => router.push('/coach/teams')}
           accessibilityRole="button"
-          accessibilityLabel="Înapoi la echipele mele"
+          accessibilityLabel={tr('Înapoi la echipele mele')}
           className="flex-row items-center gap-1.5 self-start mb-3 min-h-[44px] lg:h-8 px-2 -ml-2 rounded-[9px]"
         >
           <MaterialIcons name="arrow-back" size={17} color="var(--c-muted)" />
-          <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Echipele mele</Text>
+          <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>{tr('Echipele mele')}</Text>
         </Pressable>
 
         <PageHero
-          eyebrow="Echipă"
-          title={team?.name || 'Echipă'}
-          subtitle={team ? [team.leagueName, team.seasonName].filter(Boolean).join(' · ') : 'Se încarcă...'}
+          eyebrow={tr('Echipă')}
+          title={team?.name || tr('Echipă')}
+          subtitle={team ? [team.leagueName, team.seasonName].filter(Boolean).join(' · ') : tr('Se încarcă...')}
           leading={
             <View
               className="w-12 h-12 rounded-[14px] border items-center justify-center shrink-0"
@@ -148,7 +149,7 @@ export default function CoachTeamDetailScreen() {
               className="ui-press hidden sm:flex w-10 h-10 rounded-[11px] border items-center justify-center"
               style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
               accessibilityRole="button"
-              accessibilityLabel="Reîmprospătează"
+              accessibilityLabel={tr('Reîmprospătează')}
             >
               {refreshing ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
             </Pressable>
@@ -162,10 +163,10 @@ export default function CoachTeamDetailScreen() {
                 </View>
               ) : null}
               <StatStrip className="grid-cols-3">
-                <GlassStat dot="var(--c-purple)" label="Lot" value={players.length} hint={pluralWord(players.length, 'jucător', 'jucători')} />
+                <GlassStat dot="var(--c-purple)" label={tr('Lot')} value={players.length} hint={pluralWord(players.length, tr('jucător'), tr('jucători'))} />
                 <GlassStat
                   dot={attendanceRateColor(average)}
-                  label="Prezență"
+                  label={tr('Prezență')}
                   hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()}
                   value={average ?? '—'}
                   suffix={average == null ? undefined : '%'}
@@ -173,9 +174,9 @@ export default function CoachTeamDetailScreen() {
                 />
                 <GlassStat
                   dot="var(--c-brand-fg)"
-                  label="Urmează"
+                  label={tr('Urmează')}
                   value={upcomingEvents.length}
-                  hint={upcomingEvents[0] ? `Următoarea: ${formatCoachDate(upcomingEvents[0].startTime)}` : 'nimic programat'}
+                  hint={upcomingEvents[0] ? tr('Următoarea: {0}', { '0': formatCoachDate(upcomingEvents[0].startTime) }) : tr('nimic programat')}
                 />
               </StatStrip>
             </>
@@ -186,18 +187,18 @@ export default function CoachTeamDetailScreen() {
           <DetailSkeleton />
         ) : error ? (
           <ErrorState
-            title="Nu am putut încărca echipa"
+            title={tr('Nu am putut încărca echipa')}
             message={error}
-            actionLabel="Reîncearcă"
+            actionLabel={tr('Reîncearcă')}
             onAction={() => loadData(true)}
           />
         ) : !team ? (
-          <EmptyState icon="groups" title="Echipa nu este disponibilă" message="Întoarce-te la lista echipelor tale." />
+          <EmptyState icon="groups" title={tr('Echipa nu este disponibilă')} message={tr('Întoarce-te la lista echipelor tale.')} />
         ) : (
           <View className="gap-5">
             <View className="gap-2.5">
               <View className="flex-row items-center gap-2">
-                <Text accessibilityRole="header" className="f-display flex-1 text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Lot</Text>
+                <Text accessibilityRole="header" className="f-display flex-1 text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Lot')}</Text>
                 {/* Adding players is the team's own coach's (server: bulk route). */}
                 {coachCoachesTeam(team, session?.id) ? (
                   <Pressable
@@ -207,15 +208,15 @@ export default function CoachTeamDetailScreen() {
                     style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
                   >
                     <MaterialIcons name="group-add" size={15} color="var(--c-brand-fg)" />
-                    <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Adaugă din listă</Text>
+                    <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{tr('Adaugă din listă')}</Text>
                   </Pressable>
                 ) : null}
               </View>
               {notice ? <Text className="t-meta" style={{ color: 'var(--c-success-fg)' }}>{notice}</Text> : null}
               {sortedPlayers.length === 0 ? (
-                <EmptyState icon="groups" compact title="Lotul este gol" message="Niciun jucător nu este alocat acestei echipe deocamdată." />
+                <EmptyState icon="groups" compact title={tr('Lotul este gol')} message={tr('Niciun jucător nu este alocat acestei echipe deocamdată.')} />
               ) : (
-                <DenseList label="Lot">
+                <DenseList label={tr('Lot')}>
                   {sortedPlayers.map((player) => (
                     <CoachPlayerRow
                       key={player.id}
@@ -233,11 +234,11 @@ export default function CoachTeamDetailScreen() {
             </View>
 
             <View className="gap-2.5">
-              <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Următoarele sesiuni</Text>
+              <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Următoarele sesiuni')}</Text>
               {upcomingEvents.length === 0 ? (
-                <EmptyState icon="event-busy" compact title="Niciun eveniment programat" message="Antrenamentele și meciurile viitoare ale echipei apar aici." />
+                <EmptyState icon="event-busy" compact title={tr('Niciun eveniment programat')} message={tr('Antrenamentele și meciurile viitoare ale echipei apar aici.')} />
               ) : (
-                <DenseList label="Următoarele sesiuni">
+                <DenseList label={tr('Următoarele sesiuni')}>
                   {upcomingEvents.map((event) => <SessionRow key={event.id} inList event={event} />)}
                 </DenseList>
               )}
@@ -257,7 +258,7 @@ export default function CoachTeamDetailScreen() {
           onClose={() => setShowBulk(false)}
           onDone={({ created, skipped }) => {
             setShowBulk(false);
-            setNotice(`${plural(created, 'jucător adăugat', 'jucători adăugați')}${skipped.length ? `, ${plural(skipped.length, 'era', 'erau')} deja în lot` : ''}.`);
+            setNotice(`${plural(created, tr('jucător adăugat'), tr('jucători adăugați'))}${skipped.length ? tr(', {0} deja în lot', { '0': plural(skipped.length, 'era', 'erau') }) : ''}.`);
             void loadData(true);
           }}
         />

@@ -6,6 +6,7 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { theme } from '../constants/designSystem';
 import { MenuBadge, type AdminMenuIconName } from './Sidebar';
 
+import { tr } from '../i18n';
 type BottomItem = {
   href: string;
   label: string;
@@ -51,7 +52,7 @@ export function MobileBottomNavigation({
     // every screen tracks light/dark instead of staying white on a dark shell.
     <View
       role="navigation"
-      aria-label="Navigare principală"
+      aria-label={tr('Navigare principală')}
       className="flex lg:hidden flex-row items-center border-t fixed bottom-0 left-0 right-0 w-full z-20 px-2"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', paddingTop: 10, paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))', ...theme.shadow.lift } as any}
     >
@@ -78,15 +79,13 @@ export function MobileBottomNavigation({
           accessibilityRole="button"
           // Starts with the visible text (WCAG 2.5.3): „Toate secțiunile” alone
           // could not be reached by saying "Mai mult".
-          accessibilityLabel="Mai mult: toate secțiunile"
+          accessibilityLabel={tr('Mai mult: toate secțiunile')}
           // A page reached through „Mai mult” (Conturi, Jurnal…) marks it, as the sheet marks the page.
           {...({ 'aria-current': moreIsActive ? 'page' : undefined } as any)}
         >
           <View className="items-center justify-center rounded-[18px] px-2 py-2 min-h-[52px] w-full" style={{ backgroundColor: moreIsActive ? 'var(--c-surface-tint)' : 'transparent' }}>
             <MaterialIcons name="apps" size={20} color={moreIsActive ? theme.colors.royal : theme.colors.faint} />
-            <Text className="text-[11px] mt-1 font-semibold" style={{ color: moreIsActive ? theme.colors.royal : theme.colors.faint }} numberOfLines={1}>
-              Mai mult
-            </Text>
+            <Text className="text-[11px] mt-1 font-semibold" style={{ color: moreIsActive ? theme.colors.royal : theme.colors.faint }} numberOfLines={1}>{tr('Mai mult')}</Text>
           </View>
         </Pressable>
       ) : null}
@@ -117,11 +116,11 @@ export function MobileNavigationSheet({
         >
           <View className="self-center w-10 h-1 rounded-full mb-4" style={{ backgroundColor: 'var(--c-border-strong)' }} />
           <View className="flex-row items-center justify-between mb-3 px-1">
-            <Text className="text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>Meniu</Text>
+            <Text className="text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Meniu')}</Text>
             <Pressable
               onPress={onClose}
               accessibilityRole="button"
-              accessibilityLabel="Închide meniul"
+              accessibilityLabel={tr('Închide meniul')}
               className="ui-press w-9 h-9 rounded-full items-center justify-center"
               style={{ backgroundColor: 'var(--c-surface-2)' }}
             >

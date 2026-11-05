@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { View, Text } from '@/src/web/reactNative';
 
+import { tr } from '../../i18n';
 /** Stat tiles drop the glass effect when there is no artwork behind them. */
 const PlainHeader = createContext(false);
 

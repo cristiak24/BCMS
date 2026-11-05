@@ -8,6 +8,7 @@ import { loadFamily } from './useActiveChild';
 import { getActiveChildId, setActiveChildId } from '../../services/apiClient';
 import { getInitials } from '../coach/coachDisplay';
 
+import { tr } from '../../i18n';
 /**
  * Parent accounts: which child the player screens are showing, plus "add a
  * child". Sits above every page in the player layout for role=parent.
@@ -67,7 +68,7 @@ function AddChildDialog({ visible, onClose, onSent }: { visible: boolean; onClos
 
   const submit = async () => {
     if (!teamCode.trim() || !firstName.trim() || !lastName.trim() || !birthDate) {
-      setError('Completează codul echipei, numele, prenumele și data nașterii.');
+      setError(tr('Completează codul echipei, numele, prenumele și data nașterii.'));
       return;
     }
     setSending(true);
@@ -76,7 +77,7 @@ function AddChildDialog({ visible, onClose, onSent }: { visible: boolean; onClos
       const done = await familyApi.requestChild({ teamCode: teamCode.trim(), firstName: firstName.trim(), lastName: lastName.trim(), birthDate });
       onSent(done.teamName);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nu am putut trimite cererea.');
+      setError(err instanceof Error ? err.message : tr('Nu am putut trimite cererea.'));
     } finally {
       setSending(false);
     }
@@ -91,28 +92,26 @@ function AddChildDialog({ visible, onClose, onSent }: { visible: boolean; onClos
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Adaugă un copil"
+          aria-label={tr('Adaugă un copil')}
           className="w-full max-w-[440px] rounded-3xl p-5"
           style={{ backgroundColor: 'var(--c-surface)', border: '1px solid var(--c-border)', boxShadow: '0 28px 70px rgba(2, 8, 23, 0.35)' }}
         >
           <View>
-            <Text className="text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>Adaugă un copil</Text>
-            <Text className="t-meta mt-1 mb-4" style={{ color: 'var(--c-muted)' }}>
-              Cere antrenorului codul echipei copilului. După aprobare, copilul apare aici.
-            </Text>
+            <Text className="text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Adaugă un copil')}</Text>
+            <Text className="t-meta mt-1 mb-4" style={{ color: 'var(--c-muted)' }}>{tr('Cere antrenorului codul echipei copilului. După aprobare, copilul apare aici.')}</Text>
           </View>
           <View className="gap-3">
-            <Field label="Codul echipei" value={teamCode} onChange={setTeamCode} placeholder="ex. K4Q-72M" />
+            <Field label={tr('Codul echipei')} value={teamCode} onChange={setTeamCode} placeholder={tr('ex. K4Q-72M')} />
             <View className="flex-row gap-2">
-              <Field label="Prenume" value={firstName} onChange={setFirstName} />
-              <Field label="Nume" value={lastName} onChange={setLastName} />
+              <Field label={tr('Prenume')} value={firstName} onChange={setFirstName} />
+              <Field label={tr('Nume')} value={lastName} onChange={setLastName} />
             </View>
-            <Field label="Data nașterii" value={birthDate} onChange={setBirthDate} date />
+            <Field label={tr('Data nașterii')} value={birthDate} onChange={setBirthDate} date />
           </View>
           {error ? <Text className="text-[12.5px] font-semibold mt-3" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text> : null}
           <View className="flex-row justify-end gap-2 mt-5">
             <Pressable onPress={onClose} disabled={sending} accessibilityRole="button" className="ui-press h-11 px-4 rounded-[11px] items-center justify-center">
-              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Renunță</Text>
+              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>{tr('Renunță')}</Text>
             </Pressable>
             <Pressable
               onPress={submit}
@@ -122,7 +121,7 @@ function AddChildDialog({ visible, onClose, onSent }: { visible: boolean; onClos
               style={{ backgroundColor: 'var(--c-brand-surface)', opacity: sending ? 0.7 : 1 } as any}
             >
               {sending ? <ActivityIndicator size="small" color="var(--c-on-brand)" /> : <MaterialIcons name="send" size={15} color="var(--c-on-brand)" />}
-              <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-on-brand)' }}>Trimite cererea</Text>
+              <Text className="text-[13.5px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{tr('Trimite cererea')}</Text>
             </Pressable>
           </View>
         </div>
@@ -178,7 +177,7 @@ export default function ChildSwitcher() {
             onPress={() => children.length > 1 && setOpen((v) => !v)}
             disabled={children.length < 2}
             accessibilityRole="button"
-            accessibilityLabel={children.length > 1 ? `Copil: ${active.firstName} ${active.lastName}. Schimbă copilul` : `Copil: ${active.firstName} ${active.lastName}`}
+            accessibilityLabel={children.length > 1 ? tr('Copil: {0} {1}. Schimbă copilul', { '0': active.firstName, '1': active.lastName }) : tr('Copil: {0} {1}', { '0': active.firstName, '1': active.lastName })}
             accessibilityState={{ expanded: open }}
             className="flex-1 min-w-0 flex-row items-center gap-3 min-h-[44px] text-left"
           >
@@ -186,7 +185,7 @@ export default function ChildSwitcher() {
               <Text className="text-[12px] font-bold" style={{ color: 'var(--c-purple-fg)' }}>{getInitials(active.firstName, active.lastName)}</Text>
             </View>
             <View className="flex-1 min-w-0">
-              <Text className="t-label" style={{ color: 'var(--c-muted)' }}>Copilul tău</Text>
+              <Text className="t-label" style={{ color: 'var(--c-muted)' }}>{tr('Copilul tău')}</Text>
               <Text className="text-[14.5px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
                 {active.firstName} {active.lastName}
                 <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-muted)' }}>{active.teams.length ? ` · ${active.teams.join(', ')}` : ''}</Text>
@@ -197,12 +196,12 @@ export default function ChildSwitcher() {
           <Pressable
             onPress={() => setAdding(true)}
             accessibilityRole="button"
-            accessibilityLabel="Adaugă un copil"
+            accessibilityLabel={tr('Adaugă un copil')}
             className="ui-press h-10 min-w-[40px] px-2.5 rounded-[10px] border flex-row items-center justify-center gap-1 shrink-0"
             style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
           >
             <MaterialIcons name="add" size={16} color="var(--c-brand-fg)" />
-            <Text className="hidden sm:flex text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Copil</Text>
+            <Text className="hidden sm:flex text-[12.5px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{tr('Copil')}</Text>
           </Pressable>
         </View>
       ) : (
@@ -211,16 +210,16 @@ export default function ChildSwitcher() {
           style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
         >
           <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-ink)' }}>
-            {waiting.length ? 'Cererea ta e la antrenor' : 'Contul nu e legat încă de un copil'}
+            {waiting.length ? tr('Cererea ta e la antrenor') : tr('Contul nu e legat încă de un copil')}
           </Text>
           <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
             {waiting.length
-              ? `${waiting.map((p) => `${p.firstName} ${p.lastName} (${p.teamName})`).join(', ')} — după aprobare vezi programul, prezența și plățile copilului.`
-              : 'Adaugă copilul cu codul echipei primit de la antrenor.'}
+              ? tr('{0} — după aprobare vezi programul, prezența și plățile copilului.', { '0': waiting.map((p) => `${p.firstName} ${p.lastName} (${p.teamName})`).join(', ') })
+              : tr('Adaugă copilul cu codul echipei primit de la antrenor.')}
           </Text>
           <Pressable onPress={() => setAdding(true)} accessibilityRole="button" className="ui-press self-start h-10 px-3.5 rounded-[10px] flex-row items-center gap-1.5 mt-1" style={{ backgroundColor: 'var(--c-brand-surface)' }}>
             <MaterialIcons name="add" size={16} color="var(--c-on-brand)" />
-            <Text className="text-[13px] font-bold" style={{ color: 'var(--c-on-brand)' }}>Adaugă copil</Text>
+            <Text className="text-[13px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{tr('Adaugă copil')}</Text>
           </Pressable>
         </View>
       )}
@@ -248,8 +247,7 @@ export default function ChildSwitcher() {
       {notice ? (
         <Text className="t-meta mt-2 px-1" style={{ color: 'var(--c-success-fg)' }}>{notice}</Text>
       ) : active && waiting.length ? (
-        <Text className="t-meta mt-2 px-1" style={{ color: 'var(--c-muted)' }}>
-          În așteptare: {waiting.map((p) => `${p.firstName} ${p.lastName}`).join(', ')}
+        <Text className="t-meta mt-2 px-1" style={{ color: 'var(--c-muted)' }}>{tr('În așteptare:')}{' '}{waiting.map((p) => `${p.firstName} ${p.lastName}`).join(', ')}
         </Text>
       ) : null}
 
@@ -258,7 +256,7 @@ export default function ChildSwitcher() {
         onClose={() => setAdding(false)}
         onSent={(teamName) => {
           setAdding(false);
-          setNotice(`Cererea a fost trimisă antrenorului echipei ${teamName}.`);
+          setNotice(tr('Cererea a fost trimisă antrenorului echipei {teamName}.', { teamName }));
           void load(true);
         }}
       />

@@ -17,6 +17,7 @@ import {
   triggerFileDownload,
 } from '../scheduleShared';
 
+import { tr } from '../../../i18n';
 /**
  * Read-only event sheet for the player/coach surfaces (Home + Schedule).
  * No management actions — those stay admin-only.
@@ -50,12 +51,12 @@ function getScore(event: CalendarEvent) {
 }
 
 const STATUS_META: Record<string, { label: string; fg: string; bg: string; icon: string }> = {
-  present: { label: 'Prezent', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)', icon: 'check-circle' },
-  prezent: { label: 'Prezent', fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)', icon: 'check-circle' },
-  late: { label: 'Întârziat', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)', icon: 'schedule' },
-  absent: { label: 'Absent', fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)', icon: 'cancel' },
-  medical: { label: 'Motivat', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)', icon: 'medical-services' },
-  excused: { label: 'Motivat', fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)', icon: 'medical-services' },
+  present: { label: tr('Prezent'), fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)', icon: 'check-circle' },
+  prezent: { label: tr('Prezent'), fg: 'var(--c-success-fg)', bg: 'var(--c-success-bg)', icon: 'check-circle' },
+  late: { label: tr('Întârziat'), fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)', icon: 'schedule' },
+  absent: { label: tr('Absent'), fg: 'var(--c-danger-fg)', bg: 'var(--c-danger-bg)', icon: 'cancel' },
+  medical: { label: tr('Motivat'), fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)', icon: 'medical-services' },
+  excused: { label: tr('Motivat'), fg: 'var(--c-warning-fg)', bg: 'var(--c-warning-bg)', icon: 'medical-services' },
 };
 
 function DetailRow({ icon, children }: { icon: string; children: ReactNode }) {
@@ -158,7 +159,7 @@ export function PlayerEventDetailModal({
                       </View>
                       {cancelled ? (
                         <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: 'var(--c-danger-bg)' }}>
-                          <Text className="text-[11.5px] font-bold" style={{ color: 'var(--c-danger-fg)' }}>Anulat</Text>
+                          <Text className="text-[11.5px] font-bold" style={{ color: 'var(--c-danger-fg)' }}>{tr('Anulat')}</Text>
                         </View>
                       ) : null}
                     </View>
@@ -169,7 +170,7 @@ export function PlayerEventDetailModal({
                   <Pressable
                     onPress={onClose}
                     accessibilityRole="button"
-                    accessibilityLabel="Închide"
+                    accessibilityLabel={tr('Închide')}
                     className="ui-press w-9 h-9 rounded-full items-center justify-center"
                     style={{ backgroundColor: 'var(--c-surface-2)' }}
                   >
@@ -185,7 +186,7 @@ export function PlayerEventDetailModal({
                       <Text className="t-num text-[24px] font-bold leading-none" style={{ color: 'var(--c-ink-strong)' }}>
                         {score.home}<Text style={{ color: 'var(--c-faint)' }}> : </Text>{score.away}
                       </Text>
-                      <Text className="text-[10.5px] font-semibold mt-1 uppercase tracking-[0.06em]" style={{ color: 'var(--c-faint)' }}>Final</Text>
+                      <Text className="text-[10.5px] font-semibold mt-1 uppercase tracking-[0.06em]" style={{ color: 'var(--c-faint)' }}>{tr('Final')}</Text>
                     </View>
                     <Text className="flex-1 text-[14.5px] font-bold leading-tight" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{teams[1]}</Text>
                   </View>
@@ -222,7 +223,7 @@ export function PlayerEventDetailModal({
                   <View className="flex-row items-start gap-3 rounded-[14px] px-4 py-3" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
                     <MaterialIcons name="chat-bubble-outline" size={16} color="var(--c-brand-fg)" style={{ marginTop: 2 }} />
                     <View className="flex-1">
-                      <Text className="t-eyebrow" style={{ color: 'var(--c-brand-fg)' }}>Notă antrenor</Text>
+                      <Text className="t-eyebrow" style={{ color: 'var(--c-brand-fg)' }}>{tr('Notă antrenor')}</Text>
                       <Text className="text-[13.5px] font-medium mt-1 leading-5" style={{ color: 'var(--c-ink-soft)' }}>{event.coachNote}</Text>
                     </View>
                   </View>
@@ -231,7 +232,7 @@ export function PlayerEventDetailModal({
                 {isPlayer && isPast && !cancelled ? (
                   <View className="rounded-[14px] border px-4 py-3 gap-2" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
                     <View className="flex-row items-center justify-between gap-3">
-                      <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Prezența ta</Text>
+                      <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{tr('Prezența ta')}</Text>
                       {loadingMine ? (
                         <ActivityIndicator size="small" color="var(--c-brand-fg)" />
                       ) : status ? (
@@ -240,7 +241,7 @@ export function PlayerEventDetailModal({
                           <Text className="text-[12px] font-bold" style={{ color: status.fg }}>{status.label}</Text>
                         </View>
                       ) : (
-                        <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Nemarcată</Text>
+                        <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>{tr('Nemarcată')}</Text>
                       )}
                     </View>
                     {myStatus?.note ? (
@@ -261,25 +262,25 @@ export function PlayerEventDetailModal({
                     <Pressable
                       onPress={() => onEdit(event)}
                       accessibilityRole="button"
-                      accessibilityLabel="Editează evenimentul"
+                      accessibilityLabel={tr('Editează evenimentul')}
                       className="ui-press flex-1 min-w-[136px] h-11 rounded-[11px] flex-row items-center justify-center gap-2 border"
                       style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
                     >
                       <MaterialIcons name="edit" size={17} color="var(--c-brand-fg)" />
-                      <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>Editează</Text>
+                      <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>{tr('Editează')}</Text>
                     </Pressable>
                   ) : null}
                   {sheetLink ? (
                     <Pressable
                       onPress={openSheet}
                       accessibilityRole="button"
-                      accessibilityLabel={`Fișa meciului: ${event.title}`}
+                      accessibilityLabel={tr('Fișa meciului: {0}', { '0': event.title })}
                       className="ui-press flex-1 min-w-[136px] h-11 rounded-[11px] flex-row items-center justify-center gap-2 border"
                       style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
                     >
                       <MaterialIcons name="leaderboard" size={17} color="var(--c-brand-fg)" />
                       <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>
-                        {event.game?.status === 'live' ? 'Fișa meciului · live' : 'Fișa meciului'}
+                        {event.game?.status === 'live' ? tr('Fișa meciului · live') : tr('Fișa meciului')}
                       </Text>
                     </Pressable>
                   ) : null}
@@ -287,12 +288,12 @@ export function PlayerEventDetailModal({
                   <Pressable
                     onPress={addToCalendar}
                     accessibilityRole="button"
-                    accessibilityLabel="Adaugă în calendar"
+                    accessibilityLabel={tr('Adaugă în calendar')}
                     className="ui-press flex-1 min-w-[136px] h-11 rounded-[11px] flex-row items-center justify-center gap-2 border"
                     style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)' } as any}
                   >
                     <MaterialIcons name="event" size={17} color="var(--c-brand-fg)" />
-                    <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>Adaugă în calendar</Text>
+                    <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink)' }}>{tr('Adaugă în calendar')}</Text>
                   </Pressable>
                   ) : null}
                 </View>

@@ -10,6 +10,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import { formatRelativeDate } from './myclub/teamDisplay';
 import type { AppNotification } from '../services/notificationsApi';
 
+import { tr } from '../i18n';
 type AppHeaderProps = {
   title: string;
   subtitle?: string;
@@ -34,9 +35,9 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrator',
   accountant: 'Contabil',
   staff: 'Staff',
-  coach: 'Antrenor',
-  player: 'Jucător',
-  parent: 'Părinte',
+  coach: tr('Antrenor'),
+  player: tr('Jucător'),
+  parent: tr('Părinte'),
 };
 
 /** Admin and super admin routes, and every screen of a player, parent or coach account. */
@@ -47,7 +48,7 @@ function useQuietHeader() {
   return pathname.startsWith('/admin/') || pathname.startsWith('/super-admin') || ['player', 'parent', 'coach', 'superadmin'].includes(role);
 }
 
-const roleLabel = (role?: string | null) => (role ? ROLE_LABELS[role] ?? role : 'Cont');
+const roleLabel = (role?: string | null) => (role ? ROLE_LABELS[role] ?? role : tr('Cont'));
 
 export default function AppHeader({
   title,
@@ -135,7 +136,7 @@ export default function AppHeader({
               onPress={() => setSearchOpen(false)}
               className="w-10 h-10 items-center justify-center rounded-[12px]"
               accessibilityRole="button"
-              accessibilityLabel="Închide căutarea"
+              accessibilityLabel={tr('Închide căutarea')}
             >
               <MaterialIcons name="arrow-back" size={22} color={theme.colors.ink} />
             </Pressable>
@@ -145,7 +146,7 @@ export default function AppHeader({
                   up — the user taps the field when they want to type. Font is
                   16px so iOS Safari doesn't zoom the page on focus. */}
               <TextInput
-                accessibilityLabel={searchPlaceholder || 'Caută'}
+                accessibilityLabel={searchPlaceholder || tr('Caută')}
                 placeholder={searchPlaceholder}
                 value={searchValue}
                 onChangeText={onSearchChange}
@@ -155,7 +156,7 @@ export default function AppHeader({
                 returnKeyType="search"
               />
               {searchValue.length > 0 ? (
-                <Pressable onPress={() => onSearchChange('')} accessibilityLabel="Golește căutarea" className="w-6 h-6 items-center justify-center">
+                <Pressable onPress={() => onSearchChange('')} accessibilityLabel={tr('Golește căutarea')} className="w-6 h-6 items-center justify-center">
                   <MaterialIcons name="close" size={18} color={theme.colors.muted} />
                 </Pressable>
               ) : null}
@@ -169,7 +170,7 @@ export default function AppHeader({
                 className="w-10 h-10 rounded-[12px] overflow-hidden items-center justify-center border"
                 style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-border)' } as any}
                 accessibilityRole="button"
-                accessibilityLabel="Deschide meniul contului"
+                accessibilityLabel={tr('Deschide meniul contului')}
               >
                 {avatarUrl ? (
                   <Image source={{ uri: avatarUrl }} className="w-full h-full" />
@@ -192,7 +193,7 @@ export default function AppHeader({
                 className="relative w-10 h-10 items-center justify-center rounded-[12px] border"
                 style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
                 accessibilityRole="button"
-                accessibilityLabel="Caută"
+                accessibilityLabel={tr('Caută')}
               >
                 <MaterialIcons name="search" size={21} color={theme.colors.muted} />
                 {/* Dot signals an active search while the field is collapsed. */}
@@ -206,7 +207,7 @@ export default function AppHeader({
                 className="relative w-10 h-10 items-center justify-center rounded-[12px] border"
                 style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
                 accessibilityRole="button"
-                accessibilityLabel="Notificări"
+                accessibilityLabel={tr('Notificări')}
               >
                 <MaterialIcons name="notifications" size={20} color={theme.colors.muted} />
                 {unreadCount > 0 ? (
@@ -221,7 +222,7 @@ export default function AppHeader({
                   className="ui-press w-10 h-10 items-center justify-center rounded-[12px] border"
                   style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'color-mix(in srgb, var(--c-brand-fg) 22%, transparent)' } as any}
                   accessibilityRole="button"
-                  accessibilityLabel="Deschide meniul"
+                  accessibilityLabel={tr('Deschide meniul')}
                 >
                   <MaterialIcons name="menu" size={22} color="var(--c-brand-fg)" />
                 </Pressable>
@@ -268,7 +269,7 @@ export default function AppHeader({
         >
           <MaterialIcons name="search" size={18} color={theme.colors.faint} />
           <TextInput
-            accessibilityLabel={searchPlaceholder || 'Caută'}
+            accessibilityLabel={searchPlaceholder || tr('Caută')}
             placeholder={searchPlaceholder}
             value={searchValue}
             onChangeText={onSearchChange}
@@ -290,7 +291,7 @@ export default function AppHeader({
           className="relative w-9 h-9 items-center justify-center rounded-[10px] border"
           style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
           accessibilityRole="button"
-          accessibilityLabel="Notificări"
+          accessibilityLabel={tr('Notificări')}
         >
           <MaterialIcons name="notifications" size={19} color={theme.colors.muted} />
           {unreadCount > 0 ? (
@@ -302,17 +303,17 @@ export default function AppHeader({
           className={`flex-row items-center pl-4 border-l gap-3 ${adminUi ? '' : 'border-[#DDE7F5]'}`}
           style={adminUi ? { borderColor: 'var(--c-border)' } as any : undefined}
           accessibilityRole="button"
-          accessibilityLabel="Deschide meniul contului"
+          accessibilityLabel={tr('Deschide meniul contului')}
         >
           <View className="flex-col items-end">
             {adminUi ? (
               <>
-                <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink-strong)' }}>{userName ?? 'Contul meu'}</Text>
+                <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-ink-strong)' }}>{userName ?? tr('Contul meu')}</Text>
                 <Text className="text-[12px]" style={{ color: 'var(--c-muted)' }}>{roleLabel(role)}</Text>
               </>
             ) : (
               <>
-                <Text className="text-[12px] font-black tracking-tight text-[#0E2041]">{userName ?? 'Contul meu'}</Text>
+                <Text className="text-[12px] font-black tracking-tight text-[#0E2041]">{userName ?? tr('Contul meu')}</Text>
                 <Text className="text-[9px] font-black tracking-widest uppercase text-[#94A3B8]">{roleLabel(role)}</Text>
               </>
             )}
@@ -407,7 +408,7 @@ function ProfileActionsMenu({
             </View>
             <View className="flex-1 min-w-0">
               <Text className="text-[#0E2041] text-[14px] font-black" numberOfLines={1}>
-                {userName ?? 'Contul meu'}
+                {userName ?? tr('Contul meu')}
               </Text>
               <Text
                 className={adminUi ? 'text-[12px] mt-0.5' : 'text-[#94A3B8] text-[10px] font-black uppercase tracking-widest mt-1'}
@@ -428,7 +429,7 @@ function ProfileActionsMenu({
               <View className="w-9 h-9 rounded-[14px] bg-[#EAF2FF] items-center justify-center mr-3">
                 <MaterialIcons name="person-outline" size={20} color="var(--c-brand-fg)" />
               </View>
-              <Text className="text-[#0E2041] text-[14px] font-black flex-1">View Profile</Text>
+              <Text className="text-[#0E2041] text-[14px] font-black flex-1">{tr('View Profile')}</Text>
               <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
             </Pressable>
 
@@ -446,7 +447,7 @@ function ProfileActionsMenu({
                 )}
               </View>
               <Text className="text-[#BE123C] text-[14px] font-black flex-1">
-                {loggingOut ? 'Logging out...' : 'Log out'}
+                {loggingOut ? tr('Logging out...') : tr('Log out')}
               </Text>
             </Pressable>
           </View>
@@ -491,10 +492,10 @@ function NotificationsPanel({
           ]}
         >
           <View className="px-4 py-3.5 border-b flex-row items-center justify-between" style={{ borderColor: 'var(--c-border)' } as any}>
-            <Text className="text-[14px] font-black" style={{ color: 'var(--c-ink-strong)' }}>Notificări</Text>
+            <Text className="text-[14px] font-black" style={{ color: 'var(--c-ink-strong)' }}>{tr('Notificări')}</Text>
             {hasUnread ? (
               <Pressable onPress={onMarkAllAsRead} accessibilityRole="button">
-                <Text className="text-[12px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>Marchează toate ca citite</Text>
+                <Text className="text-[12px] font-bold" style={{ color: 'var(--c-brand-fg)' }}>{tr('Marchează toate ca citite')}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -507,9 +508,7 @@ function NotificationsPanel({
             ) : notifications.length === 0 ? (
               <View className="py-10 px-4 items-center justify-center">
                 <MaterialIcons name="notifications-none" size={28} color={theme.colors.faint} />
-                <Text className="text-[13px] font-semibold mt-2" style={{ color: 'var(--c-muted)' }}>
-                  Nu ai nicio notificare
-                </Text>
+                <Text className="text-[13px] font-semibold mt-2" style={{ color: 'var(--c-muted)' }}>{tr('Nu ai nicio notificare')}</Text>
               </View>
             ) : (
               <View className="p-2">

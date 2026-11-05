@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 /**
  * Loading the signed-in account's BCMS profile (/auth/me). Right after signup
  * the profile can lag a moment, so a "not found" is retried once — but a
@@ -7,7 +8,7 @@
  */
 
 export const PROFILE_MISSING_MESSAGE =
-  'Contul tău nu e asociat cu un club. Folosește linkul sau codul de invitație primit de la club, ori cere o invitație administratorului.';
+  tr('Contul tău nu e asociat cu un club. Folosește linkul sau codul de invitație primit de la club, ori cere o invitație administratorului.');
 
 export class ProfileMissingError extends Error {
   constructor() {

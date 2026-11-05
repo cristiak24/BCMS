@@ -29,6 +29,7 @@ import {
 } from '../../components/coach/coachUtils';
 import { plural } from '../../utils/plural';
 
+import { tr } from '../../i18n';
 /**
  * "Panou antrenor" — a digest, not an archive: a greeting with the very next
  * session, four numbers, the week at a glance, the next few sessions and the
@@ -56,9 +57,9 @@ function getFirstName(name?: string | null, firstName?: string | null) {
 function SquadHealth({ players, average }: { players: Player[]; average: number | null }) {
   const rated = players.filter((player) => player.attendanceRate != null);
   const buckets = [
-    { label: 'Peste 75%', color: 'var(--c-success)', count: rated.filter((p) => (p.attendanceRate ?? 0) >= 75).length },
+    { label: tr('Peste 75%'), color: 'var(--c-success)', count: rated.filter((p) => (p.attendanceRate ?? 0) >= 75).length },
     { label: '50–74%', color: 'var(--c-warning)', count: rated.filter((p) => (p.attendanceRate ?? 0) >= 50 && (p.attendanceRate ?? 0) < 75).length },
-    { label: 'Sub 50%', color: 'var(--c-danger)', count: rated.filter((p) => (p.attendanceRate ?? 0) < 50).length },
+    { label: tr('Sub 50%'), color: 'var(--c-danger)', count: rated.filter((p) => (p.attendanceRate ?? 0) < 50).length },
   ];
   const focus = rated
     .filter((player) => (player.attendanceRate ?? 100) < 75)
@@ -68,14 +69,14 @@ function SquadHealth({ players, average }: { players: Player[]; average: number 
   return (
     <GlassCard className="ui-rise gap-3.5">
       <View>
-        <Text accessibilityRole="header" className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Prezența lotului</Text>
-        <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>Jucătorii tăi · {ATTENDANCE_PERIOD_LABEL.toLowerCase()}</Text>
+        <Text accessibilityRole="header" className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Prezența lotului')}</Text>
+        <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>{tr('Jucătorii tăi · {0}', { '0': ATTENDANCE_PERIOD_LABEL.toLowerCase() })}</Text>
       </View>
 
       {rated.length ? (
         <>
           <View className="flex-row items-center gap-4">
-            <ProgressRing value={average} size={64} stroke={7} color={attendanceRateColor(average)} label={average == null ? 'Fără prezență marcată' : `Prezență ${average}%`}>
+            <ProgressRing value={average} size={64} stroke={7} color={attendanceRateColor(average)} label={average == null ? tr('Fără prezență marcată') : tr('Prezență {average}%', { average })}>
               <Text className="f-display t-num text-[16px] font-extrabold" style={{ color: 'var(--c-ink-strong)' }}>{formatAttendanceRate(average)}</Text>
             </ProgressRing>
             <View className="flex-1 min-w-0 gap-1.5">
@@ -90,22 +91,22 @@ function SquadHealth({ players, average }: { players: Player[]; average: number 
           </View>
 
           <View className="gap-2">
-            <Text className="t-label" style={{ color: 'var(--c-muted)' }}>Sub 75%</Text>
+            <Text className="t-label" style={{ color: 'var(--c-muted)' }}>{tr('Sub 75%')}</Text>
             {focus.length ? (
-              <DenseList label="Jucători sub 75%">
+              <DenseList label={tr('Jucători sub 75%')}>
                 {focus.map((player) => (
                   <CoachPlayerRow
                     key={player.id}
                     inList
                     firstName={player.firstName}
                     lastName={player.lastName}
-                    meta={player.teamName || player.teamNames?.[0] || player.position || 'Jucător'}
+                    meta={player.teamName || player.teamNames?.[0] || player.position || tr('Jucător')}
                     trailing={<AttendanceRate rate={player.attendanceRate} />}
                   />
                 ))}
               </DenseList>
             ) : (
-              <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Toți jucătorii cu prezență marcată sunt peste 75%.</Text>
+              <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{tr('Toți jucătorii cu prezență marcată sunt peste 75%.')}</Text>
             )}
           </View>
         </>
@@ -113,8 +114,8 @@ function SquadHealth({ players, average }: { players: Player[]; average: number 
         <EmptyState
           icon="fact-check"
           compact
-          title="Nicio prezență marcată"
-          message="Statistica apare după primele sesiuni marcate."
+          title={tr('Nicio prezență marcată')}
+          message={tr('Statistica apare după primele sesiuni marcate.')}
         />
       )}
     </GlassCard>
@@ -123,7 +124,7 @@ function SquadHealth({ players, average }: { players: Player[]; average: number 
 
 function HomeSkeleton() {
   return (
-    <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă panoul">
+    <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă panoul')}>
       <Skeleton className="h-[150px] w-full rounded-[16px]" />
       <View className="flex-col xl:flex-row gap-4">
         <View className="flex-1 gap-2.5">
@@ -175,7 +176,7 @@ export default function CoachDashboardScreen() {
       setSummary(rosterSummary);
       hasData.current = true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nu s-a putut încărca panoul antrenorului.');
+      setError(err instanceof Error ? err.message : tr('Nu s-a putut încărca panoul antrenorului.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -223,9 +224,9 @@ export default function CoachDashboardScreen() {
           <HomeSkeleton />
         ) : error ? (
           <ErrorState
-            title="Nu am putut încărca panoul"
+            title={tr('Nu am putut încărca panoul')}
             message={error}
-            actionLabel="Reîncearcă"
+            actionLabel={tr('Reîncearcă')}
             onAction={() => loadData(true)}
           />
         ) : (
@@ -238,14 +239,14 @@ export default function CoachDashboardScreen() {
               title={`${getGreeting()}, ${getFirstName(session?.name, session?.firstName)}`}
               // The scope changes what every number below counts, so it is
               // stated up front.
-              subtitle={`Sesiunile echipelor tale · ${session?.clubName ?? 'Club'}`}
+              subtitle={tr('Sesiunile echipelor tale · {0}', { '0': session?.clubName ?? 'Club' })}
               actions={
                 <>
-                  <Button variant="primary" icon="fact-check" label="Marchează prezența" onPress={goToAttendance} />
+                  <Button variant="primary" icon="fact-check" label={tr('Marchează prezența')} onPress={goToAttendance} />
                   <Pressable
                     onPress={() => loadData(true)}
                     accessibilityRole="button"
-                    accessibilityLabel="Reîmprospătează"
+                    accessibilityLabel={tr('Reîmprospătează')}
                     className="ui-press hidden sm:flex h-10 w-10 rounded-[11px] border items-center justify-center"
                     style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
                   >
@@ -255,12 +256,12 @@ export default function CoachDashboardScreen() {
               }
             >
               <StatStrip className="grid-cols-2 lg:grid-cols-4">
-                <GlassStat dot="var(--c-brand-fg)" label="Sesiuni în 7 zile" value={thisWeekEvents.length} />
-                <GlassStat dot="var(--c-sky-fg)" label="Meciuri în 7 zile" value={thisWeekMatches} />
-                <GlassStat dot="var(--c-purple)" label="Jucători" value={playerCount} hint={`în ${plural(visibleTeamsCount, 'echipă', 'echipe')}`} />
+                <GlassStat dot="var(--c-brand-fg)" label={tr('Sesiuni în 7 zile')} value={thisWeekEvents.length} />
+                <GlassStat dot="var(--c-sky-fg)" label={tr('Meciuri în 7 zile')} value={thisWeekMatches} />
+                <GlassStat dot="var(--c-purple)" label={tr('Jucători')} value={playerCount} hint={tr('în {0}', { '0': plural(visibleTeamsCount, 'echipă', 'echipe') })} />
                 <GlassStat
                   dot={averageAttendance == null ? 'var(--c-faint)' : averageAttendance >= 75 ? 'var(--c-success)' : averageAttendance >= 50 ? 'var(--c-warning)' : 'var(--c-danger)'}
-                  label="Prezență"
+                  label={tr('Prezență')}
                   hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()}
                   value={averageAttendance ?? '—'}
                   suffix={averageAttendance == null ? undefined : '%'}
@@ -273,21 +274,21 @@ export default function CoachDashboardScreen() {
               <View className="flex-1 min-w-0 gap-4">
                 <View>
                   <SectionHeader
-                    title="Sesiuni următoare"
-                    subtitle={thisWeekEvents.length ? `${plural(thisWeekEvents.length, 'sesiune', 'sesiuni')} în următoarele 7 zile` : 'Nimic în următoarele 7 zile'}
-                    trailing={<Button icon="calendar-today" label="Tot programul" onPress={goToSchedule} className="self-start" />}
+                    title={tr('Sesiuni următoare')}
+                    subtitle={thisWeekEvents.length ? tr('{0} în următoarele 7 zile', { '0': plural(thisWeekEvents.length, 'sesiune', 'sesiuni') }) : tr('Nimic în următoarele 7 zile')}
+                    trailing={<Button icon="calendar-today" label={tr('Tot programul')} onPress={goToSchedule} className="self-start" />}
                   />
 
                   {nextEvents.length ? (
-                    <DenseList label="Sesiuni următoare">
+                    <DenseList label={tr('Sesiuni următoare')}>
                       {nextEvents.map((event) => <SessionRow key={event.id} inList event={event} />)}
                     </DenseList>
                   ) : (
                     <EmptyState
                       icon="event-busy"
                       compact
-                      title="Nicio sesiune viitoare"
-                      message="Antrenamentele și meciurile programate apar aici."
+                      title={tr('Nicio sesiune viitoare')}
+                      message={tr('Antrenamentele și meciurile programate apar aici.')}
                     />
                   )}
                 </View>

@@ -3,6 +3,7 @@ import { groupByEventDays } from '@/utils/eventDays';
 import { Platform } from '@/src/web/reactNative';
 import { CalendarEvent } from '../../services/eventsApi';
 
+import { tr, appLocale } from '../../i18n';
 /**
  * Shared, pure schedule helpers used by both the admin schedule page and the
  * player/coach (tabs) schedule page. Keeping these in one place avoids the
@@ -23,14 +24,14 @@ export const EVENT_TYPE_META: Record<EventType, {
   onSoft: string;
   onSolid: string;
 }> = {
-  match: { label: 'Meci', solid: 'var(--c-brand-fg)', border: '#0F3A8A', soft: 'var(--c-surface-tint)', onSoft: 'var(--c-brand-fg)', onSolid: 'var(--c-surface)' },
+  match: { label: tr('Meci'), solid: 'var(--c-brand-fg)', border: '#0F3A8A', soft: 'var(--c-surface-tint)', onSoft: 'var(--c-brand-fg)', onSolid: 'var(--c-surface)' },
   // soft/onSoft must be TOKENS, not literal hexes: these land in inline styles,
   // which palette.css's legacy-hex remap never sees, so a pale literal stayed
   // pale in dark mode under near-white text.
-  training: { label: 'Antrenament', solid: 'var(--c-sky)', border: '#1D9CE8', soft: 'var(--c-sky-bg)', onSoft: 'var(--c-sky-fg)', onSolid: 'var(--c-surface)' },
-  camp: { label: 'Cantonament', solid: 'var(--c-purple)', border: 'var(--c-purple)', soft: 'var(--c-purple-bg)', onSoft: 'var(--c-purple-fg)', onSolid: 'var(--c-surface)' },
-  medical: { label: 'Vizită medicală', solid: '#0E9F6E', border: 'var(--c-success-fg)', soft: 'var(--c-success-bg)', onSoft: 'var(--c-success-fg)', onSolid: 'var(--c-surface)' },
-  admin: { label: 'Administrativ', solid: 'var(--c-ink-soft)', border: 'var(--c-muted)', soft: 'var(--c-surface-3)', onSoft: 'var(--c-ink-soft)', onSolid: 'var(--c-surface)' },
+  training: { label: tr('Antrenament'), solid: 'var(--c-sky)', border: '#1D9CE8', soft: 'var(--c-sky-bg)', onSoft: 'var(--c-sky-fg)', onSolid: 'var(--c-surface)' },
+  camp: { label: tr('Cantonament'), solid: 'var(--c-purple)', border: 'var(--c-purple)', soft: 'var(--c-purple-bg)', onSoft: 'var(--c-purple-fg)', onSolid: 'var(--c-surface)' },
+  medical: { label: tr('Vizită medicală'), solid: '#0E9F6E', border: 'var(--c-success-fg)', soft: 'var(--c-success-bg)', onSoft: 'var(--c-success-fg)', onSolid: 'var(--c-surface)' },
+  admin: { label: tr('Administrativ'), solid: 'var(--c-ink-soft)', border: 'var(--c-muted)', soft: 'var(--c-surface-3)', onSoft: 'var(--c-ink-soft)', onSolid: 'var(--c-surface)' },
 };
 
 export function getEventTypeMeta(type: EventType) {
@@ -157,7 +158,7 @@ export function groupEventsByDay(events: CalendarEvent[]): Map<string, CalendarE
 }
 
 // ── Formatting (Romanian locale everywhere) ───────────────────────────────
-export const RO_LOCALE = 'ro-RO';
+export const RO_LOCALE = appLocale();
 
 /** Full month names in Romanian, indexed 0–11 (for month tabs/selectors). */
 export const RO_MONTHS = [

@@ -3,6 +3,7 @@ import { View, Text, Pressable } from '@/src/web/reactNative';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 import { announce } from './LiveRegion';
 
+import { tr } from '../../i18n';
 export type ToastVariant = 'success' | 'error' | 'info';
 
 export interface ToastAction {
@@ -89,7 +90,7 @@ function ToastItem({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: num
                     <Text className="text-white text-[12px] font-black">{toast.action.label}</Text>
                 </Pressable>
             )}
-            <Pressable onPress={() => onDismiss(toast.id)} accessibilityLabel="Închide notificarea" className="tap-40 w-6 h-6 items-center justify-center rounded-full">
+            <Pressable onPress={() => onDismiss(toast.id)} accessibilityLabel={tr('Închide notificarea')} className="tap-40 w-6 h-6 items-center justify-center rounded-full">
                 <X size={14} color={meta.fg} />
             </Pressable>
         </View>

@@ -6,6 +6,7 @@ import { EmptyState } from '../ui/ScreenState';
 import { basketballApi, type Match, type StandingRow } from '../../services/basketballApi';
 import { teamsApi, type Team } from '../../services/teamsApi';
 
+import { tr } from '../../i18n';
 /**
  * FRB league table for the viewer's OWN teams (coach and player/parent home,
  * and their team pages). Admins see the same data per team in Clubul meu
@@ -117,7 +118,7 @@ export default function TeamStandingsCard({
 
   if (teams !== null && teams.length === 0) {
     return showWhenEmpty ? (
-      <EmptyState compact icon="leaderboard" title="Fără clasament" message="Echipa nu este legată de o competiție FRB." />
+      <EmptyState compact icon="leaderboard" title={tr('Fără clasament')} message={tr('Echipa nu este legată de o competiție FRB.')} />
     ) : null;
   }
 
@@ -136,9 +137,9 @@ export default function TeamStandingsCard({
           <MaterialIcons name="leaderboard" size={16} color="var(--c-purple-fg)" />
         </View>
         <View className="flex-1 min-w-0">
-          <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-ink)', letterSpacing: '-0.01em' } as any} numberOfLines={1}>Clasament</Text>
+          <Text className="text-[15px] font-semibold" style={{ color: 'var(--c-ink)', letterSpacing: '-0.01em' } as any} numberOfLines={1}>{tr('Clasament')}</Text>
           <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-            {team ? [team.leagueName, team.seasonName].filter(Boolean).join(' · ') || 'Competiție FRB' : 'Competiție FRB'}
+            {team ? [team.leagueName, team.seasonName].filter(Boolean).join(' · ') || tr('Competiție FRB') : tr('Competiție FRB')}
           </Text>
         </View>
         {team && onOpenTeam ? (
@@ -148,7 +149,7 @@ export default function TeamStandingsCard({
             className="ui-press flex-row items-center gap-1 rounded-[8px] border px-2.5 h-8 shrink-0 hover:bg-[var(--c-surface-2)]"
             style={{ borderColor: 'var(--c-border)' } as any}
           >
-            <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Echipa</Text>
+            <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{tr('Echipa')}</Text>
             <MaterialIcons name="arrow-forward" size={14} color="var(--c-muted)" />
           </Pressable>
         ) : null}
@@ -186,7 +187,7 @@ export default function TeamStandingsCard({
         ) : rows === 'error' || list.length === 0 ? (
           <View className="px-4 md:px-5 pb-3">
             <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>
-              {rows === 'error' ? 'Nu am putut încărca clasamentul din FRB.' : 'Clasament indisponibil pentru acest sezon.'}
+              {rows === 'error' ? tr('Nu am putut încărca clasamentul din FRB.') : tr('Clasament indisponibil pentru acest sezon.')}
             </Text>
           </View>
         ) : (
@@ -194,7 +195,7 @@ export default function TeamStandingsCard({
             {/* Our line at a glance: place, record, win rate. */}
             <View className="flex-row items-stretch mx-4 md:mx-5 mb-3 rounded-[12px] border overflow-hidden" style={{ borderColor: 'var(--c-border-soft)', backgroundColor: 'var(--c-surface-2)' } as any}>
               <View className="px-4 py-3 justify-center" style={{ borderRightWidth: 1, borderRightColor: 'var(--c-border-soft)' } as any}>
-                <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>Loc</Text>
+                <Text className="t-eyebrow" style={{ color: 'var(--c-muted)' }}>{tr('Loc')}</Text>
                 <View className="flex-row items-baseline gap-1 mt-1">
                   <Text className="t-num text-[26px] font-bold leading-none" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any}>{ours ? ours.position : '—'}</Text>
                   <Text className="t-num text-[12px] font-semibold" style={{ color: 'var(--c-faint)' }}>/ {list.length}</Text>
@@ -203,10 +204,10 @@ export default function TeamStandingsCard({
               <View className="flex-1 min-w-0 px-4 py-3 justify-center gap-2">
                 <View className="flex-row items-center gap-4">
                   {[
-                    { label: 'Meciuri', value: ours?.played },
-                    { label: 'Victorii', value: ours?.wins, color: 'var(--c-success-fg)' },
-                    { label: 'Înfrângeri', value: ours?.losses, color: 'var(--c-danger-fg)' },
-                    { label: 'Puncte', value: ours?.points },
+                    { label: tr('Meciuri'), value: ours?.played },
+                    { label: tr('Victorii'), value: ours?.wins, color: 'var(--c-success-fg)' },
+                    { label: tr('Înfrângeri'), value: ours?.losses, color: 'var(--c-danger-fg)' },
+                    { label: tr('Puncte'), value: ours?.points },
                   ].map((stat) => (
                     <View key={stat.label} className="min-w-0">
                       <Text className="text-[11px] font-medium" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{stat.label}</Text>
@@ -219,7 +220,7 @@ export default function TeamStandingsCard({
                     <View className="flex-1 h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--c-surface-3)' }}>
                       <View className="ui-bar h-full rounded-full" style={{ width: `${winRate}%`, backgroundColor: 'var(--c-purple)' }} />
                     </View>
-                    <Text className="t-num text-[11.5px] font-semibold shrink-0" style={{ color: 'var(--c-muted)' }}>{winRate}% victorii</Text>
+                    <Text className="t-num text-[11.5px] font-semibold shrink-0" style={{ color: 'var(--c-muted)' }}>{tr('{winRate}% victorii', { winRate })}</Text>
                   </View>
                 ) : null}
               </View>
@@ -228,8 +229,8 @@ export default function TeamStandingsCard({
             <View className="mx-4 md:mx-5 mb-2">
               <View className="flex-row items-center px-2 pb-1.5">
                 <Text className="t-eyebrow w-7" style={{ color: 'var(--c-faint)' }}>#</Text>
-                <Text className="t-eyebrow flex-1" style={{ color: 'var(--c-faint)' }}>Echipă</Text>
-                {['J', 'V', 'Î', 'Pct'].map((h) => (
+                <Text className="t-eyebrow flex-1" style={{ color: 'var(--c-faint)' }}>{tr('Echipă')}</Text>
+                {['J', 'V', 'Î', 'Pct'].map((h) => tr(h)).map((h) => (
                   <Text key={h} className="t-eyebrow w-9 text-right" style={{ color: 'var(--c-faint)' }}>{h}</Text>
                 ))}
               </View>

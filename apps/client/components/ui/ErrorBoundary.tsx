@@ -2,6 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { getClerk } from '../../config/clerk';
 import { clearAuthSession, setCachedAuthSession } from '../../utils/authSession';
 
+import { tr } from '../../i18n';
 type ErrorBoundaryProps = {
   children: ReactNode;
   /** Rendered instead of the default card. Receives a reset callback. */
@@ -95,13 +96,8 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
             </svg>
           </div>
 
-          <h1 className="text-xl font-black" style={{ color: 'var(--c-ink)' }}>
-            Ceva nu a funcționat
-          </h1>
-          <p className="mt-2 text-sm font-semibold leading-6" style={{ color: 'var(--c-muted)' }}>
-            A apărut o eroare neașteptată pe această pagină. Datele tale sunt în siguranță — poți
-            reîncerca sau te poți întoarce la pagina principală.
-          </p>
+          <h1 className="text-xl font-black" style={{ color: 'var(--c-ink)' }}>{tr('Ceva nu a funcționat')}</h1>
+          <p className="mt-2 text-sm font-semibold leading-6" style={{ color: 'var(--c-muted)' }}>{tr('A apărut o eroare neașteptată pe această pagină. Datele tale sunt în siguranță — poți reîncerca sau te poți întoarce la pagina principală.')}</p>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <button
@@ -109,9 +105,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
               onClick={this.reset}
               className="min-h-[44px] rounded-2xl px-5 text-sm font-black transition-opacity hover:opacity-90"
               style={{ backgroundColor: 'var(--c-brand-surface)', color: 'var(--c-on-brand)' }}
-            >
-              Reîncearcă
-            </button>
+            >{tr('Reîncearcă')}</button>
             <button
               type="button"
               onClick={() => {
@@ -123,9 +117,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
                 color: 'var(--c-ink-soft)',
                 backgroundColor: 'var(--c-surface)',
               }}
-            >
-              Pagina principală
-            </button>
+            >{tr('Pagina principală')}</button>
             <button
               type="button"
               onClick={this.logout}
@@ -135,9 +127,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
                 color: 'var(--c-danger-fg)',
                 backgroundColor: 'var(--c-surface)',
               }}
-            >
-              Deconectare
-            </button>
+            >{tr('Deconectare')}</button>
           </div>
 
           {import.meta.env.DEV ? (

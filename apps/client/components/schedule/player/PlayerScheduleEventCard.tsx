@@ -5,6 +5,7 @@ import { Clock, MapPin } from 'lucide-react';
 import { CalendarEvent } from '../../../services/eventsApi';
 import { EVENT_TYPE_META, isCancelledEvent, formatTimeRange, RO_LOCALE } from '../scheduleShared';
 
+import { tr } from '../../../i18n';
 /**
  * Read-only row used by the player Day/Week/Agenda views. No management
  * actions — a plain Pressable that opens PlayerEventDetailModal via onPress.
@@ -47,7 +48,7 @@ export const PlayerScheduleEventCard = React.memo(({
           </Text>
           {cancelled ? (
             <View className="bg-rose-50 rounded-full px-2.5 py-1 border border-rose-100">
-              <Text className="text-[9px] font-black uppercase tracking-widest text-rose-500">Anulat</Text>
+              <Text className="text-[9px] font-black uppercase tracking-widest text-rose-500">{tr('Anulat')}</Text>
             </View>
           ) : (
             <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: meta.soft }}>
@@ -65,7 +66,7 @@ export const PlayerScheduleEventCard = React.memo(({
           <View className="flex-row items-center gap-1.5 flex-1 min-w-0">
             <MapPin size={13} color="var(--c-faint)" />
             <Text numberOfLines={1} className="text-[12px] font-semibold flex-1" style={{ color: 'var(--c-muted)' }}>
-              {item.location || item.teamName || 'Sală principală'}
+              {item.location || item.teamName || tr('Sală principală')}
             </Text>
           </View>
         </View>

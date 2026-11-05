@@ -6,6 +6,7 @@ import { sortByStartTime, RO_LOCALE } from '../scheduleShared';
 import { PlayerScheduleEventCard } from './PlayerScheduleEventCard';
 import { plural } from '../../../utils/plural';
 
+import { tr } from '../../../i18n';
 /**
  * Day-agenda sheet opened by tapping a calendar cell — the player equivalent
  * of admin's DayScheduleModal, minus the quick-add affordance (players don't
@@ -42,7 +43,7 @@ export function PlayerDayScheduleModal({
                 </Text>
                 {isToday ? (
                   <View className="rounded-full px-2 py-[2px]" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
-                    <Text className="text-[9px] font-black uppercase tracking-widest" style={{ color: 'var(--c-brand-fg)' }}>Azi</Text>
+                    <Text className="text-[9px] font-black uppercase tracking-widest" style={{ color: 'var(--c-brand-fg)' }}>{tr('Azi')}</Text>
                   </View>
                 ) : null}
               </View>
@@ -50,10 +51,10 @@ export function PlayerDayScheduleModal({
                 {day?.date.toLocaleDateString(RO_LOCALE, { month: 'long', day: 'numeric' })}
               </Text>
               <Text className="font-bold text-[12px] mt-0.5" style={{ color: 'var(--c-faint)' }}>
-                {events.length === 0 ? 'Nimic programat' : `${plural(events.length, 'eveniment planificat', 'evenimente planificate')}`}
+                {events.length === 0 ? tr('Nimic programat') : `${plural(events.length, tr('eveniment planificat'), tr('evenimente planificate'))}`}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} accessibilityLabel="Închide" style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+            <TouchableOpacity onPress={onClose} accessibilityLabel={tr('Închide')} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
               <X size={20} color="var(--c-muted)" />
             </TouchableOpacity>
           </View>
@@ -62,7 +63,7 @@ export function PlayerDayScheduleModal({
             {events.length === 0 ? (
               <View className="items-center py-10">
                 <CalendarIcon size={28} color="var(--c-faint)" />
-                <Text className="font-bold mt-3 text-center" style={{ color: 'var(--c-muted)' }}>Nicio sesiune programată în această zi.</Text>
+                <Text className="font-bold mt-3 text-center" style={{ color: 'var(--c-muted)' }}>{tr('Nicio sesiune programată în această zi.')}</Text>
               </View>
             ) : (
               events.map((event) => (

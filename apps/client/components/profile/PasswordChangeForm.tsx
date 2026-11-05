@@ -3,6 +3,7 @@ import { Text, View } from '@/src/web/reactNative';
 import Button from '../ui/Button';
 import { FormNotice, PrimaryButton, ProfileCard, ProfileField } from './ProfileParts';
 
+import { tr } from '../../i18n';
 type PasswordChangeFormProps = {
   /** Shows only a „Schimbă parola” button until it is pressed (player/parent profile). */
   collapsible?: boolean;
@@ -28,11 +29,11 @@ function getPasswordStrength(value: string) {
 }
 
 const STRENGTH_META = [
-  { label: 'Prea scurtă', color: 'var(--c-danger)' },
-  { label: 'Slabă', color: 'var(--c-danger)' },
-  { label: 'Acceptabilă', color: 'var(--c-warning)' },
-  { label: 'Bună', color: 'var(--c-success)' },
-  { label: 'Puternică', color: 'var(--c-success)' },
+  { label: tr('Prea scurtă'), color: 'var(--c-danger)' },
+  { label: tr('Slabă'), color: 'var(--c-danger)' },
+  { label: tr('Acceptabilă'), color: 'var(--c-warning)' },
+  { label: tr('Bună'), color: 'var(--c-success)' },
+  { label: tr('Puternică'), color: 'var(--c-success)' },
 ];
 
 export default function PasswordChangeForm({ onChangePassword, collapsible = false }: PasswordChangeFormProps) {
@@ -51,17 +52,17 @@ export default function PasswordChangeForm({ onChangePassword, collapsible = fal
 
   const handleSubmit = async () => {
     if (!currentPassword.trim()) {
-      setError('Parola curentă este obligatorie.');
+      setError(tr('Parola curentă este obligatorie.'));
       return;
     }
 
     if (newPassword.trim().length < 8) {
-      setError('Parola nouă trebuie să aibă cel puțin 8 caractere.');
+      setError(tr('Parola nouă trebuie să aibă cel puțin 8 caractere.'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError('Parola nouă și confirmarea trebuie să coincidă.');
+      setError(tr('Parola nouă și confirmarea trebuie să coincidă.'));
       return;
     }
 
@@ -79,26 +80,26 @@ export default function PasswordChangeForm({ onChangePassword, collapsible = fal
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setSuccess('Parola a fost schimbată cu succes.');
+      setSuccess(tr('Parola a fost schimbată cu succes.'));
       if (collapsible) setExpanded(false);
     } catch (changeError) {
-      setError(changeError instanceof Error ? changeError.message : 'Nu s-a putut schimba parola.');
+      setError(changeError instanceof Error ? changeError.message : tr('Nu s-a putut schimba parola.'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ProfileCard icon="lock" tone="warning" title="Securitate" description="Schimbă parola contului tău.">
+    <ProfileCard icon="lock" tone="warning" title={tr('Securitate')} description={tr('Schimbă parola contului tău.')}>
       {!expanded ? (
         <View className="gap-3">
           {success ? <FormNotice tone="success" message={success} /> : null}
-          <Button icon="key" label="Schimbă parola" onPress={() => { setExpanded(true); setSuccess(null); }} className="self-start" />
+          <Button icon="key" label={tr('Schimbă parola')} onPress={() => { setExpanded(true); setSuccess(null); }} className="self-start" />
         </View>
       ) : (
       <View className="gap-4">
         <ProfileField
-          label="Parola curentă"
+          label={tr('Parola curentă')}
           icon="lock-outline"
           secureTextEntry
           value={currentPassword}
@@ -108,17 +109,17 @@ export default function PasswordChangeForm({ onChangePassword, collapsible = fal
         />
         <View>
           <ProfileField
-            label="Parolă nouă"
+            label={tr('Parolă nouă')}
             icon="key"
             secureTextEntry
             value={newPassword}
             onChangeText={(value: string) => { setNewPassword(value); setError(null); setSuccess(null); }}
             autoCapitalize="none"
             autoComplete="new-password"
-            hint={newPassword ? undefined : 'Minimum 8 caractere; combină litere mari, cifre și simboluri.'}
+            hint={newPassword ? undefined : tr('Minimum 8 caractere; combină litere mari, cifre și simboluri.')}
           />
           {newPassword ? (
-            <View className="mt-2" accessibilityLabel={`Putere parolă: ${strengthMeta.label}`}>
+            <View className="mt-2" accessibilityLabel={tr('Putere parolă: {0}', { '0': strengthMeta.label })}>
               <View className="flex-row gap-1">
                 {[0, 1, 2, 3].map((index) => (
                   <View
@@ -136,14 +137,14 @@ export default function PasswordChangeForm({ onChangePassword, collapsible = fal
           ) : null}
         </View>
         <ProfileField
-          label="Confirmă parola nouă"
+          label={tr('Confirmă parola nouă')}
           icon="key"
           secureTextEntry
           value={confirmPassword}
           onChangeText={(value: string) => { setConfirmPassword(value); setError(null); setSuccess(null); }}
           autoCapitalize="none"
           autoComplete="new-password"
-          error={mismatch ? 'Parolele nu coincid.' : null}
+          error={mismatch ? tr('Parolele nu coincid.') : null}
         />
 
         {error ? <FormNotice tone="danger" message={error} /> : null}
@@ -152,7 +153,7 @@ export default function PasswordChangeForm({ onChangePassword, collapsible = fal
         <View className="flex-row justify-end gap-2">
           {collapsible ? (
             <Button
-              label="Renunță"
+              label={tr('Renunță')}
               onPress={() => {
                 setExpanded(false);
                 setCurrentPassword('');
@@ -163,8 +164,8 @@ export default function PasswordChangeForm({ onChangePassword, collapsible = fal
             />
           ) : null}
           <PrimaryButton
-            label="Schimbă parola"
-            loadingLabel="Se actualizează…"
+            label={tr('Schimbă parola')}
+            loadingLabel={tr('Se actualizează…')}
             icon="verified-user"
             onPress={handleSubmit}
             loading={loading}

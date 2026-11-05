@@ -5,6 +5,7 @@ import * as DocumentPicker from '@/src/web/documentPicker';
 import * as ImagePicker from '@/src/web/imagePicker';
 import { profileApi } from '../../services/profileApi';
 
+import { tr } from '../../i18n';
 type ProfileImagePickerProps = {
   avatarUrl: string | null | undefined;
   initials: string;
@@ -77,13 +78,13 @@ export default function ProfileImagePicker({
           };
         }
       } catch {
-        onError?.('Accesul la galeria media este necesar pentru a actualiza fotografia de profil.');
+        onError?.(tr('Accesul la galeria media este necesar pentru a actualiza fotografia de profil.'));
         return;
       }
     }
 
     if (!asset) {
-      onError?.('Imaginea selectată nu a putut fi citită.');
+      onError?.(tr('Imaginea selectată nu a putut fi citită.'));
       return;
     }
 
@@ -104,7 +105,7 @@ export default function ProfileImagePicker({
       const response = await profileApi.uploadAvatar(formData);
       onUploaded(response.avatarUrl);
     } catch (error) {
-      onError?.(error instanceof Error ? error.message : 'Nu s-a putut încărca avatarul.');
+      onError?.(error instanceof Error ? error.message : tr('Nu s-a putut încărca avatarul.'));
     } finally {
       setUploading(false);
     }
@@ -115,7 +116,7 @@ export default function ProfileImagePicker({
       onPress={handlePickImage}
       disabled={uploading}
       accessibilityRole="button"
-      accessibilityLabel={avatarUrl ? 'Schimbă fotografia de profil' : 'Adaugă o fotografie de profil'}
+      accessibilityLabel={avatarUrl ? tr('Schimbă fotografia de profil') : tr('Adaugă o fotografie de profil')}
       className="ui-press relative self-start"
     >
       {/* Ring is the card surface colour, not white, so the avatar sits cleanly

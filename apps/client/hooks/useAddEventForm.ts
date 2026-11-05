@@ -4,6 +4,7 @@ import { eventsApi, type CalendarEvent } from '../services/eventsApi';
 import { localDateTimeToIso } from '../utils/dates';
 import { buildEventUpdate, eventToFormValues } from '../utils/eventEditForm';
 
+import { tr } from '../i18n';
 export type AddEventType = 'training' | 'match' | 'camp' | 'admin' | 'medical';
 export type AddEventFormField = 'title' | 'description' | 'location' | 'team' | 'startTime' | 'endTime' | 'recurringDays';
 export type AddEventFormErrors = Partial<Record<AddEventFormField, string>>;
@@ -25,7 +26,7 @@ function getLocalDateTime(date: Date, time: string) {
  */
 function toApiTime(day: string, time: string) {
   const iso = localDateTimeToIso(day, time);
-  if (!iso) throw new Error('Data sau ora evenimentului nu este validă.');
+  if (!iso) throw new Error(tr('Data sau ora evenimentului nu este validă.'));
   return iso;
 }
 
@@ -201,30 +202,30 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
     const location = newLocation.trim();
 
     if (!title) {
-      errors.title = 'Titlul evenimentului este obligatoriu.';
+      errors.title = tr('Titlul evenimentului este obligatoriu.');
     }
 
     // Descrierea este opțională; validăm lungimea minimă doar dacă a fost completată.
     if (description && description.length < 12 && description !== originalDescription.trim()) {
-      errors.description = 'Descrierea ar trebui să aibă cel puțin 12 caractere.';
+      errors.description = tr('Descrierea ar trebui să aibă cel puțin 12 caractere.');
     }
 
     if (!location) {
-      errors.location = 'Adaugă o sală, o locație sau un link de întâlnire online.';
+      errors.location = tr('Adaugă o sală, o locație sau un link de întâlnire online.');
     }
 
     if (!newTeamId) {
-      errors.team = 'Selectează echipa sau grupul căruia îi aparține evenimentul.';
+      errors.team = tr('Selectează echipa sau grupul căruia îi aparține evenimentul.');
     }
 
     const effectiveStartTime = normalizeTimeValue(newStartTime, '09:00');
     const effectiveEndTime = keepEndAfterStart(effectiveStartTime, normalizeTimeValue(newEndTime, '10:00'));
 
     if (!effectiveStartTime) {
-      errors.startTime = 'Ora de început este obligatorie.';
+      errors.startTime = tr('Ora de început este obligatorie.');
     }
     if (!effectiveEndTime) {
-      errors.endTime = 'Ora de sfârșit este obligatorie.';
+      errors.endTime = tr('Ora de sfârșit este obligatorie.');
     }
 
     if (effectiveStartTime && effectiveEndTime) {
@@ -233,15 +234,15 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
       const end = getLocalDateTime(endDate, effectiveEndTime);
 
       if (Number.isNaN(start.getTime())) {
-        errors.startTime = 'Alege o oră de început validă.';
+        errors.startTime = tr('Alege o oră de început validă.');
       }
       if (Number.isNaN(end.getTime()) || end <= start) {
-        errors.endTime = 'Ora de sfârșit trebuie să fie după ora de început.';
+        errors.endTime = tr('Ora de sfârșit trebuie să fie după ora de început.');
       }
     }
 
     if (newEventType === 'training' && isRecurring && recurringDays.length === 0) {
-      errors.recurringDays = 'Alege cel puțin o zi pentru antrenamentele recurente.';
+      errors.recurringDays = tr('Alege cel puțin o zi pentru antrenamentele recurente.');
     }
 
     setAddEventErrors(errors);
@@ -346,7 +347,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
       return true;
     } catch (error) {
       const maybeAxiosError = error as { response?: { data?: { error?: string } }; message?: string };
-      const message = maybeAxiosError.response?.data?.error || maybeAxiosError.message || 'Evenimentul nu a putut fi salvat.';
+      const message = maybeAxiosError.response?.data?.error || maybeAxiosError.message || tr('Evenimentul nu a putut fi salvat.');
       setSubmitError(message);
       return false;
     } finally {
@@ -413,7 +414,7 @@ export function useAddEventForm(onCreated: (createdCount: number) => void) {
       if (newLocation.trim()) await saveLocation(newLocation.trim());
       return updated;
     } catch (error) {
-      setSubmitError(error instanceof Error && error.message ? error.message : 'Modificările nu au putut fi salvate.');
+      setSubmitError(error instanceof Error && error.message ? error.message : tr('Modificările nu au putut fi salvate.'));
       return null;
     } finally {
       setAddingEvent(false);

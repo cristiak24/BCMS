@@ -6,6 +6,7 @@ import { Skeleton } from '../../ui/Skeleton';
 import { useSession } from '../../../context/AuthContext';
 import { CalendarEventPill, calendarDayLabel } from '../CalendarEventPill';
 
+import { tr } from '../../../i18n';
 /*
  * The player month grid.
  *
@@ -21,9 +22,9 @@ import { CalendarEventPill, calendarDayLabel } from '../CalendarEventPill';
  *     click-empty-day-to-create affordance anywhere in this file.
  */
 
-const WEEKDAY_LABELS = ['LUN', 'MAR', 'MIE', 'JOI', 'VIN', 'SÂM', 'DUM'];
+const WEEKDAY_LABELS = ['LUN', 'MAR', 'MIE', 'JOI', 'VIN', tr('SÂM'), 'DUM'];
 /** Player/parent accounts: sentence case, like the admin grid. */
-const WEEKDAY_LABELS_PLAIN = ['Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm', 'Dum'];
+const WEEKDAY_LABELS_PLAIN = ['Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm', 'Dum'].map((day) => tr(day));
 
 export type PlayerCalendarDay = {
   key: string;
@@ -186,7 +187,7 @@ const CalendarCell = React.memo(({
         {overflow > 0 && (
           <TouchableOpacity onPress={open} activeOpacity={0.7} className="self-start mt-[1px]">
             <View className="bg-slate-100 rounded-full px-2 py-[2px]">
-              <Text style={{ fontSize: 11, fontWeight: '700', color: 'var(--c-muted)' }}>+{overflow} încă</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: 'var(--c-muted)' }}>{tr('+{overflow} încă', { overflow })}</Text>
             </View>
           </TouchableOpacity>
         )}
@@ -231,7 +232,7 @@ export const PlayerCalendarGrid = React.memo(({
       {loading ? (
         // Same 7-column rhythm the calendar settles into, so the month view
         // keeps its height instead of collapsing to a spinner.
-        <View className="flex-row flex-wrap" accessibilityRole="progressbar" accessibilityLabel="Se încarcă programul">
+        <View className="flex-row flex-wrap" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă programul')}>
           {Array.from({ length: 35 }).map((_, index) => (
             <View
               key={index}

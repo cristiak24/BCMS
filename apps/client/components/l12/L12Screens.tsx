@@ -30,6 +30,7 @@ import { plural } from '../../utils/plural';
 import { isNotFound } from '../../services/apiClient';
 import { medicalStatus } from '../myclub/teamDisplay';
 
+import { tr, appLocale } from '../../i18n';
 /**
  * L12 area, shared by admins (/admin/l12…) and coaches (/coach/l12…):
  *  - home: upcoming matches with their sheet status + each team's L12 constant
@@ -42,7 +43,7 @@ function formatDate(iso: string | null | undefined, withTime = false) {
   const date = parseApiDate(iso);
   if (Number.isNaN(date.getTime())) return '';
   const day = formatDisplayDate(date);
-  return withTime ? `${day}, ${date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}` : day;
+  return withTime ? `${day}, ${date.toLocaleTimeString(appLocale(), { hour: '2-digit', minute: '2-digit' })}` : day;
 }
 
 /** Comparable form of a lineup — what decides "unsaved". */
@@ -105,18 +106,18 @@ function FiltersSheet({ visible, onClose, onReset, children }: { visible: boolea
       <ModalBackdrop onDismiss={onClose} className="flex-1 justify-end" style={{ backgroundColor: 'rgba(2, 8, 23, 0.55)' }}>
         <View
           accessibilityRole={'dialog' as any}
-          accessibilityLabel="Filtre"
+          accessibilityLabel={tr('Filtre')}
           aria-modal="true"
           className="ui-rise w-full rounded-t-[20px] border overflow-hidden pb-[env(safe-area-inset-bottom)]"
           style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: '0 28px 70px rgba(2, 8, 23, 0.35)' } as any}
         >
           <View className="flex-row items-center justify-between px-4 pt-4 pb-3 border-b" style={{ borderColor: 'var(--c-border)' }}>
-            <Text accessibilityRole="header" className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>Filtre</Text>
-            {onReset ? <Button size="sm" variant="ghost" label="Resetează" onPress={onReset} /> : null}
+            <Text accessibilityRole="header" className="text-[15px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Filtre')}</Text>
+            {onReset ? <Button size="sm" variant="ghost" label={tr('Resetează')} onPress={onReset} /> : null}
           </View>
           <View className="px-4 py-4 gap-4">{children}</View>
           <View className="px-4 pb-4">
-            <Button variant="primary" label="Gata" onPress={onClose} className="w-full" />
+            <Button variant="primary" label={tr('Gata')} onPress={onClose} className="w-full" />
           </View>
         </View>
       </ModalBackdrop>
@@ -129,7 +130,7 @@ function BackButton({ label, onPress }: { label: string; onPress: () => void }) 
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Înapoi la ${label}`}
+      accessibilityLabel={tr('Înapoi la {label}', { label })}
       className="ui-press self-start h-9 [@media(pointer:coarse)]:h-10 pl-2 pr-3 rounded-[10px] border flex-row items-center gap-1.5"
       style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
     >
@@ -153,7 +154,7 @@ function PageShell({ children, footer }: { children: ReactNode; footer?: ReactNo
 function LoadingSheet() {
   return (
     <PageShell>
-      <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel="Se încarcă L12">
+      <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă L12')}>
         <Skeleton className="h-9 w-28 rounded-[10px]" />
         <Skeleton className="h-8 w-2/3 max-w-[520px] rounded-[10px]" />
         <Skeleton className="h-[120px] w-full rounded-[16px]" />
@@ -179,18 +180,18 @@ function dayKey(iso: string) {
 
 function dayLabel(iso: string) {
   const date = parseApiDate(iso);
-  if (Number.isNaN(date.getTime())) return 'Fără dată';
+  if (Number.isNaN(date.getTime())) return tr('Fără dată');
   const today = new Date();
   const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-  if (date.toDateString() === today.toDateString()) return 'Azi';
-  if (date.toDateString() === tomorrow.toDateString()) return 'Mâine';
-  const label = date.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' });
+  if (date.toDateString() === today.toDateString()) return tr('Azi');
+  if (date.toDateString() === tomorrow.toDateString()) return tr('Mâine');
+  const label = date.toLocaleDateString(appLocale(), { weekday: 'long', day: 'numeric', month: 'long' });
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function timeLabel(iso: string) {
   const date = parseApiDate(iso);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString(appLocale(), { hour: '2-digit', minute: '2-digit' });
 }
 
 function Segmented<T extends string>({ value, onChange, options }: { value: T; onChange: (next: T) => void; options: { key: T; label: string; count?: number }[] }) {
@@ -226,7 +227,7 @@ const monthKeyOf = (iso: string) => {
 
 function monthLabel(key: string) {
   const [y, m] = key.split('-').map(Number);
-  const label = new Date(y, m - 1, 1).toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
+  const label = new Date(y, m - 1, 1).toLocaleDateString(appLocale(), { month: 'long', year: 'numeric' });
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
@@ -246,7 +247,7 @@ export function L12HomeScreen() {
       setError(null);
       setData(await l12Api.overview());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nu am putut încărca L12.');
+      setError(err instanceof Error ? err.message : tr('Nu am putut încărca L12.'));
     }
   }, []);
 
@@ -269,7 +270,7 @@ export function L12HomeScreen() {
     teamScopedMatches.forEach((m) => counts.set(monthKeyOf(m.startTime), (counts.get(monthKeyOf(m.startTime)) ?? 0) + 1));
     const current = monthKeyOf(new Date().toISOString());
     return [
-      { key: 'upcoming', label: 'Următoarele meciuri', count: teamScopedMatches.filter(isUpcoming).length },
+      { key: 'upcoming', label: tr('Următoarele meciuri'), count: teamScopedMatches.filter(isUpcoming).length },
       ...[...counts.keys()].sort().map((key) => ({
         key,
         label: `${monthLabel(key)}${key === current ? ' · luna asta' : ''}`,
@@ -285,7 +286,7 @@ export function L12HomeScreen() {
   const kindOptions = useMemo(() => {
     const count = (kind: MatchKind) => monthScopedMatches.filter((m) => matchKind(m) === kind).length;
     return [
-      { key: 'all' as const, label: 'Toate', count: monthScopedMatches.length },
+      { key: 'all' as const, label: tr('Toate'), count: monthScopedMatches.length },
       ...(['frb', 'amical', 'municipal'] as const).map((kind) => ({ key: kind, label: KIND_META[kind].plural, dot: KIND_META[kind].fg, count: count(kind) })),
     ];
   }, [monthScopedMatches]);
@@ -296,9 +297,9 @@ export function L12HomeScreen() {
   );
 
   const statusOptions = useMemo(() => [
-    { key: 'all' as const, label: 'Toate' },
-    { key: 'unset' as const, label: 'Fără listă', count: kindScopedMatches.filter((m) => !m.hasLineup).length },
-    { key: 'set' as const, label: 'Cu listă', count: kindScopedMatches.filter((m) => m.hasLineup).length },
+    { key: 'all' as const, label: tr('Toate') },
+    { key: 'unset' as const, label: tr('Fără listă'), count: kindScopedMatches.filter((m) => !m.hasLineup).length },
+    { key: 'set' as const, label: tr('Cu listă'), count: kindScopedMatches.filter((m) => m.hasLineup).length },
   ], [kindScopedMatches]);
 
   const filteredMatches = useMemo(() => {
@@ -336,7 +337,7 @@ export function L12HomeScreen() {
   const teamOptions = useMemo(() => {
     if (!data) return [];
     return [
-      { key: 'all', label: 'Toate echipele', count: liveMatches.length },
+      { key: 'all', label: tr('Toate echipele'), count: liveMatches.length },
       ...data.teams.map((team) => ({
         key: String(team.id),
         label: team.name,
@@ -361,21 +362,21 @@ export function L12HomeScreen() {
 
   // The same controls inline from sm up and inside the phone's „Filtre” sheet.
   const teamSelect = data && data.teams.length > 1 ? (
-    <SelectField label="Echipă" icon="groups" options={teamOptions} value={teamFilter} onChange={setTeamFilter} className="min-w-0 lg:w-[280px]" />
+    <SelectField label={tr('Echipă')} icon="groups" options={teamOptions} value={teamFilter} onChange={setTeamFilter} className="min-w-0 lg:w-[280px]" />
   ) : null;
-  const monthSelect = <SelectField label="Lună" icon="calendar-month" options={monthOptions} value={monthFilter} onChange={setMonthFilter} className="min-w-0 lg:w-[250px]" />;
-  const kindChips = <FilterChips label="Tip meci" options={kindOptions} value={kindFilter} onChange={setKindFilter} />;
+  const monthSelect = <SelectField label={tr('Lună')} icon="calendar-month" options={monthOptions} value={monthFilter} onChange={setMonthFilter} className="min-w-0 lg:w-[250px]" />;
+  const kindChips = <FilterChips label={tr('Tip meci')} options={kindOptions} value={kindFilter} onChange={setKindFilter} />;
   const resetButton = (
     <Pressable onPress={resetFilters} accessibilityRole="button" className="ui-press h-8 [@media(pointer:coarse)]:h-10 px-2.5 rounded-[9px] flex-row items-center gap-1 shrink-0">
       <MaterialIcons name="close" size={14} color="var(--c-muted)" />
-      <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>Resetează</Text>
+      <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-muted)' }}>{tr('Resetează')}</Text>
     </Pressable>
   );
 
   return (
     <PageShell>
       {error ? (
-        <ErrorState title="Nu am putut încărca L12" message={error} actionLabel="Reîncearcă" onAction={load} />
+        <ErrorState title={tr('Nu am putut încărca L12')} message={error} actionLabel={tr('Reîncearcă')} onAction={load} />
       ) : !data ? (
         <View className="gap-3">
           <Skeleton className="h-[64px] w-full rounded-[14px]" />
@@ -397,14 +398,14 @@ export function L12HomeScreen() {
             value={tab}
             onChange={setTab}
             options={[
-              { key: 'matches', label: 'Meciuri', count: upcomingCount },
-              { key: 'teams', label: 'L12 constant', count: data.teams.length },
+              { key: 'matches', label: tr('Meciuri'), count: upcomingCount },
+              { key: 'teams', label: tr('L12 constant'), count: data.teams.length },
             ]}
           />
 
           {tab === 'matches' ? (
             liveMatches.length === 0 ? (
-              <EmptyState compact icon="sports-basketball" title="Niciun meci programat" message="Meciurile oficiale FRB, amicalele și meciurile municipale din Program apar aici." />
+              <EmptyState compact icon="sports-basketball" title={tr('Niciun meci programat')} message={tr('Meciurile oficiale FRB, amicalele și meciurile municipale din Program apar aici.')} />
             ) : (
               <View className="gap-4">
                 {/* Phones: the status stays in view and Echipă / Lună / Tip meci move into
@@ -416,7 +417,7 @@ export function L12HomeScreen() {
                   <Button
                     size="sm"
                     icon="tune"
-                    label={extraFilterCount ? `Filtre (${extraFilterCount})` : 'Filtre'}
+                    label={extraFilterCount ? tr('Filtre ({extraFilterCount})', { extraFilterCount }) : tr('Filtre')}
                     variant={extraFilterCount ? 'primary' : 'secondary'}
                     onPress={() => setFiltersOpen(true)}
                   />
@@ -438,9 +439,9 @@ export function L12HomeScreen() {
                   {teamSelect}
                   {monthSelect}
                   <View className="gap-1.5">
-                    <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Tip meci</Text>
+                    <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{tr('Tip meci')}</Text>
                     {/* Wrapped in the sheet: a sideways-scrolling row cut „Municipale” at the edge. */}
-                    <FilterChips label="Tip meci" options={kindOptions} value={kindFilter} onChange={setKindFilter} scrollOnMobile={false} />
+                    <FilterChips label={tr('Tip meci')} options={kindOptions} value={kindFilter} onChange={setKindFilter} scrollOnMobile={false} />
                   </View>
                 </FiltersSheet>
 
@@ -448,9 +449,9 @@ export function L12HomeScreen() {
                   <EmptyState
                     compact
                     icon="search-off"
-                    title="Niciun meci pentru aceste filtre"
-                    message={monthFilter === 'upcoming' ? 'Nu sunt meciuri viitoare pentru selecția asta. Alege o lună din listă ca să vezi și meciurile trecute.' : 'Încearcă altă lună, echipă sau alt tip de meci.'}
-                    actionLabel={filtersActive ? 'Resetează filtrele' : undefined}
+                    title={tr('Niciun meci pentru aceste filtre')}
+                    message={monthFilter === 'upcoming' ? tr('Nu sunt meciuri viitoare pentru selecția asta. Alege o lună din listă ca să vezi și meciurile trecute.') : tr('Încearcă altă lună, echipă sau alt tip de meci.')}
+                    actionLabel={filtersActive ? tr('Resetează filtrele') : undefined}
                     onAction={filtersActive ? resetFilters : undefined}
                   />
                 ) : (
@@ -460,7 +461,7 @@ export function L12HomeScreen() {
                       {dayGroups.map((group) => (
                         <View key={group.key + group.label} className="gap-2">
                           <DayHeading label={group.label} count={group.matches.length} />
-                          <DenseList label={`Meciuri · ${group.label}`}>
+                          <DenseList label={tr('Meciuri · {0}', { '0': group.label })}>
                             {group.matches.map((match) => {
                               const { home, away, note } = overviewSides(match);
                               // The club's team is usually one of the two sides already.
@@ -488,10 +489,10 @@ export function L12HomeScreen() {
               </View>
             )
           ) : data.teams.length === 0 ? (
-            <EmptyState compact icon="groups" title="Nicio echipă" message="Creează o echipă ca să-i setezi L12-ul." />
+            <EmptyState compact icon="groups" title={tr('Nicio echipă')} message={tr('Creează o echipă ca să-i setezi L12-ul.')} />
           ) : (
             <View className="gap-3">
-              <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{teamsSet} din {plural(data.teams.length, 'echipă', 'echipe')} {teamsSet === 1 ? 'are' : 'au'} L12 constant setat.</Text>
+              <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{teamsSet === 1 ? tr('{0} din {1} are L12 constant setat.', { '0': teamsSet, '1': plural(data.teams.length, 'echipă', 'echipe') }) : tr('{0} din {1} au L12 constant setat.', { '0': teamsSet, '1': plural(data.teams.length, 'echipă', 'echipe') })}</Text>
               <View className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 ui-stagger">
                 {data.teams.map((team) => (
                   <TeamTile
@@ -550,7 +551,7 @@ function checkBeforeExport(lineup: L12Lineup, notify: (message: string, variant:
     notify(problem, 'error');
     return false;
   }
-  if (lineup.players.length < L12_MIN_PLAYERS) notify(`Foaia are ${plural(lineup.players.length, 'jucător', 'jucători')} — minimum ${L12_MIN_PLAYERS} pentru joc.`, 'info');
+  if (lineup.players.length < L12_MIN_PLAYERS) notify(tr('Foaia are {0} — minimum {L12_MIN_PLAYERS} pentru joc.', { '0': plural(lineup.players.length, 'jucător', 'jucători'), L12_MIN_PLAYERS }), 'info');
   return true;
 }
 
@@ -618,7 +619,7 @@ export function L12MatchScreen() {
       setSeeded(false);
     } catch (err) {
       setMissing(isNotFound(err));
-      setError(err instanceof Error ? err.message : 'Nu am putut încărca L12.');
+      setError(err instanceof Error ? err.message : tr('Nu am putut încărca L12.'));
     } finally {
       setLoading(false);
     }
@@ -670,10 +671,10 @@ export function L12MatchScreen() {
       setSaved(result);
       setDraft(team ? withTeamGender(result, team) : result);
       setBaseline(team ? withTeamGender(result, team) : result);
-      showToast({ variant: 'success', message: 'L12 salvat pentru acest meci.' });
+      showToast({ variant: 'success', message: tr('L12 salvat pentru acest meci.') });
       return true;
     } catch (err) {
-      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Salvarea a eșuat.' });
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : tr('Salvarea a eșuat.') });
       return false;
     } finally {
       setSaving(false);
@@ -690,9 +691,9 @@ export function L12MatchScreen() {
     try {
       const result = await l12Api.saveTemplate(team.id, { ...withTeamGender(draft, team), players: sortLineupPlayers(draft.players) });
       setTemplate(result);
-      showToast({ variant: 'success', message: `L12 constant pentru ${team.name} actualizat.` });
+      showToast({ variant: 'success', message: tr('L12 constant pentru {0} actualizat.', { '0': team.name }) });
     } catch (err) {
-      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Nu am putut salva L12-ul constant.' });
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : tr('Nu am putut salva L12-ul constant.') });
     }
   };
 
@@ -701,9 +702,9 @@ export function L12MatchScreen() {
       await l12Api.resetForEvent(eventId);
       setSaved(null);
       setSeeded(false);
-      showToast({ variant: 'success', message: 'L12-ul meciului a fost șters.' });
+      showToast({ variant: 'success', message: tr('L12-ul meciului a fost șters.') });
     } catch (err) {
-      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Nu am putut șterge L12-ul.' });
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : tr('Nu am putut șterge L12-ul.') });
     }
   };
 
@@ -729,9 +730,9 @@ export function L12MatchScreen() {
         <View className="gap-4">
           <BackButton label="L12" onPress={() => router.back(base)} />
           {missing ? (
-            <ErrorState title="Meciul nu mai există" message="A fost șters din Program sau linkul nu mai e valid." actionLabel="Înapoi la L12" onAction={() => router.back(base)} />
+            <ErrorState title={tr('Meciul nu mai există')} message={tr('A fost șters din Program sau linkul nu mai e valid.')} actionLabel={tr('Înapoi la L12')} onAction={() => router.back(base)} />
           ) : (
-            <ErrorState title="L12 nu poate fi afișat" message={error ?? 'Nu am putut încărca L12.'} actionLabel="Reîncearcă" onAction={load} />
+            <ErrorState title={tr('L12 nu poate fi afișat')} message={error ?? tr('Nu am putut încărca L12.')} actionLabel={tr('Reîncearcă')} onAction={load} />
           )}
         </View>
       </PageShell>
@@ -757,7 +758,7 @@ export function L12MatchScreen() {
     const expired = docInput.lineup.players
       .filter((p) => medicalStatus(roster.find((r) => r.id === p.playerId)?.medicalCheckExpiry) === 'expired')
       .map((p) => `${p.firstName} ${p.lastName}`.trim());
-    if (expired.length) gaps.unshift(`viză medicală expirată: ${expired.join(', ')}`);
+    if (expired.length) gaps.unshift(tr('viză medicală expirată: {0}', { '0': expired.join(', ') }));
     if (gaps.length) {
       setExportConfirm({ kind, gaps });
       return;
@@ -770,7 +771,7 @@ export function L12MatchScreen() {
     <PageShell
       footer={dirty ? (
         <UnsavedBar
-          label={saved ? 'Modificări nesalvate' : 'L12 nesalvat'}
+          label={saved ? tr('Modificări nesalvate') : tr('L12 nesalvat')}
           saving={saving}
           onSave={save}
           onDiscard={saved ? () => { setDraft(withTeamGender(saved, team)); setOpponent(savedOpponent); } : undefined}
@@ -780,7 +781,7 @@ export function L12MatchScreen() {
       <View className="mb-5 gap-4">
         <View className="flex-row items-center gap-2">
           <Button size="sm" icon="chevron-left" label="L12" onPress={() => router.back(base)} />
-          <StatusChip set={Boolean(saved)} label={saved ? 'Salvată pentru meci' : 'Fără listă'} />
+          <StatusChip set={Boolean(saved)} label={saved ? tr('Salvată pentru meci') : tr('Fără listă')} />
         </View>
 
         <View className="ui-rise relative overflow-hidden rounded-[16px] border p-3.5 md:p-4 gap-3" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
@@ -788,9 +789,9 @@ export function L12MatchScreen() {
             <View className="flex-1 min-w-0">
               {/* The visible title is a pair of team badges; readers get one page title. */}
               <Text className="sr-only" accessibilityRole="header" aria-level={1}>
-                {`Formular L-12 · ${homeTeam}${awayTeam ? ` – ${awayTeam}` : ''}`}
+                {tr('Formular L-12 · {homeTeam}{1}', { homeTeam, '1': awayTeam ? ` – ${awayTeam}` : '' })}
               </Text>
-              <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>Formular L-12 · {team.name}</Text>
+              <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{tr('Formular L-12 · {0}', { '0': team.name })}</Text>
               <View className="mt-2 flex-col md:flex-row md:items-center gap-x-3 gap-y-1.5">
                 <View className="flex-row items-center gap-2 min-w-0">
                   <TeamAvatar name={homeTeam} mine={isOwnSide(homeTeam, team.name)} size={30} />
@@ -808,10 +809,10 @@ export function L12MatchScreen() {
               </View>
               {!titleHasSides ? (
                 <View className="mt-3 max-w-[360px]">
-                  <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>Adversar</Text>
+                  <Text className="text-[12.5px] font-semibold mb-1.5" style={{ color: 'var(--c-ink-soft)' }}>{tr('Adversar')}</Text>
                   <Input
-                    label="Adversar"
-                    placeholder="Numele echipei adverse"
+                    label={tr('Adversar')}
+                    placeholder={tr('Numele echipei adverse')}
                     maxLength={160}
                     value={opponent}
                     onChange={setOpponent}
@@ -819,9 +820,7 @@ export function L12MatchScreen() {
                     invalid={opponentTouched && !opponent.trim()}
                   />
                   {opponentTouched && !opponent.trim() ? (
-                    <Text className="text-[12px] font-semibold mt-1.5" style={{ color: 'var(--c-danger-fg)' }}>
-                      Completează adversarul: apare pe foaia L12.
-                    </Text>
+                    <Text className="text-[12px] font-semibold mt-1.5" style={{ color: 'var(--c-danger-fg)' }}>{tr('Completează adversarul: apare pe foaia L12.')}</Text>
                   ) : null}
                 </View>
               ) : null}
@@ -829,23 +828,21 @@ export function L12MatchScreen() {
                 {!titleHasSides ? <MetaChip icon="emoji-events" label={event.title} /> : null}
                 <MetaChip icon="event" label={formatDate(event.startTime, true)} />
                 {event.location ? <MetaChip icon="place" label={event.location} /> : null}
-                {teamGender ? <MetaChip icon="groups" label={teamGender === 'M' ? 'Masculin' : 'Feminin'} /> : null}
+                {teamGender ? <MetaChip icon="groups" label={teamGender === 'M' ? tr('Masculin') : tr('Feminin')} /> : null}
               </View>
             </View>
             <View className="flex-row flex-wrap gap-2 lg:justify-end shrink-0">
               <Button icon="picture-as-pdf" label="PDF" onPress={() => exportAs('pdf')} />
-              <Button icon="description" label="Word" onPress={() => exportAs('word')} />
-              <Button icon="leaderboard" label="Statistică live" onPress={() => router.push(`${base.replace('/l12', '')}/stats/${eventId}` as any)} />
-              <Button icon="more-horiz" label="Mai multe" iconOnlyOnMobile accessibilityLabel="Mai multe acțiuni" onPress={() => setMenuOpen(true)} />
+              <Button icon="description" label={tr('Word')} onPress={() => exportAs('word')} />
+              <Button icon="leaderboard" label={tr('Statistică live')} onPress={() => router.push(`${base.replace('/l12', '')}/stats/${eventId}` as any)} />
+              <Button icon="more-horiz" label={tr('Mai multe')} iconOnlyOnMobile accessibilityLabel={tr('Mai multe acțiuni')} onPress={() => setMenuOpen(true)} />
             </View>
           </View>
 
           {fromTemplate ? (
             <View className="flex-row items-center gap-2.5 rounded-[12px] px-3.5 py-2.5" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
               <MaterialIcons name="info-outline" size={17} color="var(--c-brand-fg)" />
-              <Text className="flex-1 text-[13px] font-medium" style={{ color: 'var(--c-ink-soft)' }}>
-                Pornit din L12-ul constant al echipei. Salvează ca să-l fixezi pe acest meci.
-              </Text>
+              <Text className="flex-1 text-[13px] font-medium" style={{ color: 'var(--c-ink-soft)' }}>{tr('Pornit din L12-ul constant al echipei. Salvează ca să-l fixezi pe acest meci.')}</Text>
             </View>
           ) : null}
         </View>
@@ -855,24 +852,24 @@ export function L12MatchScreen() {
 
       <ActionSheet
         visible={menuOpen}
-        title="L12 pentru acest meci"
+        title={tr('L12 pentru acest meci')}
         subtitle={team.name}
         onClose={() => setMenuOpen(false)}
         actions={[
-          ...(template ? [{ key: 'load', label: 'Încarcă L12 constant', icon: 'restore', hint: 'Înlocuiește foaia cu formula de bază', onPress: () => setConfirm('template') }] : []),
-          ...(draft.players.length > 0 ? [{ key: 'saveTemplate', label: 'Salvează ca L12 constant', icon: 'bookmark', hint: 'Meciurile următoare pornesc de aici', onPress: () => setConfirm('saveTemplate') }] : []),
-          { key: 'team', label: 'Deschide L12 constant', icon: 'groups', onPress: () => router.push(`${base}/team/${team.id}` as any) },
-          ...(saved ? [{ key: 'reset', label: 'Șterge L12-ul meciului', icon: 'delete-outline', tone: 'danger' as const, onPress: () => setConfirm('reset') }] : []),
+          ...(template ? [{ key: 'load', label: tr('Încarcă L12 constant'), icon: 'restore', hint: tr('Înlocuiește foaia cu formula de bază'), onPress: () => setConfirm('template') }] : []),
+          ...(draft.players.length > 0 ? [{ key: 'saveTemplate', label: tr('Salvează ca L12 constant'), icon: 'bookmark', hint: tr('Meciurile următoare pornesc de aici'), onPress: () => setConfirm('saveTemplate') }] : []),
+          { key: 'team', label: tr('Deschide L12 constant'), icon: 'groups', onPress: () => router.push(`${base}/team/${team.id}` as any) },
+          ...(saved ? [{ key: 'reset', label: tr('Șterge L12-ul meciului'), icon: 'delete-outline', tone: 'danger' as const, onPress: () => setConfirm('reset') }] : []),
         ]}
       />
 
       <ConfirmDialog
         visible={exportConfirm != null}
         icon="warning-amber"
-        title="Foaia L12 e incompletă"
-        message={exportConfirm ? `Lipsesc: ${exportConfirm.gaps.join('; ')}. O foaie oficială incompletă poate fi refuzată de arbitru. Exporți oricum?` : ''}
-        confirmLabel={exportConfirm?.kind === 'word' ? 'Exportă Word oricum' : 'Exportă PDF oricum'}
-        cancelLabel="Completez foaia"
+        title={tr('Foaia L12 e incompletă')}
+        message={exportConfirm ? tr('Lipsesc: {0}. O foaie oficială incompletă poate fi refuzată de arbitru. Exporți oricum?', { '0': exportConfirm.gaps.join('; ') }) : ''}
+        confirmLabel={exportConfirm?.kind === 'word' ? tr('Exportă Word oricum') : tr('Exportă PDF oricum')}
+        cancelLabel={tr('Completez foaia')}
         onConfirm={() => {
           const kind = exportConfirm?.kind;
           setExportConfirm(null);
@@ -884,14 +881,14 @@ export function L12MatchScreen() {
         visible={confirm != null}
         destructive={confirm === 'reset'}
         icon={confirm === 'reset' ? 'delete-outline' : confirm === 'saveTemplate' ? 'bookmark' : 'restore'}
-        title={confirm === 'reset' ? 'Ștergi L12-ul acestui meci?' : confirm === 'saveTemplate' ? 'Salvezi ca L12 constant?' : 'Încarci L12-ul constant?'}
+        title={confirm === 'reset' ? tr('Ștergi L12-ul acestui meci?') : confirm === 'saveTemplate' ? tr('Salvezi ca L12 constant?') : tr('Încarci L12-ul constant?')}
         message={confirm === 'reset'
-          ? 'Meciul revine la „Fără listă”. L12-ul constant al echipei rămâne neschimbat.'
+          ? tr('Meciul revine la „Fără listă”. L12-ul constant al echipei rămâne neschimbat.')
           : confirm === 'saveTemplate'
-            ? `Foaia de acum devine formula de bază pentru meciurile următoare ale echipei ${team.name}.`
-            : 'Jucătorii și staff-ul de pe foaie vor fi înlocuiți cu cei din L12-ul constant.'}
-        confirmLabel={confirm === 'reset' ? 'Șterge' : confirm === 'saveTemplate' ? 'Salvează' : 'Încarcă'}
-        cancelLabel="Renunță"
+            ? tr('Foaia de acum devine formula de bază pentru meciurile următoare ale echipei {0}.', { '0': team.name })
+            : tr('Jucătorii și staff-ul de pe foaie vor fi înlocuiți cu cei din L12-ul constant.')}
+        confirmLabel={confirm === 'reset' ? tr('Șterge') : confirm === 'saveTemplate' ? tr('Salvează') : tr('Încarcă')}
+        cancelLabel={tr('Renunță')}
         onConfirm={() => {
           const action = confirm;
           setConfirm(null);
@@ -901,7 +898,7 @@ export function L12MatchScreen() {
         }}
         onCancel={() => setConfirm(null)}
       />
-      <LeaveGuardDialog guard={leaveGuard} saving={saving} what="lista L12 a meciului" onSave={save} />
+      <LeaveGuardDialog guard={leaveGuard} saving={saving} what={tr('lista L12 a meciului')} onSave={save} />
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </PageShell>
   );
@@ -946,7 +943,7 @@ export function L12TemplateScreen() {
       setSeeded(false);
     } catch (err) {
       setMissing(isNotFound(err));
-      setError(err instanceof Error ? err.message : 'Nu am putut încărca L12-ul constant.');
+      setError(err instanceof Error ? err.message : tr('Nu am putut încărca L12-ul constant.'));
     } finally {
       setLoading(false);
     }
@@ -979,10 +976,10 @@ export function L12TemplateScreen() {
       setSaved(result);
       setDraft(team ? withTeamGender(result, team) : result);
       setBaseline(team ? withTeamGender(result, team) : result);
-      showToast({ variant: 'success', message: 'L12 constant salvat.' });
+      showToast({ variant: 'success', message: tr('L12 constant salvat.') });
       return true;
     } catch (err) {
-      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Salvarea a eșuat.' });
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : tr('Salvarea a eșuat.') });
       return false;
     } finally {
       setSaving(false);
@@ -997,9 +994,9 @@ export function L12TemplateScreen() {
         <View className="gap-4">
           <BackButton label="L12" onPress={() => router.back(base)} />
           {missing ? (
-            <ErrorState title="Echipa nu mai există" message="A fost ștearsă sau linkul nu mai e valid." actionLabel="Înapoi la L12" onAction={() => router.back(base)} />
+            <ErrorState title={tr('Echipa nu mai există')} message={tr('A fost ștearsă sau linkul nu mai e valid.')} actionLabel={tr('Înapoi la L12')} onAction={() => router.back(base)} />
           ) : (
-            <ErrorState title="L12 nu poate fi afișat" message={error ?? 'Nu am putut încărca L12-ul constant.'} actionLabel="Reîncearcă" onAction={load} />
+            <ErrorState title={tr('L12 nu poate fi afișat')} message={error ?? tr('Nu am putut încărca L12-ul constant.')} actionLabel={tr('Reîncearcă')} onAction={load} />
           )}
         </View>
       </PageShell>
@@ -1027,7 +1024,7 @@ export function L12TemplateScreen() {
     <PageShell
       footer={dirty ? (
         <UnsavedBar
-          label={saved ? 'Modificări nesalvate' : 'L12 constant nesalvat'}
+          label={saved ? tr('Modificări nesalvate') : tr('L12 constant nesalvat')}
           saving={saving}
           onSave={save}
           onDiscard={saved ? () => setDraft(withTeamGender(lineupForRoster(saved, roster), team)) : undefined}
@@ -1037,40 +1034,38 @@ export function L12TemplateScreen() {
       <View className="mb-5 gap-4">
         <View className="flex-row items-center gap-2">
           <Button size="sm" icon="chevron-left" label="L12" onPress={() => router.back(base)} />
-          <StatusChip set={Boolean(saved)} label={saved ? 'Salvat' : 'Nesalvat'} />
+          <StatusChip set={Boolean(saved)} label={saved ? tr('Salvat') : tr('Nesalvat')} />
         </View>
 
         <View className="ui-rise relative overflow-hidden rounded-[16px] border p-3.5 md:p-4" style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-sm)' } as any}>
           <View className="relative flex-col lg:flex-row lg:items-start gap-3">
             <View className="flex-1 min-w-0">
-              <Text className="sr-only" accessibilityRole="header" aria-level={1}>{`L12 constant · ${team.name}`}</Text>
-              <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>L12 constant</Text>
+              <Text className="sr-only" accessibilityRole="header" aria-level={1}>{tr('L12 constant · {0}', { '0': team.name })}</Text>
+              <Text className="t-eyebrow" style={{ color: 'var(--c-faint)' }}>{tr('L12 constant')}</Text>
               <View className="flex-row items-center gap-2.5 mt-2 min-w-0">
                 <TeamAvatar name={team.name} mine size={34} />
                 <Text className="f-display text-[17px] md:text-[19px] font-extrabold leading-tight shrink" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any} numberOfLines={2}>
                   {team.name}
                 </Text>
               </View>
-              <Text className="text-[13px] mt-1.5" style={{ color: 'var(--c-muted)' }}>
-                Formula de bază a echipei. Fiecare meci nou pornește de aici.
-              </Text>
+              <Text className="text-[13px] mt-1.5" style={{ color: 'var(--c-muted)' }}>{tr('Formula de bază a echipei. Fiecare meci nou pornește de aici.')}</Text>
               <View className="flex-row flex-wrap gap-1.5 mt-3">
                 {team.leagueName ? <MetaChip icon="emoji-events" label={team.leagueName} /> : null}
                 {team.seasonName ? <MetaChip icon="date-range" label={team.seasonName} /> : null}
-                {teamGender ? <MetaChip icon="groups" label={teamGender === 'M' ? 'Masculin' : 'Feminin'} /> : null}
-                {saved?.updatedAt ? <MetaChip icon="schedule" label={`Actualizat ${formatDate(saved.updatedAt)}`} /> : null}
+                {teamGender ? <MetaChip icon="groups" label={teamGender === 'M' ? tr('Masculin') : tr('Feminin')} /> : null}
+                {saved?.updatedAt ? <MetaChip icon="schedule" label={tr('Actualizat {0}', { '0': formatDate(saved.updatedAt) })} /> : null}
               </View>
             </View>
             <View className="flex-row flex-wrap gap-2">
               <Button icon="picture-as-pdf" label="PDF" onPress={() => exportAs('pdf')} />
-              <Button icon="description" label="Word" onPress={() => exportAs('word')} />
+              <Button icon="description" label={tr('Word')} onPress={() => exportAs('word')} />
             </View>
           </View>
         </View>
       </View>
 
       <L12Editor lineup={draft} onChange={setDraft} roster={roster} rosterLoading={rosterLoading} showMatchDetails={false} known={saved?.players ?? []} />
-      <LeaveGuardDialog guard={leaveGuard} saving={saving} what="L12-ul constant" onSave={save} />
+      <LeaveGuardDialog guard={leaveGuard} saving={saving} what={tr('L12-ul constant')} onSave={save} />
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </PageShell>
   );

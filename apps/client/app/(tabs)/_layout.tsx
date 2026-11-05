@@ -12,17 +12,18 @@ import { PLAYER_FEATURE_FLAGS } from '../../config/playerFeatureFlags';
 import ChildSwitcher from '../../components/family/ChildSwitcher';
 import AssignedGamesBanner from '../../components/stats/AssignedGamesBanner';
 
+import { tr } from '../../i18n';
 const PLAYER_MENU_ITEMS = [
-    { href: '/myclub' as const, label: 'Acasă', icon: 'grid-view' as const, match: 'myclub' },
-    { href: '/schedule' as const, label: 'Program', icon: 'calendar-today' as const, match: 'schedule' },
-    { href: '/attendance' as const, label: 'Prezență', icon: 'fact-check' as const, match: 'attendance' },
-    { href: '/payments' as const, label: 'Plăți', icon: 'payments' as const, match: 'payments' },
-    { href: '/documents' as const, label: 'Documente', icon: 'folder' as const, match: 'documents' },
-    { href: '/contacts' as const, label: 'Contacte', icon: 'contacts' as const, match: 'contacts' },
+    { href: '/myclub' as const, label: tr('Acasă'), icon: 'grid-view' as const, match: 'myclub' },
+    { href: '/schedule' as const, label: tr('Program'), icon: 'calendar-today' as const, match: 'schedule' },
+    { href: '/attendance' as const, label: tr('Prezență'), icon: 'fact-check' as const, match: 'attendance' },
+    { href: '/payments' as const, label: tr('Plăți'), icon: 'payments' as const, match: 'payments' },
+    { href: '/documents' as const, label: tr('Documente'), icon: 'folder' as const, match: 'documents' },
+    { href: '/contacts' as const, label: tr('Contacte'), icon: 'contacts' as const, match: 'contacts' },
     ...(PLAYER_FEATURE_FLAGS.teammatesView
-        ? [{ href: '/team' as const, label: 'Echipa mea', icon: 'groups' as const, match: 'team' }]
+        ? [{ href: '/team' as const, label: tr('Echipa mea'), icon: 'groups' as const, match: 'team' }]
         : []),
-    { href: '/account' as const, label: 'Profil', icon: 'person' as const, match: 'account' },
+    { href: '/account' as const, label: tr('Profil'), icon: 'person' as const, match: 'account' },
 ];
 
 // A coach gets their own `/coach/*` screens plus the two shared ones
@@ -34,15 +35,15 @@ const PLAYER_MENU_ITEMS = [
 // have to be real path fragments — 'coach-teams' would never highlight on
 // /coach/teams.
 const COACH_MENU_ITEMS = [
-    { href: '/coach/dashboard' as const, label: 'Acasă', icon: 'grid-view' as const, match: 'coach/dashboard' },
-    { href: '/schedule' as const, label: 'Program', icon: 'calendar-today' as const, match: 'schedule' },
-    { href: '/coach/attendance' as const, label: 'Prezență', icon: 'fact-check' as const, match: 'coach/attendance' },
-    { href: '/coach/teams' as const, label: 'Echipe', icon: 'groups' as const, match: 'coach/teams' },
-    { href: '/coach/requests' as const, label: 'Cereri', icon: 'how-to-reg' as const, match: 'coach/requests' },
+    { href: '/coach/dashboard' as const, label: tr('Acasă'), icon: 'grid-view' as const, match: 'coach/dashboard' },
+    { href: '/schedule' as const, label: tr('Program'), icon: 'calendar-today' as const, match: 'schedule' },
+    { href: '/coach/attendance' as const, label: tr('Prezență'), icon: 'fact-check' as const, match: 'coach/attendance' },
+    { href: '/coach/teams' as const, label: tr('Echipe'), icon: 'groups' as const, match: 'coach/teams' },
+    { href: '/coach/requests' as const, label: tr('Cereri'), icon: 'how-to-reg' as const, match: 'coach/requests' },
     { href: '/coach/l12' as const, label: 'L12', icon: 'assignment' as const, match: 'coach/l12' },
-    { href: '/documents' as const, label: 'Documente', icon: 'folder' as const, match: 'documents' },
-    { href: '/contacts' as const, label: 'Contacte', icon: 'contacts' as const, match: 'contacts' },
-    { href: '/account' as const, label: 'Profil', icon: 'person' as const, match: 'account' },
+    { href: '/documents' as const, label: tr('Documente'), icon: 'folder' as const, match: 'documents' },
+    { href: '/contacts' as const, label: tr('Contacte'), icon: 'contacts' as const, match: 'contacts' },
+    { href: '/account' as const, label: tr('Profil'), icon: 'person' as const, match: 'account' },
 ];
 
 // Bottom bar stays at 4 primary destinations on mobile so it never crowds or
@@ -60,7 +61,7 @@ function getActivePlayerItem<T extends { href: string; match: string; label: str
     const match = items.find((item) => normalizedPathname.startsWith(item.href));
     if (match) return match;
     // Pages without a menu entry still need a truthful header title (not "Acasă").
-    if (/\/stats\//.test(normalizedPathname)) return { ...items[0], label: 'Statistică meci', match: 'stats' };
+    if (/\/stats\//.test(normalizedPathname)) return { ...items[0], label: tr('Statistică meci'), match: 'stats' };
     if (normalizedPathname.startsWith('/coach/l12')) return { ...items[0], label: 'L12', match: 'coach/l12' };
     return items[0];
 }
@@ -91,7 +92,7 @@ function PlayerTabsLayoutContent() {
     const menuItems: TabMenuItem[] = isCoach
         ? COACH_MENU_ITEMS
         : isParent
-            ? PLAYER_MENU_ITEMS.map((item) => (item.match === 'team' ? { ...item, label: 'Echipa copilului' } : item))
+            ? PLAYER_MENU_ITEMS.map((item) => (item.match === 'team' ? { ...item, label: tr('Echipa copilului') } : item))
             : PLAYER_MENU_ITEMS;
     // Sentence-case labels (global.css). On <html>, not this div: sheets and
     // dialogs are portaled to <body>.
@@ -120,7 +121,7 @@ function PlayerTabsLayoutContent() {
     return (
         <div className="flex flex-1 min-h-screen bg-[var(--c-bg)] lg:flex-row flex-col">
             {/* Keyboard users skip the menu (12+ stops) straight to the page. */}
-            <a href="#continut" className="skip-link">Sari la conținut</a>
+            <a href="#continut" className="skip-link">{tr('Sari la conținut')}</a>
             <Sidebar items={menuItems} plain />
 
             <div className="flex flex-1 min-w-0 flex-col relative">

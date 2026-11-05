@@ -26,13 +26,14 @@ import {
   PlayerPaymentTransaction,
 } from '../../services/financeApi';
 
+import { tr, appLocale, trServer } from '../../i18n';
 type ActionTarget = 'all' | 'setup' | string | null;
 
 const TRANSACTIONS_PAGE_SIZE = 10;
 
 function formatCurrency(amount: number, currency: string) {
   try {
-    return new Intl.NumberFormat(currency.toLowerCase() === 'ron' ? 'ro-RO' : 'en-US', {
+    return new Intl.NumberFormat(currency.toLowerCase() === 'ron' ? appLocale() : 'en-US', {
       style: 'currency',
       currency: currency.toUpperCase(),
       minimumFractionDigits: 2,
@@ -44,7 +45,7 @@ function formatCurrency(amount: number, currency: string) {
 
 function formatDate(value?: string | null) {
   if (!value) {
-    return 'Programat';
+    return tr('Programat');
   }
 
   const date = parseApiDate(value);
@@ -52,7 +53,7 @@ function formatDate(value?: string | null) {
     return value;
   }
 
-  return new Intl.DateTimeFormat('ro-RO', {
+  return new Intl.DateTimeFormat(appLocale(), {
     month: 'short',
     day: '2-digit',
     year: 'numeric',
@@ -69,7 +70,7 @@ function getReturnUrl() {
 
 async function openStripeUrl(url: string | null) {
   if (!url) {
-    throw new Error('Stripe nu a returnat un URL de plată.');
+    throw new Error(tr('Stripe nu a returnat un URL de plată.'));
   }
 
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -84,7 +85,7 @@ function formatDueDate(value: string | null) {
   if (!value) return null;
   const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'short' }).format(date);
+  return new Intl.DateTimeFormat(appLocale(), { day: 'numeric', month: 'short' }).format(date);
 }
 
 /**
@@ -109,21 +110,21 @@ function FeeRow({
   // An older server sends 'failed' for a row whose Stripe attempt failed.
   const failed = fee.status === 'failed' || overdue;
   // Still owed is `amount`; a partial payment already made is shown next to it.
-  const partlyPaid = fee.paidAmount ? `achitat ${formatCurrency(fee.paidAmount, fee.currency)} din ${formatCurrency(fee.amount + fee.paidAmount, fee.currency)}` : null;
+  const partlyPaid = fee.paidAmount ? tr('achitat {0} din {1}', { '0': formatCurrency(fee.paidAmount, fee.currency), '1': formatCurrency(fee.amount + fee.paidAmount, fee.currency) }) : null;
 
   return (
     <DenseRow>
       <View className="flex-1 min-w-0">
         <View className="flex-row items-start gap-1.5">
           {failed ? <MaterialIcons name="error-outline" size={16} color="var(--c-danger-fg)" style={{ marginTop: 2 }} /> : null}
-          <Text className="text-[14.5px] font-bold leading-5 flex-1 min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{fee.label}</Text>
+          <Text className="text-[14.5px] font-bold leading-5 flex-1 min-w-0" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{trServer(fee.label)}</Text>
         </View>
         <Text className="t-meta mt-0.5" style={{ color: failed ? 'var(--c-danger-fg)' : 'var(--c-muted)' }} numberOfLines={2}>
           {overdue
-            ? [`Restanță${due ? ` din ${due}` : ''}`, partlyPaid].filter(Boolean).join(' · ')
+            ? [(due ? tr('Restanță din {due}', { due }) : tr('Restanță')), partlyPaid].filter(Boolean).join(' · ')
             : failed
-              ? 'Plata a eșuat — încearcă din nou'
-              : [due ? `Scadență ${due}` : null, partlyPaid ?? fee.description].filter(Boolean).join(' · ')}
+              ? tr('Plata a eșuat — încearcă din nou')
+              : [due ? tr('Scadență {due}', { due }) : null, partlyPaid ?? trServer(fee.description)].filter(Boolean).join(' · ')}
         </Text>
       </View>
 
@@ -136,14 +137,14 @@ function FeeRow({
             onPress={onPay}
             disabled={busy}
             accessibilityRole="button"
-            accessibilityLabel={`Plătește ${fee.label}`}
+            accessibilityLabel={tr('Plătește {0}', { '0': trServer(fee.label) })}
             className="ui-press h-10 px-3.5 rounded-[10px] items-center justify-center border"
             style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border-strong)' } as any}
           >
             {busy ? (
               <ActivityIndicator size="small" color="var(--c-brand-fg)" />
             ) : (
-              <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>Plătește</Text>
+              <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>{tr('Plătește')}</Text>
             )}
           </Pressable>
         ) : null}
@@ -175,7 +176,7 @@ function PaymentMethodCard({ method }: { method: PlayerPaymentMethod }) {
             {brand} •••• {method.last4}
           </Text>
           <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }}>
-            {method.isDefault ? 'Principal' : 'Salvat'}{method.expMonth && method.expYear ? ` · Exp. ${String(method.expMonth).padStart(2, '0')}/${method.expYear}` : ''}
+            {method.isDefault ? tr('Principal') : tr('Salvat')}{method.expMonth && method.expYear ? ` · Exp. ${String(method.expMonth).padStart(2, '0')}/${method.expYear}` : ''}
           </Text>
         </View>
       </View>
@@ -214,14 +215,14 @@ function TransactionRow({
           mobile this column is the icon-to-amount sliver and 1 line truncated
           ordinary-length labels mid-word ("May Traini..."). */}
       <View className="flex-[2] min-w-0">
-        <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{transaction.label}</Text>
-        <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{transaction.description}</Text>
+        <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={2}>{trServer(transaction.label)}</Text>
+        <Text className="text-[12px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{trServer(transaction.description)}</Text>
         {/* Phones: date + status under the label (those columns are md+). */}
         <View className="flex-row items-center gap-1.5 mt-1 md:hidden">
           <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>{formatDate(transaction.date)}</Text>
           <Text className="text-[12px]" style={{ color: 'var(--c-faint)' }}>·</Text>
           <Text className="text-[12px] font-semibold" style={{ color: isSuccess ? 'var(--c-success-fg)' : 'var(--c-danger-fg)' }}>
-            {isSuccess ? 'Reușită' : 'Eșuată'}
+            {isSuccess ? tr('Reușită') : tr('Eșuată')}
           </Text>
         </View>
       </View>
@@ -242,7 +243,7 @@ function TransactionRow({
             className="text-[11px] font-semibold"
             style={{ color: isSuccess ? 'var(--c-success-fg)' : 'var(--c-danger-fg)' }}
           >
-            {isSuccess ? 'Reușită' : 'Eșuată'}
+            {isSuccess ? tr('Reușită') : tr('Eșuată')}
           </Text>
         </View>
       </View>
@@ -255,7 +256,7 @@ function TransactionRow({
         <Pressable
           onPress={onOpenReceipt}
           accessibilityRole="button"
-          accessibilityLabel="Dovada de plată"
+          accessibilityLabel={tr('Dovada de plată')}
           className="ui-press h-10 w-10 rounded-[10px] items-center justify-center shrink-0 border"
           style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
         >
@@ -307,7 +308,7 @@ function PlayerPaymentsScreen() {
       // load the default credentials..." straight into the UI. Log the real
       // error, show the player something actionable.
       console.error('[payments] Failed to load player payment summary:', err);
-      setError('Plățile nu au putut fi încărcate. Încearcă din nou în câteva momente.');
+      setError(tr('Plățile nu au putut fi încărcate. Încearcă din nou în câteva momente.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -324,7 +325,7 @@ function PlayerPaymentsScreen() {
     const cancelled = params.payment_status === 'cancelled';
 
     if (cancelled) {
-      setNotice('Plată anulată.');
+      setNotice(tr('Plată anulată.'));
       router.replace('/payments' as any);
       return;
     }
@@ -338,12 +339,12 @@ function PlayerPaymentsScreen() {
       setActionTarget('all');
       try {
         await financeApi.confirmPlayerCheckoutSession(sessionId);
-        setNotice('Plată confirmată.');
+        setNotice(tr('Plată confirmată.'));
         await loadSummary(true);
         router.replace('/payments' as any);
       } catch (err) {
         console.error('[payments] Failed to confirm checkout session:', err);
-        setError('Nu s-a putut confirma plata.');
+        setError(tr('Nu s-a putut confirma plata.'));
       } finally {
         setActionTarget(null);
       }
@@ -358,12 +359,12 @@ function PlayerPaymentsScreen() {
       setActionTarget('setup');
       try {
         await financeApi.confirmPlayerSetupSession(sessionId);
-        setNotice('Metodă de plată adăugată.');
+        setNotice(tr('Metodă de plată adăugată.'));
         await loadSummary(true);
         router.replace('/payments' as any);
       } catch (err) {
         console.error('[payments] Failed to confirm setup session:', err);
-        setError('Nu s-a putut confirma metoda de plată.');
+        setError(tr('Nu s-a putut confirma metoda de plată.'));
       } finally {
         setActionTarget(null);
       }
@@ -390,7 +391,7 @@ function PlayerPaymentsScreen() {
       await openStripeUrl(session.url);
     } catch (err) {
       console.error('[payments] Failed to start checkout:', err);
-      setError('Nu s-a putut porni Stripe Checkout.');
+      setError(tr('Nu s-a putut porni Stripe Checkout.'));
     } finally {
       setActionTarget(null);
     }
@@ -406,7 +407,7 @@ function PlayerPaymentsScreen() {
       await openStripeUrl(session.url);
     } catch (err) {
       console.error('[payments] Failed to open card setup:', err);
-      setError('Nu s-a putut deschide configurarea cardului Stripe.');
+      setError(tr('Nu s-a putut deschide configurarea cardului Stripe.'));
     } finally {
       setActionTarget(null);
     }
@@ -433,7 +434,7 @@ function PlayerPaymentsScreen() {
   if (loading) {
     return (
       <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-20">
-        <PageContainer accessibilityRole="progressbar" accessibilityLabel="Se încarcă finanțele">
+        <PageContainer accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă finanțele')}>
           <View className="flex-row items-start justify-between gap-4 mb-8">
             <View>
               <Skeleton className="h-9 w-44" />
@@ -472,9 +473,9 @@ function PlayerPaymentsScreen() {
       <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-20">
         <PageContainer>
           <ErrorState
-            title="Nu am putut încărca finanțele"
+            title={tr('Nu am putut încărca finanțele')}
             message={error}
-            actionLabel="Reîncearcă"
+            actionLabel={tr('Reîncearcă')}
             onAction={() => loadSummary(true)}
           />
         </PageContainer>
@@ -486,14 +487,14 @@ function PlayerPaymentsScreen() {
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-20">
       <PageContainer>
         <PageHero
-          eyebrow="Cotizații"
-          title="Plăți"
-          subtitle={online ? 'Cotizații, carduri salvate și istoricul plăților.' : 'Ce ai de plătit și ce ai plătit.'}
+          eyebrow={tr('Cotizații')}
+          title={tr('Plăți')}
+          subtitle={online ? tr('Cotizații, carduri salvate și istoricul plăților.') : tr('Ce ai de plătit și ce ai plătit.')}
           actions={
             <Pressable
               onPress={() => loadSummary(true)}
               accessibilityRole="button"
-              accessibilityLabel="Reîmprospătează"
+              accessibilityLabel={tr('Reîmprospătează')}
               className="ui-press hidden sm:flex w-10 h-10 rounded-[11px] border items-center justify-center"
               style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
             >
@@ -512,17 +513,17 @@ function PlayerPaymentsScreen() {
                     className="text-[11px] font-semibold"
                     style={{ color: summary?.outstandingAmount ? 'var(--c-danger-fg)' : 'var(--c-success-fg)' }}
                   >
-                    {summary?.dueLabel ?? 'Achitat'}
+                    {summary?.dueLabel ? trServer(summary.dueLabel) : tr('Achitat')}
                   </Text>
                 </View>
                 <Text className="text-[12.5px] font-medium" style={{ color: 'var(--c-muted)' }}>
-                  {summary?.billingCycle ?? 'Ciclu curent'}
+                  {summary?.billingCycle ?? tr('Ciclu curent')}
                 </Text>
               </View>
 
               {/* One accent on this page: ink for the figure, indigo only on
                   the action. */}
-              <Text className="t-label mt-3" style={{ color: 'var(--c-muted)' }}>Sold de plată</Text>
+              <Text className="t-label mt-3" style={{ color: 'var(--c-muted)' }}>{tr('Sold de plată')}</Text>
               <Text className="f-display t-num text-[28px] font-extrabold mt-0.5 leading-tight" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any}>
                 {formatCurrency(summary?.outstandingAmount ?? 0, summary?.currency ?? 'ron')}
               </Text>
@@ -533,13 +534,13 @@ function PlayerPaymentsScreen() {
                 <Button
                   variant="primary"
                   icon="payments"
-                  label="Plătește tot"
+                  label={tr('Plătește tot')}
                   loading={actionTarget === 'all'}
                   disabled={!payableFees.length || actionTarget === 'all'}
                   onPress={() => startCheckout()}
                 />
                 <Text className="t-meta mt-2 text-center" style={{ color: 'var(--c-muted)' }}>
-                  {summary?.autoPayNote ?? 'Plăți procesate securizat prin Stripe.'}
+                  {summary?.autoPayNote ?? tr('Plăți procesate securizat prin Stripe.')}
                 </Text>
               </View>
             ) : (
@@ -547,9 +548,7 @@ function PlayerPaymentsScreen() {
               // „cheile Stripe”, which only the club can act on.
               <View className="w-full md:w-[300px] flex-row items-start gap-2.5 rounded-[12px] px-3.5 py-3" style={{ backgroundColor: 'var(--c-surface-2)' }}>
                 <MaterialIcons name="info-outline" size={17} color="var(--c-muted)" style={{ marginTop: 1 }} />
-                <Text className="text-[13px] font-medium leading-5 flex-1" style={{ color: 'var(--c-ink-soft)' }}>
-                  Plata online nu e activă la club. Plătești cash sau prin transfer, la club; plata apare aici după ce clubul o înregistrează.
-                </Text>
+                <Text className="text-[13px] font-medium leading-5 flex-1" style={{ color: 'var(--c-ink-soft)' }}>{tr('Plata online nu e activă la club. Plătești cash sau prin transfer, la club; plata apare aici după ce clubul o înregistrează.')}</Text>
               </View>
             )}
           </View>
@@ -574,11 +573,11 @@ function PlayerPaymentsScreen() {
         <View className="mb-6">
           <View className="w-full">
             <View className="flex-row items-center justify-between mb-3">
-              <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any}>Metode de plată</Text>
+              <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.02em' } as any}>{tr('Metode de plată')}</Text>
               {online ? (
                 <Button
                   icon="credit-card"
-                  label={actionTarget === 'setup' ? 'Se deschide' : 'Adaugă card'}
+                  label={actionTarget === 'setup' ? tr('Se deschide') : tr('Adaugă card')}
                   loading={actionTarget === 'setup'}
                   disabled={actionTarget === 'setup'}
                   onPress={addPaymentMethod}
@@ -593,27 +592,25 @@ function PlayerPaymentsScreen() {
                 <EmptyState
                   icon="credit-card-off"
                   compact
-                  title="Niciun card salvat"
-                  message="Adaugă o metodă de plată pentru a plăti mai rapid."
+                  title={tr('Niciun card salvat')}
+                  message={tr('Adaugă o metodă de plată pentru a plăti mai rapid.')}
                 />
               )}
             </View>
 
-            <Text className="text-[12px] font-medium mt-3" style={{ color: 'var(--c-faint)' }}>
-              Datele tale de plată sunt criptate și stocate de Stripe.
-            </Text>
+            <Text className="text-[12px] font-medium mt-3" style={{ color: 'var(--c-faint)' }}>{tr('Datele tale de plată sunt criptate și stocate de Stripe.')}</Text>
           </View>
         </View>
         ) : null}
 
         <View className="mb-6">
           <SectionHeader
-            title="De plată"
-            subtitle="Restanțele, apoi taxele care urmează."
+            title={tr('De plată')}
+            subtitle={tr('Restanțele, apoi taxele care urmează.')}
             isMobile={isMobile}
           />
           {payableFees.length ? (
-            <DenseList label="De plată">
+            <DenseList label={tr('De plată')}>
               {payableFees.map((fee) => (
                 <FeeRow
                   key={fee.id}
@@ -628,16 +625,16 @@ function PlayerPaymentsScreen() {
             <EmptyState
               icon="check-circle"
               compact
-              title="Nicio taxă viitoare"
-              message="Nu ai taxe de achitat în acest moment."
+              title={tr('Nicio taxă viitoare')}
+              message={tr('Nu ai taxe de achitat în acest moment.')}
             />
           )}
         </View>
 
         <View>
           <SectionHeader
-            title="Istoric tranzacții"
-            subtitle="Plățile efectuate și chitanțele lor."
+            title={tr('Istoric tranzacții')}
+            subtitle={tr('Plățile efectuate și chitanțele lor.')}
             isMobile={isMobile}
           />
 
@@ -649,10 +646,10 @@ function PlayerPaymentsScreen() {
               className="hidden md:flex flex-row items-center gap-4 px-4 py-3"
               style={{ backgroundColor: 'var(--c-surface-2)' }}
             >
-              <Text className="flex-[2] t-label" style={{ color: 'var(--c-muted)' }}>Tranzacție</Text>
-              <Text className="flex-1 t-label" style={{ color: 'var(--c-muted)' }}>Dată</Text>
-              <Text className="flex-1 t-label" style={{ color: 'var(--c-muted)' }}>Status</Text>
-              <Text className="min-w-[98px] text-right t-label" style={{ color: 'var(--c-muted)' }}>Sumă</Text>
+              <Text className="flex-[2] t-label" style={{ color: 'var(--c-muted)' }}>{tr('Tranzacție')}</Text>
+              <Text className="flex-1 t-label" style={{ color: 'var(--c-muted)' }}>{tr('Dată')}</Text>
+              <Text className="flex-1 t-label" style={{ color: 'var(--c-muted)' }}>{tr('Status')}</Text>
+              <Text className="min-w-[98px] text-right t-label" style={{ color: 'var(--c-muted)' }}>{tr('Sumă')}</Text>
               {/* Over the receipt buttons, so „Sumă” sits above the amounts. */}
               {transactions.some((transaction) => transaction.receiptUrl || transaction.status === 'success') ? <View className="w-10 shrink-0" /> : null}
             </View>
@@ -673,8 +670,8 @@ function PlayerPaymentsScreen() {
               <EmptyState
                 icon="receipt-long"
                 compact
-                title="Nicio tranzacție încă"
-                message="Plățile efectuate apar aici, împreună cu chitanțele."
+                title={tr('Nicio tranzacție încă')}
+                message={tr('Plățile efectuate apar aici, împreună cu chitanțele.')}
               />
             )}
           </View>
@@ -687,7 +684,7 @@ function PlayerPaymentsScreen() {
               rangeStart={transactionsPager.rangeStart}
               rangeEnd={transactionsPager.rangeEnd}
               total={transactionsPager.total}
-              itemNoun="tranzacții"
+              itemNoun={tr('tranzacții')}
             />
           ) : null}
         </View>

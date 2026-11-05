@@ -9,6 +9,7 @@ import { FormField } from '../../ui/FormField';
 import { EVENT_TYPE_META } from '../scheduleShared';
 import { plural } from '../../../utils/plural';
 
+import { tr } from '../../../i18n';
 /**
  * "Eveniment nou" — bottom sheet on phones, centred dialog on desktop.
  *
@@ -33,9 +34,9 @@ const TYPE_ICON: Record<AddEventType, string> = {
   medical: 'medical-services',
   admin: 'badge',
 };
-const REPEAT_DAY_LABELS = ['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'];
+const REPEAT_DAY_LABELS = ['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'].map((day) => tr(`zi:${day}`));
 const REPEAT_WEEKS = [2, 4, 6, 8, 12];
-const DEFAULT_LOCATIONS = ['Sală principală', 'Sala Polivalentă', 'Teren de antrenament'];
+const DEFAULT_LOCATIONS = [tr('Sală principală'), tr('Sala Polivalentă'), 'Teren de antrenament'];
 
 function toDateInput(date: Date) {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -185,16 +186,16 @@ export function AddEventModal({
             ) : null}
             <View className="flex-row items-center justify-between gap-3">
               <View className="flex-1 min-w-0">
-                <Text className="text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>{editing ? 'Editează evenimentul' : 'Eveniment nou'}</Text>
+                <Text className="text-[18px] font-bold" style={{ color: 'var(--c-ink)' }}>{editing ? tr('Editează evenimentul') : tr('Eveniment nou')}</Text>
                 <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }}>
-                  {editing ? 'Prezența deja notată rămâne. Familiile sunt anunțate dacă se schimbă ora sau locul.' : 'Apare imediat în programul echipei.'}
+                  {editing ? tr('Prezența deja notată rămâne. Familiile sunt anunțate dacă se schimbă ora sau locul.') : tr('Apare imediat în programul echipei.')}
                 </Text>
               </View>
               <Pressable
                 onPress={close}
                 disabled={addingEvent}
                 accessibilityRole="button"
-                accessibilityLabel="Închide"
+                accessibilityLabel={tr('Închide')}
                 className="ui-press w-9 h-9 rounded-full items-center justify-center"
                 style={{ backgroundColor: 'var(--c-surface-2)' }}
               >
@@ -206,9 +207,9 @@ export function AddEventModal({
           {/* Body */}
           <ScrollView ref={scrollRef} className="flex-1" contentContainerStyle={{ padding: 20, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
             <View className="gap-6">
-              <Section title="Tip">
+              <Section title={tr('Tip')}>
                 {/* Wraps instead of scrolling so all five are visible at once. */}
-                <View className="flex-row flex-wrap gap-2" accessibilityRole="radiogroup" accessibilityLabel="Tip eveniment">
+                <View className="flex-row flex-wrap gap-2" accessibilityRole="radiogroup" accessibilityLabel={tr('Tip eveniment')}>
                   {TYPE_ORDER.map((type) => {
                     const meta = EVENT_TYPE_META[type];
                     const selected = newEventType === type;
@@ -239,18 +240,18 @@ export function AddEventModal({
                 </View>
               </Section>
 
-              <Section title="Detalii">
+              <Section title={tr('Detalii')}>
                 <FormField
-                  label="Titlu"
+                  label={tr('Titlu')}
                   value={newTitle}
                   onChangeText={(value: string) => { setNewTitle(value); clearError('title'); }}
-                  placeholder={isTraining ? 'ex. Antrenament aruncări U16' : 'ex. CSM Focșani vs CSU Brașov'}
+                  placeholder={isTraining ? tr('ex. Antrenament aruncări U16') : tr('ex. CSM Focșani vs CSU Brașov')}
                   error={addEventErrors.title}
                   maxLength={255}
                 />
 
                 <View>
-                  <Label>Echipă</Label>
+                  <Label>{tr('Echipă')}</Label>
                   <View className="relative">
                     {/* Native select: the phone's own picker, no custom sheet. */}
                     <select
@@ -268,9 +269,9 @@ export function AddEventModal({
                         setNewTeamId(value ? Number(value) : null);
                         clearError('team');
                       }}
-                      aria-label="Echipă"
+                      aria-label={tr('Echipă')}
                     >
-                      <option value="">Alege echipa</option>
+                      <option value="">{tr('Alege echipa')}</option>
                       {teams.map((team) => (
                         <option key={team.id} value={team.id}>{team.name}</option>
                       ))}
@@ -284,11 +285,11 @@ export function AddEventModal({
 
                 <View>
                   <FormField
-                    label="Locație"
+                    label={tr('Locație')}
                     icon="place"
                     value={newLocation}
                     onChangeText={(value: string) => { setNewLocation(value); clearError('location'); }}
-                    placeholder="Sală, teren sau link"
+                    placeholder={tr('Sală, teren sau link')}
                     error={addEventErrors.location}
                     maxLength={255}
                   />
@@ -299,7 +300,7 @@ export function AddEventModal({
                           key={location}
                           onPress={() => { setNewLocation(location); clearError('location'); }}
                           accessibilityRole="button"
-                          accessibilityLabel={`Folosește locația ${location}`}
+                          accessibilityLabel={tr('Folosește locația {location}', { location })}
                           className="ui-press h-8 rounded-full px-3 justify-center border"
                           style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}
                         >
@@ -312,32 +313,32 @@ export function AddEventModal({
 
                 {newEventType === 'match' ? (
                   <FormField
-                    label="Adversar"
+                    label={tr('Adversar')}
                     icon="groups"
                     value={newOpponent}
                     onChangeText={setNewOpponent}
-                    placeholder="ex. CSM Oradea"
+                    placeholder={tr('ex. CSM Oradea')}
                     maxLength={160}
                   />
                 ) : null}
               </Section>
 
               <Section
-                title="Când"
+                title={tr('Când')}
                 trailing={isTraining && !editing ? (
                   <View className="flex-row items-center gap-2">
-                    <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Se repetă</Text>
+                    <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{tr('Se repetă')}</Text>
                     <Switch
                       value={isRecurring}
                       onValueChange={(value: boolean) => { setIsRecurring(value); clearError('recurringDays'); }}
-                      accessibilityLabel="Antrenament recurent"
+                      accessibilityLabel={tr('Antrenament recurent')}
                     />
                   </View>
                 ) : null}
               >
                 <View className={`grid gap-3 ${isTraining ? 'grid-cols-1' : 'grid-cols-2'}`}>
                   <View className="min-w-0">
-                    <Label>{isTraining ? 'Data' : 'Început'}</Label>
+                    <Label>{isTraining ? tr('Data') : tr('Început')}</Label>
                     <input
                       type="date"
                       className={nativeInputClass}
@@ -349,12 +350,12 @@ export function AddEventModal({
                         setNewStartDate(date);
                         if (newEndDate < date) setNewEndDate(date);
                       }}
-                      aria-label="Data de început"
+                      aria-label={tr('Data de început')}
                     />
                   </View>
                   {!isTraining ? (
                     <View className="min-w-0">
-                      <Label>Sfârșit</Label>
+                      <Label>{tr('Sfârșit')}</Label>
                       <input
                         type="date"
                         className={nativeInputClass}
@@ -365,7 +366,7 @@ export function AddEventModal({
                           const date = fromDateInput(event.target.value);
                           if (date) setNewEndDate(date);
                         }}
-                        aria-label="Data de sfârșit"
+                        aria-label={tr('Data de sfârșit')}
                       />
                     </View>
                   ) : null}
@@ -376,7 +377,7 @@ export function AddEventModal({
                     const error = field === 'start' ? addEventErrors.startTime : addEventErrors.endTime;
                     return (
                       <View key={field} className="min-w-0">
-                        <Label>{field === 'start' ? 'Ora de început' : 'Ora de sfârșit'}</Label>
+                        <Label>{field === 'start' ? tr('Ora de început') : tr('Ora de sfârșit')}</Label>
                         <input
                           type="time"
                           step={300}
@@ -390,7 +391,7 @@ export function AddEventModal({
                           onChange={(event) => {
                             if (event.target.value) updatePickerTime(field, event.target.value);
                           }}
-                          aria-label={field === 'start' ? 'Ora de început' : 'Ora de sfârșit'}
+                          aria-label={field === 'start' ? tr('Ora de început') : tr('Ora de sfârșit')}
                         />
                         <FieldError message={error} />
                       </View>
@@ -401,7 +402,7 @@ export function AddEventModal({
                 {isTraining && isRecurring && !editing ? (
                   <View className="gap-3 rounded-[14px] border p-3.5" style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border-soft)' } as any}>
                     <View>
-                      <Label>Zilele săptămânii</Label>
+                      <Label>{tr('Zilele săptămânii')}</Label>
                       <View className="flex-row justify-between gap-1">
                         {REPEAT_DAY_LABELS.map((day, index) => {
                           const selected = recurringDays.includes(index);
@@ -429,7 +430,7 @@ export function AddEventModal({
                       <FieldError message={addEventErrors.recurringDays} />
                     </View>
                     <View>
-                      <Label>Timp de</Label>
+                      <Label>{tr('Timp de')}</Label>
                       <View className="flex-row rounded-[11px] p-1 gap-1" style={{ backgroundColor: 'var(--c-surface-3)' }}>
                         {REPEAT_WEEKS.map((weeks) => {
                           const selected = recurringWeeks === weeks;
@@ -439,11 +440,11 @@ export function AddEventModal({
                               onPress={() => setRecurringWeeks(weeks)}
                               accessibilityRole="radio"
                               accessibilityState={{ selected }}
-                              accessibilityLabel={plural(weeks, 'săptămână', 'săptămâni')}
+                              accessibilityLabel={plural(weeks, tr('săptămână'), tr('săptămâni'))}
                               className="flex-1 h-9 rounded-[8px] items-center justify-center"
                               style={{ backgroundColor: selected ? 'var(--c-surface)' : 'transparent', boxShadow: selected ? 'var(--e-xs)' : 'none' } as any}
                             >
-                              <Text className="text-[12.5px] font-semibold" style={{ color: selected ? 'var(--c-ink)' : 'var(--c-muted)' }}>{weeks} săpt.</Text>
+                              <Text className="text-[12.5px] font-semibold" style={{ color: selected ? 'var(--c-ink)' : 'var(--c-muted)' }}>{tr('{weeks} săpt.', { weeks })}</Text>
                             </Pressable>
                           );
                         })}
@@ -454,9 +455,9 @@ export function AddEventModal({
               </Section>
 
               {canEditFee && (newEventType === 'camp' || (editing && newAmount.trim() !== '')) ? (
-                <Section title="Cost">
+                <Section title={tr('Cost')}>
                   <FormField
-                    label="Taxă de participare (RON)"
+                    label={tr('Taxă de participare (RON)')}
                     icon="payments"
                     value={newAmount}
                     onChangeText={setNewAmount}
@@ -467,12 +468,12 @@ export function AddEventModal({
                 </Section>
               ) : null}
 
-              <Section title="Note">
+              <Section title={tr('Note')}>
                 <FormField
-                  label="Descriere (opțional)"
+                  label={tr('Descriere (opțional)')}
                   value={newDescription}
                   onChangeText={(value: string) => { setNewDescription(value); clearError('description'); }}
-                  placeholder="Obiective, echipament, detalii de logistică…"
+                  placeholder={tr('Obiective, echipament, detalii de logistică…')}
                   multiline
                   error={addEventErrors.description}
                   maxLength={5000}
@@ -505,17 +506,17 @@ export function AddEventModal({
               onPress={close}
               disabled={addingEvent}
               accessibilityRole="button"
-              accessibilityLabel="Anulează"
+              accessibilityLabel={tr('Anulează')}
               className="ui-press h-11 px-5 rounded-[11px] items-center justify-center border"
               style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface)', opacity: addingEvent ? 0.6 : 1 } as any}
             >
-              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Renunță</Text>
+              <Text className="text-[13.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{tr('Renunță')}</Text>
             </Pressable>
             <Pressable
               onPress={handleSubmit}
               disabled={addingEvent}
               accessibilityRole="button"
-              accessibilityLabel={editing ? 'Salvează modificările' : 'Salvează evenimentul'}
+              accessibilityLabel={editing ? tr('Salvează modificările') : tr('Salvează evenimentul')}
               className="ui-press flex-1 h-11 rounded-[11px] flex-row items-center justify-center gap-2"
               style={{ backgroundColor: 'var(--c-brand-surface)', boxShadow: 'var(--e-brand)', opacity: addingEvent ? 0.8 : 1 } as any}
             >
@@ -525,7 +526,7 @@ export function AddEventModal({
                 <MaterialIcons name="check" size={18} color="#FFFFFF" />
               )}
               <Text className="text-[14px] font-bold" style={{ color: '#FFFFFF' }}>
-                {addingEvent ? 'Se salvează…' : editing ? 'Salvează modificările' : isTraining && isRecurring ? 'Creează seria' : 'Salvează'}
+                {addingEvent ? tr('Se salvează…') : editing ? tr('Salvează modificările') : isTraining && isRecurring ? tr('Creează seria') : tr('Salvează')}
               </Text>
             </Pressable>
           </View>

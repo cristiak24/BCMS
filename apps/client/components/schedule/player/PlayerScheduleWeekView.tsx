@@ -8,7 +8,8 @@ import {
   isCancelledEvent, sortByStartTime, formatTimeRange, RO_LOCALE,
 } from '../scheduleShared';
 
-const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm', 'Dum'];
+import { tr } from '../../../i18n';
+const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm', 'Dum'].map((day) => tr(day));
 const WEEK_MAX_VISIBLE = 6;
 
 /**
@@ -45,28 +46,28 @@ export function PlayerScheduleWeekView({
       <View className="px-5 py-4 flex-row items-center justify-between border-b" style={{ borderColor: 'var(--c-border)' }}>
         <View>
           <Text className="text-[17px] font-black" style={{ color: 'var(--c-ink-strong)' }}>{rangeLabel}</Text>
-          <Text className="text-[10px] font-black uppercase tracking-widest mt-1" style={{ color: 'var(--c-faint)' }}>Vedere săptămânală</Text>
+          <Text className="text-[10px] font-black uppercase tracking-widest mt-1" style={{ color: 'var(--c-faint)' }}>{tr('Vedere săptămânală')}</Text>
         </View>
         {/* Same 36px control size as the toolbar's IconButton, so the week
             view's stepper reads as the same family as the month stepper. */}
         <View className="flex-row items-center gap-1.5">
           <TouchableOpacity
             onPress={() => setWeekStart((d) => addDays(d, -7))}
-            accessibilityLabel="Săptămâna anterioară"
+            accessibilityLabel={tr('Săptămâna anterioară')}
             className="w-9 h-9 rounded-[10px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
           >
             <ChevronLeft color="var(--c-ink-soft)" size={16} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setWeekStart(startOfWeek(new Date()))}
-            accessibilityLabel="Mergi la săptămâna curentă"
+            accessibilityLabel={tr('Mergi la săptămâna curentă')}
             className="h-9 px-3 items-center justify-center rounded-[10px] border border-[var(--c-border)] bg-[var(--c-surface)]"
           >
-            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Azi</Text>
+            <Text className="text-[12px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{tr('Azi')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setWeekStart((d) => addDays(d, 7))}
-            accessibilityLabel="Săptămâna următoare"
+            accessibilityLabel={tr('Săptămâna următoare')}
             className="w-9 h-9 rounded-[10px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
           >
             <ChevronRight color="var(--c-ink-soft)" size={16} />
@@ -173,8 +174,7 @@ export function PlayerScheduleWeekView({
                   {dayEvents.length > WEEK_MAX_VISIBLE ? (
                     <View className="items-center py-1">
                       <Text className="text-[9px] font-black uppercase tracking-widest" style={{ color: 'var(--c-faint)' }}>
-                        +{dayEvents.length - WEEK_MAX_VISIBLE} încă
-                      </Text>
+                        +{dayEvents.length - WEEK_MAX_VISIBLE}{' '}{tr('încă')}</Text>
                     </View>
                   ) : null}
                 </View>

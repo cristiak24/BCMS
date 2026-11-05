@@ -2,6 +2,7 @@ import { View, TextInput, Text, Pressable, TextInputProps } from '@/src/web/reac
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useState } from 'react';
 
+import { tr } from '../../i18n';
 interface AuraInputProps extends TextInputProps {
     label: string;
     iconName: keyof typeof MaterialIcons.glyphMap;
@@ -51,7 +52,7 @@ export default function AuraInput({ label, iconName, error, secureTextEntry, cla
                         onPress={() => setPasswordVisible(!isPasswordVisible)}
                         className="w-10 h-10 items-center justify-center"
                         accessibilityRole="button"
-                        accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
+                        accessibilityLabel={isPasswordVisible ? tr('Hide password') : tr('Show password')}
                     >
                         <MaterialIcons
                             name={isPasswordVisible ? "visibility" : "visibility-off"}

@@ -6,6 +6,7 @@ import {
 import { EVENT_TYPE_META } from '../scheduleShared';
 import { plural } from '../../../utils/plural';
 
+import { tr } from '../../../i18n';
 /*
  * The player schedule's control surface, in ONE row.
  *
@@ -29,17 +30,17 @@ export type PlayerScheduleView = 'month' | 'week' | 'agenda';
 export type PlayerEventFilter = 'all' | 'training' | 'match' | 'camp';
 
 const VIEW_OPTIONS: { key: PlayerScheduleView; icon: typeof LayoutGrid; label: string }[] = [
-  { key: 'month', icon: LayoutGrid, label: 'Lună' },
-  { key: 'week', icon: CalendarDays, label: 'Săptămână' },
-  { key: 'agenda', icon: List, label: 'Agendă' },
+  { key: 'month', icon: LayoutGrid, label: tr('Lună') },
+  { key: 'week', icon: CalendarDays, label: tr('Săptămână') },
+  { key: 'agenda', icon: List, label: tr('Agendă') },
 ];
 
 // Mirrors the player screen's existing filter set (a subset of the admin
 // types) — the filtering behaviour is unchanged, only the chip geometry is.
 const FILTER_ORDER: { key: Exclude<PlayerEventFilter, 'all'>; label: string }[] = [
-  { key: 'training', label: 'Antrenamente' },
-  { key: 'match', label: 'Meciuri' },
-  { key: 'camp', label: 'Cantonamente' },
+  { key: 'training', label: tr('Antrenamente') },
+  { key: 'match', label: tr('Meciuri') },
+  { key: 'camp', label: tr('Cantonamente') },
 ];
 
 /** Compact icon button — 44px touch target on mobile, admin IconButton geometry (36x36, radius 10) from lg. */
@@ -107,14 +108,14 @@ export function PlayerScheduleToolbar({
     <View className="flex-row items-center gap-1">
       <TouchableOpacity
         onPress={() => onNavigateMonth(-1)}
-        accessibilityLabel="Luna anterioară"
+        accessibilityLabel={tr('Luna anterioară')}
         className="w-8 h-8 rounded-[9px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
       >
         <ChevronLeft size={16} color="var(--c-ink-soft)" />
       </TouchableOpacity>
       <TouchableOpacity
         onPress={onToday}
-        accessibilityLabel="Mergi la luna curentă"
+        accessibilityLabel={tr('Mergi la luna curentă')}
         className="px-2.5 h-8 justify-center"
       >
         {/* min-width keeps the arrows from shifting as the month name changes
@@ -129,7 +130,7 @@ export function PlayerScheduleToolbar({
       </TouchableOpacity>
       <TouchableOpacity
         onPress={() => onNavigateMonth(1)}
-        accessibilityLabel="Luna următoare"
+        accessibilityLabel={tr('Luna următoare')}
         className="w-8 h-8 rounded-[9px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
       >
         <ChevronRight size={16} color="var(--c-ink-soft)" />
@@ -183,9 +184,7 @@ export function PlayerScheduleToolbar({
         <Text
           className="text-[12px] font-semibold"
           style={{ color: filter === 'all' ? 'var(--c-on-brand)' : 'var(--c-ink-soft)' }}
-        >
-          Toate
-        </Text>
+        >{tr('Toate')}</Text>
       </TouchableOpacity>
 
       {FILTER_ORDER.map(({ key, label }) => {
@@ -232,10 +231,10 @@ export function PlayerScheduleToolbar({
 
   const actions = (
     <View className="flex-row items-center gap-1.5">
-      <IconButton onPress={onExport} label="Exportă luna (.ics)">
+      <IconButton onPress={onExport} label={tr('Exportă luna (.ics)')}>
         <Download size={15} color="var(--c-muted)" />
       </IconButton>
-      <IconButton onPress={onRefresh} label="Reîmprospătează" disabled={refreshing}>
+      <IconButton onPress={onRefresh} label={tr('Reîmprospătează')} disabled={refreshing}>
         {refreshing
           ? <ActivityIndicator size="small" color="var(--c-brand-fg)" />
           : <RotateCw size={15} color="var(--c-muted)" />}
@@ -255,7 +254,7 @@ export function PlayerScheduleToolbar({
         <Text className="text-[11px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>
           {searchValue}
         </Text>
-        <TouchableOpacity onPress={onClearSearch} accessibilityLabel="Golește căutarea" className="p-0.5">
+        <TouchableOpacity onPress={onClearSearch} accessibilityLabel={tr('Golește căutarea')} className="p-0.5">
           <X size={12} color="var(--c-muted)" />
         </TouchableOpacity>
       </View>
@@ -270,20 +269,20 @@ export function PlayerScheduleToolbar({
         <View className="flex-row items-center gap-2">
           <TouchableOpacity
             onPress={() => onNavigateMonth(-1)}
-            accessibilityLabel="Luna anterioară"
+            accessibilityLabel={tr('Luna anterioară')}
             className="ui-press w-10 h-10 rounded-[11px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
           >
             <ChevronLeft size={18} color="var(--c-ink-soft)" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={onToday} accessibilityLabel="Mergi la luna curentă" className="flex-1 items-center justify-center h-10">
+          <TouchableOpacity onPress={onToday} accessibilityLabel={tr('Mergi la luna curentă')} className="flex-1 items-center justify-center h-10">
             <Text className="text-[17px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{monthTitle}</Text>
             <Text className="text-[11.5px] font-medium" style={{ color: 'var(--c-faint)' }}>
-              {plural(eventCount, 'eveniment', 'evenimente')}
+              {plural(eventCount, tr('eveniment'), tr('evenimente'))}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => onNavigateMonth(1)}
-            accessibilityLabel="Luna următoare"
+            accessibilityLabel={tr('Luna următoare')}
             className="ui-press w-10 h-10 rounded-[11px] items-center justify-center border border-[var(--c-border)] bg-[var(--c-surface)]"
           >
             <ChevronRight size={18} color="var(--c-ink-soft)" />
@@ -317,7 +316,7 @@ export function PlayerScheduleToolbar({
         {monthNav}
 
         <Text className="text-[12px] font-medium" style={{ color: 'var(--c-faint)' }}>
-          {plural(eventCount, 'eveniment', 'evenimente')}
+          {plural(eventCount, tr('eveniment'), tr('evenimente'))}
         </Text>
 
         <View className="w-px h-6" style={{ backgroundColor: 'var(--c-border)' }} />

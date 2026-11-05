@@ -24,6 +24,7 @@ import { isAttendanceOpen } from '../../utils/attendanceWindow';
 import { defaultSession, splitSessions } from '../../utils/attendanceSessions';
 import { coachCanChangeEvent } from '../../utils/coachEventScope';
 
+import { tr } from '../../i18n';
 /**
  * "Prezență" — pick a session on the left, mark the squad on the right.
  *
@@ -160,19 +161,15 @@ function AttendanceRow({
           <AttendanceNoteInput value={draft} onChange={setDraft} playerName={`${player.firstName} ${player.lastName}`} />
           <View className="flex-row items-center justify-end gap-2.5">
             {unmarked ? (
-              <Text className="flex-1 text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>
-                Marchează întâi prezența, apoi salvează nota.
-              </Text>
+              <Text className="flex-1 text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>{tr('Marchează întâi prezența, apoi salvează nota.')}</Text>
             ) : noteDirty ? (
-              <Text className="flex-1 text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>
-                Familia primește nota ca notificare.
-              </Text>
+              <Text className="flex-1 text-[12px] font-medium" style={{ color: 'var(--c-muted)' }}>{tr('Familia primește nota ca notificare.')}</Text>
             ) : null}
             <Button
               size="sm"
               variant={noteDirty ? 'primary' : 'secondary'}
               icon={noteDirty ? 'save' : 'check'}
-              label={noteDirty ? 'Salvează nota' : 'Salvat'}
+              label={noteDirty ? tr('Salvează nota') : tr('Salvat')}
               disabled={!noteDirty || unmarked || busy || locked}
               loading={savingNote}
               onPress={saveNote}
@@ -216,7 +213,7 @@ export default function CoachAttendanceScreen() {
       setEvents([...groups.upcoming, ...groups.past]);
       setSelectedEventId((current) => current ?? defaultSession(groups)?.id ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nu s-au putut încărca sesiunile.');
+      setError(err instanceof Error ? err.message : tr('Nu s-au putut încărca sesiunile.'));
     } finally {
       setLoadingEvents(false);
     }
@@ -281,7 +278,7 @@ export default function CoachAttendanceScreen() {
       setPlayers(mergeAttendance(teamPlayers, attendanceRows));
     } catch (err) {
       if (activeEventIdRef.current !== eventId) return;
-      setError(err instanceof Error ? err.message : 'Nu s-a putut încărca prezența.');
+      setError(err instanceof Error ? err.message : tr('Nu s-a putut încărca prezența.'));
     } finally {
       if (activeEventIdRef.current === eventId) setLoadingAttendance(false);
     }
@@ -305,7 +302,7 @@ export default function CoachAttendanceScreen() {
       await saveStatus.track(eventsApi.updateEventAttendance(eventId, [{ playerId, status }]));
     } catch (err) {
       if (activeEventIdRef.current === eventId) setStatus(previous);
-      Alert.alert('Prezență', err instanceof Error ? err.message : 'Nu s-a putut actualiza prezența.');
+      Alert.alert(tr('Prezență'), err instanceof Error ? err.message : tr('Nu s-a putut actualiza prezența.'));
     } finally {
       setSavingPlayerId(null);
     }
@@ -323,7 +320,7 @@ export default function CoachAttendanceScreen() {
       setPlayers((current) => current.map((row) => (row.playerId === playerId ? { ...row, note } : row)));
       return true;
     } catch (err) {
-      Alert.alert('Notă', err instanceof Error ? err.message : 'Nu s-a putut salva nota.');
+      Alert.alert(tr('Notă'), err instanceof Error ? err.message : tr('Nu s-a putut salva nota.'));
       return false;
     }
   };
@@ -355,7 +352,7 @@ export default function CoachAttendanceScreen() {
       setBulkConfirmOpen(false);
     } catch (err) {
       setBulkConfirmOpen(false);
-      Alert.alert('Prezență', err instanceof Error ? err.message : 'Nu s-a putut actualiza prezența.');
+      Alert.alert(tr('Prezență'), err instanceof Error ? err.message : tr('Nu s-a putut actualiza prezența.'));
     } finally {
       setBulkSaving(false);
     }
@@ -371,18 +368,18 @@ export default function CoachAttendanceScreen() {
     <ScrollView className="flex-1 bg-[var(--c-bg)]" contentContainerClassName="pb-16">
       <PageContainer>
         <PageHero
-          eyebrow={selectedMeta ? `Prezență · ${selectedMeta.label}` : 'Prezență'}
-          title={selectedEvent?.title ?? 'Prezență'}
+          eyebrow={selectedMeta ? tr('Prezență · {0}', { '0': selectedMeta.label }) : tr('Prezență')}
+          title={selectedEvent?.title ?? tr('Prezență')}
           subtitle={selectedEvent
-            ? `${selectedEvent.teamName ?? 'Echipă'} · ${formatCoachDate(selectedEvent.startTime)} · ${formatCoachTimeRange(selectedEvent.startTime, selectedEvent.endTime)}`
-            : 'Alege o sesiune și marchează disponibilitatea jucătorilor.'}
+            ? `${selectedEvent.teamName ?? tr('Echipă')} · ${formatCoachDate(selectedEvent.startTime)} · ${formatCoachTimeRange(selectedEvent.startTime, selectedEvent.endTime)}`
+            : tr('Alege o sesiune și marchează disponibilitatea jucătorilor.')}
           actions={
             <>
               {unmarkedCount > 0 && players.length > 0 && !selectedLocked ? (
                 <Button
                   variant="primary"
                   icon="check-circle"
-                  label={`Restul prezenți (${unmarkedCount})`}
+                  label={tr('Restul prezenți ({unmarkedCount})', { unmarkedCount })}
                   loading={bulkSaving}
                   onPress={() => setBulkConfirmOpen(true)}
                 />
@@ -392,7 +389,7 @@ export default function CoachAttendanceScreen() {
                 className="ui-press w-10 h-10 rounded-[11px] border items-center justify-center"
                 style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)' } as any}
                 accessibilityRole="button"
-                accessibilityLabel="Reîmprospătează"
+                accessibilityLabel={tr('Reîmprospătează')}
               >
                 {loadingEvents ? <ActivityIndicator size="small" color="var(--c-brand-fg)" /> : <MaterialIcons name="refresh" size={17} color="var(--c-ink-soft)" />}
               </Pressable>
@@ -400,11 +397,11 @@ export default function CoachAttendanceScreen() {
           }
         >
           <StatStrip className="grid-cols-3">
-            <GlassStat dot="var(--c-brand-fg)" label="Marcați" value={`${markedCount}/${players.length}`} hint="din lot" />
-            <GlassStat dot="var(--c-success)" label="Prezențe" value={presentCount} hint="din lot" />
+            <GlassStat dot="var(--c-brand-fg)" label={tr('Marcați')} value={`${markedCount}/${players.length}`} hint={tr('din lot')} />
+            <GlassStat dot="var(--c-success)" label={tr('Prezențe')} value={presentCount} hint={tr('din lot')} />
             <GlassStat
               dot={presentRate == null ? 'var(--c-faint)' : attendanceRateColor(presentRate)}
-              label="Rată"
+              label={tr('Rată')}
               value={presentRate ?? '—'}
               suffix={presentRate == null ? undefined : '%'}
               bar={presentRate ?? undefined}
@@ -415,9 +412,9 @@ export default function CoachAttendanceScreen() {
         {error ? (
           <View className="mb-4">
             <ErrorState
-              title="Ceva nu a mers"
+              title={tr('Ceva nu a mers')}
               message={error}
-              actionLabel="Reîncearcă"
+              actionLabel={tr('Reîncearcă')}
               onAction={() => loadEvents()}
             />
           </View>
@@ -429,14 +426,12 @@ export default function CoachAttendanceScreen() {
           <View className="w-full xl:w-[360px] shrink-0">
             <GlassCard className="gap-3">
               <View>
-                <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>Sesiuni</Text>
-                <Text className="text-[12.5px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }}>
-                  Alege sesiunea de marcat.
-                </Text>
+                <Text className="f-display text-[16px] font-bold" style={{ color: 'var(--c-ink)' }}>{tr('Sesiuni')}</Text>
+                <Text className="text-[12.5px] font-medium mt-0.5" style={{ color: 'var(--c-muted)' }}>{tr('Alege sesiunea de marcat.')}</Text>
               </View>
 
               {loadingEvents ? (
-                <View className="gap-2.5" accessibilityRole="progressbar" accessibilityLabel="Se încarcă sesiunile">
+                <View className="gap-2.5" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă sesiunile')}>
                   {Array.from({ length: 4 }).map((_, index) => (
                     <Skeleton key={index} className="h-[68px] w-full rounded-[14px]" />
                   ))}
@@ -444,8 +439,8 @@ export default function CoachAttendanceScreen() {
               ) : events.length ? (
                 <View className="gap-2 ui-stagger">
                   {([
-                    { key: 'upcoming', title: 'Urmează', list: visibleGroups.upcoming },
-                    { key: 'past', title: 'Trecute', list: visibleGroups.past },
+                    { key: 'upcoming', title: tr('Urmează'), list: visibleGroups.upcoming },
+                    { key: 'past', title: tr('Trecute'), list: visibleGroups.past },
                   ] as const).map((group) => group.list.length ? (
                     <View key={group.key} className="gap-2">
                       <Text className="t-label mt-1" style={{ color: 'var(--c-muted)' }} accessibilityRole="header">{group.title}</Text>
@@ -470,12 +465,12 @@ export default function CoachAttendanceScreen() {
                     <Pressable
                       onPress={() => setShowAllSessions((value) => !value)}
                       accessibilityRole="button"
-                      accessibilityLabel={showAllSessions ? 'Arată mai puține sesiuni' : `Arată toate sesiunile (${pickerCount})`}
+                      accessibilityLabel={showAllSessions ? tr('Arată mai puține sesiuni') : tr('Arată toate sesiunile ({pickerCount})', { pickerCount })}
                       className="ui-press h-10 rounded-[11px] border flex-row items-center justify-center gap-1.5"
                       style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
                     >
                       <Text className="text-[13px] font-semibold" style={{ color: 'var(--c-brand-fg)' }}>
-                        {showAllSessions ? 'Arată mai puține' : `Arată toate (${pickerCount})`}
+                        {showAllSessions ? tr('Arată mai puține') : tr('Arată toate ({pickerCount})', { pickerCount })}
                       </Text>
                       <MaterialIcons name="expand-more" size={16} color="var(--c-brand-fg)" style={{ transform: showAllSessions ? 'rotate(180deg)' : undefined }} />
                     </Pressable>
@@ -485,8 +480,8 @@ export default function CoachAttendanceScreen() {
                 <EmptyState
                   icon="event-busy"
                   compact
-                  title="Nicio sesiune"
-                  message="Sesiunile la care ești antrenor apar aici."
+                  title={tr('Nicio sesiune')}
+                  message={tr('Sesiunile la care ești antrenor apar aici.')}
                 />
               )}
             </GlassCard>
@@ -494,7 +489,7 @@ export default function CoachAttendanceScreen() {
 
           <View className="flex-1 min-w-0 gap-4">
             {loadingAttendance ? (
-              <View className="gap-2.5" accessibilityRole="progressbar" accessibilityLabel="Se încarcă prezența">
+              <View className="gap-2.5" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă prezența')}>
                 {Array.from({ length: 5 }).map((_, index) => (
                   <Skeleton key={index} className="h-[110px] md:h-[76px] w-full rounded-[14px]" />
                 ))}
@@ -506,14 +501,14 @@ export default function CoachAttendanceScreen() {
                     <MaterialIcons name="lock" size={18} color="var(--c-muted)" style={{ marginTop: 1 }} />
                     <Text className="flex-1 text-[13px] font-medium leading-5" style={{ color: 'var(--c-ink-soft)' }}>
                       {selectedNotMine
-                        ? 'Echipa nu are un antrenor alocat, așa că prezența o notează administratorul clubului. Tu vezi lista.'
-                        : `Prezența se poate nota din ziua evenimentului (${formatCoachDate(selectedEvent.startTime)}). Până atunci vezi doar lotul.`}
+                        ? tr('Echipa nu are un antrenor alocat, așa că prezența o notează administratorul clubului. Tu vezi lista.')
+                        : tr('Prezența se poate nota din ziua evenimentului ({0}). Până atunci vezi doar lotul.', { '0': formatCoachDate(selectedEvent.startTime) })}
                     </Text>
                   </View>
                 ) : (
                   <AttendanceSaveStatus state={saveStatus.state} />
                 )}
-                <DenseList label="Jucători">
+                <DenseList label={tr('Jucători')}>
                   {players.map((player) => (
                     <AttendanceRow
                       key={player.playerId}
@@ -529,10 +524,10 @@ export default function CoachAttendanceScreen() {
             ) : (
               <EmptyState
                 icon="groups"
-                title={selectedEvent ? 'Niciun jucător în lot' : 'Nicio sesiune selectată'}
+                title={selectedEvent ? tr('Niciun jucător în lot') : tr('Nicio sesiune selectată')}
                 message={selectedEvent
-                  ? 'Echipa acestei sesiuni nu are jucători alocați.'
-                  : 'Alege o sesiune din listă pentru a marca prezența.'}
+                  ? tr('Echipa acestei sesiuni nu are jucători alocați.')
+                  : tr('Alege o sesiune din listă pentru a marca prezența.')}
               />
             )}
           </View>
@@ -542,10 +537,10 @@ export default function CoachAttendanceScreen() {
       <ConfirmDialog
         visible={bulkConfirmOpen}
         icon="check-circle"
-        title="Marchezi prezența pentru rest?"
-        message={`Cine nu are încă marcaj (${unmarkedIds.length}) primește „Prezent”. Marcajele existente nu se schimbă.`}
-        confirmLabel="Confirmă"
-        cancelLabel="Renunță"
+        title={tr('Marchezi prezența pentru rest?')}
+        message={tr('Cine nu are încă marcaj ({0}) primește „Prezent”. Marcajele existente nu se schimbă.', { '0': unmarkedIds.length })}
+        confirmLabel={tr('Confirmă')}
+        cancelLabel={tr('Renunță')}
         loading={bulkSaving}
         onConfirm={markRemainingPresent}
         onCancel={() => setBulkConfirmOpen(false)}

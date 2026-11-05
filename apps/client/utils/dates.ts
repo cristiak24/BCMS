@@ -1,3 +1,4 @@
+import { appLocale } from '../i18n';
 /**
  * The one place the client turns API timestamps into Dates, and form input
  * into API timestamps (audit P0-3, P1-15, R3-4).
@@ -88,11 +89,11 @@ export function calendarDayToIso(day: string): string | null {
 export function formatDate(value: string | number | Date | null | undefined): string {
   if (value == null || value === '') return '';
   const date = parseApiDate(value);
-  return isValidDate(date) ? date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  return isValidDate(date) ? date.toLocaleDateString(appLocale(), { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 }
 
 export function formatDateTime(value: string | number | Date | null | undefined): string {
   if (value == null || value === '') return '';
   const date = parseApiDate(value);
-  return isValidDate(date) ? date.toLocaleString('ro-RO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+  return isValidDate(date) ? date.toLocaleString(appLocale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
 }

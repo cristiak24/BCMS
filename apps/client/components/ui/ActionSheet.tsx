@@ -3,6 +3,7 @@ import { Modal, Pressable, Text, View } from '@/src/web/reactNative';
 import ModalBackdrop from './ModalBackdrop';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 
+import { tr } from '../../i18n';
 /**
  * Row-level action menu. Dense lists keep one "⋯" per row instead of a strip
  * of four coloured pills under every item; the actions live here. Bottom sheet
@@ -144,7 +145,7 @@ export default function ActionSheet({
               className="ui-press h-11 rounded-[12px] items-center justify-center"
               style={{ backgroundColor: 'var(--c-surface-3)' }}
             >
-              <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>Închide</Text>
+              <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{tr('Închide')}</Text>
             </Pressable>
           </View>
         </View>

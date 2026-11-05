@@ -1,4 +1,5 @@
 import { View, Text, Pressable, ScrollView } from '@/src/web/reactNative';
+import { tr } from '../../i18n';
 
 /**
  * Admin's filter chip, extracted so the player screens stop inventing their own.
@@ -34,7 +35,7 @@ export default function FilterChips<T extends string>({
   value,
   onChange,
   scrollOnMobile = true,
-  label = 'Filtre',
+  label = tr('Filtre'),
 }: {
   options: FilterChipOption<T>[];
   value: T;

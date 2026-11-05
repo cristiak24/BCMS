@@ -15,6 +15,7 @@ import ProtectedRoute from '../components/auth/ProtectedRoute';
 import PublicRoute from '../components/auth/PublicRoute';
 import { PLAYER_FEATURE_FLAGS } from '../config/playerFeatureFlags';
 import { titleForPath } from '../utils/routeTitles';
+import { normalizeLang, roleCanChooseLanguage, setLang } from '../i18n';
 
 // "/" stays in the main chunk: it forwards a saved session home at once. The
 // pages only a visitor sees (the marketing page, inside Landing, and Login)
@@ -304,6 +305,21 @@ function RouteTitle() {
   return null;
 }
 
+/**
+ * The language follows the account: a player, parent or coach gets the one
+ * saved on their profile (on any device); admin screens are Romanian only.
+ */
+function SessionLanguage() {
+  const { session } = useSession();
+  const role = session ? normalizeRole(session.role) : null;
+  const saved = session?.preferredLanguage ?? null;
+  useEffect(() => {
+    if (!role) return;
+    setLang(roleCanChooseLanguage(role) ? normalizeLang(saved) : 'ro');
+  }, [role, saved]);
+  return null;
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -311,6 +327,7 @@ export default function App() {
         <ThemeProvider>
           <AuthProvider>
             <RouteProgress />
+            <SessionLanguage />
             <RouteTitle />
             <LiveRegion />
             <RoutePrefetcher />
