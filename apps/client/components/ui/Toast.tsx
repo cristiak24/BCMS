@@ -51,7 +51,18 @@ const VARIANT_META: Record<ToastVariant, { icon: typeof Info; fg: string; bg: st
 function ToastItem({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: number) => void }) {
     const meta = VARIANT_META[toast.variant];
     const Icon = meta.icon;
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // The countdown stops while the pointer or focus is on the toast and while
+    // the tab is hidden: an undo („Anulează”) used to expire under the cursor.
+    const remainingRef = useRef(toast.duration ?? 4000);
+    const [held, setHeld] = useState(false);
+    const [tabHidden, setTabHidden] = useState(() => typeof document !== 'undefined' && document.hidden);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return undefined;
+        const onVisibility = () => setTabHidden(document.hidden);
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => document.removeEventListener('visibilitychange', onVisibility);
+    }, []);
 
     useEffect(() => {
         announce(toast.action ? `${toast.message.replace(/[.!]$/, '')}. ${toast.action.label}.` : toast.message, toast.variant === 'error' ? 'assertive' : 'polite');
@@ -59,21 +70,32 @@ function ToastItem({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: num
     }, [toast.id]);
 
     useEffect(() => {
-        const duration = toast.duration ?? 4000;
-        if (duration <= 0) return;
-        timerRef.current = setTimeout(() => onDismiss(toast.id), duration);
+        if ((toast.duration ?? 4000) <= 0 || held || tabHidden) return undefined;
+        const startedAt = Date.now();
+        const timer = setTimeout(() => onDismiss(toast.id), Math.max(0, remainingRef.current));
         return () => {
-            if (timerRef.current) clearTimeout(timerRef.current);
+            clearTimeout(timer);
+            remainingRef.current -= Date.now() - startedAt;
         };
-    }, [toast.id, toast.duration, onDismiss]);
+    }, [toast.id, toast.duration, held, tabHidden, onDismiss]);
 
     return (
         <View
-            className="flex-row items-center gap-3 rounded-[14px] px-4 py-3 shadow-[0_10px_30px_rgba(16,24,40,0.14)] border"
+            className="ui-rise flex-row items-center gap-3 rounded-[14px] px-4 py-3 shadow-[0_10px_30px_rgba(16,24,40,0.14)] border"
             // The host is pointerEvents="box-none", which the web shim maps to
             // `pointer-events: none` — inherited, so „Anulează” and × could not be
             // clicked at all. The toast itself takes taps again.
             style={{ backgroundColor: meta.bg, borderColor: meta.border, minWidth: 280, maxWidth: 420, pointerEvents: 'auto' } as any}
+            {...({
+                // A real mouse only: on Android a tap on the text counts as
+                // hovering and kept the toast up until the next tap elsewhere.
+                onPointerEnter: (event: React.PointerEvent<HTMLElement>) => { if (event.pointerType === 'mouse') setHeld(true); },
+                onPointerLeave: (event: React.PointerEvent<HTMLElement>) => { if (event.pointerType === 'mouse') setHeld(false); },
+                onFocus: () => setHeld(true),
+                onBlur: (event: React.FocusEvent<HTMLElement>) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setHeld(false);
+                },
+            } as any)}
         >
             <Icon size={18} color={meta.fg} />
             <Text className="flex-1 text-[13px] font-bold" style={{ color: meta.fg }}>{toast.message}</Text>

@@ -51,8 +51,10 @@
 }
 
 @layer utilities {
+  /* 200ms like .ui-rise: at 500ms the Finanțe cards were still fading in
+     while the rest of the app had settled. */
   .dash-fade-in {
-    animation: dashFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: dashFadeIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   /* Staggered reveal for grids/rows of cards */
@@ -133,8 +135,10 @@
      keyframe (see the dashFadeIn note) so nothing stays a promoted layer at
      rest. All of it is switched off under prefers-reduced-motion. */
 
+  /* 200ms: at 550ms a screen opened many times a day (Acasă, Lot) showed its
+     numbers half a second late. */
   .ui-rise {
-    animation: dashFadeIn 0.55s var(--ease-out) both;
+    animation: dashFadeIn 0.2s var(--ease-out) both;
   }
 
   /* 200ms with a 30ms step, capped after the 5th child: at 550ms + 420ms of
@@ -179,8 +183,7 @@
   /* Progress fills grow in from the left. */
   .ui-bar {
     transform-origin: left center;
-    animation: uiBarGrow 0.9s var(--ease-out) both;
-    animation-delay: 0.15s;
+    animation: uiBarGrow 0.3s var(--ease-out) both;
   }
 
   /* SVG ring arcs draw in. The element's own stroke-dashoffset is the end
@@ -210,7 +213,9 @@
     inset: 0;
     border-radius: 999px;
     background: inherit;
-    animation: uiPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+    /* Two pings, then a still dot: an endless pulse kept moving for as long
+       as the page stayed open. */
+    animation: uiPing 1.8s cubic-bezier(0, 0, 0.2, 1) 2;
   }
 
   .ui-spin-slow {
@@ -339,6 +344,50 @@
   .ui-press:active {
     transform: none !important;
   }
+}
+
+/* Press feedback for every Pressable that has none of its own (list rows,
+   sort headers, checkboxes): 30 of 44 controls on Lot showed nothing until the
+   result loaded. Zero specificity, so `ui-press` and `active:` utilities win;
+   only the innermost pressed control dims, not the card around it. */
+:where(.rn-pressable:not(.ui-press):not(:disabled):not(.rn-pressable-disabled)) {
+  transition: opacity 150ms ease;
+}
+:where(.rn-pressable:not(.ui-press):not(:disabled):not(.rn-pressable-disabled):active:not(:has(.rn-pressable:active))) {
+  opacity: 0.7;
+  transition-duration: 0ms;
+}
+
+/* ── Menus (components/ui/ActionSheet) ───────────────────────────────────
+   Phones: a sheet that slides up. Tablets: a centred card that fades in.
+   Desktop, anchored to its ⋯: a 150ms pop from the corner next to the button
+   (transform-origin set inline). Closing: the whole layer fades out (.ui-exit,
+   on a copy left behind for 150ms). End states carry no transform. */
+.ui-menu {
+  animation: uiSheetUp 0.24s var(--ease-out) both;
+}
+@media (min-width: 640px) {
+  .ui-menu { animation: dashFadeIn 0.2s var(--ease-out) both; }
+}
+.ui-menu.ui-menu-anchored {
+  animation: uiPop 0.15s var(--ease-out) both;
+}
+@keyframes uiPop {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; }
+}
+.ui-exit {
+  pointer-events: none;
+  animation: uiFadeOut 0.15s ease both;
+}
+.ui-exit * {
+  animation: none !important;
+}
+@keyframes uiFadeOut {
+  to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-menu, .ui-menu.ui-menu-anchored, .ui-exit { animation: none; }
 }
 
 /* ── Admin home cards (app/(admin)/dashboard.tsx) ──────────────────────

@@ -167,7 +167,8 @@ export default function ConfirmDialog({
     const accentSoft = destructive ? 'var(--c-danger-bg)' : 'var(--c-surface-tint)';
 
     return (
-        <Modal visible onRequestClose={loading ? undefined : onCancel}>
+        // Fades in (200ms) like the menu that usually opens it; it used to pop in.
+        <Modal visible animationType="fade" onRequestClose={loading ? undefined : onCancel}>
             <ModalBackdrop
                 onDismiss={loading || !dismissOnBackdrop ? undefined : onCancel}
                 className={sheetOnPhone ? 'items-stretch justify-end sm:items-center sm:justify-center sm:p-5' : 'items-center justify-center p-5'}

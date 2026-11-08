@@ -59,7 +59,9 @@ export default function ActionSheet({
   // (or the trigger is gone), it stays centred.
   const [anchor, setAnchor] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
   useLayoutEffect(() => {
-    if (!visible || typeof window === 'undefined' || window.innerWidth < 1024) {
+    // Kept while closing, so the fading copy stays where the menu was.
+    if (!visible) return;
+    if (typeof window === 'undefined' || window.innerWidth < 1024) {
       setAnchor(null);
       return;
     }
@@ -77,6 +79,31 @@ export default function ActionSheet({
   }, [visible]);
 
   const menuRef = useRef<HTMLElement | null>(null);
+
+  // Closing fades out over 150ms instead of vanishing in one frame. The Modal
+  // still unmounts at once (focus goes back to the ⋯ before a confirm dialog
+  // opened by the action takes it); a detached copy of the layer, inert, is
+  // what fades.
+  const layerRef = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (visible) {
+      layerRef.current = (menuRef.current?.closest('.rn-modal') as HTMLElement | null) ?? null;
+      return;
+    }
+    const layer = layerRef.current;
+    layerRef.current = null;
+    if (!layer || layer.isConnected || typeof window === 'undefined') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const ghost = layer.cloneNode(true) as HTMLElement;
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.setAttribute('inert', '');
+    ghost.removeAttribute('role');
+    ghost.classList.add('ui-exit');
+    // Below any layer already open (the confirm dialog an action just opened).
+    document.body.insertBefore(ghost, document.body.querySelector(':scope > .rn-modal'));
+    const timer = window.setTimeout(() => ghost.remove(), 160);
+    return () => { window.clearTimeout(timer); ghost.remove(); };
+  }, [visible]);
   const onMenuKey = (event: { key: string; preventDefault: () => void }) => {
     const items = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
     const at = items.indexOf(document.activeElement as HTMLElement);
@@ -97,7 +124,7 @@ export default function ActionSheet({
     <Modal visible transparent onRequestClose={onClose}>
       <ModalBackdrop
         onDismiss={onClose}
-        className="flex-1 justify-end sm:justify-center items-center sm:p-6"
+        className="ui-backdrop flex-1 justify-end sm:justify-center items-center sm:p-6"
         // Anchored to its button, the menu needs no dark veil over the page.
         style={{ backgroundColor: anchor ? 'transparent' : 'rgba(2, 8, 23, 0.55)' }}
       >
@@ -107,12 +134,13 @@ export default function ActionSheet({
           accessibilityRole={'dialog' as any}
           accessibilityLabel={title}
           aria-modal="true"
-          className={`ui-rise w-full sm:max-w-[360px] rounded-t-[20px] sm:rounded-[18px] border overflow-hidden pb-[env(safe-area-inset-bottom)] ${anchor ? 'lg:max-w-[300px] lg:rounded-[14px]' : ''}`}
+          className={`ui-menu ${anchor ? 'ui-menu-anchored' : ''} w-full sm:max-w-[360px] rounded-t-[20px] sm:rounded-[18px] border overflow-hidden pb-[env(safe-area-inset-bottom)] ${anchor ? 'lg:max-w-[300px] lg:rounded-[14px]' : ''}`}
           style={{
             backgroundColor: 'var(--c-surface)',
             borderColor: 'var(--c-border)',
             boxShadow: anchor ? 'var(--e-lg)' : '0 28px 70px rgba(2, 8, 23, 0.35)',
-            ...(anchor ? { position: 'fixed', top: anchor.top, bottom: anchor.bottom, right: anchor.right } : null),
+            // Grows from the corner next to the ⋯, not from its own centre.
+            ...(anchor ? { position: 'fixed', top: anchor.top, bottom: anchor.bottom, right: anchor.right, transformOrigin: anchor.top !== undefined ? 'top right' : 'bottom right' } : null),
           } as any}
         >
           <View className="px-4 pt-4 pb-3 border-b" style={{ borderColor: 'var(--c-border)' }}>
