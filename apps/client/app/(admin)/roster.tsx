@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Pressable, ScrollView, StyleSheet, Alert } from '@/src/web/reactNative';
+import { View, Text, TouchableOpacity, Pressable, ScrollView, StyleSheet } from '@/src/web/reactNative';
 import { useRouter } from '@/src/web/expoRouter';
 import { Download, Plus } from 'lucide-react';
 import { teamsApi, Player, RosterPage, RosterPageQuery, RosterSummary, Team } from '../../services/teamsApi';
@@ -33,6 +33,7 @@ import { ATTENDANCE_PERIOD_LABEL, formatAttendanceRate } from '../../utils/atten
 import { plural } from '../../utils/plural';
 import { loadFailureMessage } from '../../utils/errorMessages';
 import { LoadError } from '../../components/ui/ScreenState';
+import { ToastHost, useToasts } from '../../components/ui/Toast';
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 100];
 const DEFAULT_PAGE_SIZE = 12;
@@ -57,6 +58,8 @@ export default function RosterScreen() {
   const router = useRouter();
   const { isMobile } = useResponsive();
   const { searchValue, setSearchValue, setSearchPlaceholder, setHeaderActions, setMobileFab } = useHeader();
+  // Results and failures as toasts, like the rest of the admin (they were the browser's own alert box).
+  const { toasts, showToast, dismissToast } = useToasts();
 
   // One page of the roster at a time: the server searches, filters, sorts and
   // pages (it used to send the whole club, ~160 KB, on every visit).
@@ -225,7 +228,7 @@ export default function RosterScreen() {
     } catch (removeError: any) {
       console.error('Remove player error:', removeError);
       setPendingRemoval(null);
-      Alert.alert('Eroare', removeError?.message || 'Jucătorul nu a putut fi eliminat din lot.');
+      showToast({ variant: 'error', message: removeError?.message || 'Jucătorul nu a putut fi eliminat din lot.' });
     } finally {
       setPlayerActionBusy(false);
     }
@@ -242,7 +245,7 @@ export default function RosterScreen() {
       await fetchRosterData();
     } catch (restoreError: any) {
       console.error('Restore player error:', restoreError);
-      Alert.alert('Eroare', restoreError?.message || 'Jucătorul nu a putut fi restaurat la echipă.');
+      showToast({ variant: 'error', message: restoreError?.message || 'Jucătorul nu a putut fi restaurat la echipă.' });
     } finally {
       setPlayerActionBusy(false);
     }
@@ -260,16 +263,21 @@ export default function RosterScreen() {
       const result = await teamsApi.sendPaymentReminders();
       const owing = result.players ?? result.recipients.length;
       const skipped = result.skipped ?? 0;
-      Alert.alert(
-        owing ? 'Mementouri trimise' : 'Nicio plată de amintit',
-        owing
-          ? `${plural(result.sent, 'notificare trimisă', 'notificări trimise')} pentru ${plural(owing, 'jucător cu restanțe', 'jucători cu restanțe')} (jucătorilor și părinților lor).${skipped ? ` ${plural(skipped, 'cont a primit', 'conturi au primit')} deja un memento în ultimele 7 zile.` : ''}`
-          : 'Nimeni nu are restanțe. Plățile care nu au ajuns la scadență nu primesc memento.'
-      );
+      showToast(owing
+        ? {
+          variant: 'success',
+          message: `Mementouri trimise: ${plural(result.sent, 'notificare', 'notificări')} pentru ${plural(owing, 'jucător cu restanțe', 'jucători cu restanțe')} (jucătorilor și părinților lor).${skipped ? ` ${plural(skipped, 'cont a primit', 'conturi au primit')} deja un memento în ultimele 7 zile.` : ''}`,
+          duration: 6000,
+        }
+        : {
+          variant: 'info',
+          message: 'Nicio plată de amintit: nimeni nu are restanțe. Plățile care nu au ajuns la scadență nu primesc memento.',
+          duration: 6000,
+        });
       await fetchRosterData();
     } catch (reminderError: any) {
       console.error('Send reminders error:', reminderError);
-      Alert.alert('Eroare', reminderError?.message || 'Mementourile de plată nu au putut fi procesate.');
+      showToast({ variant: 'error', message: reminderError?.message || 'Mementourile de plată nu au putut fi trimise.' });
     } finally {
       setSendingReminders(false);
     }
@@ -393,7 +401,7 @@ export default function RosterScreen() {
       const all = await teamsApi.getRosterPage({ ...rosterQueryRef.current, page: 1, pageSize: 'all' });
       downloadRosterCsv(all.items, 'lot-jucatori.csv');
     } catch (exportError: any) {
-      Alert.alert('Eroare', exportError?.message || 'Exportul nu a putut fi generat.');
+      showToast({ variant: 'error', message: exportError?.message || 'Exportul nu a putut fi generat.' });
     }
   };
 
@@ -413,10 +421,11 @@ export default function RosterScreen() {
         const done = results.length - failed;
         const reason = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')?.reason;
         const teamName = teams.find((team) => team.id === teamId)?.name ?? 'echipa aleasă';
-        Alert.alert(
-          done ? 'Mutare parțială' : 'Mutarea nu a mers',
-          `Am mutat ${done} din ${plural(results.length, 'jucător', 'jucători')} la ${teamName}. Pentru ${failed} mutarea nu a mers${reason ? `: ${loadFailureMessage(reason)}` : '.'}`,
-        );
+        showToast({
+          variant: 'error',
+          message: `Am mutat ${done} din ${plural(results.length, 'jucător', 'jucători')} la ${teamName}. Pentru ${failed} mutarea nu a mers${reason ? `: ${loadFailureMessage(reason)}` : '.'}`,
+          duration: 8000,
+        });
       }
     } finally {
       setBulkBusy(false);
@@ -442,10 +451,11 @@ export default function RosterScreen() {
       if (failed) {
         const done = results.length - failed;
         const reason = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')?.reason;
-        Alert.alert(
-          'Eliminare parțială',
-          `Am eliminat ${done} din ${plural(results.length, 'jucător', 'jucători')}. Pentru ${failed} eliminarea nu a mers${reason ? `: ${loadFailureMessage(reason)}` : '.'}`,
-        );
+        showToast({
+          variant: 'error',
+          message: `Am eliminat ${done} din ${plural(results.length, 'jucător', 'jucători')}. Pentru ${failed} eliminarea nu a mers${reason ? `: ${loadFailureMessage(reason)}` : '.'}`,
+          duration: 8000,
+        });
       }
     } finally {
       setBulkBusy(false);
@@ -512,8 +522,8 @@ export default function RosterScreen() {
             zIndex: 30,
           } as any}
         >
-          <Plus color="#FFFFFF" size={18} strokeWidth={2.6} />
-          <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' } as any}>Jucător</Text>
+          <Plus color="var(--c-on-brand)" size={18} strokeWidth={2.6} />
+          <Text style={{ color: 'var(--c-on-brand)', fontSize: 14, fontWeight: '700' } as any}>Jucător</Text>
         </Pressable>
       );
       return;
@@ -570,7 +580,7 @@ export default function RosterScreen() {
               />
             ) : null}
             {/* Phones use the floating „+ Jucător”: here the button was cut to "Adaugă jucă…" and repeated it. */}
-            <Button icon="add" label="Adaugă jucător" variant="primary" className="hidden sm:flex" onPress={() => setShowAddModal(true)} />
+            <Button icon="add" label="Adaugă jucător" variant="primary" className="hidden lg:flex" onPress={() => setShowAddModal(true)} />
           </View>
         }
       >
@@ -807,6 +817,8 @@ export default function RosterScreen() {
         onSelect={handleBulkReassign}
         onClose={() => setShowBulkReassignSheet(false)}
       />
+
+      <ToastHost toasts={toasts} onDismiss={dismissToast} />
     </>
   );
 }

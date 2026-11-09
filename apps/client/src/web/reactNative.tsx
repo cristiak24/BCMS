@@ -309,6 +309,34 @@ function mergeRefs<T>(...refs: Array<React.Ref<T> | ((node: T | null) => void | 
   };
 }
 
+/**
+ * Arrow keys between the tabs of a tablist (WAI-ARIA tabs): ←/→ select the
+ * previous/next tab, Home/End the first/last. Each tab stays a Tab stop as
+ * before; the arrows are what keyboard and screen-reader users try first.
+ */
+const TAB_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'Home', 'End']);
+function moveBetweenTabs(event: React.KeyboardEvent<HTMLElement>) {
+  if (!TAB_KEYS.has(event.key) || event.altKey || event.ctrlKey || event.metaKey) return;
+  const list = event.currentTarget;
+  const tabs = Array.from(list.querySelectorAll<HTMLElement>('[role="tab"]')).filter((tab) => (
+    tab.closest('[role="tablist"]') === list
+    && tab.getAttribute('aria-disabled') !== 'true'
+    && !(tab as HTMLButtonElement).disabled
+    // Not a tab hidden at this width (display: none).
+    && tab.getClientRects().length > 0
+  ));
+  const current = tabs.findIndex((tab) => tab.contains(event.target as Node));
+  if (current < 0 || tabs.length < 2) return;
+  event.preventDefault();
+  const last = tabs.length - 1;
+  const next = event.key === 'Home' ? 0
+    : event.key === 'End' ? last
+      : event.key === 'ArrowRight' ? (current === last ? 0 : current + 1)
+        : (current === 0 ? last : current - 1);
+  tabs[next].focus();
+  tabs[next].click();
+}
+
 function createBox(tag: keyof React.JSX.IntrinsicElements, defaultClassName?: string) {
   return React.forwardRef<HTMLElement, AnyProps>(function Box(props, ref) {
     const { rest, native } = omitNativeProps(props);
@@ -327,6 +355,12 @@ function createBox(tag: keyof React.JSX.IntrinsicElements, defaultClassName?: st
 
     const layoutRef = useLayoutObserver(onLayout);
     const roleProps = role ? { role, 'aria-level': ariaLevel } : ariaRoleProps(native.accessibilityRole, ariaLevel);
+    const onKeyDown = (roleProps as { role?: string }).role === 'tablist'
+      ? (event: React.KeyboardEvent<HTMLElement>) => {
+          domProps.onKeyDown?.(event);
+          if (!event.defaultPrevented) moveBetweenTabs(event);
+        }
+      : domProps.onKeyDown;
 
     const Element = tag as any;
     return (
@@ -337,6 +371,7 @@ function createBox(tag: keyof React.JSX.IntrinsicElements, defaultClassName?: st
         data-testid={native.testID}
         ref={onLayout ? mergeRefs(ref, layoutRef) : ref}
         {...roleProps}
+        onKeyDown={onKeyDown}
         style={withPointerEvents(flattenStyle(style), native.pointerEvents)}
         className={cx(defaultClassName, className)}
         onClick={

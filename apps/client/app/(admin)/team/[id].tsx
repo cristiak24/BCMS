@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput, Alert } from '@/src/web/reactNative';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput } from '@/src/web/reactNative';
 import { useLocalSearchParams, useRouter } from '@/src/web/expoRouter';
 import {
     ArrowLeft, Users, UserPlus, Copy, Check, Search, X, Shield, ListOrdered, History,
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import TeamSeasonTable from '../../../components/stats/TeamSeasonTable';
 import Button from '../../../components/ui/Button';
+import { ToastHost, useToasts } from '../../../components/ui/Toast';
 import ActionSheet, { type SheetAction } from '../../../components/ui/ActionSheet';
 import { DenseAvatar, DenseHeader, DenseHeading, DenseList, DenseRow } from '../../../components/ui/DenseList';
 import { teamsApi, Team, Player, Coach, TeamStats, TeamPlayerStat } from '../../../services/teamsApi';
@@ -42,6 +43,8 @@ export default function TeamDetailsScreen() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
     const teamId = Number(id);
+    // Results and failures as toasts, like the rest of the admin (they were the browser's own alert box).
+    const { toasts, showToast, dismissToast } = useToasts();
 
     const [team, setTeam] = useState<Team | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
@@ -130,7 +133,7 @@ export default function TeamDetailsScreen() {
             void refreshStats();
             setPlayerPendingRemoval(null);
         } catch (e) {
-            Alert.alert('Eroare', e instanceof Error ? e.message : 'Nu am putut scoate jucătorul.');
+            showToast({ variant: 'error', message: e instanceof Error ? e.message : 'Nu am putut scoate jucătorul.' });
         } finally {
             setRemovingId(null);
         }
@@ -477,7 +480,7 @@ export default function TeamDetailsScreen() {
                 onClose={() => setMedicalVisaOpen(false)}
                 onSuccess={(updated, failed) => {
                     if (updated > 0) loadData();
-                    if (failed > 0) Alert.alert('Eroare', `${failed} actualizări au eșuat.`);
+                    if (failed > 0) showToast({ variant: 'error', message: `${plural(failed, 'viză nu s-a putut actualiza', 'vize nu s-au putut actualiza')}.`, duration: 6000 });
                 }}
             />
 
@@ -513,9 +516,15 @@ export default function TeamDetailsScreen() {
                 onDone={({ created, skipped }) => {
                     setShowBulk(false);
                     void loadData({ silent: true });
-                    Alert.alert('Lot actualizat', `${plural(created, 'jucător adăugat', 'jucători adăugați')}${skipped.length ? `, ${skipped.length} deja în lot (${skipped.slice(0, 5).join(', ')}${skipped.length > 5 ? '…' : ''})` : ''}.`);
+                    showToast({
+                        variant: 'success',
+                        message: `Lot actualizat: ${plural(created, 'jucător adăugat', 'jucători adăugați')}${skipped.length ? `, ${skipped.length} deja în lot (${skipped.slice(0, 5).join(', ')}${skipped.length > 5 ? '…' : ''})` : ''}.`,
+                        duration: skipped.length ? 8000 : 4000,
+                    });
                 }}
             />
+
+            <ToastHost toasts={toasts} onDismiss={dismissToast} />
         </View>
     );
 }

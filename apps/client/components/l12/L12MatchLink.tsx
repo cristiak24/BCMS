@@ -4,6 +4,8 @@ import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import { useLocation } from 'react-router-dom';
 import { l12Api } from '../../services/l12Api';
 import { plural } from '../../utils/plural';
+import { useSession } from '../../context/AuthContext';
+import { normalizeRole } from '../../utils/authSession';
 
 import { tr } from '../../i18n';
 /** Admin and coach share the L12 screens under their own prefix. */
@@ -24,10 +26,15 @@ export function StatusChip({ set, label }: { set: boolean; label?: string }) {
 /** Small "L12" entry on a match's detail page. */
 export function L12MatchLink({ eventId, onOpen }: { eventId: number; onOpen: (path: string) => void }) {
   const base = useL12Base();
-  const [state, setState] = useState<'loading' | 'set' | 'unset' | 'hidden'>('loading');
+  const { session } = useSession();
+  // L12 belongs to admins and coaches (server: 403 for staff and accountants).
+  // Not asked at all for the others: the refused request showed up as an error.
+  const canUseL12 = ['admin', 'superadmin', 'coach'].includes(normalizeRole(session?.role));
+  const [state, setState] = useState<'loading' | 'set' | 'unset' | 'hidden'>(canUseL12 ? 'loading' : 'hidden');
   const [count, setCount] = useState(0);
 
   useEffect(() => {
+    if (!canUseL12) return undefined;
     let cancelled = false;
     l12Api.getForEvent(eventId)
       .then((data) => {
@@ -35,10 +42,9 @@ export function L12MatchLink({ eventId, onOpen }: { eventId: number; onOpen: (pa
         setCount(data.lineup?.players.length ?? 0);
         setState(data.lineup ? 'set' : 'unset');
       })
-      // 403 for roles that can't edit L12 (accountant/staff) — just hide it.
       .catch(() => { if (!cancelled) setState('hidden'); });
     return () => { cancelled = true; };
-  }, [eventId]);
+  }, [eventId, canUseL12]);
 
   if (state === 'hidden') return null;
 

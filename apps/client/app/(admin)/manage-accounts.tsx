@@ -24,13 +24,16 @@ import CoachHandoverDialog from '../../components/accounts/CoachHandoverDialog';
 import { readHandoverRequest, type HandoverRequest } from '../../utils/coachHandover';
 import { plural } from '../../utils/plural';
 
-const FILTERS = ['all', 'coach', 'player', 'parent', 'invite', 'inactive'] as const;
+// Accountants and staff are listed too; their chips show only when the club has some.
+const FILTERS = ['all', 'coach', 'player', 'parent', 'accountant', 'staff', 'invite', 'inactive'] as const;
 
 const FILTER_LABEL: Record<(typeof FILTERS)[number], string> = {
     all: 'Toate',
     coach: 'Antrenori',
     player: 'Jucători',
     parent: 'Părinți',
+    accountant: 'Contabili',
+    staff: 'Staff',
     invite: 'Invitații',
     inactive: 'Dezactivate',
 };
@@ -592,6 +595,8 @@ export default function ManageAccountsScreen() {
         coach: accounts.filter((a) => a.role === 'coach' && a.source !== 'invite').length,
         player: accounts.filter((a) => a.role === 'player' && a.source !== 'invite').length,
         parent: accounts.filter((a) => a.role === 'parent' && a.source !== 'invite').length,
+        accountant: accounts.filter((a) => a.role === 'accountant' && a.source !== 'invite').length,
+        staff: accounts.filter((a) => a.role === 'staff' && a.source !== 'invite').length,
         invite: counts.invites,
         inactive: accounts.filter((a) => a.status === 'inactive').length,
     }), [accounts, counts.invites]);
@@ -711,8 +716,13 @@ export default function ManageAccountsScreen() {
                                         const sv = statusVisual(account);
                                         const RowMain: any = isInvite ? View : Pressable;
                                         const actions = sheetActions(account);
+                                        // An invite without a name comes with the part of the email before „@”
+                                        // („invitat”): the address alone says it better, once.
+                                        const unnamedInvite = isInvite && (!account.name || account.name === account.email.split('@')[0]);
+                                        // „Stare” already says „Invitație trimisă”; here only when („Trimisă acum 2 ore”).
+                                        const sentAt = isInvite ? formatRelativeDate(account.createdAt) : '';
                                         const lastSeen = isInvite
-                                            ? `Invitație trimisă ${formatRelativeDate(account.createdAt)}`
+                                            ? sentAt === '—' ? sentAt : sentAt.startsWith('acum') ? `Trimisă ${sentAt}` : `Trimisă pe ${sentAt}`
                                             : account.lastLoginAt ? formatRelativeDate(account.lastLoginAt) : 'Niciodată';
 
                                         return (
@@ -754,8 +764,8 @@ export default function ManageAccountsScreen() {
                                                             : <Text className="text-[12px] font-bold" style={{ color: rv.fg }}>{initialsOf(account.name, account.email)}</Text>}
                                                     </View>
                                                     <View className="flex-1 min-w-0">
-                                                        <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{account.name || account.email}</Text>
-                                                        <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{account.email}</Text>
+                                                        <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{unnamedInvite ? account.email : account.name || account.email}</Text>
+                                                        {unnamedInvite ? null : <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{account.email}</Text>}
                                                         {/* Phones: role + status under the email. */}
                                                         <View className="md:hidden flex-row items-center gap-1.5 mt-0.5">
                                                             <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sv.dot }} />

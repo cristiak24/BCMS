@@ -230,9 +230,13 @@ export default function PlayerProfile() {
               </View>
             )}
             // While there are changes the bar at the bottom carries „Salvează”:
-            // one save button on screen, not two.
+            // one save button on screen, not two. Saved is a state, not a
+            // (disabled) button.
             actions={dirty ? undefined : (
-              <Button icon="check" label="Salvat" variant="secondary" disabled />
+              <View className="flex-row items-center gap-2 py-2">
+                <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: 'var(--c-success)' }} />
+                <Text className="text-[13px] font-medium" style={{ color: 'var(--c-muted)' }}>Totul este salvat</Text>
+              </View>
             )}
           >
             <View className="flex-row flex-wrap gap-1.5">
@@ -343,7 +347,7 @@ export default function PlayerProfile() {
               <Card title="Plăți" icon="payments">
                 <View className="rounded-[12px] px-3.5 py-3 mb-3" style={{ backgroundColor: 'var(--c-surface-2)' }}>
                   <Text className="t-label" style={{ color: 'var(--c-muted)' }}>{amountDue > 0 ? 'De plătit' : 'Plătit total'}</Text>
-                  <Text className="t-num text-[24px] font-bold mt-1" style={{ color: amountDue > 0 ? 'var(--c-warning-fg)' : 'var(--c-ink)' }}>
+                  <Text className="t-num text-[24px] font-bold mt-1" style={{ color: overdue > 0 ? 'var(--c-danger-fg)' : amountDue > 0 ? 'var(--c-warning-fg)' : 'var(--c-ink)' }}>
                     {money(amountDue > 0 ? amountDue : player.paidAmount ?? transactions.reduce((sum, t) => sum + t.amount, 0))}
                   </Text>
                   {/* The hero shows only the past-due part („340 Restanță”); here the whole

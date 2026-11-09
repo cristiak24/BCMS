@@ -149,8 +149,8 @@ export default function ScheduleScreen() {
           zIndex: 30,
         } as any}
       >
-        <Plus color="#FFFFFF" size={18} strokeWidth={2.6} />
-        <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' } as any}>Eveniment</Text>
+        <Plus color="var(--c-on-brand)" size={18} strokeWidth={2.6} />
+        <Text style={{ color: 'var(--c-on-brand)', fontSize: 14, fontWeight: '700' } as any}>Eveniment</Text>
       </Pressable>
     );
   }, [activeTab, canManage, setHeaderActions, setMobileFab]);

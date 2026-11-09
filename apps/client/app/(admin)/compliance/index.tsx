@@ -44,7 +44,7 @@ function expiryHint(iso: string | null, status: MedicalStatus) {
   const days = Math.round((parseApiDate(iso).getTime() - Date.now()) / 86400000);
   if (days < 0) return `Expirată de ${plural(-days, 'zi', 'zile')}`;
   if (days === 0) return 'Expiră azi';
-  return `Peste ${plural(days, 'zi', 'zile')}`;
+  return `Expiră peste ${plural(days, 'zi', 'zile')}`;
 }
 
 function StatusBadge({ status }: { status: MedicalStatus }) {

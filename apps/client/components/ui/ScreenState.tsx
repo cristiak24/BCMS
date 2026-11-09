@@ -14,6 +14,8 @@ type ErrorStateProps = {
   message: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** The error stands in for the whole page: its title is the page's h1. */
+  pageTitle?: boolean;
 };
 
 type EmptyStateProps = {
@@ -82,6 +84,7 @@ export function ErrorState({
   message,
   actionLabel,
   onAction,
+  pageTitle = false,
 }: ErrorStateProps) {
   return (
     <View
@@ -90,7 +93,11 @@ export function ErrorState({
       accessibilityRole="alert"
     >
       <MaterialIcons name="error-outline" size={34} color="var(--c-danger)" />
-      <Text className="mt-3 text-center text-xl font-black" style={{ color: 'var(--c-ink)' }}>
+      <Text
+        className="mt-3 text-center text-xl font-black"
+        style={{ color: 'var(--c-ink)' }}
+        {...(pageTitle ? { accessibilityRole: 'header' as const, 'aria-level': 1 } : {})}
+      >
         {title}
       </Text>
       <Text className="mt-2 text-center font-semibold" style={{ color: 'var(--c-muted)' }}>

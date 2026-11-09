@@ -227,8 +227,8 @@ export default function ManageAccessScreen() {
                                             {item.label}
                                         </Text>
                                         {badge > 0 ? (
-                                            <View className="min-w-[18px] h-[18px] px-1 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-danger)' }}>
-                                                <Text className="text-[10.5px] font-bold t-num" style={{ color: '#FFFFFF' }}>{badge > 99 ? '99+' : badge}</Text>
+                                            <View className="min-w-[18px] h-[18px] px-1 rounded-full items-center justify-center" style={{ backgroundColor: 'var(--c-danger-bg)' }}>
+                                                <Text className="text-[10.5px] font-bold t-num" style={{ color: 'var(--c-danger-fg)' }}>{badge > 99 ? '99+' : badge}</Text>
                                             </View>
                                         ) : null}
                                     </Pressable>

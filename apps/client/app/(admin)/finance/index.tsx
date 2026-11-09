@@ -943,32 +943,47 @@ export default function FinancialSettingsPage() {
                                         const tone = reversed ? 'var(--c-muted)' : paid ? 'var(--c-success-fg)' : failed ? 'var(--c-danger-fg)' : 'var(--c-warning-fg)';
                                         // Card payments are refunded through Stripe; only desk payments are reversed here.
                                         const canReverse = paid && payment.provider !== 'stripe';
+                                        const startReverse = () => {
+                                            if (reverseReasonFor.current !== payment.id) setReverseReason('');
+                                            reverseReasonFor.current = payment.id;
+                                            setPendingReverse(payment);
+                                        };
+                                        const reverseLabel = `Stornează plata de ${formatCurrency(payment.amount, payment.currency)} de la ${payment.playerName}`;
                                         return (
                                             <View key={payment.id} className="flex-row items-center gap-3 py-2.5" style={index > 0 ? ({ borderTopWidth: 1, borderTopColor: 'var(--c-border)' } as any) : undefined}>
                                                 <View className="flex-1 min-w-0">
                                                     <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{payment.playerName}</Text>
-                                                    <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+                                                    {/* Two lines on a phone: the team and the method were cut („transf…”). */}
+                                                    <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={2}>
                                                         {[formatPaymentWhen(payment.date, payment.provider), payment.teamName, paymentMethodLabel(payment.provider)].filter(Boolean).join(' · ')}
                                                     </Text>
                                                 </View>
                                                 <View className="items-end shrink-0">
                                                     <Text className="t-num text-[14px] font-bold" style={{ color: reversed ? 'var(--c-muted)' : 'var(--c-ink)', textDecorationLine: reversed ? 'line-through' : 'none' } as any}>{formatCurrency(payment.amount, payment.currency)}</Text>
                                                     <Text className="text-[11.5px] font-semibold" style={{ color: tone }}>{label}</Text>
+                                                    {/* Phones: under the sum, with its name — a lone ⊖ said nothing. */}
+                                                    {canReverse ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            icon="remove-circle-outline"
+                                                            label="Stornează"
+                                                            className="sm:hidden mt-1"
+                                                            accessibilityLabel={reverseLabel}
+                                                            onPress={startReverse}
+                                                        />
+                                                    ) : null}
                                                 </View>
                                                 {canReverse ? (
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
-                                                        // Its own icon: on a phone „Redeschide” (a document) used the same undo arrow.
+                                                        // Its own icon: „Redeschide” (a document) uses the undo arrow.
                                                         icon="remove-circle-outline"
                                                         label="Stornează"
-                                                        iconOnlyOnMobile
-                                                        accessibilityLabel={`Stornează plata de ${formatCurrency(payment.amount, payment.currency)} de la ${payment.playerName}`}
-                                                        onPress={() => {
-                                                            if (reverseReasonFor.current !== payment.id) setReverseReason('');
-                                                            reverseReasonFor.current = payment.id;
-                                                            setPendingReverse(payment);
-                                                        }}
+                                                        className="hidden sm:flex"
+                                                        accessibilityLabel={reverseLabel}
+                                                        onPress={startReverse}
                                                     />
                                                 ) : null}
                                             </View>

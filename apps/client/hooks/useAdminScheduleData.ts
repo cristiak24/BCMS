@@ -3,6 +3,8 @@ import { useFocusEffect } from '@/src/web/reactNavigationNative';
 import { eventsApi, CalendarEvent } from '../services/eventsApi';
 import { teamsApi, Team } from '../services/teamsApi';
 import { apiFetch } from '../services/apiClient';
+import { useSession } from '../context/AuthContext';
+import { normalizeRole } from '../utils/authSession';
 import { loadFailureMessage } from '../utils/errorMessages';
 
 export type CoachUser = { id: number; name: string; role: string };
@@ -68,7 +70,12 @@ export function useAdminScheduleData(currentDate: Date, filters: ScheduleFilters
     }, [fetchEvents])
   );
 
+  // The coach filter reads the club's accounts, an admin list (server: 403 for
+  // staff). Staff see the calendar without that filter instead of an error.
+  const { session } = useSession();
+  const canListUsers = ['admin', 'superadmin'].includes(normalizeRole(session?.role));
   useEffect(() => {
+    if (!canListUsers) return;
     (async () => {
       try {
         const usersResponse = await apiFetch<CoachUser[]>('/users');
@@ -78,7 +85,7 @@ export function useAdminScheduleData(currentDate: Date, filters: ScheduleFilters
         console.error('Fetch filters error:', err);
       }
     })();
-  }, []);
+  }, [canListUsers]);
 
   return { events, upcoming, teams, coaches, loading, error, refetch: fetchEvents };
 }

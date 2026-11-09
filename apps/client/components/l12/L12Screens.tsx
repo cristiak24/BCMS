@@ -376,7 +376,7 @@ export function L12HomeScreen() {
   return (
     <PageShell>
       {error ? (
-        <ErrorState title={tr('Nu am putut încărca L12')} message={error} actionLabel={tr('Reîncearcă')} onAction={load} />
+        <ErrorState pageTitle title={tr('Nu am putut încărca L12')} message={error} actionLabel={tr('Reîncearcă')} onAction={load} />
       ) : !data ? (
         <View className="gap-3">
           <Skeleton className="h-[64px] w-full rounded-[14px]" />
@@ -730,9 +730,9 @@ export function L12MatchScreen() {
         <View className="gap-4">
           <BackButton label="L12" onPress={() => router.back(base)} />
           {missing ? (
-            <ErrorState title={tr('Meciul nu mai există')} message={tr('A fost șters din Program sau linkul nu mai e valid.')} actionLabel={tr('Înapoi la L12')} onAction={() => router.back(base)} />
+            <ErrorState pageTitle title={tr('Meciul nu mai există')} message={tr('A fost șters din Program sau linkul nu mai e valid.')} actionLabel={tr('Înapoi la L12')} onAction={() => router.back(base)} />
           ) : (
-            <ErrorState title={tr('L12 nu poate fi afișat')} message={error ?? tr('Nu am putut încărca L12.')} actionLabel={tr('Reîncearcă')} onAction={load} />
+            <ErrorState pageTitle title={tr('L12 nu poate fi afișat')} message={error ?? tr('Nu am putut încărca L12.')} actionLabel={tr('Reîncearcă')} onAction={load} />
           )}
         </View>
       </PageShell>
@@ -996,7 +996,7 @@ export function L12TemplateScreen() {
           {missing ? (
             <ErrorState title={tr('Echipa nu mai există')} message={tr('A fost ștearsă sau linkul nu mai e valid.')} actionLabel={tr('Înapoi la L12')} onAction={() => router.back(base)} />
           ) : (
-            <ErrorState title={tr('L12 nu poate fi afișat')} message={error ?? tr('Nu am putut încărca L12-ul constant.')} actionLabel={tr('Reîncearcă')} onAction={load} />
+            <ErrorState pageTitle title={tr('L12 nu poate fi afișat')} message={error ?? tr('Nu am putut încărca L12-ul constant.')} actionLabel={tr('Reîncearcă')} onAction={load} />
           )}
         </View>
       </PageShell>

@@ -167,11 +167,11 @@ export function FilterModal({
               </View>
             </View>
 
+            {/* No coach list (staff may not read the club's accounts, or there is
+                no coach yet): no section, rather than „Niciun antrenor disponibil”. */}
+            {coaches.length > 0 ? (
             <View className="mb-6">
               <SectionLabel icon={<UserCog size={13} color="var(--c-faint)" />}>Antrenor</SectionLabel>
-              {coaches.length === 0 ? (
-                <Text className="text-slate-400 text-[13px] font-semibold">Niciun antrenor disponibil.</Text>
-              ) : (
                 <>
                   {coaches.length > SEARCH_THRESHOLD && (
                     <InlineSearch value={coachQuery} onChange={setCoachQuery} placeholder="Caută antrenor…" />
@@ -199,8 +199,8 @@ export function FilterModal({
                     </ScrollView>
                   )}
                 </>
-              )}
             </View>
+            ) : null}
 
             <View className="mb-6">
               <SectionLabel icon={<Users size={13} color="var(--c-faint)" />}>Club / echipă</SectionLabel>

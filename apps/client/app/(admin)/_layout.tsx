@@ -1,9 +1,10 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { ContentLoading } from '../../components/ui/ScreenState';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar, { ADMIN_MENU_ITEMS } from '../../components/Sidebar';
 import { HeaderProvider, useHeader } from '../../components/HeaderContext';
-import { normalizeRole, isSuperadmin } from '../../utils/authSession';
+import { normalizeRole, isSuperadmin, getHomeRouteForRole } from '../../utils/authSession';
+import { canOpenAdminPage } from '../../utils/adminPages';
 import { useSession } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import AppHeader from '../../components/AppHeader';
@@ -121,6 +122,14 @@ function AdminLayoutContent() {
     const { isMobile } = useResponsive();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+    // Sentence-case labels, like the coach, player and super admin consoles
+    // (global.css). On <html>: sheets and dialogs are portaled to <body>.
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        document.documentElement.dataset.ui = 'quiet';
+        return () => { delete document.documentElement.dataset.ui; };
+    }, []);
+
     const role = normalizeRole(session?.role);
     const isAccountant = role === 'accountant';
     const isStaff = role === 'staff';
@@ -167,11 +176,15 @@ function AdminLayoutContent() {
         return `${first}${last}`.toUpperCase();
     };
 
-    // The ProtectedRoute wrapper in App.tsx already guarantees `session` exists 
-    // and the user has an admin-level role before this renders.
+    // The ProtectedRoute wrapper in App.tsx already guarantees `session` exists
+    // and the user has an admin-level role before this renders. The accountant
+    // and staff only get their own pages (utils/adminPages).
+    if (!canOpenAdminPage(role, pathname)) {
+        return <Navigate to={getHomeRouteForRole(role)} replace />;
+    }
 
     return (
-        <div className="flex flex-1 min-h-screen bg-[#EAF1F8] lg:flex-row flex-col">
+        <div className="flex flex-1 min-h-screen bg-[var(--c-bg)] lg:flex-row flex-col">
             {/* Keyboard users skip the menu (12+ stops) straight to the page. */}
             <a href="#continut" className="skip-link">Sari la conținut</a>
             <Sidebar items={availableMenuItems} plain />
