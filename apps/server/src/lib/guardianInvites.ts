@@ -63,15 +63,17 @@ export async function findUsableGuardianInvite(token: string) {
 
 /**
  * Atomically marks the invite used and links `userId` to the child. Returns
- * null when the invite is unknown, expired or already used.
+ * null when the invite is unknown, expired, already used or for another club
+ * than `clubId` — then nothing is consumed or linked.
  */
-export async function redeemGuardianInvite(token: string, userId: number, outer?: Tx) {
+export async function redeemGuardianInvite(token: string, userId: number, clubId: number, outer?: Tx) {
     if (!looksLikeGuardianInvite(token)) return null;
     const work = async (tx: Tx) => {
         const [invite] = await tx.update(guardianInvites)
             .set({ usedAt: new Date().toISOString(), usedBy: userId })
             .where(and(
                 eq(guardianInvites.tokenHash, hashGuardianToken(token)),
+                eq(guardianInvites.clubId, clubId),
                 isNull(guardianInvites.usedAt),
                 gt(guardianInvites.expiresAt, sql`(now() at time zone 'utc')`),
             ))

@@ -1,7 +1,7 @@
 import { toIso } from './dateUtils';
 import { db } from '../db';
 import { users, clubs, teams, accessRequests, inviteLinks, players, playersToTeams } from '../db/schema';
-import { eq, and, asc, desc, isNull, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, isNull, or, sql } from 'drizzle-orm';
 import type { AccessRequestRecord, InviteRole } from '../types/manageAccess';
 import { decryptInviteToken, encryptInviteToken } from './manageAccessTokens';
 import { splitDisplayName } from './password';
@@ -192,6 +192,12 @@ export async function denyAccessRequest(id: number, clubId: number, reviewedBy: 
     return updated[0] ?? null;
 }
 
+/**
+ * Applies an approved access request to its account — only while that account
+ * still waits for THIS club (pending, and in this club or in none). A stale
+ * request must not move an account that has since become active, or joined
+ * another club, into this one. Null when the account no longer qualifies.
+ */
 export async function updateUserAccess(userId: number, payload: { clubId: number; role: InviteRole; status: 'active' | 'disabled'; }) {
     const updated = await db.update(users)
         .set({
@@ -199,7 +205,11 @@ export async function updateUserAccess(userId: number, payload: { clubId: number
             role: payload.role as any,
             status: payload.status as any,
         })
-        .where(eq(users.id, userId))
+        .where(and(
+            eq(users.id, userId),
+            eq(users.status, 'pending'),
+            or(isNull(users.clubId), eq(users.clubId, payload.clubId)),
+        ))
         .returning();
 
     return updated.length > 0 ? (updated[0] as unknown as UserDoc) : null;

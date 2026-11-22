@@ -662,7 +662,7 @@ async function buildAdminRecentPayments(clubId: number | null, limit = 12, teamI
             .select({ email: pgUsers.email })
             .from(pgUsers)
             .where(eq(pgUsers.clubId, clubId));
-    const clubUserEmails = clubUserRows.map((user) => user.email.trim().toLowerCase());
+    const clubUserEmails = clubUserRows.map((user) => user.email.trim().toLowerCase()).filter(Boolean);
     const unassignedClubPlayers = clubUserEmails.length
         ? await db
             .select()

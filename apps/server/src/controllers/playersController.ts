@@ -147,14 +147,16 @@ function auditPlayer(req: AuthenticatedRequest, action: string, playerId: number
 
 const HISTORY_FIELDS = ['firstName', 'lastName', 'name', 'status', 'number', 'birthYear', 'medicalCheckExpiry', 'avatarUrl'] as const;
 
-async function getPlayerClubIdByEmail(email?: string | null) {
-    if (!email) return null;
+/** Is there an account with this email in `clubId`? Looks only inside that club. */
+async function emailHasAccountInClub(email: string | null | undefined, clubId: number | null) {
+    const normalized = email?.trim().toLowerCase();
+    if (!normalized || clubId == null) return false;
     const userRows = await db
-        .select({ clubId: users.clubId })
+        .select({ id: users.id })
         .from(users)
-        .where(eq(users.email, email.trim().toLowerCase()))
+        .where(and(eq(users.email, normalized), eq(users.clubId, clubId)))
         .limit(1);
-    return userRows[0]?.clubId == null ? null : Number(userRows[0].clubId);
+    return userRows.length > 0;
 }
 
 async function isPlayerAllowedForRequest(req: AuthenticatedRequest, player: typeof players.$inferSelect) {
@@ -171,9 +173,7 @@ async function isPlayerAllowedForRequest(req: AuthenticatedRequest, player: type
     // On another club's team: never ours, whatever its email (lib/teamlessPlayer.ts).
     if (!isTeamless(player, membershipRows.length)) return false;
 
-    const requestClubId = getRequestClubId(req);
-    const playerClubId = await getPlayerClubIdByEmail(player.email);
-    return requestClubId != null && playerClubId === requestClubId;
+    return emailHasAccountInClub(player.email, getRequestClubId(req));
 }
 
 function monthName(month?: number | null, year?: number | null) {
@@ -468,7 +468,8 @@ async function buildFullPlayerPayload(req: AuthenticatedRequest, player: typeof 
         ...player,
         ...rosterPlayer,
         ...paymentSummary,
-        clubId: rosterPlayer?.clubId ?? await getPlayerClubIdByEmail(player.email),
+        // Never another club's id: only the caller's club, when the email is an account there.
+        clubId: rosterPlayer?.clubId ?? (await emailHasAccountInClub(player.email, getRequestClubId(req)) ? getRequestClubId(req) : null),
         isUnassigned: rosterPlayer?.isUnassigned ?? true,
         teamName: rosterPlayer?.teamName ?? 'Unassigned',
         teamNames: rosterPlayer?.teamNames ?? [],
@@ -566,7 +567,7 @@ async function buildPlayerScope(req: AuthenticatedRequest): Promise<{ skip: true
         const memberIds = (await db.select({ playerId: playersToTeams.playerId }).from(playersToTeams).where(inArray(playersToTeams.teamId, allowedTeamIds)))
             .map((row) => row.playerId);
         const clubEmails = clubId != null
-            ? (await db.select({ email: users.email }).from(users).where(eq(users.clubId, clubId))).map((row) => row.email.trim().toLowerCase())
+            ? (await db.select({ email: users.email }).from(users).where(eq(users.clubId, clubId))).map((row) => row.email.trim().toLowerCase()).filter(Boolean)
             : [];
         const inClub = [inArray(players.teamId, allowedTeamIds)];
         if (memberIds.length) inClub.push(inArray(players.id, memberIds));
@@ -832,22 +833,43 @@ export const playersController = {
             const id = parseInt(req.params.id as string, 10);
             if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid player id' });
 
+            const [p] = await db.select().from(players).where(eq(players.id, id)).limit(1);
+            if (!p) return res.status(404).json({ error: 'Not found' });
+            const playerTeamIds = await getTeamIdsForPlayer(id, p.teamId ?? null);
+
             const allowedTeamIds = await getAllowedTeamIds(req);
             if (allowedTeamIds !== null) {
-                const pRows = await db.select().from(players).where(eq(players.id, id)).limit(1);
-                const p = pRows[0];
-                if (!p) return res.status(404).json({ error: 'Not found' });
-                const mRows = await db.select().from(playersToTeams).where(eq(playersToTeams.playerId, id));
-                
                 const allowedSet = new Set(allowedTeamIds);
-                const isAllowed = (p.teamId && allowedSet.has(p.teamId)) || mRows.some(m => allowedSet.has(m.teamId));
-                if (!isAllowed) return res.status(403).json({ error: 'Access denied' });
+                if (!playerTeamIds.some((teamId) => allowedSet.has(teamId))) return res.status(403).json({ error: 'Access denied' });
                 if (!await coachMayEditPlayer(req, p.id, p.teamId ?? null)) return res.status(403).json({ error: COACH_SCOPE_ERROR });
             }
 
-            await db.delete(playersToTeams).where(eq(playersToTeams.playerId, id));
-            await db.update(players).set({ teamId: null, status: 'inactive' }).where(eq(players.id, id));
-            await auditPlayer(req, 'player.removed_from_roster', id, {});
+            // Only the caller's own teams lose the player: a coach their managed
+            // teams, an admin the club's. Another squad keeps them, and the
+            // player stays active while any team is left.
+            let removable: Set<number>;
+            if (allowedTeamIds === null) {
+                removable = new Set(playerTeamIds);
+            } else if (req.user?.role === 'coach') {
+                const clubTeams = await db.select({ id: teams.id, coachId: teams.coachId }).from(teams).where(inArray(teams.id, allowedTeamIds.length ? allowedTeamIds : [-1]));
+                removable = new Set(teamsManagedByCoach(clubTeams, req.user?.id));
+            } else {
+                removable = new Set(allowedTeamIds);
+            }
+            const removed = playerTeamIds.filter((teamId) => removable.has(teamId));
+            const remaining = playerTeamIds.filter((teamId) => !removable.has(teamId));
+
+            if (removed.length) {
+                await db.delete(playersToTeams).where(and(eq(playersToTeams.playerId, id), inArray(playersToTeams.teamId, removed)));
+            }
+            if (remaining.length) {
+                if (p.teamId != null && removable.has(p.teamId)) {
+                    await db.update(players).set({ teamId: remaining[0] }).where(eq(players.id, id));
+                }
+            } else {
+                await db.update(players).set({ teamId: null, status: 'inactive' }).where(eq(players.id, id));
+            }
+            await auditPlayer(req, 'player.removed_from_roster', id, removed.length ? { teamIds: removed } : {});
 
             res.json({ success: true });
         } catch (error) {

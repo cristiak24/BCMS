@@ -167,7 +167,7 @@ export async function registerWithGuardianInvite(input: SignupIdentity & {
                 status: 'active',
                 clubId: input.clubId,
             });
-            const redeemed = await redeemGuardianInvite(input.token, user.id, tx);
+            const redeemed = await redeemGuardianInvite(input.token, user.id, input.clubId, tx);
             if (!redeemed) throw new InviteAlreadyUsed();
             return { user, redeemed };
         });

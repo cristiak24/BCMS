@@ -52,12 +52,18 @@ export async function approveManageAccessRequest(user: AppUserContext, requestId
         throw new Error('Only pending requests can be approved.');
     }
 
-    await approveAccessRequest(request.id, club.id, user.id);
-    await updateUserAccess(request.userId, {
+    const activated = await updateUserAccess(request.userId, {
         clubId: club.id,
         role: request.requestedRole as InviteRole,
         status: 'active',
     });
+    if (!activated) {
+        // The account is active already or belongs to another club now: the
+        // request is stale, so it is closed instead of re-homing the account.
+        await denyAccessRequest(request.id, club.id, user.id);
+        throw new Error('Contul nu mai așteaptă aprobarea acestui club. Cererea a fost închisă.');
+    }
+    await approveAccessRequest(request.id, club.id, user.id);
     if (request.requestedRole === 'player' && request.teamId != null) {
         await placeApprovedPlayerOnTeam({ userId: request.userId, userName: request.userName, userEmail: request.userEmail, teamId: request.teamId });
     }

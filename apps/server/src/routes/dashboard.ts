@@ -93,7 +93,7 @@ async function getScopedPostgresPlayers(clubScope: DashboardClubScope, teamIds: 
     directPlayers.forEach((player) => playersById.set(player.id, player));
     relationRows.forEach((row) => playersById.set(row.player.id, row.player));
 
-    const clubUserEmails = clubUserRows.map((user) => user.email.trim().toLowerCase());
+    const clubUserEmails = clubUserRows.map((user) => user.email.trim().toLowerCase()).filter(Boolean);
     if (clubUserEmails.length) {
         // Only players on no team: another club's player is never ours (lib/teamlessPlayer.ts).
         const userPlayers = await db.select().from(pgPlayers).where(and(inArray(pgPlayers.email, clubUserEmails), teamlessPlayer));

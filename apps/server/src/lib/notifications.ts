@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { notifications, playerGuardians, players, playersToTeams, users } from '../db/schema';
+import { notifications, playerGuardians, players, playersToTeams, teams, users } from '../db/schema';
 import { and, eq, gte, inArray, ne, sql } from 'drizzle-orm';
 import { sendNotificationEmails } from './mailer';
 import { roundMoney } from './money';
@@ -24,21 +24,45 @@ export async function recipientsForPlayers(playerIds: number[]) {
     if (!playerIds.length) return byPlayer;
     playerIds.forEach((id) => byPlayer.set(id, new Set()));
 
-    const [playerRows, guardianRows] = await Promise.all([
-        db.select({ id: players.id, email: players.email, userId: players.userId }).from(players).where(inArray(players.id, playerIds)),
+    const [playerRows, guardianRows, membershipRows] = await Promise.all([
+        db.select({ id: players.id, email: players.email, userId: players.userId, teamClubId: teams.clubId })
+            .from(players).leftJoin(teams, eq(teams.id, players.teamId)).where(inArray(players.id, playerIds)),
         db.select({ playerId: playerGuardians.playerId, userId: playerGuardians.userId }).from(playerGuardians).where(inArray(playerGuardians.playerId, playerIds)),
+        db.select({ playerId: playersToTeams.playerId, clubId: teams.clubId })
+            .from(playersToTeams).innerJoin(teams, eq(teams.id, playersToTeams.teamId)).where(inArray(playersToTeams.playerId, playerIds)),
     ]);
+    // The clubs each player's teams belong to.
+    const clubsOf = new Map<number, Set<number>>();
+    const addClub = (playerId: number, clubId: number | null) => {
+        if (clubId == null) return;
+        const set = clubsOf.get(playerId) ?? new Set<number>();
+        set.add(Number(clubId));
+        clubsOf.set(playerId, set);
+    };
+    playerRows.forEach((row) => addClub(row.id, row.teamClubId));
+    membershipRows.forEach((row) => addClub(row.playerId, row.clubId));
+
     const emails = playerRows.map((row) => row.email?.trim().toLowerCase()).filter((email): email is string => Boolean(email));
     const accounts = emails.length
-        ? await db.select({ id: users.id, email: users.email }).from(users)
+        ? await db.select({ id: users.id, email: users.email, clubId: users.clubId }).from(users)
             .where(and(inArray(sql<string>`lower(${users.email})`, emails), ne(users.status, 'disabled')))
         : [];
-    const accountByEmail = new Map(accounts.map((account) => [account.email.trim().toLowerCase(), account.id]));
+    const accountByEmail = new Map(accounts.map((account) => [account.email.trim().toLowerCase(), account]));
 
     playerRows.forEach((row) => {
         // The claimed account first; the email match covers records not yet claimed.
-        const accountId = row.userId ?? (row.email ? accountByEmail.get(row.email.trim().toLowerCase()) : undefined);
-        if (accountId != null) byPlayer.get(row.id)?.add(accountId);
+        if (row.userId != null) {
+            byPlayer.get(row.id)?.add(row.userId);
+            return;
+        }
+        const account = row.email ? accountByEmail.get(row.email.trim().toLowerCase()) : undefined;
+        if (!account) return;
+        // An email match counts only inside the player's own club: a member of
+        // another club whose address sits on this record hears nothing about
+        // it. A player on no team has no club yet (lib/teamlessPlayer.ts).
+        const playerClubs = clubsOf.get(row.id);
+        if (playerClubs && (account.clubId == null || !playerClubs.has(Number(account.clubId)))) return;
+        byPlayer.get(row.id)?.add(account.id);
     });
     guardianRows.forEach((row) => byPlayer.get(row.playerId)?.add(row.userId));
     return byPlayer;

@@ -134,8 +134,11 @@ router.post('/invites/accept', limiter, async (req: AuthenticatedRequest, res) =
             res.status(403).json({ error: 'Invitația este pentru un cont de părinte.' });
             return;
         }
-        const redeemed = await redeemGuardianInvite(String(req.body?.token ?? ''), Number(req.user.id));
-        if (!redeemed || redeemed.clubId !== Number(req.user.clubId)) {
+        const clubId = Number(req.user.clubId);
+        const redeemed = Number.isInteger(clubId) && clubId > 0
+            ? await redeemGuardianInvite(String(req.body?.token ?? ''), Number(req.user.id), clubId)
+            : null;
+        if (!redeemed) {
             res.status(400).json({ error: 'Invitația nu mai este valabilă. Cere una nouă clubului.' });
             return;
         }

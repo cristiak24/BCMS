@@ -66,6 +66,11 @@ export async function completeInviteSignup(input: InviteSignupInput): Promise<In
     const body = input.body ?? {};
     const { name, inviteToken } = body as { name?: string; inviteToken?: unknown };
     if (!name || !inviteToken) return fail(400, 'Name and invite token are required');
+    // Clubs find their people by email; an identity without one would match
+    // every record with an empty email, in any club.
+    if (!String(input.identity.email ?? '').trim()) {
+        return fail(400, 'Contul tău nu are o adresă de email confirmată. Adaug-o și încearcă din nou.');
+    }
 
     // Phone is collected on every signup form. Required for a coach (checked
     // per branch below) and a parent registering children; otherwise optional.
