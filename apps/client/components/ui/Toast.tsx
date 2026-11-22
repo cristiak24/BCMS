@@ -109,7 +109,8 @@ function ToastItem({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: num
                     className="tap-40 px-3 py-1.5 rounded-full items-center justify-center"
                     style={{ backgroundColor: meta.fg }}
                 >
-                    <Text className="text-white text-[12px] font-black">{toast.action.label}</Text>
+                    {/* The page surface on the variant colour: white text on the light dark-theme fg was 2.1:1. */}
+                    <Text className="text-[12px] font-black" style={{ color: 'var(--c-surface)' }}>{toast.action.label}</Text>
                 </Pressable>
             )}
             <Pressable onPress={() => onDismiss(toast.id)} accessibilityLabel={tr('Închide notificarea')} className="tap-40 w-6 h-6 items-center justify-center rounded-full">

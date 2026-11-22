@@ -130,7 +130,7 @@ function TeamCard({ team, onPress }: { team: TeamWithPlayers; onPress: () => voi
           ) : null}
         </View>
       ) : (
-        <EmptyState icon="groups" compact title={tr('Lot gol')} message={tr('Niciun jucător alocat acestei echipe încă.')} />
+        <EmptyState icon="groups" compact title={tr('Lotul e gol')} message={tr('Încă nu sunt jucători în această echipă.')} />
       )}
     </Pressable>
   );

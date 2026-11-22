@@ -44,7 +44,8 @@ export default function Button({
 }) {
   const colors = VARIANTS[variant];
   const inactive = Boolean(disabled || loading);
-  // Touch screens: 40px minimum (32px sm controls were the most common miss at 375px).
+  // Touch screens: 40px minimum (32px sm controls were the most common miss at 375px),
+  // and `hit-44` rings it to a 44px target without moving the layout.
   const height = size === 'sm' ? 'h-8 [@media(pointer:coarse)]:h-10' : 'h-10';
   const pad = iconOnlyOnMobile && icon
     ? (size === 'sm' ? 'w-8 [@media(pointer:coarse)]:w-10 sm:w-auto sm:px-2.5' : 'w-10 sm:w-auto sm:px-3.5')
@@ -57,7 +58,7 @@ export default function Button({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: inactive, busy: Boolean(loading) }}
-      className={`ui-press ${height} ${pad} rounded-[10px] border flex-row items-center justify-center gap-1.5 shrink-0 ${className ?? ''}`}
+      className={`ui-press hit-44 ${height} ${pad} rounded-[10px] border flex-row items-center justify-center gap-1.5 shrink-0 ${className ?? ''}`}
       style={{ backgroundColor: colors.bg, borderColor: colors.border, opacity: inactive ? 0.55 : 1 } as any}
     >
       {loading ? (

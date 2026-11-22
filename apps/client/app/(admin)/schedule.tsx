@@ -201,7 +201,11 @@ export default function ScheduleScreen() {
         if (!silent || !alreadyShown) {
           showToast({
             variant: 'info',
-            message: `Sezon FRB vechi (fără meciuri recente): ${res.staleTeams.join(', ')}. Actualizează sezonul din Clubul meu.`,
+            // A count, not the list: with every team named it grew to 8 lines over the calendar.
+            message: res.staleTeams.length === 1
+              ? `${res.staleTeams[0]} are un sezon FRB vechi, fără meciuri recente.`
+              : `${res.staleTeams.length} echipe au un sezon FRB vechi, fără meciuri recente.`,
+            action: { label: 'Vezi în Clubul meu', onPress: () => router.push('/admin/my-club-admin' as any) },
           });
           try { sessionStorage.setItem(FRB_STALE_KEY, res.staleTeams.join('|')); } catch { /* ignore */ }
         }

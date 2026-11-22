@@ -9,7 +9,7 @@ export function NoTeamsEmptyState({ onImport, onCreate }: { onImport: () => void
             <View className="w-16 h-16 rounded-full items-center justify-center mb-4" style={{ backgroundColor: 'var(--c-surface-tint)' }}>
                 <ShieldPlus size={28} color="var(--c-faint)" />
             </View>
-            <Text className="f-display text-[16px] font-extrabold mb-1.5" style={{ color: 'var(--c-ink-strong)' }}>Niciun club nu are încă echipe</Text>
+            <Text className="f-display text-[16px] font-extrabold mb-1.5" style={{ color: 'var(--c-ink-strong)' }}>Clubul nu are încă echipe</Text>
             <Text className="text-[13px] max-w-[360px] leading-relaxed mb-5" style={{ color: 'var(--c-muted)' }}>
                 Importă echipele oficiale din FRB împreună cu loturile lor, sau creează prima echipă manual și adaugă jucătorii ulterior.
             </Text>

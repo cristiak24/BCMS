@@ -68,7 +68,8 @@ export default function RosterPlayerCard({
         </View>
         <View className="flex-1 min-w-0">
           <View className="flex-row items-center gap-2 min-w-0">
-            <Text className="flex-1 min-w-0 text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{fullName}</Text>
+            {/* Two lines, never one: „Ștefan-Alexandru …” hid the surname that tells two children apart. */}
+            <Text className="flex-1 min-w-0 text-[14px] font-semibold" style={{ color: 'var(--c-ink)', overflowWrap: 'anywhere' } as any} numberOfLines={2}>{fullName}</Text>
             {showStatusChip && !isActive ? <StatusBadge label="Inactiv" tone="gray" /> : null}
           </View>
           <Text className="t-meta" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>

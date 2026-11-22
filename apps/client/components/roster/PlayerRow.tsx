@@ -76,7 +76,7 @@ export default function PlayerRow({
           </View>
           <View style={styles.playerTextWrap}>
             <View className="flex-row items-center gap-2 min-w-0">
-              <Text style={styles.name} numberOfLines={1}>{fullName}</Text>
+              <Text style={[styles.name, { overflowWrap: 'anywhere' }] as any} numberOfLines={2}>{fullName}</Text>
               {showStatusChip && !isActive ? <StatusBadge label="Inactiv" tone="gray" /> : null}
             </View>
             <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>

@@ -26,7 +26,7 @@ export default function RosterCheckbox({ checked, indeterminate, onToggle, size 
       accessibilityRole="checkbox"
       accessibilityLabel={accessibilityLabel}
       aria-checked={indeterminate && !checked ? 'mixed' : Boolean(checked)}
-      className="items-center justify-center shrink-0"
+      className="hit-44 items-center justify-center shrink-0"
       style={{ width: hit, height: hit, margin: -(hit - size) / 2 }}
     >
       <View

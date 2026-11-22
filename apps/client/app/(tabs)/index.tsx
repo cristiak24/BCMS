@@ -26,7 +26,7 @@ import PageContainer from '../../components/ui/PageContainer';
 import { formatToday, getGreeting } from '../../components/ui/HeroBanner';
 import Button from '../../components/ui/Button';
 import PageHero from '../../components/admin/PageHero';
-import { useActiveChild } from '../../components/family/useActiveChild';
+import { loadFamily, useActiveChild } from '../../components/family/useActiveChild';
 import ProgressRing from '../../components/ui/ProgressRing';
 import DateTile from '../../components/ui/DateTile';
 import { PLAYER_FEATURE_FLAGS } from '../../config/playerFeatureFlags';
@@ -817,7 +817,10 @@ function PlayerHomeScreen() {
   const router = useRouter();
   const { session } = useSession();
   const isParent = session?.role === 'parent';
-  const { active: activeChild } = useActiveChild(isParent);
+  const { active: activeChild, family } = useActiveChild(isParent);
+  // A parent with no child linked has no schedule, attendance or form to show: the
+  // „Adaugă copil” card (in the layout) is the whole page, without empty stats under it.
+  const childless = isParent && family != null && family.children.length === 0;
   const { isMobile } = useResponsive();
   // Search lives in the global app header (components/AppHeader.tsx, wired via
   // HeaderContext) — same as the schedule screen. Home used to render its own
@@ -860,6 +863,11 @@ function PlayerHomeScreen() {
     setAttendanceWarning(null);
 
     try {
+      // No child linked: nothing to load (/players/me answered 404 on every visit).
+      if (session?.role === 'parent' && (await loadFamily()).children.length === 0) {
+        setEvents([]);
+        return;
+      }
       // Last HISTORY_MONTHS months onward: enough for results, form, the
       // attendance strip and month-over-month volume. This used to fetch the
       // club's entire history on every visit to the home screen.
@@ -1064,10 +1072,10 @@ function PlayerHomeScreen() {
             </>
           }
         >
-          <HeroAttendance playerAttendance={playerAttendance} attendanceRate={attendanceRate} />
+          {childless ? null : <HeroAttendance playerAttendance={playerAttendance} attendanceRate={attendanceRate} />}
         </PageHero>
 
-        {loading ? (
+        {childless ? null : loading ? (
           <View className="gap-4" accessibilityRole="progressbar" accessibilityLabel={tr('Se încarcă panoul')}>
             <Skeleton className="h-[150px] w-full rounded-[16px]" />
             {Array.from({ length: 2 }).map((_, sectionIndex) => (

@@ -21,6 +21,7 @@ import { familyRequestsApi } from '../../services/familyRequestsApi';
 import { basketballApi, type Match } from '../../services/basketballApi';
 import { teamsApi, type Team as SavedTeam } from '../../services/teamsApi';
 import PrivacyRequestsBanner from '../../components/privacy/PrivacyRequestsBanner';
+import ClubSetupCard from '../../components/dashboard/ClubSetupCard';
 import { ATTENDANCE_PERIOD_LABEL } from '../../utils/attendanceRate';
 import { plural } from '../../utils/plural';
 
@@ -168,6 +169,10 @@ function KpiCard({
   const numeric = typeof value === 'number' ? value : null;
   const animated = useCountUp(numeric);
   const shown = numeric != null ? (animated ?? 0) : value;
+  // A figure is never cut (10.000.000 read as „10.000.00”): long ones step down a size,
+  // and the last resort is a wrap, never an ellipsis.
+  const finalText = `${numeric != null ? numeric : value ?? ''}${suffix ?? ''}`;
+  const figureSize = finalText.length > 13 ? 'text-[17px] md:text-[22px]' : finalText.length > 9 ? 'text-[20px] md:text-[24px]' : 'text-[24px] md:text-[28px]';
   // A disabled Pressable renders at 0.65 opacity, so cards without a link are plain Views.
   const Shell: any = onPress ? Pressable : View;
 
@@ -187,8 +192,8 @@ function KpiCard({
         </View>
       </View>
 
-      <View className="flex-row items-baseline gap-1 mt-2.5 min-w-0">
-        <Text className="f-display t-num text-[24px] md:text-[28px] font-extrabold leading-none" style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em' } as any} numberOfLines={1}>
+      <View className="flex-row flex-wrap items-baseline gap-x-1 mt-2.5 min-w-0">
+        <Text className={`f-display t-num ${figureSize} font-extrabold leading-none min-w-0`} style={{ color: 'var(--c-ink-strong)', letterSpacing: '-0.03em', overflowWrap: 'anywhere' } as any}>
           {shown == null || shown === '' ? '—' : shown}
         </Text>
         {suffix && shown != null ? (
@@ -226,7 +231,7 @@ function QuickAction({ icon, label, detail, onPress }: { icon: string; label: st
       onPress={onPress}
       accessibilityRole="link"
       accessibilityLabel={label}
-      className="home-card rounded-[14px] border px-3 py-2.5 flex-row items-center gap-2.5 min-w-0 text-left"
+      className="home-card hit-44 rounded-[14px] border px-3 py-2.5 flex-row items-center gap-2.5 min-w-0 text-left"
       style={CARD as any}
     >
       <MaterialIcons name={icon} size={18} color="var(--c-muted)" />
@@ -395,7 +400,7 @@ function WeekStrip({ events, selected, onSelect }: { events: CalendarEvent[]; se
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             accessibilityLabel={`${day.weekday} ${day.date}: ${plural(day.events.length, 'eveniment', 'evenimente')}`}
-            className="ui-press items-center rounded-[10px] border py-2.5 gap-1.5 hover:bg-[var(--c-surface-3)]"
+            className="ui-press hit-44 items-center rounded-[10px] border py-2.5 gap-1.5 hover:bg-[var(--c-surface-3)]"
             style={{
               backgroundColor: active ? 'var(--c-brand-surface)' : day.events.length ? 'var(--c-surface-2)' : 'transparent',
               borderColor: active ? 'var(--c-brand-surface)' : day.isToday ? 'var(--c-brand-fg)' : 'var(--c-border-soft)',
@@ -581,13 +586,15 @@ export default function Dashboard() {
   const attendanceTone: Tone = attendanceRate == null ? 'sky' : attendanceRate >= 75 ? 'success' : attendanceRate >= 60 ? 'warning' : 'danger';
   const matchesThisWeek = weekEvents?.filter((e) => e.type === 'match').length ?? 0;
   const nextEvent = weekEvents === null ? undefined : weekEvents[0] ?? null;
+  // A club with no players has nothing to be „la zi” with: the calm messages say that instead.
+  const noPlayers = summary?.activePlayerCount === 0;
 
   const attentionCard = (
     <SectionCard
       title="Necesită atenție"
-      subtitle={loadingSummary ? 'Se verifică…' : summaryUnavailable ? 'Nu am putut verifica tot' : attention.length ? `${plural(attention.length, 'lucru de rezolvat', 'lucruri de rezolvat')}` : partialCheck ? 'Verificare parțială' : 'Totul la zi'}
+      subtitle={loadingSummary ? 'Se verifică…' : summaryUnavailable ? 'Nu am putut verifica tot' : attention.length ? `${plural(attention.length, 'lucru de rezolvat', 'lucruri de rezolvat')}` : partialCheck ? 'Verificare parțială' : noPlayers ? 'Încă nu sunt jucători în club' : 'Totul la zi'}
       icon="notifications-active"
-      tone={attention.some((a) => a.tone === 'danger') ? 'danger' : attention.length || summaryUnavailable ? 'warning' : 'success'}
+      tone={attention.some((a) => a.tone === 'danger') ? 'danger' : attention.length || summaryUnavailable ? 'warning' : noPlayers ? 'brand' : 'success'}
     >
       {summaryUnavailable ? (
         <LoadFailed
@@ -611,12 +618,12 @@ export default function Dashboard() {
         </View>
       ) : attention.length === 0 ? (summaryUnavailable || partialCheck ? null : (
         <View className="flex-row items-center gap-3 px-4 md:px-5 pb-4">
-          <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: 'var(--c-success-bg)' }}>
-            <MaterialIcons name="check" size={18} color="var(--c-success-fg)" />
+          <View className="w-9 h-9 rounded-full items-center justify-center shrink-0" style={{ backgroundColor: noPlayers ? 'var(--c-surface-3)' : 'var(--c-success-bg)' }}>
+            <MaterialIcons name={noPlayers ? 'person-add' : 'check'} size={18} color={noPlayers ? 'var(--c-muted)' : 'var(--c-success-fg)'} />
           </View>
           <View className="flex-1 min-w-0">
-            <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>Totul e în regulă</Text>
-            <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>Nimic urgent azi.</Text>
+            <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>{noPlayers ? 'Nimic de verificat încă' : 'Totul e în regulă'}</Text>
+            <Text className="t-meta" style={{ color: 'var(--c-muted)' }}>{noPlayers ? 'Vizele și restanțele apar aici după ce adaugi jucători.' : 'Nimic urgent azi.'}</Text>
           </View>
         </View>
       )) : (
@@ -684,7 +691,9 @@ export default function Dashboard() {
                             ? <HeaderChip icon="cloud-off" tone="warning" label={attention.length ? `${attention.length} de rezolvat · verificare parțială` : 'Verificare parțială'} />
                             : attention.length
                               ? <HeaderChip icon="warning-amber" tone="warning" label={`${attention.length} de rezolvat`} />
-                              : <HeaderChip icon="verified" tone="success" label="Totul la zi" />
+                              : noPlayers
+                                ? <HeaderChip icon="person-add" label="Încă fără jucători" />
+                                : <HeaderChip icon="verified" tone="success" label="Totul la zi" />
                       ) : null}
                     </View>
                     <View className="flex-row flex-wrap gap-2 mt-3">
@@ -695,6 +704,15 @@ export default function Dashboard() {
                   <NextEventPanel event={nextEvent} failed={eventsUnavailable} onPress={(id) => go(`/admin/event/${id}`)} />
                 </View>
               </View>
+
+              {role === 'admin' && summary ? (
+                <ClubSetupCard
+                  clubKey={String(session?.clubId ?? session?.clubName ?? 'club')}
+                  teamCount={summary.teamCount}
+                  playerCount={summary.activePlayerCount}
+                  onNavigate={go}
+                />
+              ) : null}
 
               {/* KPIs */}
               {loadingSummary ? (
@@ -749,7 +767,7 @@ export default function Dashboard() {
                     tone={summary.pendingPaymentsCount > 0 ? 'warning' : 'success'}
                     label="Cu restanțe"
                     value={summary.pendingPaymentsCount}
-                    hint={summary.pendingPaymentsCount > 0 ? (canSeeFinance ? 'Vezi în Finanțe' : 'Vezi în Lot') : summary.owingPlayersCount ? `${summary.owingPlayersCount} cu plăți nescadente` : 'Toți sunt la zi'}
+                    hint={summary.pendingPaymentsCount > 0 ? (canSeeFinance ? 'Vezi în Finanțe' : 'Vezi în Lot') : summary.owingPlayersCount ? `${summary.owingPlayersCount} cu plăți nescadente` : noPlayers ? 'Încă nu sunt jucători' : 'Toți sunt la zi'}
                     // Arrears are worked in Finanțe (it opens on "Cu restanțe"), not in Lot.
                     onPress={() => go(canSeeFinance ? '/admin/finance' : '/admin/roster')}
                   />

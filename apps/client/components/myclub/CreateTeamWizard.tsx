@@ -2,6 +2,8 @@ import Button from '../ui/Button';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, TextInput, ActivityIndicator, Modal, ScrollView } from '@/src/web/reactNative';
 import ModalBackdrop from '../ui/ModalBackdrop';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import { FormField } from '../ui/FormField';
 import { RefreshCw, Plus, X, Search } from 'lucide-react';
 import { basketballApi } from '../../services/basketballApi';
 import { teamsApi, Team, Coach, TeamGender, TeamLevel, Player } from '../../services/teamsApi';
@@ -12,6 +14,12 @@ type Item = { id: string; name: string };
 type SourceType = 'frb' | 'manual';
 
 const STEP_LABELS = ['Tip echipă', 'Date echipă', 'Jucători', 'Confirmare'];
+
+/** The season a team made today plays in: from July it's this year–next year. */
+export function currentSeasonLabel(now = new Date()) {
+    const start = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    return `${start}-${start + 1}`;
+}
 
 export default function CreateTeamWizard({
     coaches,
@@ -47,7 +55,7 @@ export default function CreateTeamWizard({
     // manual fields
     const [customName, setCustomName] = useState('');
     const [customCategory, setCustomCategory] = useState('');
-    const [customSeason, setCustomSeason] = useState('2025-2026');
+    const [customSeason, setCustomSeason] = useState(currentSeasonLabel);
 
     // players step
     const [playerQuery, setPlayerQuery] = useState('');
@@ -57,6 +65,14 @@ export default function CreateTeamWizard({
 
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Past the first step a stray click on the backdrop (or Esc) used to drop
+    // everything typed so far: now it asks first.
+    const [confirmClose, setConfirmClose] = useState(false);
+    const requestClose = () => {
+        if (creating) return;
+        if (step > 0) setConfirmClose(true);
+        else onClose();
+    };
 
     useEffect(() => {
         if (initialSource === 'frb' && step === 0) {
@@ -118,7 +134,8 @@ export default function CreateTeamWizard({
     const canAdvanceFromStep1 = source !== null;
     const canAdvanceFromStep2 = source === 'frb'
         ? Boolean(leagueId && seasonId && teamId)
-        : Boolean(customName.trim() && customCategory.trim() && customSeason.trim());
+        // Category is optional: it was required but unmarked, so „Continuă” stayed grey with no reason given.
+        : Boolean(customName.trim() && customSeason.trim());
 
     const goNext = () => {
         setError(null);
@@ -178,8 +195,8 @@ export default function CreateTeamWizard({
     const leagues = gender === 'M' ? LEAGUES_M : LEAGUES_F;
 
     return (
-        <Modal visible transparent animationType={isMobile ? 'slide' : 'fade'} onRequestClose={onClose}>
-        <ModalBackdrop className={`flex-1 ${isMobile ? 'justify-end' : 'items-center justify-center px-4'}`} style={{ backgroundColor: 'rgba(2, 8, 23, 0.62)' }} onDismiss={creating ? undefined : onClose} >
+        <Modal visible transparent animationType={isMobile ? 'slide' : 'fade'} onRequestClose={requestClose}>
+        <ModalBackdrop className={`flex-1 ${isMobile ? 'justify-end' : 'items-center justify-center px-4'}`} style={{ backgroundColor: 'rgba(2, 8, 23, 0.62)' }} onDismiss={creating ? undefined : requestClose} >
             {/* A named dialog on the system shell (it was unnamed, with an unlabelled close). */}
             <View
                 role="dialog"
@@ -190,7 +207,7 @@ export default function CreateTeamWizard({
             >
                 <View className="flex-row items-center justify-between px-6 pt-6 pb-1">
                     <Text className="text-[18px] font-bold text-[color:var(--c-ink-strong)]">Creează echipă</Text>
-                    <Pressable onPress={onClose} disabled={creating} accessibilityRole="button" accessibilityLabel="Închide" className="tap-40 w-9 h-9 rounded-full bg-[var(--c-surface-2)] items-center justify-center border border-[var(--c-border)]">
+                    <Pressable onPress={requestClose} disabled={creating} accessibilityRole="button" accessibilityLabel="Închide" className="tap-40 w-9 h-9 rounded-full bg-[var(--c-surface-2)] items-center justify-center border border-[var(--c-border)]">
                         <X size={16} color="var(--c-muted)" />
                     </Pressable>
                 </View>
@@ -248,7 +265,8 @@ export default function CreateTeamWizard({
                                 <View className="flex-1">
                                     <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-1.5">Categorie</Text>
                                     <select
-                                        value={leagueId}
+                                        aria-label="Categorie"
+                                    value={leagueId}
                                         onChange={(e) => {
                                             const opt = leagues.find((l) => l.id === e.target.value);
                                             setLeagueId(e.target.value);
@@ -264,7 +282,8 @@ export default function CreateTeamWizard({
                                 <View className="flex-1">
                                     <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-1.5">Sezon</Text>
                                     <select
-                                        value={seasonId}
+                                        aria-label="Sezon"
+                                    value={seasonId}
                                         disabled={seasons.length === 0}
                                         onChange={(e) => {
                                             const opt = seasons.find((s) => s.id === e.target.value);
@@ -283,6 +302,7 @@ export default function CreateTeamWizard({
                             <View>
                                 <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-1.5">Echipă FRB</Text>
                                 <select
+                                    aria-label="Echipă FRB"
                                     value={teamId}
                                     disabled={frbTeams.length === 0}
                                     onChange={(e) => {
@@ -300,7 +320,7 @@ export default function CreateTeamWizard({
                             <View className="flex-row gap-3">
                                 <View className="flex-1">
                                     <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-1.5">Nivel</Text>
-                                    <select value={level} onChange={(e) => setLevel(e.target.value as TeamLevel | '')} className="w-full h-[46px] rounded-[14px] border border-[var(--c-border)] px-3 text-[13px] font-bold text-[color:var(--c-ink-strong)] bg-[var(--c-surface-2)]">
+                                    <select aria-label="Nivel" value={level} onChange={(e) => setLevel(e.target.value as TeamLevel | '')} className="w-full h-[46px] rounded-[14px] border border-[var(--c-border)] px-3 text-[13px] font-bold text-[color:var(--c-ink-strong)] bg-[var(--c-surface-2)]">
                                         <option value="">Fără nivel</option>
                                         <option value="national">Național</option>
                                         <option value="municipal">Municipal</option>
@@ -309,7 +329,7 @@ export default function CreateTeamWizard({
                                 </View>
                                 <View className="flex-1">
                                     <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-1.5">Antrenor</Text>
-                                    <select value={coachId} onChange={(e) => setCoachId(e.target.value === '' ? '' : Number(e.target.value))} className="w-full h-[46px] rounded-[14px] border border-[var(--c-border)] px-3 text-[13px] font-bold text-[color:var(--c-ink-strong)] bg-[var(--c-surface-2)]">
+                                    <select aria-label="Antrenor" value={coachId} onChange={(e) => setCoachId(e.target.value === '' ? '' : Number(e.target.value))} className="w-full h-[46px] rounded-[14px] border border-[var(--c-border)] px-3 text-[13px] font-bold text-[color:var(--c-ink-strong)] bg-[var(--c-surface-2)]">
                                         <option value="">Fără antrenor</option>
                                         {coaches.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
@@ -320,18 +340,13 @@ export default function CreateTeamWizard({
 
                     {step === 1 && source === 'manual' && (
                         <View className="gap-3.5">
-                            <View>
-                                <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-1.5">Nume echipă</Text>
-                                <TextInput value={customName} onChangeText={setCustomName} placeholder="Ex: Municipal U16 Masculin" placeholderTextColor="var(--c-faint)" className="w-full h-[48px] rounded-[14px] border border-[var(--c-border)] px-4 text-[14px] font-bold text-[color:var(--c-ink-strong)] bg-[var(--c-surface-2)]" />
-                            </View>
-                            <View className="flex-row gap-3">
-                                <View className="flex-1">
-                                    <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-1.5">Categorie</Text>
-                                    <TextInput value={customCategory} onChangeText={setCustomCategory} placeholder="Ex: Junior League" placeholderTextColor="var(--c-faint)" className="w-full h-[48px] rounded-[14px] border border-[var(--c-border)] px-4 text-[14px] font-bold text-[color:var(--c-ink-strong)] bg-[var(--c-surface-2)]" />
+                            <FormField label="Nume echipă" value={customName} onChangeText={setCustomName} placeholder="ex. Municipal U16 Masculin" />
+                            <View className="flex-row flex-wrap gap-3">
+                                <View className="flex-1 min-w-[160px]">
+                                    <FormField label="Categorie (opțional)" value={customCategory} onChangeText={setCustomCategory} placeholder="ex. U14 Feminin" />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-1.5">Sezon</Text>
-                                    <TextInput value={customSeason} onChangeText={setCustomSeason} placeholder="2025-2026" placeholderTextColor="var(--c-faint)" className="w-full h-[48px] rounded-[14px] border border-[var(--c-border)] px-4 text-[14px] font-bold text-[color:var(--c-ink-strong)] bg-[var(--c-surface-2)]" />
+                                <View className="flex-1 min-w-[160px]">
+                                    <FormField label="Sezon" value={customSeason} onChangeText={setCustomSeason} placeholder={currentSeasonLabel()} />
                                 </View>
                             </View>
                             <View className="flex-row gap-3">
@@ -347,7 +362,7 @@ export default function CreateTeamWizard({
                                 </View>
                                 <View className="flex-1">
                                     <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-1.5">Nivel</Text>
-                                    <select value={level} onChange={(e) => setLevel(e.target.value as TeamLevel | '')} className="w-full h-[46px] rounded-[14px] border border-[var(--c-border)] px-3 text-[13px] font-bold text-[color:var(--c-ink-strong)] bg-[var(--c-surface-2)]">
+                                    <select aria-label="Nivel" value={level} onChange={(e) => setLevel(e.target.value as TeamLevel | '')} className="w-full h-[46px] rounded-[14px] border border-[var(--c-border)] px-3 text-[13px] font-bold text-[color:var(--c-ink-strong)] bg-[var(--c-surface-2)]">
                                         <option value="">Fără nivel</option>
                                         <option value="national">Național</option>
                                         <option value="municipal">Municipal</option>
@@ -357,7 +372,7 @@ export default function CreateTeamWizard({
                             </View>
                             <View>
                                 <Text className="text-[12.5px] font-semibold text-[color:var(--c-ink-soft)] mb-1.5">Antrenor</Text>
-                                <select value={coachId} onChange={(e) => setCoachId(e.target.value === '' ? '' : Number(e.target.value))} className="w-full h-[46px] rounded-[14px] border border-[var(--c-border)] px-3 text-[13px] font-bold text-[color:var(--c-ink-strong)] bg-[var(--c-surface-2)]">
+                                <select aria-label="Antrenor" value={coachId} onChange={(e) => setCoachId(e.target.value === '' ? '' : Number(e.target.value))} className="w-full h-[46px] rounded-[14px] border border-[var(--c-border)] px-3 text-[13px] font-bold text-[color:var(--c-ink-strong)] bg-[var(--c-surface-2)]">
                                     <option value="">Fără antrenor</option>
                                     {coaches.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
@@ -367,7 +382,7 @@ export default function CreateTeamWizard({
 
                     {step === 2 && (
                         <View className="gap-3">
-                            <Text className="text-[12px] font-semibold text-[color:var(--c-muted)]">Selectează jucători existenți din baza de date a clubului. Poți adăuga alții mai târziu, din pagina echipei.</Text>
+                            <Text className="text-[12.5px] font-medium text-[color:var(--c-muted)]">Alege jucători care sunt deja în club. Pasul e opțional: dacă nu ai încă jucători, îi adaugi după ce creezi echipa sau le trimiți familiilor codul echipei.</Text>
                             <View className="relative">
                                 <View className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
                                     <Search size={14} color="var(--c-faint)" />
@@ -376,6 +391,7 @@ export default function CreateTeamWizard({
                                     value={playerQuery}
                                     onChangeText={setPlayerQuery}
                                     placeholder="Caută după nume"
+                                    accessibilityLabel="Caută jucători după nume"
                                     placeholderTextColor="var(--c-faint)"
                                     className="w-full h-[44px] rounded-[14px] border border-[var(--c-border)] pl-9 pr-3 text-[13px] font-bold text-[color:var(--c-ink-strong)] bg-[var(--c-surface-2)]"
                                 />
@@ -418,6 +434,8 @@ export default function CreateTeamWizard({
                             <View className="bg-[var(--c-surface-2)] rounded-[16px] p-4 border border-[var(--c-border)] gap-2">
                                 <SummaryRow label="Echipă" value={source === 'frb' ? teamName : customName} />
                                 <SummaryRow label="Sursă" value={source === 'frb' ? 'Import FRB' : 'Creare manuală'} />
+                                <SummaryRow label="Categorie" value={(source === 'frb' ? leagueName : customCategory.trim()) || '—'} />
+                                <SummaryRow label="Sezon" value={(source === 'frb' ? seasonName : customSeason.trim()) || '—'} />
                                 <SummaryRow label="Sex" value={gender === 'M' ? 'Masculin' : 'Feminin'} />
                                 <SummaryRow label="Nivel" value={level ? { national: 'Național', municipal: 'Municipal', initiere: 'Inițiere' }[level] : '—'} />
                                 <SummaryRow label="Antrenor" value={coachId ? coaches.find((c) => c.id === coachId)?.name ?? '—' : 'Fără antrenor'} />
@@ -435,7 +453,7 @@ export default function CreateTeamWizard({
                     <Button
                         variant="primary"
                         icon={step === 3 ? 'check' : undefined}
-                        label={step === 3 ? 'Creează echipa' : 'Continuă'}
+                        label={step === 3 ? 'Creează echipa' : step === 2 && selectedPlayers.length === 0 ? 'Continuă fără jucători' : 'Continuă'}
                         loading={creating}
                         disabled={(step === 0 && !canAdvanceFromStep1) || (step === 1 && !canAdvanceFromStep2)}
                         onPress={goNext}
@@ -443,15 +461,26 @@ export default function CreateTeamWizard({
                 </View>
             </View>
         </ModalBackdrop>
+        <ConfirmDialog
+            visible={confirmClose}
+            title="Renunți la echipa nouă?"
+            message="Ce ai completat până acum se pierde. Echipa nu se creează."
+            confirmLabel="Renunță la echipă"
+            cancelLabel="Continuă completarea"
+            destructive
+            focusCancel
+            onConfirm={() => { setConfirmClose(false); onClose(); }}
+            onCancel={() => setConfirmClose(false)}
+        />
         </Modal>
     );
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
     return (
-        <View className="flex-row items-center justify-between">
-            <Text className="text-[11.5px] font-bold text-[color:var(--c-muted)]">{label}</Text>
-            <Text className="text-[12.5px] font-bold text-[color:var(--c-ink-strong)]">{value}</Text>
+        <View className="flex-row items-start justify-between gap-3">
+            <Text className="text-[11.5px] font-bold text-[color:var(--c-muted)] shrink-0">{label}</Text>
+            <Text className="text-[12.5px] font-bold text-[color:var(--c-ink-strong)] text-right min-w-0" style={{ overflowWrap: 'anywhere' } as any}>{value}</Text>
         </View>
     );
 }

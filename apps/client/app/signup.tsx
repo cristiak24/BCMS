@@ -340,17 +340,18 @@ export default function Signup() {
                         >
                             {/* Role and club come from the invite; the admin chose them. A
                                 team code only fixes the team — the person says who they are. */}
-                            <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
-                                <Lock size={16} className="shrink-0 text-blue-700" />
+                            <div className="flex items-center gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface-2)] px-3 py-2.5">
+                                <Lock size={16} className="shrink-0 text-[var(--c-brand-fg)]" />
                                 <div className="min-w-0 flex-1">
-                                    <p className="m-0 truncate text-[13px] font-black text-blue-950">
+                                    {/* The whole club name: the person confirms here which club they join. */}
+                                    <p className="m-0 text-[13px] font-black text-[var(--c-ink-strong)] [overflow-wrap:anywhere]">
                                         {isTeamCode
                                             ? `${invite.teamName ?? 'Echipă'}${invite.clubName ? ` · ${invite.clubName}` : ''}`
                                             : isGuardianInvite
                                                 ? `Părinte · ${invite.childName ?? ''}`
                                                 : `${roleLabel}${invite.clubName ? ` · ${invite.clubName}` : ''}`}
                                     </p>
-                                    <p className="m-0 text-[11px] font-bold text-blue-700">
+                                    <p className="m-0 text-[11px] font-bold text-[var(--c-muted)]">
                                         {isTeamCode
                                             ? 'Cod de echipă'
                                             : isGuardianInvite
@@ -366,7 +367,7 @@ export default function Signup() {
                                     <button
                                         type="button"
                                         onClick={resetInvite}
-                                        className="shrink-0 border-0 bg-transparent px-0 text-[12px] font-black text-blue-700 hover:underline"
+                                        className="shrink-0 border-0 bg-transparent px-0 text-[12px] font-black text-[var(--c-brand-fg)] hover:underline"
                                     >
                                         Alt cod
                                     </button>
@@ -457,6 +458,7 @@ export default function Signup() {
                                                 ))}
                                             </select>
                                             <input
+                                                aria-label="Număr de telefon"
                                                 className={authInputClass}
                                                 placeholder="7xx xxx xxx"
                                                 type="tel"

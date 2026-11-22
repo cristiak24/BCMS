@@ -308,7 +308,6 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
         const normalizedLabel = label.trim().replace(/\s+/g, ' ');
         const normalizedEmail = email.trim().toLowerCase();
         const nextErrors: typeof errors = {};
-        if (!normalizedLabel) nextErrors.label = 'Adaugă o etichetă ca să recunoști invitația.';
         if (!normalizedEmail) nextErrors.email = 'Emailul este obligatoriu.';
         else if (!EMAIL_RE.test(normalizedEmail)) nextErrors.email = 'Introdu o adresă de email validă.';
         setErrors(nextErrors);
@@ -318,7 +317,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
         setError(null);
         try {
             // The label is admin-only; the member enters their real name when registering.
-            const response = await clubAdminApi.createInvitation({ email: normalizedEmail, fullName: normalizedLabel, role: who });
+            const response = await clubAdminApi.createInvitation({ email: normalizedEmail, fullName: normalizedLabel || normalizedEmail, role: who });
             finish({
                 kind: 'email',
                 email: response.invitation.email,
@@ -436,7 +435,9 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
     return (
         <Modal visible transparent onRequestClose={busy ? undefined : onClose}>
             <ModalBackdrop
-                onDismiss={busy ? undefined : onClose}
+                // A click outside never closes it before the end: the dialog changes height between
+                // steps, and a second click landed on the backdrop and dropped every choice.
+                onDismiss={busy || step < 3 ? undefined : onClose}
                 className="flex-1 items-stretch sm:items-center justify-center sm:p-6"
                 style={{ backgroundColor: 'rgba(2, 8, 23, 0.55)' }}
             >
@@ -445,7 +446,7 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="invite-flow-title"
-                    className="ui-rise flex flex-col w-full h-[100dvh] sm:h-auto sm:max-h-[min(720px,calc(100dvh-48px))] sm:max-w-[760px] sm:rounded-[18px] sm:border overflow-hidden"
+                    className="ui-rise flex flex-col w-full h-[100dvh] sm:h-auto sm:min-h-[min(560px,calc(100dvh-48px))] sm:max-h-[min(720px,calc(100dvh-48px))] sm:max-w-[760px] sm:rounded-[18px] sm:border overflow-hidden"
                     style={{ backgroundColor: 'var(--c-surface)', borderColor: 'var(--c-border)', boxShadow: 'var(--e-lg)' }}
                 >
                     {/* Header */}
@@ -602,8 +603,8 @@ export default function InviteFlow({ visible, onClose, onCreated }: Props) {
                                         <View className="flex-col md:flex-row gap-4">
                                             <View className="md:flex-1">
                                                 <FormField
-                                                    label="Etichetă"
-                                                    hint="O văd doar administratorii. Persoana își scrie numele real la crearea contului."
+                                                    label="Etichetă (opțional)"
+                                                    hint="O văd doar administratorii. Fără etichetă, invitația apare cu emailul. Persoana își scrie numele real la crearea contului."
                                                     error={errors.label}
                                                     value={label}
                                                     onChangeText={(value: string) => {

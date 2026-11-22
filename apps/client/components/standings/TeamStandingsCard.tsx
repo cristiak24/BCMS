@@ -146,7 +146,7 @@ export default function TeamStandingsCard({
           <Pressable
             onPress={() => onOpenTeam(team.id)}
             accessibilityRole="link"
-            className="ui-press flex-row items-center gap-1 rounded-[8px] border px-2.5 h-8 shrink-0 hover:bg-[var(--c-surface-2)]"
+            className="ui-press tap-40 flex-row items-center gap-1 rounded-[8px] border px-2.5 h-8 shrink-0 hover:bg-[var(--c-surface-2)]"
             style={{ borderColor: 'var(--c-border)' } as any}
           >
             <Text className="text-[12.5px] font-semibold" style={{ color: 'var(--c-ink-soft)' }}>{tr('Echipa')}</Text>

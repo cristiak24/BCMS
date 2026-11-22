@@ -340,7 +340,7 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                         className="self-start md:self-auto"
                     />
                 ) : null}
-                <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 [@media(pointer:coarse)]:h-[42px] border md:ml-auto md:w-[240px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
+                <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 [@media(pointer:coarse)]:h-11 border md:ml-auto md:w-[240px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
                     <MaterialIcons name="search" size={15} color="var(--c-faint)" />
                     <TextInput
                         value={query}
@@ -364,9 +364,9 @@ export default function BalancesCard({ onPaymentRecorded, onNotify, reloadKey = 
                     <Button size="sm" icon="refresh" label="Reîncearcă" onPress={() => void load()} />
                 </View>
             ) : filtered.length === 0 ? (
-                <View className="py-6 items-center">
-                    <Text className="text-[13px] font-medium" style={{ color: 'var(--c-muted)' }}>
-                        {filter === 'overdue' ? 'Nicio restanță. Toți jucătorii sunt la zi.' : 'Niciun jucător nu corespunde filtrului.'}
+                <View className="py-6 items-center px-4">
+                    <Text className="text-[13px] font-medium text-center" style={{ color: 'var(--c-muted)' }}>
+                        {balances.length === 0 ? 'Încă nu sunt jucători în club. Soldurile apar aici după ce îi adaugi în Lot.' : filter === 'overdue' ? 'Nicio restanță. Toți jucătorii sunt la zi.' : 'Niciun jucător nu corespunde filtrului.'}
                     </Text>
                 </View>
             ) : (

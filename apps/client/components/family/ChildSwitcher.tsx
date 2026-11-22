@@ -197,7 +197,7 @@ export default function ChildSwitcher() {
             onPress={() => setAdding(true)}
             accessibilityRole="button"
             accessibilityLabel={tr('Adaugă un copil')}
-            className="ui-press h-10 min-w-[40px] px-2.5 rounded-[10px] border flex-row items-center justify-center gap-1 shrink-0"
+            className="ui-press hit-44 h-10 min-w-[40px] px-2.5 rounded-[10px] border flex-row items-center justify-center gap-1 shrink-0"
             style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}
           >
             <MaterialIcons name="add" size={16} color="var(--c-brand-fg)" />
@@ -217,7 +217,7 @@ export default function ChildSwitcher() {
               ? tr('{0} — după aprobare vezi programul, prezența și plățile copilului.', { '0': waiting.map((p) => `${p.firstName} ${p.lastName} (${p.teamName})`).join(', ') })
               : tr('Adaugă copilul cu codul echipei primit de la antrenor.')}
           </Text>
-          <Pressable onPress={() => setAdding(true)} accessibilityRole="button" className="ui-press self-start h-10 px-3.5 rounded-[10px] flex-row items-center gap-1.5 mt-1" style={{ backgroundColor: 'var(--c-brand-surface)' }}>
+          <Pressable onPress={() => setAdding(true)} accessibilityRole="button" className="ui-press hit-44 self-start h-10 px-3.5 rounded-[10px] flex-row items-center gap-1.5 mt-1" style={{ backgroundColor: 'var(--c-brand-surface)' }}>
             <MaterialIcons name="add" size={16} color="var(--c-on-brand)" />
             <Text className="text-[13px] font-bold" style={{ color: 'var(--c-on-brand)' }}>{tr('Adaugă copil')}</Text>
           </Pressable>

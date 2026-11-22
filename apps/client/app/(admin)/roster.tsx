@@ -32,7 +32,7 @@ import {
 import { ATTENDANCE_PERIOD_LABEL, formatAttendanceRate } from '../../utils/attendanceRate';
 import { plural } from '../../utils/plural';
 import { loadFailureMessage } from '../../utils/errorMessages';
-import { LoadError } from '../../components/ui/ScreenState';
+import { LoadError, EmptyState as StartEmptyState } from '../../components/ui/ScreenState';
 import { ToastHost, useToasts } from '../../components/ui/Toast';
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 100];
@@ -485,6 +485,9 @@ export default function RosterScreen() {
     selectedStatus !== DEFAULT_STATUS_FILTER ||
     selectedAttendance !== 'all' ||
     selectedPayment !== 'all';
+  // A club with no players yet: filters, export and four empty figures only stood
+  // between the admin and the one thing to do — add the first player.
+  const emptyClub = rosterPage != null && rosterTotal === 0 && !hasActiveFilters;
 
   // Header/mobile FAB wiring — put the currently-inert HeaderContext slots to real use.
   // "Adaugă jucător" itself lives in PageHero's actions (desktop) and this FAB
@@ -584,12 +587,12 @@ export default function RosterScreen() {
           </View>
         }
       >
-        <StatStrip className="grid-cols-2 lg:grid-cols-4">
+        {emptyClub ? null : <StatStrip className="grid-cols-2 lg:grid-cols-4">
           <GlassStat dot="var(--c-brand-fg)" value={formatAttendanceRate(attendanceValue)} label="Prezență" hint={ATTENDANCE_PERIOD_LABEL.toLowerCase()} />
           <GlassStat dot="var(--c-success)" value={rosterReadiness == null ? '—' : `${rosterReadiness}%`} label="Fără restanțe" bar={rosterReadiness ?? undefined} />
           <GlassStat dot="var(--c-muted)" value={rosterTotal} label="Jucători în lot" />
           <GlassStat dot={!summary ? 'var(--c-faint)' : pendingPayments > 0 ? 'var(--c-danger)' : 'var(--c-success)'} danger={pendingPayments > 0} value={summary ? pendingPayments : '—'} label="Cu restanțe" />
-        </StatStrip>
+        </StatStrip>}
         {summaryError && !summary ? (
           <View className="mt-3">
             <LoadError title="Cifrele lotului nu s-au încărcat" message={summaryError} onRetry={() => void fetchMeta()} />
@@ -597,6 +600,17 @@ export default function RosterScreen() {
         ) : null}
       </PageHero>
 
+      {emptyClub ? (
+        <View className="rounded-[16px] border" style={{ backgroundColor: dash.surface, borderColor: dash.hairlineStrong, ...dash.shadow.sm }}>
+          <StartEmptyState
+            icon="groups"
+            title="Încă nu sunt jucători în club"
+            message="Adaugă primul jucător sau trimite familiilor codul echipei din Acces & invitații. Prezența și plățile apar aici după aceea."
+            actionLabel="Adaugă jucător"
+            onAction={() => setShowAddModal(true)}
+          />
+        </View>
+      ) : (
       <View className="rounded-[16px] p-4 border" style={{ backgroundColor: dash.surface, borderColor: dash.hairlineStrong, ...dash.shadow.sm }}>
         <View className={`mb-4 ${isMobile ? 'gap-3' : 'flex-row items-center justify-between'}`}>
           <View>
@@ -610,7 +624,7 @@ export default function RosterScreen() {
           </View>
           <TouchableOpacity
             onPress={() => { void handleExportFilteredCsv(); }}
-            className="dash-btn-hover flex-row items-center self-start rounded-[10px] border h-9 [@media(pointer:coarse)]:h-10 px-3"
+            className="dash-btn-hover hit-44 flex-row items-center self-start rounded-[10px] border h-9 [@media(pointer:coarse)]:h-10 px-3"
             style={{ backgroundColor: dash.surfaceSubtle, borderColor: dash.hairlineStrong }}
           >
             <Download color={dash.inkSoft} size={15} />
@@ -749,6 +763,7 @@ export default function RosterScreen() {
           onPageChange={setCurrentPage}
         />
       </View>
+      )}
     </>
   );
 

@@ -214,7 +214,7 @@ export default function CoachTeamDetailScreen() {
               </View>
               {notice ? <Text className="t-meta" style={{ color: 'var(--c-success-fg)' }}>{notice}</Text> : null}
               {sortedPlayers.length === 0 ? (
-                <EmptyState icon="groups" compact title={tr('Lotul este gol')} message={tr('Niciun jucător nu este alocat acestei echipe deocamdată.')} />
+                <EmptyState icon="groups" compact title={tr('Lotul e gol')} message={tr('Încă nu sunt jucători în această echipă.')} />
               ) : (
                 <DenseList label={tr('Lot')}>
                   {sortedPlayers.map((player) => (

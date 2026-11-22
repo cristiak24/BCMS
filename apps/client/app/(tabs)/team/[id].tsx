@@ -305,7 +305,7 @@ export default function PlayerTeamDetailScreen() {
 
             {tab === 'roster' ? (
               team.roster.length === 0 ? (
-                <EmptyState icon="groups" compact title={tr('Lotul este gol')} message={tr('Niciun jucător nu este alocat acestei echipe deocamdată.')} />
+                <EmptyState icon="groups" compact title={tr('Lotul e gol')} message={tr('Încă nu sunt jucători în această echipă.')} />
               ) : (
                 <View className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
                   {team.roster.map((player) => <TeammateTile key={player.id} player={player} />)}

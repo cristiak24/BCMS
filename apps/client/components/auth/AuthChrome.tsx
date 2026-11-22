@@ -40,7 +40,7 @@ export function MobileBrand({ showOnDesktop = false }: { showOnDesktop?: boolean
             </div>
             <div>
                 <p className="m-0 text-base font-extrabold leading-tight tracking-tight text-[var(--c-ink-strong)]">BCMS</p>
-                <p className="m-0 text-[11px] font-semibold text-[var(--c-muted)]">Club workspace</p>
+                <p className="m-0 text-[11px] font-semibold text-[var(--c-muted)]">Spațiul clubului</p>
             </div>
         </div>
     );

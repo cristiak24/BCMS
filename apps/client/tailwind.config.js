@@ -1,5 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+    // `hover:` only where a real pointer hovers: on a phone the first tap left
+    // the hover state stuck (a KPI card stayed grey after it was touched).
+    future: { hoverOnlyWhenSupported: true },
     content: [
         "./index.html",
         "./app/**/*.{js,jsx,ts,tsx}",

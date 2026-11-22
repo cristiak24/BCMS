@@ -98,8 +98,8 @@ function RequestCard({
           <MaterialIcons name="warning-amber" size={16} color="var(--c-warning-fg)" style={{ marginTop: 1 }} />
           <Text className="flex-1 text-[12.5px] font-semibold leading-[18px]" style={{ color: 'var(--c-warning-fg)' }}>
             {request.suggestions.length === 1
-              ? tr('În club există un jucător cu același nume. Leagă-l doar dacă ești sigur că e același copil.')
-              : tr('În club există {0} cu nume asemănător. Leagă doar dacă ești sigur că e același copil.', { '0': plural(request.suggestions.length, 'jucător', 'jucători') })}
+              ? tr('În club există un jucător cu același nume. Leagă-l doar dacă știi sigur că e același copil.')
+              : tr('În club există {0} cu nume asemănător. Leagă doar dacă știi sigur că e același copil.', { '0': plural(request.suggestions.length, 'jucător', 'jucători') })}
           </Text>
         </View>
       ) : null}

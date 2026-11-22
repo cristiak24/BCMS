@@ -641,9 +641,11 @@ export default function FinancialSettingsPage() {
                         <GlassStat
                             dot="var(--c-purple)"
                             label="Cotizație"
-                            hint="per jucător / lună"
-                            value={loadingSettings || !settings ? '—' : `${settings.monthlyPlayerFee ?? 0}`}
-                            suffix={loadingSettings || !settings ? undefined : 'RON'}
+                            // No fee yet (a new club): say where it's set instead of a bare „0 RON”.
+                            hint={settings && !Number(settings.monthlyPlayerFee) ? 'nestabilită · o setezi în Setări' : 'per jucător / lună'}
+                            // Same Romanian format as every other amount („999.999,99”, not „999999.99”).
+                            value={loadingSettings || !settings ? '—' : !Number(settings.monthlyPlayerFee) ? '—' : new Intl.NumberFormat('ro-RO', { maximumFractionDigits: 2 }).format(Number(settings.monthlyPlayerFee))}
+                            suffix={loadingSettings || !settings || !Number(settings.monthlyPlayerFee) ? undefined : 'RON'}
                         />
                         <GlassStat
                             // Green only once something came in: „0 RON” with a success dot read as good news.
@@ -816,7 +818,7 @@ export default function FinancialSettingsPage() {
                                         count: f.key === 'all' ? uploads.length : uploads.filter((u) => u.accountingStatus === f.key).length,
                                     }))}
                                 />
-                                <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 [@media(pointer:coarse)]:h-[42px] border md:ml-auto md:w-[220px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
+                                <View className="flex-row items-center gap-2 rounded-[10px] px-3 h-9 [@media(pointer:coarse)]:h-11 border md:ml-auto md:w-[220px]" style={{ borderColor: 'var(--c-border)', backgroundColor: 'var(--c-surface-2)' } as any}>
                                     <MaterialIcons name="search" size={15} color="var(--c-faint)" />
                                     <TextInput
                                         value={documentSearch}

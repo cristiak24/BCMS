@@ -134,7 +134,7 @@ export default function AppHeader({
           <View className="flex-row items-center gap-2">
             <Pressable
               onPress={() => setSearchOpen(false)}
-              className="w-10 h-10 items-center justify-center rounded-[12px]"
+              className="hit-44 w-10 h-10 items-center justify-center rounded-[12px]"
               accessibilityRole="button"
               accessibilityLabel={tr('Închide căutarea')}
             >
@@ -167,13 +167,13 @@ export default function AppHeader({
             <View className="flex-row items-center gap-3 flex-1 min-w-0">
               <Pressable
                 onPress={() => setProfileMenuOpen(true)}
-                className="w-10 h-10 rounded-[12px] overflow-hidden items-center justify-center border"
+                className="hit-44 w-10 h-10 rounded-[12px] items-center justify-center border"
                 style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'var(--c-border)' } as any}
                 accessibilityRole="button"
                 accessibilityLabel={tr('Deschide meniul contului')}
               >
                 {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} className="w-full h-full" />
+                  <Image source={{ uri: avatarUrl }} className="w-full h-full rounded-[11px]" />
                 ) : (
                   <Text className="font-black" style={{ color: 'var(--c-brand-fg)' }}>{initials}</Text>
                 )}
@@ -190,7 +190,7 @@ export default function AppHeader({
               {showSearch ? (
               <Pressable
                 onPress={() => setSearchOpen(true)}
-                className="relative w-10 h-10 items-center justify-center rounded-[12px] border"
+                className="hit-44 relative w-10 h-10 items-center justify-center rounded-[12px] border"
                 style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
                 accessibilityRole="button"
                 accessibilityLabel={tr('Caută')}
@@ -204,7 +204,7 @@ export default function AppHeader({
               ) : null}
               <Pressable
                 onPress={openNotifications}
-                className="relative w-10 h-10 items-center justify-center rounded-[12px] border"
+                className="hit-44 relative w-10 h-10 items-center justify-center rounded-[12px] border"
                 style={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any}
                 accessibilityRole="button"
                 accessibilityLabel={tr('Notificări')}
@@ -219,7 +219,7 @@ export default function AppHeader({
               {onOpenMenu ? (
                 <Pressable
                   onPress={onOpenMenu}
-                  className="ui-press w-10 h-10 items-center justify-center rounded-[12px] border"
+                  className="ui-press hit-44 w-10 h-10 items-center justify-center rounded-[12px] border"
                   style={{ backgroundColor: 'var(--c-surface-tint)', borderColor: 'color-mix(in srgb, var(--c-brand-fg) 22%, transparent)' } as any}
                   accessibilityRole="button"
                   accessibilityLabel={tr('Deschide meniul')}
@@ -323,7 +323,7 @@ export default function AppHeader({
             style={adminUi ? { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any : undefined}
           >
             {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} className="w-full h-full" />
+              <Image source={{ uri: avatarUrl }} className="w-full h-full rounded-[11px]" />
             ) : adminUi ? (
               <Text className="font-bold text-[13px]" style={{ color: 'var(--c-ink)' }}>{initials}</Text>
             ) : (
@@ -399,7 +399,7 @@ function ProfileActionsMenu({
               style={adminUi ? { backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)' } as any : undefined}
             >
               {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} className="w-full h-full" />
+                <Image source={{ uri: avatarUrl }} className="w-full h-full rounded-[11px]" />
               ) : adminUi ? (
                 <Text className="font-bold" style={{ color: 'var(--c-ink)' }}>{initials}</Text>
               ) : (
