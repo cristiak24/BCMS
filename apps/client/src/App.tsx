@@ -268,29 +268,77 @@ function preloadCurrentRoute() {
 preloadCurrentRoute();
 
 /**
+ * Calls `run` once the page has loaded and no resource has finished for a
+ * moment (the screen's own chunks, fonts and data are in), or after `maxMs`
+ * at the latest. Returns a cancel function.
+ */
+function whenNetworkSettles(run: () => void, quietMs = 1200, maxMs = 8000) {
+  let quiet: number | undefined;
+  let observer: PerformanceObserver | null = null;
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    window.clearTimeout(quiet);
+    window.clearTimeout(cap);
+    observer?.disconnect();
+    window.removeEventListener('load', start);
+  };
+  const fire = () => {
+    if (done) return;
+    finish();
+    run();
+  };
+  const arm = () => {
+    window.clearTimeout(quiet);
+    quiet = window.setTimeout(fire, quietMs);
+  };
+  function start() {
+    try {
+      // Every finished download (chunk, font, API answer) restarts the wait.
+      observer = new PerformanceObserver(arm);
+      observer.observe({ type: 'resource' });
+    } catch {
+      // No resource timing: the quiet timer alone.
+    }
+    arm();
+  }
+  const cap = window.setTimeout(fire, maxMs);
+  if (document.readyState === 'complete') start();
+  else window.addEventListener('load', start, { once: true });
+  return finish;
+}
+
+/**
  * Once the session is known, warm the chunks of the screens this role actually
  * navigates between (bottom-nav destinations first), so a tap on a phone swaps
  * the page immediately instead of waiting on the network.
+ *
+ * Not before the current screen has what it needs: on a slow phone connection
+ * the ~110 kB (gzip) of an admin's other screens used to download at the same
+ * time as this screen's own chunks and data, and pushed its first paint back.
  */
 function RoutePrefetcher() {
   const { session } = useSession();
   const role = normalizeRole(session?.role);
 
   useEffect(() => {
-    if (!role) return;
+    if (!role) return undefined;
+    let loaders: Loader[];
     if (role === 'coach') {
-      prefetchRoutes([loadPlayerLayout, loadCoachDashboard, loadPlayerSchedule, loadCoachAttendance, loadCoachTeams, loadPlayerAccount]);
+      loaders = [loadPlayerLayout, loadCoachDashboard, loadPlayerSchedule, loadCoachAttendance, loadCoachTeams, loadPlayerAccount];
     } else if (role === 'player' || role === 'parent') {
-      prefetchRoutes([loadPlayerLayout, loadPlayerHome, loadPlayerSchedule, loadPlayerAttendance, loadPlayerPayments, loadPlayerTeam, loadPlayerAccount]);
+      loaders = [loadPlayerLayout, loadPlayerHome, loadPlayerSchedule, loadPlayerAttendance, loadPlayerPayments, loadPlayerTeam, loadPlayerAccount];
     } else if (role === 'superadmin') {
-      prefetchRoutes([loadSuperAdminLayout, loadSuperAdminDashboard, loadSuperAdminClubs, loadSuperAdminClubDetail, loadSuperAdminUsers, loadSuperAdminBilling, loadSuperAdminCreateUser]);
+      loaders = [loadSuperAdminLayout, loadSuperAdminDashboard, loadSuperAdminClubs, loadSuperAdminClubDetail, loadSuperAdminUsers, loadSuperAdminBilling, loadSuperAdminCreateUser];
     } else if (role === 'staff') {
-      prefetchRoutes([loadAdminLayout, loadAdminSchedule, loadAdminDocuments, loadAdminContacts, loadProfile]);
+      loaders = [loadAdminLayout, loadAdminSchedule, loadAdminDocuments, loadAdminContacts, loadProfile];
     } else if (role === 'accountant') {
-      prefetchRoutes([loadAdminLayout, loadAdminFinance, loadAdminDocuments, loadAdminContacts, loadProfile]);
+      loaders = [loadAdminLayout, loadAdminFinance, loadAdminDocuments, loadAdminContacts, loadProfile];
     } else {
-      prefetchRoutes([loadAdminLayout, loadAdminDashboard, loadAdminFinance, loadAdminRoster, loadAdminSchedule, loadAdminMyClubAdmin, loadProfile]);
+      loaders = [loadAdminLayout, loadAdminDashboard, loadAdminFinance, loadAdminRoster, loadAdminSchedule, loadAdminMyClubAdmin, loadProfile];
     }
+    return whenNetworkSettles(() => prefetchRoutes(loaders));
   }, [role]);
 
   return null;

@@ -75,20 +75,22 @@
   .dash-stagger > *:nth-child(6) { animation-delay: 0.27s; }
 
   /* Token-driven so the shimmer tracks the theme. Hardcoded greys here used to
-     render as bright light slabs over the dark surfaces. */
+     render as bright light slabs over the dark surfaces. The sweep is a
+     pseudo-element moved with `transform` (compositor only): animating
+     background-position repainted every skeleton on every frame, exactly
+     while the page was busy loading. */
   .dash-skeleton {
-    background: linear-gradient(
-      90deg,
-      var(--c-surface-2) 0%,
-      var(--c-surface-3) 50%,
-      var(--c-surface-2) 100%
-    );
-    background-size: 200% 100%;
-    animation: dashShimmer 1.5s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+    background: var(--c-surface-2);
   }
-
-  .dash-card {
-    will-change: transform;
+  .dash-skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, var(--c-surface-3) 50%, transparent 100%);
+    transform: translateX(-100%);
+    animation: dashShimmer 1.5s ease-in-out infinite;
   }
 
   .dash-card-hover {
@@ -276,11 +278,11 @@
 }
 
 @keyframes dashShimmer {
-  0% {
-    background-position: 200% 0;
+  from {
+    transform: translateX(-100%);
   }
-  100% {
-    background-position: -200% 0;
+  to {
+    transform: translateX(100%);
   }
 }
 
@@ -337,7 +339,7 @@
 @media (prefers-reduced-motion: reduce) {
   .dash-fade-in,
   .dash-stagger > *,
-  .dash-skeleton,
+  .dash-skeleton::after,
   .dash-pulse-dot,
   .ui-rise,
   .ui-stagger > *,
