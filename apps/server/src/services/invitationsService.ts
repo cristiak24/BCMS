@@ -343,6 +343,29 @@ export const INVITATION_ERRORS = {
 } as const;
 
 /**
+ * An active account of another club never changes club or role through an
+ * email invitation (same rule as P2-3 for access requests): accepting used to
+ * re-home it, so club A's admin invited as coach by club B left A without an
+ * admin. Answered 409 with this code; the invitation stays unused.
+ */
+export const ACCOUNT_IN_OTHER_CLUB = 'ACCOUNT_IN_OTHER_CLUB';
+export const ACCOUNT_IN_OTHER_CLUB_MESSAGE = 'Contul tău este deja într-un alt club. Cere adminului acelui club să te elimine sau folosește alt email.';
+
+export class AccountInOtherClubError extends Error {
+  readonly status = 409;
+  // Not `code`: httpErrors treats a string `code` as a driver error.
+  readonly errorCode = ACCOUNT_IN_OTHER_CLUB;
+  constructor() {
+    super(ACCOUNT_IN_OTHER_CLUB_MESSAGE);
+    this.name = 'AccountInOtherClubError';
+  }
+}
+
+function belongsToOtherClub(account: Pick<typeof users.$inferSelect, 'status' | 'clubId'>, clubId: number | null) {
+  return account.status === 'active' && account.clubId != null && account.clubId !== clubId;
+}
+
+/**
  * Reads one invitation by its token. Read-only: the public signup page calls
  * this without a session, so it must never write (expiry is computed here,
  * not stored) nor scan anything beyond the requested invite.
@@ -462,6 +485,9 @@ export async function acceptInvitation(params: {
     throw new Error(INVITATION_ERRORS.otherAccount);
   }
   const existing = own ?? byEmail ?? null;
+  if (existing && belongsToOtherClub(existing, invite.clubId)) {
+    throw new AccountInOtherClubError();
+  }
 
   const displayName = [params.firstName, params.lastName].filter(Boolean).join(' ').trim() || email.split('@')[0] || 'New User';
   const firstName = params.firstName?.trim() || null;
@@ -493,6 +519,13 @@ export async function acceptInvitation(params: {
 
     let id: number;
     if (existing) {
+      // Re-read under a lock: the account may have joined a club since the
+      // check above. Throwing here also rolls back the claim.
+      const [current] = await tx.select({ status: users.status, clubId: users.clubId })
+        .from(users).where(eq(users.id, existing.id)).for('update');
+      if (current && belongsToOtherClub(current, invite.clubId)) {
+        throw new AccountInOtherClubError();
+      }
       const updated = await tx.update(users).set({ ...account, updatedAt: nowIso })
         .where(and(
           eq(users.id, existing.id),

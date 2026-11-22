@@ -47,6 +47,24 @@ test.describe('invitație', () => {
   });
 });
 
+test.describe('invitație din alt club', () => {
+  test('an active admin invited by another club is refused and stays admin here', async () => {
+    const { otherClubInvite, clubId } = seedIds();
+    const admin = await apiAs('admin');
+    const response = await admin.post(`invitations/${otherClubInvite.token}/accept`, { data: { firstName: 'Admin', lastName: 'Local', phone: '0722 000 111' } });
+    expect(response.status()).toBe(409);
+    const body = await response.json();
+    expect(body.code).toBe('ACCOUNT_IN_OTHER_CLUB');
+    expect(body.error).toMatch(/deja într-un alt club/);
+    const me = await (await admin.get('auth/me')).json();
+    expect(me.user.role).toBe('admin');
+    expect(me.user.clubId).toBe(clubId);
+    // The invitation is still unused.
+    const invitation = await (await admin.get(`invitations/${otherClubInvite.token}`)).json();
+    expect(invitation.valid).toBe(true);
+  });
+});
+
 test.describe('antrenorul altei echipe', () => {
   test('gets 403 on the L12 of a team they do not coach', async () => {
     const { teams, events } = seedIds();

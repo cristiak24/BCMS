@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate, requireSuperadmin, type AuthenticatedRequest } from '../middleware/auth';
 import {
   acceptInvitation,
+  AccountInOtherClubError,
   completeUserRegistration,
   createSuperAdminInvitation,
   listInvitations,
@@ -114,6 +115,9 @@ router.post('/:token/accept', publicInviteLimiter, authenticate, async (req: Aut
 
     res.status(201).json({ success: true, ...result });
   } catch (error) {
+    if (error instanceof AccountInOtherClubError) {
+      return res.status(error.status).json({ error: error.message, code: error.errorCode });
+    }
     sendRouteError(res, error, { fallback: 'Nu am putut accepta invitația.', log: 'Accept invitation error:' });
   }
 });

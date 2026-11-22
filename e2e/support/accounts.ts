@@ -18,4 +18,6 @@ export type SeedIds = {
   players: { matei: number; radu: number; luca: number; ana: number; elena: number };
   events: { u14Match: number; u12Match: number; delegatedMatch: number };
   invite: { token: string; email: string };
+  /** Another club's invitation for ACCOUNTS.admin (an active admin here). */
+  otherClubInvite: { token: string; clubId: number };
 };

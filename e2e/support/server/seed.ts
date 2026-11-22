@@ -5,6 +5,7 @@
  *  - a player account for Luca Marin (U12);
  *  - three more players per team (the scorer needs at least five);
  *  - a pending invitation with a known token;
+ *  - a second club inviting this club's admin as coach (refused: ACCOUNT_IN_OTHER_CLUB);
  *  - matches for the scorer and the delegated-scorekeeper scenarios;
  *  - every account has accepted the current Terms (else a consent gate covers the app).
  * Returns the ids the specs need (written to E2E.seedFile).
@@ -67,6 +68,12 @@ export async function seedE2E(): Promise<SeedIds> {
         token: hashInviteToken(inviteToken), tokenHash: hashInviteToken(inviteToken), email: inviteEmail, role: 'coach',
         clubId: club.id, status: 'pending', expiresAt: at(5, 12), createdBy: admin.id,
     });
+    const [otherClub] = await db.insert(schema.clubs).values({ name: 'Club Vecin E2E', normalizedName: 'club vecin e2e' }).returning();
+    const otherClubToken = 'e2e-invite-token-other-club';
+    await db.insert(schema.invites).values({
+        token: hashInviteToken(otherClubToken), tokenHash: hashInviteToken(otherClubToken), email: ACCOUNTS.admin, role: 'coach',
+        clubId: otherClub.id, status: 'pending', expiresAt: at(5, 12),
+    });
 
     const everyone = await db.select({ id: schema.users.id }).from(schema.users);
     await db.insert(schema.legalAcceptances).values(everyone.map((user) => ({ userId: user.id, version: LEGAL_VERSION })));
@@ -78,5 +85,6 @@ export async function seedE2E(): Promise<SeedIds> {
         players: { matei: matei.id, radu: radu.id, luca: luca.id, ana: ana.id, elena: elena.id },
         events: { u14Match: u14Match.id, u12Match: u12Match.id, delegatedMatch: delegatedMatch.id },
         invite: { token: inviteToken, email: inviteEmail },
+        otherClubInvite: { token: otherClubToken, clubId: otherClub.id },
     };
 }

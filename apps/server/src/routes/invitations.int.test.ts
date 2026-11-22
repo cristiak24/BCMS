@@ -146,6 +146,49 @@ test('a row nobody signs in to yet is linked by the invited, verified email', as
     assert.equal(prepared.status, 'active');
 });
 
+test('club A\'s admin invited as coach by club B stays admin of club A (ACCOUNT_IN_OTHER_CLUB)', async () => {
+    await db.insert(users).values({ email: 'adm.a@club.ro', name: 'Admin A', role: 'admin', status: 'active', clubId: clubA, clerkUserId: 'user_adm_a' });
+    const { token, id } = await invitation('adm.a@club.ro', 'coach', clubB);
+    const auth = bearer('user_adm_a', 'adm.a@club.ro');
+
+    const out = await accept(token, auth);
+    assert.equal(out.status, 409);
+    assert.equal(out.body.code, 'ACCOUNT_IN_OTHER_CLUB');
+    assert.equal(out.body.error, 'Contul tău este deja într-un alt club. Cere adminului acelui club să te elimine sau folosește alt email.');
+
+    // Through the signup form too.
+    const viaSignup = await api.call('POST', '/api/auth/complete-invite-signup', {
+        auth, body: { name: 'Admin A', inviteToken: token, phone: '+40722000000' },
+    });
+    assert.equal(viaSignup.status, 409);
+    assert.equal(viaSignup.body.code, 'ACCOUNT_IN_OTHER_CLUB');
+
+    const admin = await user('adm.a@club.ro');
+    assert.equal(admin.clubId, clubA);
+    assert.equal(admin.role, 'admin');
+    assert.equal(admin.status, 'active');
+    const row = await inviteRow(id);
+    assert.equal(row.status, 'pending', 'the invitation is not spent');
+    assert.equal(row.usedBy, null);
+});
+
+test('a pending or club-less account, or one of the same club, still accepts as before', async () => {
+    await db.insert(users).values([
+        { email: 'pend.a@club.ro', name: 'În așteptare', role: 'player', status: 'pending', clubId: clubA, clerkUserId: 'user_pend_a' },
+        { email: 'free@club.ro', name: 'Fără club', role: 'player', status: 'active', clubId: null, clerkUserId: 'user_free' },
+        { email: 'same.b@club.ro', name: 'Antrenor B', role: 'coach', status: 'active', clubId: clubB, clerkUserId: 'user_same_b' },
+    ]);
+    for (const [email, uid] of [['pend.a@club.ro', 'user_pend_a'], ['free@club.ro', 'user_free'], ['same.b@club.ro', 'user_same_b']]) {
+        const { token } = await invitation(email, 'admin', clubB);
+        const out = await accept(token, bearer(uid, email));
+        assert.equal(out.status, 201, email);
+        const row = await user(email);
+        assert.equal(row.clubId, clubB, email);
+        assert.equal(row.role, 'admin', email);
+        assert.equal(row.status, 'active', email);
+    }
+});
+
 test('validating a token is read-only and scoped to that invitation', async () => {
     const expired = await invitation('late@club.ro', 'coach', clubA, -60 * 60 * 1000);
     // An account already exists for another pending invite: validating some

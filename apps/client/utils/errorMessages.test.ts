@@ -13,6 +13,8 @@ test('server English becomes Romanian for its status', () => {
 test('Romanian server messages pass through, even without diacritics', () => {
   assert.equal(userFacingMessage('Suma este prea mare.', 400), 'Suma este prea mare.');
   assert.equal(userFacingMessage('Plata a fost deja stornată.', 409), 'Plata a fost deja stornată.');
+  const otherClub = 'Contul tău este deja într-un alt club. Cere adminului acelui club să te elimine sau folosește alt email.';
+  assert.equal(userFacingMessage(otherClub, 409), otherClub);
   assert.equal(userFacingMessage('Timp invalid.', 400), 'Timp invalid.');
   assert.equal(userFacingMessage('Alege un club.', 400), 'Alege un club.');
 });

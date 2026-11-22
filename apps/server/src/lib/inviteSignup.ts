@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { users } from '../db/schema';
-import { acceptInvitation, COACH_PHONE_REQUIRED } from '../services/invitationsService';
+import { acceptInvitation, AccountInOtherClubError, COACH_PHONE_REQUIRED } from '../services/invitationsService';
 import { writeAuditLog, type AuditLogInput } from '../services/auditService';
 import { notifyReviewers } from './accessNotify';
 import { registerWithAccessLink, registerWithGuardianInvite, registerWithTeamCode } from './accountSignup';
@@ -251,15 +251,23 @@ async function signUpWithClubCode(ctx: Ctx, { code }: Of<'club-code'>) {
 // Classic email invitation: bound to one address, the account comes in with
 // the role the super admin chose.
 async function signUpWithEmailInvitation(ctx: Ctx) {
-    const result = await acceptInvitation({
-        token: ctx.token,
-        clerkUserId: ctx.uid,
-        email: ctx.email,
-        firstName: ctx.firstName,
-        lastName: ctx.lastName,
-        // Checked there: a coach invitation needs it (COACH_PHONE_REQUIRED).
-        phone: ctx.phone,
-    });
+    let result: Awaited<ReturnType<typeof acceptInvitation>>;
+    try {
+        result = await acceptInvitation({
+            token: ctx.token,
+            clerkUserId: ctx.uid,
+            email: ctx.email,
+            firstName: ctx.firstName,
+            lastName: ctx.lastName,
+            // Checked there: a coach invitation needs it (COACH_PHONE_REQUIRED).
+            phone: ctx.phone,
+        });
+    } catch (error) {
+        if (error instanceof AccountInOtherClubError) {
+            return { status: error.status, body: { error: error.message, code: error.errorCode } };
+        }
+        throw error;
+    }
     if (ctx.phone) {
         await db.update(users).set({ phone: ctx.phone }).where(eq(users.clerkUserId, ctx.uid));
     }
