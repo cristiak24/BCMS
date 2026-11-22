@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { gamesApi, type Game } from '../../services/gamesApi';
 import { computeBoxScore, type EventType, type GameEvent, type Side } from '../../utils/gameStats';
-import { pendingActionCount } from '../../utils/scorerStatus';
+import { pendingActionCount, settlePush } from '../../utils/scorerStatus';
 
 import { tr } from '../../i18n';
 /**
@@ -99,13 +99,14 @@ export function useScorer(eventId: number, game: Game, serverEvents: GameEvent[]
     setSyncing(true);
     try {
       const result = await gamesApi.push(eventId, batch, { period: current.clock.period, clockSec: clockSecNow() });
-      const done = new Set([...result.acked, ...result.rejected.map((r) => r.clientId)]);
       const rejected = new Set(result.rejected.map((r) => r.clientId));
+      const now = stateRef.current;
       const next: Stored = {
-        ...stateRef.current,
-        pending: stateRef.current.pending.filter((id) => !done.has(id)),
+        ...now,
+        // An undo tapped while this push was in flight stays pending.
+        pending: settlePush(now.events, now.pending, batch, result),
         // A rejected action never counted on the server — drop it here too.
-        events: stateRef.current.events.map((e) => (rejected.has(e.clientId) ? { ...e, deleted: true } : e)),
+        events: now.events.map((e) => (rejected.has(e.clientId) ? { ...e, deleted: true } : e)),
       };
       stateRef.current = next;
       setState(next);

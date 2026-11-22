@@ -211,9 +211,14 @@ export function computeBoxScore(events: GameEvent[], starters: number[], periodS
         }
         if (e.type === 'sub' && e.playerId != null && e.otherPlayerId != null) {
             if (timed && periodOpen) {
-                credit(e.otherPlayerId, since.get(e.otherPlayerId) ?? periodSec!, e.clockSec ?? 0);
-                since.delete(e.otherPlayerId);
-                since.set(e.playerId, e.clockSec ?? 0);
+                // Only someone on court can come off (an undone earlier sub can
+                // leave a later one naming a player who never came on), and
+                // someone already on court keeps the stretch they started.
+                if (box.onCourt.includes(e.otherPlayerId)) {
+                    credit(e.otherPlayerId, since.get(e.otherPlayerId) ?? periodSec!, e.clockSec ?? 0);
+                    since.delete(e.otherPlayerId);
+                }
+                if (!box.onCourt.includes(e.playerId)) since.set(e.playerId, e.clockSec ?? 0);
             }
             box.onCourt = box.onCourt.filter((id) => id !== e.otherPlayerId);
             if (!box.onCourt.includes(e.playerId)) box.onCourt.push(e.playerId);

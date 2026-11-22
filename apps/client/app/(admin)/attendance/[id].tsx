@@ -225,6 +225,12 @@ export default function AttendanceScreen() {
     const previous = new Map(roster.filter((row) => ids.includes(row.id)).map((row) => [row.id, row.status]));
     const next = new Map(marks.map((mark) => [mark.id, mark.status]));
     patchRows(new Set(ids), (row) => ({ ...row, status: next.get(row.id) ?? row.status }));
+    if (outbox.holds(ids)) {
+      // Behind an older mark for the same player: keep the order.
+      outbox.queue(marks);
+      void outbox.flush();
+      return true;
+    }
     setBusy(ids, true);
     try {
       await saveStatus.track(eventsApi.updateEventAttendance(event.id, marks.map((mark) => ({ playerId: mark.id, status: mark.status }))));

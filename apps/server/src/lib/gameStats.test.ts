@@ -85,3 +85,29 @@ test('during a running period, MIN counts up to the clock now (not 0:00 until a 
     const ended = computeBoxScore([...events, ev({ type: 'period_end', clockSec: 0 })], [1, 2], 600, 0);
     assert.equal(ended.players[1].secondsPlayed, 600);
 });
+
+test('after an undone sub, a later sub never credits minutes to a player who did not come on', () => {
+    seq = 0;
+    const box = computeBoxScore([
+        ev({ type: 'period_start', clockSec: 600 }),
+        // X (3) on for Y (2) at 8:00 — undone.
+        ev({ type: 'sub', playerId: 3, otherPlayerId: 2, clockSec: 480, deleted: true }),
+        // Later: 4 on for 3 at 5:00 — but 3 never came on.
+        ev({ type: 'sub', playerId: 4, otherPlayerId: 3, clockSec: 300 }),
+        ev({ type: 'period_end', clockSec: 0 }),
+    ], [1, 2], 600);
+    assert.equal(box.players[3]?.secondsPlayed ?? 0, 0);
+    assert.equal(box.players[2].secondsPlayed, 600);
+    assert.equal(box.players[4].secondsPlayed, 300);
+});
+
+test('a sub naming a player already on court keeps their stretch', () => {
+    seq = 0;
+    const box = computeBoxScore([
+        ev({ type: 'period_start', clockSec: 600 }),
+        ev({ type: 'sub', playerId: 1, otherPlayerId: 2, clockSec: 300 }),
+        ev({ type: 'period_end', clockSec: 0 }),
+    ], [1, 2], 600);
+    assert.equal(box.players[1].secondsPlayed, 600);
+    assert.equal(box.players[2].secondsPlayed, 300);
+});

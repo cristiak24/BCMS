@@ -8,7 +8,7 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { buildEventQueryPlan, type EventQueryParams } from '../lib/eventQuery';
 import { createFeedbackNotification, notifyEventChange } from '../lib/notifications';
 import { parseAttendancePayload, parseEventInput } from '../lib/eventValidation';
-import { fetchFrbMatches, frbDateToUtc, type ParsedMatch } from '../lib/frbMatches';
+import { fetchFrbMatches, frbDateToUtc, mergeSeasonMonths, takeMovedFixture, type ParsedMatch } from '../lib/frbMatches';
 import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
 import { coachManagesEvent, coachManagesTeam, coachReadsEvent } from '../lib/coachScope';
 import { auditAttendanceSave, auditRequest } from '../services/auditService';
@@ -949,29 +949,39 @@ export const eventsController = {
             const importFrom = Date.now() - IMPORT_WINDOW_MS;
 
             for (const team of teamRows) {
-                let fixtures: ParsedMatch[] = [];
-                try {
-                    // The widget pages by calendar month; a season spans all 12.
-                    const months = await Promise.all(
-                        Array.from({ length: 12 }, (_, index) => fetchFrbMatches({
-                            leagueId: team.frbLeagueId,
-                            seasonId: team.frbSeasonId,
-                            teamId: team.frbTeamId,
-                            month: index + 1,
-                        }).catch(() => [] as ParsedMatch[])),
-                    );
-                    const seen = new Set<string>();
-                    fixtures = months.flat().filter((match) => {
-                        const id = `${match.date}|${match.homeTeam}|${match.awayTeam}`;
-                        if (seen.has(id)) return false;
-                        seen.add(id);
-                        return true;
-                    });
-                } catch (error) {
-                    console.error(`[sync-frb] team ${team.id} fetch failed:`, error);
+                // The widget pages by calendar month; a season spans all 12.
+                const months = await Promise.allSettled(
+                    Array.from({ length: 12 }, (_, index) => fetchFrbMatches({
+                        leagueId: team.frbLeagueId,
+                        seasonId: team.frbSeasonId,
+                        teamId: team.frbTeamId,
+                        month: index + 1,
+                    })),
+                );
+                const merged = mergeSeasonMonths(months);
+                if (!merged) {
+                    // FRB down: say so, instead of calling the season old.
+                    const first = months.find((result) => result.status === 'rejected') as PromiseRejectedResult | undefined;
+                    console.error(`[sync-frb] team ${team.id} fetch failed:`, first?.reason);
                     failedTeams.push(team.name);
                     continue;
                 }
+                const fixtures: ParsedMatch[] = merged;
+
+                // This team's synced rows on a day no fixture has any more: a
+                // fixture FRB moved to another day takes its old row along.
+                // Only with the whole season loaded — a month that failed would
+                // make its rows look moved.
+                const complete = months.every((result) => result.status === 'fulfilled');
+                const fixtureKeys = new Set(fixtures.flatMap((match) => {
+                    const at = frbDateToUtc(match.date, match.time);
+                    return at ? [keyOf(team.id, `${match.homeTeam} vs ${match.awayTeam}`, bucharestDay(at))] : [];
+                }));
+                const orphans = !complete ? [] : existingRows.filter((row) => {
+                    const at = toDate(row.startTime);
+                    return row.teamId === team.id && at && /FRB/i.test(row.description ?? '') && row.status !== 'cancelled'
+                        && !fixtureKeys.has(keyOf(team.id, row.title, bucharestDay(at)));
+                });
 
                 const newest = fixtures.reduce((max, match) => Math.max(max, frbDateToUtc(match.date, match.time)?.getTime() ?? 0), 0);
                 if (newest < Date.now() - STALE_AFTER_MS) staleTeams.push(team.name);
@@ -989,7 +999,14 @@ export const eventsController = {
                     const location = match.league || team.leagueName || null;
                     const status = finished ? 'finished' : 'scheduled';
                     const key = keyOf(team.id, title, bucharestDay(start));
-                    const existing = existingByKey.get(key);
+                    let existing = existingByKey.get(key);
+                    if (!existing) {
+                        const moved = takeMovedFixture(orphans, title, start);
+                        if (moved) {
+                            existing = moved;
+                            existingByKey.set(key, moved);
+                        }
+                    }
 
                     if (!existing) {
                         if (start.getTime() < importFrom) continue;

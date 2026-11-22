@@ -28,3 +28,24 @@ export function startsMoreThanADayAhead(startTime: string | null | undefined, no
   const start = parseApiDate(startTime).getTime();
   return !Number.isNaN(start) && start - now.getTime() > DAY_MS;
 }
+
+type SentEvent = { clientId: string; deleted: boolean };
+
+/**
+ * What is still unsent after a push came back. An action the server acked or
+ * rejected is done — unless it changed on the device while the push was in
+ * flight (an undo marks it deleted): the server got the old copy, so it stays
+ * pending and the undo goes out with the next push. Dropping it lost the undo
+ * and the server kept counting the basket.
+ */
+export function settlePush(
+  events: SentEvent[],
+  pending: string[],
+  sent: SentEvent[],
+  result: { acked: string[]; rejected: { clientId: string }[] },
+) {
+  const done = new Set([...result.acked, ...result.rejected.map((r) => r.clientId)]);
+  const sentDeleted = new Map(sent.map((e) => [e.clientId, e.deleted]));
+  const nowDeleted = new Map(events.map((e) => [e.clientId, e.deleted]));
+  return pending.filter((id) => !done.has(id) || (sentDeleted.has(id) && sentDeleted.get(id) !== nowDeleted.get(id)));
+}

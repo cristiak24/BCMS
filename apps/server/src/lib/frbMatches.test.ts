@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 
-import { frbDateToUtc, parseMatchesWidget } from './frbMatches';
+import { frbDateToUtc, mergeSeasonMonths, parseMatchesWidget, takeMovedFixture, type ParsedMatch } from './frbMatches';
 
 test('frbDateToUtc: winter time (EET, UTC+2)', () => {
     assert.equal(frbDateToUtc('15.03.2025', '19:00')?.toISOString(), '2025-03-15T17:00:00.000Z');
@@ -67,4 +67,31 @@ test('parseMatchesWidget: unknown side gives N/A, never a guessed result', () =>
     const html = '<table><tbody><tr><td>03.10.2026 18:00</td><td>A</td><td>62 - 87</td><td>B</td></tr></tbody></table>';
     const raw = `MBT.API.update('w1', '${html.replace(/\//g, '\\/')}');`;
     assert.equal(parseMatchesWidget(raw, '77')[0].result, 'N/A');
+});
+
+const fixture = (date: string, homeTeam = 'CSM', awayTeam = 'Rapid') => ({ date, homeTeam, awayTeam } as ParsedMatch);
+
+test('mergeSeasonMonths: every month failing is an outage (null), not an empty season', () => {
+    const down = Array.from({ length: 12 }, () => ({ status: 'rejected', reason: new Error('timeout') }) as PromiseSettledResult<ParsedMatch[]>);
+    assert.equal(mergeSeasonMonths(down), null);
+    const partly: PromiseSettledResult<ParsedMatch[]>[] = [
+        { status: 'rejected', reason: new Error('timeout') },
+        { status: 'fulfilled', value: [fixture('01.10.2026'), fixture('08.10.2026')] },
+        { status: 'fulfilled', value: [fixture('08.10.2026')] },
+        { status: 'fulfilled', value: [] },
+    ];
+    assert.deepEqual(mergeSeasonMonths(partly)?.map((m) => m.date), ['01.10.2026', '08.10.2026']);
+    assert.deepEqual(mergeSeasonMonths(Array.from({ length: 12 }, () => ({ status: 'fulfilled', value: [] }) as PromiseSettledResult<ParsedMatch[]>)), []);
+});
+
+test('takeMovedFixture: a fixture moved to another day reuses its old synced row', () => {
+    const orphans = [
+        { id: 1, title: 'CSM vs Rapid', startTime: '2026-10-10T16:00:00.000Z' },
+        { id: 2, title: 'CSM vs Dinamo', startTime: '2026-10-11T16:00:00.000Z' },
+        { id: 3, title: 'csm vs rapid ', startTime: '2026-03-10T16:00:00.000Z' },
+    ];
+    const moved = takeMovedFixture(orphans, 'CSM vs Rapid', new Date('2026-10-11T15:00:00.000Z'));
+    assert.equal(moved?.id, 1, 'the closest row with the same title');
+    assert.deepEqual(orphans.map((o) => o.id), [2, 3], 'taken off the list so it is not used twice');
+    assert.equal(takeMovedFixture(orphans, 'CSM vs Steaua', new Date()), null);
 });

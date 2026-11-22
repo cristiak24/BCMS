@@ -58,6 +58,8 @@ export function useAttendanceOutbox(
   const [reason, setReason] = useState<'offline' | 'server'>('offline');
   const pendingRef = useRef(pending);
   const flushing = useRef(false);
+  const queuedWhileFlushing = useRef(false);
+  const flushRef = useRef<() => Promise<void>>(async () => undefined);
   const sendRef = useRef(send);
   const rejectRef = useRef(onRejected);
   sendRef.current = send;
@@ -77,7 +79,8 @@ export function useAttendanceOutbox(
   }, [eventId]);
 
   const queue = useCallback((marks: { id: number; status: AttendanceMark }[], error?: unknown) => {
-    setReason(failureReason(error));
+    if (error !== undefined) setReason(failureReason(error));
+    if (flushing.current) queuedWhileFlushing.current = true;
     const next = new Map(pendingRef.current);
     marks.forEach((mark) => next.set(mark.id, mark.status));
     commit(next);
@@ -111,8 +114,22 @@ export function useAttendanceOutbox(
       }
     } finally {
       flushing.current = false;
+      // A mark tapped while this batch was out goes right after it, in order.
+      if (queuedWhileFlushing.current) {
+        queuedWhileFlushing.current = false;
+        if (pendingRef.current.size) void flushRef.current();
+      }
     }
   }, [commit]);
+  flushRef.current = flush;
+
+  /**
+   * True when a new mark for these players must go through the outbox: a
+   * batch is on its way (it may carry an older mark for the same player) or
+   * one of them is still waiting. Sent directly, the new mark could reach the
+   * server first and be overwritten by the older one.
+   */
+  const holds = useCallback((ids: number[]) => flushing.current || ids.some((id) => pendingRef.current.has(id)), []);
 
   const count = pending.size;
   useEffect(() => {
@@ -126,5 +143,5 @@ export function useAttendanceOutbox(
     };
   }, [count, flush]);
 
-  return { pending, reason, queue, drop, flush };
+  return { pending, reason, queue, drop, flush, holds };
 }

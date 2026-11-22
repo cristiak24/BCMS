@@ -353,30 +353,11 @@ router.post('/events/:eventId/events', rateLimit({ bucket: 'games:events', limit
             else rejected.push({ clientId: String((item as { clientId?: unknown })?.clientId ?? ''), error: result.error });
         }
 
-        if (parsed.length) {
-            await db.insert(gameStatEvents)
-                .values(parsed.map((e) => ({ ...e, gameId: game.id, createdBy: Number(req.user?.id) })))
-                .onConflictDoUpdate({
-                    target: [gameStatEvents.gameId, gameStatEvents.clientId],
-                    // Only "deleted" may change after the fact (undo / redo).
-                    set: { deleted: sql`excluded.deleted` },
-                });
+        const box = await saveGameEvents(game.id, parsed, req.body?.state, Number(req.user?.id));
+        if (!box) {
+            res.status(409).json({ error: 'Meciul e încheiat.' });
+            return;
         }
-
-        const all = (await db.select().from(gameStatEvents).where(eq(gameStatEvents.gameId, game.id))).map(serializeEvent);
-        const box = computeBoxScore(all, game.starters as number[], game.periodSec);
-        const state = (req.body?.state ?? {}) as { period?: unknown; clockSec?: unknown };
-        const period = Number(state.period);
-        const clockSec = state.clockSec == null ? null : Number(state.clockSec);
-        await db.update(gameStats).set({
-            scoreUs: box.us,
-            scoreThem: box.them,
-            status: game.status === 'setup' ? 'live' : game.status,
-            currentPeriod: Number.isInteger(period) && period >= 1 && period <= 10 ? period : game.currentPeriod,
-            clockSec: clockSec != null && Number.isInteger(clockSec) && clockSec >= 0 && clockSec <= 3600 ? clockSec : game.clockSec,
-            updatedAt: new Date().toISOString(),
-        }).where(eq(gameStats.id, game.id));
-
         res.json({ acked: parsed.map((e) => e.clientId), rejected, scoreUs: box.us, scoreThem: box.them });
     } catch (error) {
         console.error('[games/events] error:', error);
@@ -394,10 +375,17 @@ router.post('/events/:eventId/finish', async (req: AuthenticatedRequest, res) =>
         }
         // The final score is what Acasă shows as the result: derive it from
         // the stored actions once more rather than trusting the last snapshot.
-        const box = await recomputeScore(match.game);
-        const [saved] = await db.update(gameStats)
-            .set({ status: 'finished', scoreUs: box.us, scoreThem: box.them, finishedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-            .where(eq(gameStats.id, match.game.id)).returning();
+        const gameId = match.game.id;
+        // Under the game's row lock: a push still running finishes first and
+        // its actions are in the final score (and it can't reopen the match).
+        const { box, saved } = await db.transaction(async (tx) => {
+            const [locked] = await tx.select().from(gameStats).where(eq(gameStats.id, gameId)).for('update');
+            const box = await recomputeScore(locked, tx);
+            const [saved] = await tx.update(gameStats)
+                .set({ status: 'finished', scoreUs: box.us, scoreThem: box.them, finishedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+                .where(eq(gameStats.id, gameId)).returning();
+            return { box, saved };
+        });
         if (match.game.status !== 'finished') {
             await auditRequest(req, {
                 action: 'game.finished',
@@ -572,9 +560,47 @@ router.get('/season/teams/:teamId', async (req: AuthenticatedRequest, res) => {
 });
 
 /** The score from the stored actions — the source of truth, not the last snapshot. */
-async function recomputeScore(game: typeof gameStats.$inferSelect) {
-    const all = (await db.select().from(gameStatEvents).where(eq(gameStatEvents.gameId, game.id))).map(serializeEvent);
+type DbExecutor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function recomputeScore(game: typeof gameStats.$inferSelect, exec: DbExecutor = db) {
+    const all = (await exec.select().from(gameStatEvents).where(eq(gameStatEvents.gameId, game.id))).map(serializeEvent);
     return computeBoxScore(all, game.starters as number[], game.periodSec);
+}
+
+/**
+ * Stores a batch of scorer actions and the score snapshot, under the game's
+ * row lock. Null when the match is finished by then: the status read before
+ * (loadMatch) may be stale — a finish from another device landing between
+ * the two used to be overwritten back to 'live' by this snapshot, with the
+ * late actions stored after the final score.
+ */
+export async function saveGameEvents(gameId: number, parsed: GameEvent[], rawState: unknown, createdBy: number) {
+    return db.transaction(async (tx) => {
+        const [game] = await tx.select().from(gameStats).where(eq(gameStats.id, gameId)).for('update');
+        if (!game || game.status === 'finished') return null;
+        if (parsed.length) {
+            await tx.insert(gameStatEvents)
+                .values(parsed.map((e) => ({ ...e, gameId, createdBy })))
+                .onConflictDoUpdate({
+                    target: [gameStatEvents.gameId, gameStatEvents.clientId],
+                    // Only "deleted" may change after the fact (undo / redo).
+                    set: { deleted: sql`excluded.deleted` },
+                });
+        }
+        const box = await recomputeScore(game, tx);
+        const state = (rawState ?? {}) as { period?: unknown; clockSec?: unknown };
+        const period = Number(state.period);
+        const clockSec = state.clockSec == null ? null : Number(state.clockSec);
+        await tx.update(gameStats).set({
+            scoreUs: box.us,
+            scoreThem: box.them,
+            status: game.status === 'setup' ? 'live' : game.status,
+            currentPeriod: Number.isInteger(period) && period >= 1 && period <= 10 ? period : game.currentPeriod,
+            clockSec: clockSec != null && Number.isInteger(clockSec) && clockSec >= 0 && clockSec <= 3600 ? clockSec : game.clockSec,
+            updatedAt: new Date().toISOString(),
+        }).where(eq(gameStats.id, gameId));
+        return box;
+    });
 }
 
 export default router;

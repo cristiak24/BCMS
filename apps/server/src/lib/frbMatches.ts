@@ -282,3 +282,40 @@ export function frbDateToUtc(dateStr: string, timeStr?: string): Date | null {
     const settled = guess - zoneOffsetMs(first, 'Europe/Bucharest');
     return new Date(settled);
 }
+
+/**
+ * The twelve monthly fetches of a season, merged and de-duplicated. Null when
+ * every month failed: FRB is down, which is not the same as a season with no
+ * recent fixtures (that used to be reported as „echipă pe un sezon vechi”).
+ */
+export function mergeSeasonMonths(results: PromiseSettledResult<ParsedMatch[]>[]): ParsedMatch[] | null {
+    const fetched = results.filter((result): result is PromiseFulfilledResult<ParsedMatch[]> => result.status === 'fulfilled');
+    if (results.length && !fetched.length) return null;
+    const seen = new Set<string>();
+    return fetched.flatMap((result) => result.value).filter((match) => {
+        const id = `${match.date}|${match.homeTeam}|${match.awayTeam}`;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+    });
+}
+
+/**
+ * A fixture FRB moved to another day: its synced row is matched by day, so the
+ * move used to add a second event and leave the old one. `orphans` are this
+ * team's FRB-synced rows whose day no fixture of the season has any more; the
+ * one with the same title closest in time is taken (removed from the list)
+ * and moved by the caller.
+ */
+export function takeMovedFixture<T extends { title: string; startTime: string | null }>(orphans: T[], title: string, start: Date): T | null {
+    const wanted = title.trim().toLowerCase();
+    let best = -1;
+    let bestGap = Number.POSITIVE_INFINITY;
+    orphans.forEach((row, index) => {
+        if (row.title.trim().toLowerCase() !== wanted) return;
+        const at = row.startTime ? Date.parse(row.startTime) : NaN;
+        const gap = Number.isFinite(at) ? Math.abs(at - start.getTime()) : Number.POSITIVE_INFINITY - 1;
+        if (gap < bestGap) { best = index; bestGap = gap; }
+    });
+    return best >= 0 ? orphans.splice(best, 1)[0] : null;
+}
