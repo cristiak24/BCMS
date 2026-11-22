@@ -20,6 +20,10 @@ import './theme/dark-extras.css';
 import { initI18n } from '../i18n';
 import { captureInstallPrompt } from './pwa/installApp';
 import { wakeServer } from '../services/apiClient';
+import { installErrorReporter } from '../services/errorReporter';
+
+// First, so a crash while the app boots is reported too (POST /api/client-errors).
+installErrorReporter();
 
 // Before render: Chrome can fire beforeinstallprompt as soon as the page loads.
 captureInstallPrompt();

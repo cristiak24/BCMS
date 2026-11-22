@@ -114,6 +114,19 @@ export function setSessionTokenGetter(getter: SessionTokenGetter | null) {
   }
 }
 
+/**
+ * The session token right now, without waiting for sign-in to finish (null
+ * before that) — for requests that work signed out too (error reports).
+ */
+export async function peekSessionToken(): Promise<string | null> {
+  if (!sessionTokenGetter) return null;
+  try {
+    return await sessionTokenGetter();
+  } catch {
+    return null;
+  }
+}
+
 /** Get the current session token, or null if not logged in */
 async function getSessionToken(): Promise<string | null> {
   if (!sessionTokenGetter) {

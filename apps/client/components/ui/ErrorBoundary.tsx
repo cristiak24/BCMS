@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { getClerk } from '../../config/clerk';
 import { clearAuthSession, setCachedAuthSession } from '../../utils/authSession';
+import { reportClientError } from '../../services/errorReporter';
 
 import { tr } from '../../i18n';
 type ErrorBoundaryProps = {
@@ -39,6 +40,9 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
     // Keep the component stack — it is the only way to find which screen threw
     // once the tree has already been torn down.
     console.error('[ErrorBoundary]', error, info.componentStack);
+    // …and to the server log ([client-error] on Render), so a crash on a
+    // parent's phone is seen without them having to describe it.
+    reportClientError('boundary', error, { componentStack: info.componentStack });
   }
 
   reset = () => this.setState({ error: null });

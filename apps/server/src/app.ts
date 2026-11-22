@@ -25,6 +25,7 @@ import notificationRoutes from './routes/notificationRoutes';
 import privacyRoutes from './routes/privacy';
 import { loadServerEnv } from './lib/loadEnv';
 import { cspReportRoute } from './routes/cspReport';
+import { clientErrorRoute } from './routes/clientErrors';
 import { createAllowedOrigins, isOriginAllowed } from './lib/corsOrigins';
 import { securityHeaders } from './middleware/securityHeaders';
 import { isoTimestampReplacer } from './lib/dateUtils';
@@ -69,6 +70,8 @@ export function createServerApp() {
     app.post('/api/finance/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);
     // Before express.json(): CSP reports come as application/csp-report.
     app.post('/api/csp-report', ...cspReportRoute);
+    // Own small body limit and text/plain (sendBeacon), so also before express.json().
+    app.post('/api/client-errors', ...clientErrorRoute);
     app.use(express.json());
     // Raw `timestamp` text left unmapped by a route leaves as ISO with `Z`.
     app.set('json replacer', isoTimestampReplacer);
