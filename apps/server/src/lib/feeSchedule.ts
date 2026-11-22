@@ -119,23 +119,51 @@ function fromIndex(index: number) {
     return { year: Math.floor(index / 12), month: (index % 12) + 1 };
 }
 
+// The same `now` is passed for every player of a club in one request.
+let lastMonthOf: { at: number; index: number } | null = null;
+
 function currentMonthIndex(now: Date) {
+    const at = now.getTime();
+    if (lastMonthOf?.at === at) return lastMonthOf.index;
     const { year, month } = clubMonth(now);
-    return monthIndex(year, month);
+    lastMonthOf = { at, index: monthIndex(year, month) };
+    return lastMonthOf.index;
 }
 
 /**
  * End (23:59:59, Romanian time) of day `dueDay` of the month after (year,
  * month), clamped to that month's length.
  */
+// A club's ledger asks for the same few months over and over (every player ×
+// every billed month × every recurring fee), and each answer costs Intl calls:
+// the DST-aware due date two formatToParts, the label a formatter. Both depend
+// on their arguments only, so they are worked out once per process. Bounded:
+// the keys are calendar months (× due day), a few hundred at most in practice.
+const MEMO_LIMIT = 5000;
+const dueTimes = new Map<string, number>();
+const monthLabels = new Map<number, string>();
+const monthLabelFormat = new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+function remember<K, V>(cache: Map<K, V>, key: K, value: V) {
+    if (cache.size >= MEMO_LIMIT) cache.clear();
+    cache.set(key, value);
+    return value;
+}
+
 export function dueDateFor(year: number, month: number, dueDay: number) {
     const next = fromIndex(monthIndex(year, month) + 1);
     const day = Math.min(Math.max(1, Math.trunc(dueDay) || 1), daysInMonth(next.year, next.month));
-    return clubDateTime(next.year, next.month, day, 23, 59, 59);
+    const key = `${next.year}-${next.month}-${day}`;
+    const cached = dueTimes.get(key);
+    // A fresh Date each time: callers may keep or change the one they get.
+    if (cached !== undefined) return new Date(cached);
+    return new Date(remember(dueTimes, key, clubDateTime(next.year, next.month, day, 23, 59, 59).getTime()));
 }
 
 function monthLabel(year: number, month: number) {
-    return new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, 15)));
+    const index = monthIndex(year, month);
+    return monthLabels.get(index)
+        ?? remember(monthLabels, index, monthLabelFormat.format(new Date(Date.UTC(year, month - 1, 15))));
 }
 
 /** Months billed for this player, oldest first. */
@@ -162,6 +190,17 @@ export function billedMonths(settings: FeeSettings, playerSince: string | null, 
  * Oldest first: by due date, fees without one last. The sort is stable, so
  * fees due together keep the order they were listed in (cotizație first).
  */
+const windowStarts = new Map<string, number | null>();
+
+/** When the billing window opens: the 1st of the start month, 00:00 in Romania. */
+function billingWindowStart(billingStartMonth: string | null) {
+    const key = billingStartMonth ?? '';
+    const cached = windowStarts.get(key);
+    if (cached !== undefined) return cached;
+    const start = parseMonth(billingStartMonth);
+    return remember(windowStarts, key, start ? clubDateTime(start.year, start.month, 1).getTime() : null);
+}
+
 function byDueDate(a: ComputedFee, b: ComputedFee) {
     const at = a.dueDate ? Date.parse(a.dueDate) : Number.POSITIVE_INFINITY;
     const bt = b.dueDate ? Date.parse(b.dueDate) : Number.POSITIVE_INFINITY;
@@ -251,10 +290,7 @@ export function computePlayerLedger(input: FeeInput): FeeLedger {
 
     // Event fees: upcoming ones for the whole squad; a past one stays owed
     // only by players who took part, and only inside the billing window.
-    const windowStart = (() => {
-        const start = parseMonth(settings.billingStartMonth);
-        return start ? clubDateTime(start.year, start.month, 1).getTime() : null;
-    })();
+    const windowStart = billingWindowStart(settings.billingStartMonth);
     const eventFees = events
         .filter((event) => positive(event.amount) > 0 && String(event.status ?? '').toLowerCase() !== 'cancelled' && !paid.has(`event:${event.id}`))
         .map((event) => ({ event, start: event.startTime ? new Date(event.startTime).getTime() : NaN }))

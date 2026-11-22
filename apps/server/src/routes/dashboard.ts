@@ -225,7 +225,10 @@ router.get('/summary', async (req, res) => {
         // against what should be in by month-end (collected + still owed on fees due
         // by then, older restanțe included). Mid-month the home used to show a red
         // „-100%” against last month and a negative „profit”.
-        const bucharestMonth = (date: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Bucharest', year: 'numeric', month: '2-digit' }).format(date);
+        // One formatter for the request: it runs once per fee of the club (a
+        // new Intl.DateTimeFormat each time was most of this route's CPU).
+        const bucharestMonthFormat = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Bucharest', year: 'numeric', month: '2-digit' });
+        const bucharestMonth = (date: Date) => bucharestMonthFormat.format(date);
         const thisMonth = bucharestMonth(now);
         const feesCollectedThisMonth = postgresMonthlyPaymentIncome;
         const stillOwedByMonthEnd = balances.reduce((sum, balance) => sum + balance.fees

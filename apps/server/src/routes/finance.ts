@@ -698,13 +698,21 @@ async function buildAdminRecentPayments(clubId: number | null, limit = 12, teamI
         return [];
     }
 
+    // Only the newest `limit` rows leave the database (the club's whole payment
+    // history used to be loaded and sorted here for a list of 12). Same order
+    // as the sort below: payment date (else creation), then the newest row.
     const postgresPaymentRows = await db
         .select()
         .from(pgPlayerPayments)
-        .where(inArray(pgPlayerPayments.playerId, playerIds));
+        .where(and(
+            inArray(pgPlayerPayments.playerId, playerIds),
+            // A voided request was settled by a later payment, which is listed itself.
+            sql`lower(trim(${pgPlayerPayments.status})) <> 'void'`,
+        ))
+        .orderBy(sql`coalesce(${pgPlayerPayments.date}, ${pgPlayerPayments.createdAt}) desc`, desc(pgPlayerPayments.id))
+        .limit(limit);
 
     const payments: AdminRecentPayment[] = postgresPaymentRows
-        // A voided request was settled by a later payment, which is listed itself.
         .filter((payment) => normalizeStatus(payment.status) !== 'void')
         .map((payment) => {
             const player = playersById.get(payment.playerId);

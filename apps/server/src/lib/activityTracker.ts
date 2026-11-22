@@ -41,13 +41,16 @@ function ensureSweep() {
 }
 
 /** Calendar day and month of `date` in Romania (invoices follow local months). */
+// Built once: this runs on every authenticated request.
+const dayPartsFormat = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+});
+
 export function activityKeys(date: Date) {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: TIME_ZONE,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    }).formatToParts(date);
+    const parts = dayPartsFormat.formatToParts(date);
     const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
     const day = `${get('year')}-${get('month')}-${get('day')}`;
     return { day, month: day.slice(0, 7) };

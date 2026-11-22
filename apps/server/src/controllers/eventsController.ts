@@ -925,9 +925,11 @@ export const eventsController = {
             const existingRows = await db.select().from(events)
                 .where(and(inArray(events.teamId, teamIds), eq(events.type, 'match')));
 
-            const bucharestDay = (value: Date) => new Intl.DateTimeFormat('en-CA', {
+            // One formatter for every match of the club (it was built per row).
+            const bucharestDayFormat = new Intl.DateTimeFormat('en-CA', {
                 timeZone: 'Europe/Bucharest', year: 'numeric', month: '2-digit', day: '2-digit',
-            }).format(value);
+            });
+            const bucharestDay = (value: Date) => bucharestDayFormat.format(value);
             const keyOf = (teamId: number, title: string, day: string) => `${teamId}|${title.trim().toLowerCase()}|${day}`;
 
             const existingByKey = new Map<string, typeof existingRows[number]>();
