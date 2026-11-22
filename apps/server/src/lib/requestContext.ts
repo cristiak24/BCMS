@@ -4,6 +4,7 @@ import { normalizeRole } from './requestAuth';
 import { verifyBearerToken } from './clerkAuth';
 import { findOrLinkUser } from './identityLink';
 import { recordActivity } from './activityTracker';
+import { PENDING_ACCOUNT_ERROR, pendingAccountMayUse } from './pendingAccess';
 
 type ErrorPayload = { error: string };
 
@@ -71,6 +72,12 @@ export async function requireRequestUser(req: Request, res: Response): Promise<A
 
     if (user.status === 'rejected') {
         res.status(403).json({ error: 'This account has been disabled.' } satisfies ErrorPayload);
+        return null;
+    }
+
+    // Not a member until the club approves (lib/pendingAccess.ts).
+    if (user.status === 'pending' && !pendingAccountMayUse(req.originalUrl)) {
+        res.status(403).json(PENDING_ACCOUNT_ERROR);
         return null;
     }
 

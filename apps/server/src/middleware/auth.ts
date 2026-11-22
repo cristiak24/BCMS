@@ -3,6 +3,7 @@ import { verifyBearerToken, type ClerkAuthUser } from '../lib/clerkAuth';
 import { findOrLinkUser } from '../lib/identityLink';
 import { recordActivity } from '../lib/activityTracker';
 import type { users } from '../db/schema';
+import { PENDING_ACCOUNT_ERROR, pendingAccountMayUse } from '../lib/pendingAccess';
 
 /** A `users` row as Drizzle selects it. */
 export type User = typeof users.$inferSelect;
@@ -37,6 +38,10 @@ export const authenticate = async (req: AuthenticatedRequest, res: Response, nex
             // leaving them with a working session until the token expires.
             if (user.status === 'disabled') {
                 return res.status(403).json({ error: 'This account has been disabled.' });
+            }
+            // Not a member until the club approves (lib/pendingAccess.ts).
+            if (user.status === 'pending' && !pendingAccountMayUse(req.originalUrl)) {
+                return res.status(403).json(PENDING_ACCOUNT_ERROR);
             }
 
             req.user = user;

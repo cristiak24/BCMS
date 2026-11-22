@@ -9,6 +9,7 @@
 import { and, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { attendance, events, financialSettings, playerPayments, players, playersToTeams, teams, users } from '../db/schema';
+import { teamlessPlayer } from '../lib/teamlessPlayer';
 import { computePlayerLedger, summarizeFees, type ComputedFee, type FeeEvent, type FeeInput, type FeeSettings, type FeeTotals, type LedgerRow } from '../lib/feeSchedule';
 import { DEFAULT_PAYMENT_DUE_DAY } from '../lib/financeDefaults';
 import { isPaidStatus } from '../lib/paymentLedger';
@@ -199,7 +200,8 @@ export async function clubPlayers(clubId: number, teamId: number | null = null):
             .map((user) => user.email.trim().toLowerCase())
             .filter(Boolean);
         if (emails.length) {
-            const linked = await db.select().from(players).where(inArray(sql<string>`lower(trim(${players.email}))`, emails));
+            // Only players on no team: another club's player is never ours (lib/teamlessPlayer.ts).
+            const linked = await db.select().from(players).where(and(inArray(sql<string>`lower(trim(${players.email}))`, emails), teamlessPlayer));
             linked.forEach((player) => { if (!byId.has(player.id)) byId.set(player.id, player); });
         }
     }

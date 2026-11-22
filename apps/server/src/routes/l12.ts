@@ -344,7 +344,8 @@ router.put('/events/:eventId', async (req: AuthenticatedRequest, res) => {
 
 router.delete('/events/:eventId', async (req: AuthenticatedRequest, res) => {
     try {
-        const match = await loadMatchForCaller(req, res);
+        // A write: the same rule as saving the sheet (AUDIT-SECURITY-2026-11 P1-3).
+        const match = await loadMatchForCaller(req, res, true);
         if (!match) return;
         await db.delete(l12Lineups).where(eq(l12Lineups.eventId, match.event.id));
         res.status(204).end();

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Request } from 'express';
 import { db } from '../db';
 import { storedFiles } from '../db/schema';
@@ -58,8 +58,19 @@ export function fileKeyFromUrl(url: string | null | undefined) {
     return match ? match[1] : null;
 }
 
-export async function deleteStoredFile(key: string | null) {
-    if (key) await db.delete(storedFiles).where(eq(storedFiles.key, key));
+/**
+ * Deletes a stored file only if it is the given owner's file of that kind.
+ * Never by key alone: a key read from a DB column the caller can influence
+ * (users.avatar_url) would otherwise delete another person's avatar or
+ * another club's finance document (AUDIT-SECURITY-2026-11 P1-1).
+ */
+export async function deleteOwnStoredFile(key: string | null, owner: { uploadedBy: number; kind: string }) {
+    if (!key) return;
+    await db.delete(storedFiles).where(and(
+        eq(storedFiles.key, key),
+        eq(storedFiles.uploadedBy, owner.uploadedBy),
+        eq(storedFiles.kind, owner.kind),
+    ));
 }
 
 /**

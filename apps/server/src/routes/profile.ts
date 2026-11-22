@@ -7,7 +7,7 @@ import { authenticate } from '../middleware/auth';
 import { toIso } from '../lib/dateUtils';
 import { db } from '../db';
 import { clubs, playersToTeams, teams, users } from '../db/schema';
-import { apiOrigin, deleteStoredFile, fileKeyFromUrl, saveStoredFile, sniffMime } from '../lib/storedFiles';
+import { apiOrigin, deleteOwnStoredFile, fileKeyFromUrl, saveStoredFile, sniffMime } from '../lib/storedFiles';
 import { guardianChildren, requestedChildId, resolveSelfPlayer, teamIdsOfPlayers } from '../lib/selfPlayer';
 import { checkProfileFields } from '../lib/profileInput';
 
@@ -282,7 +282,7 @@ router.post('/me/avatar', (req, res, next) => {
         }).where(eq(users.id, requestUser.id));
 
         // The previous picture is no longer referenced anywhere.
-        await deleteStoredFile(fileKeyFromUrl(existingUser.avatarUrl)).catch(() => undefined);
+        await deleteOwnStoredFile(fileKeyFromUrl(existingUser.avatarUrl), { uploadedBy: existingUser.id, kind: 'avatar' }).catch(() => undefined);
 
         return res.json({ success: true, avatarUrl });
     } catch (error) {

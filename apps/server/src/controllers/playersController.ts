@@ -9,6 +9,7 @@ import { toDate, toIso } from '../lib/dateUtils';
 import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
 import { isFailedStatus, isOutstandingStatus, isPaidStatus } from '../lib/paymentLedger';
 import { coachSeesPlayer, teamsManagedByCoach, teamsReadableByCoach } from '../lib/coachScope';
+import { isTeamless, teamlessPlayer } from '../lib/teamlessPlayer';
 import { attendancePeriod, attendancePeriodInfo, attendanceRateFromCounts, attendanceSummary, type AttendancePeriod } from '../lib/attendanceRate';
 import { clubBalances, playerFees } from '../services/clubFinance';
 import { listPlayerHistory, writeAuditLog } from '../services/auditService';
@@ -167,6 +168,8 @@ async function isPlayerAllowedForRequest(req: AuthenticatedRequest, player: type
     const membershipRows = await db.select().from(playersToTeams).where(eq(playersToTeams.playerId, player.id));
     const isAssignedToAllowedTeam = Boolean(player.teamId && allowedSet.has(player.teamId)) || membershipRows.some(m => allowedSet.has(m.teamId));
     if (isAssignedToAllowedTeam) return true;
+    // On another club's team: never ours, whatever its email (lib/teamlessPlayer.ts).
+    if (!isTeamless(player, membershipRows.length)) return false;
 
     const requestClubId = getRequestClubId(req);
     const playerClubId = await getPlayerClubIdByEmail(player.email);
@@ -327,9 +330,10 @@ async function buildRosterRows(req: AuthenticatedRequest, options: { stripForPla
         if (memberPlayerIds.length) playerConditions.push(inArray(players.id, memberPlayerIds));
         if (!isPlayerFacing) {
             const linkedIds = await clubLinkedPlayerIds(clubId);
-            if (linkedIds.length) playerConditions.push(inArray(players.id, linkedIds));
+            if (linkedIds.length) playerConditions.push(and(inArray(players.id, linkedIds), teamlessPlayer)!);
         }
-        if (clubEmails.length) playerConditions.push(inArray(sql<string>`lower(trim(${players.email}))`, clubEmails));
+        // Account/guardian links place only a player on no team (lib/teamlessPlayer.ts).
+        if (clubEmails.length) playerConditions.push(and(inArray(sql<string>`lower(trim(${players.email}))`, clubEmails), teamlessPlayer)!);
 
         const [playerRows, teamRows] = await Promise.all([
             db.select().from(players).where(or(...playerConditions)),
@@ -566,9 +570,10 @@ async function buildPlayerScope(req: AuthenticatedRequest): Promise<{ skip: true
             : [];
         const inClub = [inArray(players.teamId, allowedTeamIds)];
         if (memberIds.length) inClub.push(inArray(players.id, memberIds));
-        if (clubEmails.length) inClub.push(inArray(sql<string>`lower(trim(${players.email}))`, clubEmails));
+        // Account/guardian links place only a player on no team (lib/teamlessPlayer.ts).
+        if (clubEmails.length) inClub.push(and(inArray(sql<string>`lower(trim(${players.email}))`, clubEmails), teamlessPlayer)!);
         const linkedIds = await clubLinkedPlayerIds(clubId);
-        if (linkedIds.length) inClub.push(inArray(players.id, linkedIds));
+        if (linkedIds.length) inClub.push(and(inArray(players.id, linkedIds), teamlessPlayer)!);
         scope = or(...inClub);
         const managed = await coachManagedTeamIds(req);
         if (managed !== null) scope = and(scope, coachVisiblePlayers(managed));

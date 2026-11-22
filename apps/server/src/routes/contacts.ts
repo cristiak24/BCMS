@@ -8,7 +8,7 @@ import { playerGuardians, players, playersToTeams, teams, users } from '../db/sc
 import { resolveRequestClubId } from '../lib/tenantScope';
 import { canReadFamilyContacts, isContactStaff, parsePlayerContact } from '../lib/contacts';
 import { guardianChildren, resolveSelfPlayer, teamIdsOfPlayers } from '../lib/selfPlayer';
-import { coachReadsTeam } from '../lib/coachScope';
+import { coachManagesTeam, coachReadsTeam } from '../lib/coachScope';
 
 /**
  * Club contact book.
@@ -102,7 +102,9 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
         // A player's own account phone (profile) is the fallback for their number.
         const emails = Array.from(byId.values()).map(({ row }) => row.email?.trim().toLowerCase()).filter((e): e is string => Boolean(e));
         const accounts = emails.length
-            ? await db.select({ email: users.email, phone: users.phone }).from(users).where(inArray(users.email, emails))
+            // This club's accounts only: a record carrying another club's member's
+            // email must not reveal that person's phone (AUDIT-SECURITY-2026-11 P1-4).
+            ? await db.select({ email: users.email, phone: users.phone }).from(users).where(and(inArray(users.email, emails), eq(users.clubId, clubId)))
             : [];
         const accountPhone = new Map(accounts.map((a) => [a.email.trim().toLowerCase(), a.phone?.trim() || null]));
 
@@ -162,10 +164,11 @@ router.put(
             }
 
             // The player must be on one of this club's teams — for a coach, one
-            // they manage.
+            // they manage: the write rule, so a team with no coach is the
+            // admin's (AUDIT-SECURITY-2026-11 P1-3; WP7-F1).
             const clubTeams = await db.select({ id: teams.id, coachId: teams.coachId }).from(teams).where(eq(teams.clubId, clubId));
             const clubTeamIds = (req.user?.role === 'coach'
-                ? clubTeams.filter((team) => coachReadsTeam(team.coachId, req.user?.id))
+                ? clubTeams.filter((team) => coachManagesTeam(team.coachId, req.user?.id))
                 : clubTeams).map((t) => t.id);
             if (!clubTeamIds.length) {
                 res.status(404).json({ error: 'Jucătorul nu există.' });

@@ -126,7 +126,9 @@ router.post('/registration/complete', authenticate, async (req: AuthenticatedReq
       lastName: String(req.body?.lastName ?? ''),
       phone: req.body?.phone ?? null,
       dateOfBirth: req.body?.dateOfBirth ?? null,
-      avatarUrl: req.body?.avatarUrl ?? null,
+      // No avatarUrl: a picture is set only by uploading it (POST /api/profile/me/avatar).
+      // Taking a URL here let anyone point their avatar at another person's
+      // stored file, which the next upload then deleted (AUDIT-SECURITY-2026-11 P1-1).
     });
 
     res.json({ success: true, user: result });

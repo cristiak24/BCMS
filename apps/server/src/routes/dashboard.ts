@@ -11,6 +11,7 @@ import {
     users as pgUsers,
 } from '../db/schema';
 import { and, eq, gt, inArray, sql, type SQLWrapper } from 'drizzle-orm';
+import { teamlessPlayer } from '../lib/teamlessPlayer';
 import { getRequestUser } from '../lib/requestContext';
 import { resolveDashboardClubScope, type DashboardClubScope } from '../lib/dashboardScope';
 import { clubBalances } from '../services/clubFinance';
@@ -94,7 +95,8 @@ async function getScopedPostgresPlayers(clubScope: DashboardClubScope, teamIds: 
 
     const clubUserEmails = clubUserRows.map((user) => user.email.trim().toLowerCase());
     if (clubUserEmails.length) {
-        const userPlayers = await db.select().from(pgPlayers).where(inArray(pgPlayers.email, clubUserEmails));
+        // Only players on no team: another club's player is never ours (lib/teamlessPlayer.ts).
+        const userPlayers = await db.select().from(pgPlayers).where(and(inArray(pgPlayers.email, clubUserEmails), teamlessPlayer));
         userPlayers.forEach((player) => playersById.set(player.id, player));
     }
 

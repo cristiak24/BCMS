@@ -538,7 +538,6 @@ export async function completeUserRegistration(params: {
   lastName: string;
   phone?: string | null;
   dateOfBirth?: string | null;
-  avatarUrl?: string | null;
 }) {
   const rows = await db.select().from(users).where(eq(users.clerkUserId, params.clerkUserId)).limit(1);
   const user = rows[0];
@@ -553,7 +552,6 @@ export async function completeUserRegistration(params: {
     firstName: params.firstName.trim(),
     lastName: params.lastName.trim(),
     phone: params.phone ?? user.phone ?? null,
-    avatarUrl: params.avatarUrl ?? user.avatarUrl ?? null,
     // Profile details only. This used to set status 'active' for any caller,
     // so an account still waiting for the club's approval could approve
     // itself. Activation happens where the club approves (or the invite flow).

@@ -265,7 +265,16 @@ export async function approveJoinRequest(reviewer: Reviewer, requestId: number, 
         playerId = choice;
     }
 
-    const clubTeamIds = (await db.select({ id: teams.id }).from(teams).where(eq(teams.clubId, request.clubId))).map((t) => t.id);
+    // Which existing records this reviewer may link the request to: an admin,
+    // any player of the club; a coach, only a player of a team they coach.
+    // Before, a coach could attach their own (second) account as the guardian
+    // of any child in the club — and pull that child onto their own team —
+    // by approving a request with that child's id (AUDIT-SECURITY-2026-11 P1-2).
+    const linkableTeamIds = (await reviewableTeamIds(reviewer))
+        ?? (await db.select({ id: teams.id }).from(teams).where(eq(teams.clubId, request.clubId))).map((t) => t.id);
+    if (playerId !== 'new' && linkableTeamIds.length === 0) {
+        throw new JoinRequestError('Jucătorul ales nu face parte din echipele tale.', 403);
+    }
 
     const approved = await db.transaction(async (tx) => {
         let player: typeof players.$inferSelect;
@@ -286,9 +295,13 @@ export async function approveJoinRequest(reviewer: Reviewer, requestId: number, 
         } else {
             const found = await tx.select({ player: players }).from(players)
                 .leftJoin(playersToTeams, eq(playersToTeams.playerId, players.id))
-                .where(and(eq(players.id, playerId), or(inArray(players.teamId, clubTeamIds), inArray(playersToTeams.teamId, clubTeamIds))))
+                .where(and(eq(players.id, playerId), or(inArray(players.teamId, linkableTeamIds), inArray(playersToTeams.teamId, linkableTeamIds))))
                 .limit(1);
-            if (!found[0]) throw new JoinRequestError('Jucătorul ales nu face parte din club.', 400);
+            if (!found[0]) {
+                throw reviewer.role === 'coach'
+                    ? new JoinRequestError('Jucătorul ales nu face parte din echipele tale.', 403)
+                    : new JoinRequestError('Jucătorul ales nu face parte din club.', 400);
+            }
             player = found[0].player;
 
             if (request.kind === 'player') {

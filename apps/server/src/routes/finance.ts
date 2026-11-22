@@ -24,6 +24,7 @@ import {
     users as pgUsers,
 } from '../db/schema';
 import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { teamlessPlayer } from '../lib/teamlessPlayer';
 import {
     isFailedStatus,
     isOutstandingStatus,
@@ -666,7 +667,8 @@ async function buildAdminRecentPayments(clubId: number | null, limit = 12, teamI
         ? await db
             .select()
             .from(pgPlayers)
-            .where(inArray(pgPlayers.email, clubUserEmails))
+            // Only players on no team: another club's player is never ours (lib/teamlessPlayer.ts).
+            .where(and(inArray(pgPlayers.email, clubUserEmails), teamlessPlayer))
         : [];
 
     const playersById = new Map<number, typeof pgPlayers.$inferSelect>();
