@@ -278,6 +278,40 @@ export const attendance = pgTable("attendance", {
 	index("attendance_team_date_idx").on(table.teamId, table.date),
 ]);
 
+// A player's answer to "are you coming?" for one training/match/camp, given by
+// the player or a linked parent before the event starts (lib/eventResponses.ts).
+// Only a hint for the coach: attendance stays the coach's own record.
+// `reason` (optional, only with not_going) may hold health details, so only the
+// team's coach and the club admin read it. Migration 0029.
+export const eventResponses = pgTable("event_responses", {
+	id: serial().primaryKey().notNull(),
+	eventId: integer("event_id").notNull(),
+	playerId: integer("player_id").notNull(),
+	status: varchar({ length: 12 }).notNull(),
+	reason: varchar({ length: 200 }),
+	respondedBy: integer("responded_by"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	uniqueIndex("event_responses_event_player_unique").on(table.eventId, table.playerId),
+	index("event_responses_player_idx").on(table.playerId),
+	foreignKey({
+			columns: [table.eventId],
+			foreignColumns: [events.id],
+			name: "event_responses_event_id_events_id_fk"
+		}).onDelete('cascade'),
+	foreignKey({
+			columns: [table.playerId],
+			foreignColumns: [players.id],
+			name: "event_responses_player_id_players_id_fk"
+		}).onDelete('cascade'),
+	foreignKey({
+			columns: [table.respondedBy],
+			foreignColumns: [users.id],
+			name: "event_responses_responded_by_users_id_fk"
+		}).onDelete('set null'),
+]);
+
 export const notifications = pgTable("notifications", {
 	id: serial().primaryKey().notNull(),
 	userId: integer("user_id").notNull(),

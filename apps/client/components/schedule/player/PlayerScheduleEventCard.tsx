@@ -6,6 +6,8 @@ import { CalendarEvent } from '../../../services/eventsApi';
 import { EVENT_TYPE_META, isCancelledEvent, formatTimeRange, RO_LOCALE } from '../scheduleShared';
 
 import { tr } from '../../../i18n';
+import RsvpChip from '../../rsvp/RsvpChip';
+import { useRsvpState } from '../../rsvp/useRsvpState';
 /**
  * Read-only row used by the player Day/Week/Agenda views. No management
  * actions — a plain Pressable that opens PlayerEventDetailModal via onPress.
@@ -22,6 +24,7 @@ export const PlayerScheduleEventCard = React.memo(({
   const eventDate = parseApiDate(item.startTime);
   const meta = EVENT_TYPE_META[item.type];
   const cancelled = isCancelledEvent(item);
+  const rsvp = useRsvpState(item);
 
   return (
     <TouchableOpacity
@@ -71,6 +74,7 @@ export const PlayerScheduleEventCard = React.memo(({
           </View>
         </View>
       </View>
+      {rsvp.show ? <RsvpChip status={rsvp.status} open={rsvp.open} voice={rsvp.voice} /> : null}
     </TouchableOpacity>
   );
 });

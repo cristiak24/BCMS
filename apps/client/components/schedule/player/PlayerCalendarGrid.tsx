@@ -5,6 +5,7 @@ import { EVENT_TYPE_META, isCancelledEvent } from '../scheduleShared';
 import { Skeleton } from '../../ui/Skeleton';
 import { useSession } from '../../../context/AuthContext';
 import { CalendarEventPill, calendarDayLabel } from '../CalendarEventPill';
+import { EventRsvpDot } from '../../rsvp/RsvpChip';
 
 import { tr } from '../../../i18n';
 /*
@@ -182,7 +183,13 @@ const CalendarCell = React.memo(({
       {/* Events list */}
       <View className="gap-[3px]">
         {visibleEvents.map((event) => (
-          <CalendarEventPill key={event.id} event={event} dateKey={day.dateKey} onPress={open} />
+          <CalendarEventPill
+            key={event.id}
+            event={event}
+            dateKey={day.dateKey}
+            onPress={open}
+            leading={<EventRsvpDot event={event} ring={event.type === 'match' ? EVENT_TYPE_META.match.onSolid : undefined} />}
+          />
         ))}
         {overflow > 0 && (
           <TouchableOpacity onPress={open} activeOpacity={0.7} className="self-start mt-[1px]">

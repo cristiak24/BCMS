@@ -1,4 +1,5 @@
-import { Text, TouchableOpacity } from '@/src/web/reactNative';
+import type { ReactNode } from 'react';
+import { Text, TouchableOpacity, View } from '@/src/web/reactNative';
 import type { CalendarEvent } from '../../services/eventsApi';
 import { isContinuationDay } from '../../utils/eventDays';
 import { plural } from '../../utils/plural';
@@ -11,11 +12,32 @@ import { tr, appLocale } from '../../i18n';
  * title. On the later days of a multi-day event (a camp) it reads
  * "↳ Cantonament Predeal" in the soft tone, so the span is visible.
  */
-export function CalendarEventPill({ event, dateKey, onPress }: { event: CalendarEvent; dateKey: string | null; onPress: () => void }) {
+export function CalendarEventPill({ event, dateKey, onPress, leading }: {
+  event: CalendarEvent;
+  dateKey: string | null;
+  onPress: () => void;
+  /** A small mark before the text (the player's answer dot, Val 3). */
+  leading?: ReactNode;
+}) {
   const meta = EVENT_TYPE_META[event.type] ?? EVENT_TYPE_META.admin;
   const continued = dateKey ? isContinuationDay(event, dateKey) : false;
   const solid = event.type === 'match' && !continued;
   const time = formatEventTime(event.startTime);
+  // One line cut by characters, not words: a line clamp moved the title to the
+  // (hidden) second line in narrow cells and left only "21:00 …".
+  const text = (
+    <Text style={{ fontSize: 11, fontWeight: '800', color: solid ? meta.onSolid : meta.onSoft, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 } as any}>
+      {continued ? (
+        `↳ ${event.title}`
+      ) : (
+        <>
+          {/* Lighter weight, not opacity: at 0.8 the time fell to 3.9:1 on the soft pills. */}
+          <Text className="t-num" style={{ fontWeight: '600', whiteSpace: 'nowrap' } as any}>{time}</Text>
+          {` ${event.title}`}
+        </>
+      )}
+    </Text>
+  );
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -30,19 +52,7 @@ export function CalendarEventPill({ event, dateKey, onPress }: { event: Calendar
         opacity: continued ? 0.85 : 1,
       }}
     >
-      {/* One line cut by characters, not words: a line clamp moved the title
-          to the (hidden) second line in narrow cells and left only "21:00 …". */}
-      <Text style={{ fontSize: 11, fontWeight: '800', color: solid ? meta.onSolid : meta.onSoft, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as any}>
-        {continued ? (
-          `↳ ${event.title}`
-        ) : (
-          <>
-            {/* Lighter weight, not opacity: at 0.8 the time fell to 3.9:1 on the soft pills. */}
-            <Text className="t-num" style={{ fontWeight: '600', whiteSpace: 'nowrap' } as any}>{time}</Text>
-            {` ${event.title}`}
-          </>
-        )}
-      </Text>
+      {leading ? <View className="flex-row items-center gap-1 min-w-0">{leading}{text}</View> : text}
     </TouchableOpacity>
   );
 }

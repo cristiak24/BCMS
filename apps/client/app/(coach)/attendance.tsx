@@ -25,6 +25,11 @@ import { defaultSession, splitSessions } from '../../utils/attendanceSessions';
 import { coachCanChangeEvent } from '../../utils/coachEventScope';
 
 import { tr } from '../../i18n';
+import { useLocalSearchParams } from '@/src/web/expoRouter';
+import RsvpIndicator from '../../components/rsvp/RsvpIndicator';
+import { RemindButton, useEventResponses } from '../../components/rsvp/RsvpStaffSummary';
+import type { StaffResponseRow } from '../../services/eventResponsesApi';
+import { countsLine, eventTakesResponses } from '../../utils/rsvp';
 /**
  * "Prezență" — pick a session on the left, mark the squad on the right.
  *
@@ -97,12 +102,15 @@ function mergeAttendance(teamPlayers: Player[], attendanceRows: EventAttendance[
  */
 function AttendanceRow({
   player,
+  response,
   busy,
   locked,
   onMark,
   onSaveNote,
 }: {
   player: AttendancePlayer;
+  /** The player's „Vine / Nu vine / Poate” (Val 3): shown, never applied. */
+  response?: StaffResponseRow | null;
   busy: boolean;
   locked: boolean;
   onMark: (status: AttendanceMark) => void;
@@ -143,6 +151,7 @@ function AttendanceRow({
             // Only the unmarked state needs saying — a marked one is already
             // spelled out by the filled segment on the right.
             meta={unmarked ? attendanceStatusTone(null).label : null}
+            metaExtra={response?.status ? <RsvpIndicator row={response} /> : null}
           />
         </View>
         <AttendanceNoteToggle open={noteOpen} hasNote={Boolean(player.note.trim())} playerName={`${player.firstName} ${player.lastName}`} onPress={() => setNoteOpen((v) => !v)} />
@@ -184,6 +193,10 @@ function AttendanceRow({
 export default function CoachAttendanceScreen() {
   const { session } = useSession();
   const { isMobile } = useResponsive();
+  // „Vezi lista” in the event sheet and the „Nu vine” notification open a session here.
+  const { event: requestedEvent } = useLocalSearchParams<{ event?: string }>();
+  const requestedEventId = Number(requestedEvent) > 0 ? Number(requestedEvent) : null;
+  const appliedRequestRef = useRef<number | null>(null);
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -211,13 +224,21 @@ export default function CoachAttendanceScreen() {
       const groups = splitSessions(getCoachScopedEvents(eventRows, session, teamRows).filter((event) => event.type !== 'admin'));
       setTeams(teamRows);
       setEvents([...groups.upcoming, ...groups.past]);
-      setSelectedEventId((current) => current ?? defaultSession(groups)?.id ?? null);
+      const requested = requestedEventId != null && [...groups.upcoming, ...groups.past].some((event) => event.id === requestedEventId) ? requestedEventId : null;
+      // A requested session wins once (a link opened while already on this page);
+      // a later refresh keeps whatever the coach picked since.
+      if (requested != null && appliedRequestRef.current !== requested) {
+        appliedRequestRef.current = requested;
+        setSelectedEventId(requested);
+      } else {
+        setSelectedEventId((current) => current ?? defaultSession(groups)?.id ?? null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : tr('Nu s-au putut încărca sesiunile.'));
     } finally {
       setLoadingEvents(false);
     }
-  }, [session]);
+  }, [session, requestedEventId]);
 
   useEffect(() => {
     loadEvents();
@@ -255,6 +276,11 @@ export default function CoachAttendanceScreen() {
   // A team with no coach is shown, but its sheet is the admin's (WP7-F1).
   const selectedNotMine = selectedEvent ? !coachCanChangeEvent(selectedEvent, teams, session?.id) : false;
   const selectedLocked = selectedNotYet || selectedNotMine;
+  const { summary: responses, reload: reloadResponses } = useEventResponses(selectedEvent?.id ?? null, eventTakesResponses(selectedEvent));
+  const responseByPlayer = useMemo(
+    () => new Map((responses?.enabled ? responses.players : []).map((row) => [row.playerId, row])),
+    [responses],
+  );
   const { reset: resetSaveStatus } = saveStatus;
 
   const loadAttendance = useCallback(async () => {
@@ -508,11 +534,20 @@ export default function CoachAttendanceScreen() {
                 ) : (
                   <AttendanceSaveStatus state={saveStatus.state} />
                 )}
+                {responses?.enabled ? (
+                  <View className="flex-row items-center justify-between gap-2.5 flex-wrap">
+                    <Text className="text-[12.5px] font-medium flex-1 min-w-[200px]" style={{ color: 'var(--c-muted)' }}>
+                      {tr('Răspunsuri: {0}', { '0': countsLine(responses.counts) })}
+                    </Text>
+                    <RemindButton summary={responses} onSent={reloadResponses} size="sm" />
+                  </View>
+                ) : null}
                 <DenseList label={tr('Jucători')}>
                   {players.map((player) => (
                     <AttendanceRow
                       key={player.playerId}
                       player={player}
+                      response={responseByPlayer.get(player.playerId)}
                       busy={bulkSaving || savingPlayerId === player.playerId}
                       locked={selectedLocked}
                       onMark={(status) => markPlayer(player.playerId, status)}

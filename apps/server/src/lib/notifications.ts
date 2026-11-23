@@ -240,3 +240,59 @@ export async function sendPaymentReminders(balances: Array<{ playerId: number; p
     }
     return { notified: rows.length, skipped };
 }
+
+/**
+ * „Amintește-le” (Val 3): the players who haven't answered yet, and their
+ * parents, are asked to confirm. In the app only. The text doesn't name the
+ * child: a parent of two players on the team gets one message per event.
+ */
+export async function notifyResponseReminder(params: { playerIds: number[]; eventId: number; title: string; startTime: string }) {
+    if (!params.playerIds.length) return 0;
+    const when = formatWhen(params.startTime);
+    return notifyPlayers(params.playerIds, () => ({
+        type: 'rsvp_reminder',
+        title: 'Confirmă participarea',
+        message: `„${params.title}” de ${when} așteaptă răspunsul: vii, nu vii sau poate.`,
+        eventId: params.eventId,
+    }));
+}
+
+/**
+ * A player (or parent) answered „Nu vin”: the team's coach and the coach on
+ * the event are told, in the app. Admins only when the team has no coach.
+ * Once per player and event — see lib/eventResponses.ts shouldNotifyDecline.
+ */
+export async function notifyResponseDeclined(params: {
+    clubId: number;
+    coachIds: Array<number | null | undefined>;
+    eventId: number;
+    playerId: number;
+    playerName: string;
+    noun: string;
+    startTime: string;
+    reason: string | null;
+}) {
+    let userIds = Array.from(new Set(params.coachIds.filter((id): id is number => id != null).map(Number)));
+    if (userIds.length) {
+        // Only staff still active in this club.
+        userIds = (await db.select({ id: users.id }).from(users)
+            .where(and(inArray(users.id, userIds), eq(users.clubId, params.clubId), ne(users.status, 'disabled'))))
+            .map((row) => row.id);
+    }
+    if (!userIds.length) {
+        userIds = (await db.select({ id: users.id }).from(users)
+            .where(and(eq(users.clubId, params.clubId), eq(users.role, 'admin'), eq(users.status, 'active'))))
+            .map((row) => row.id);
+    }
+    if (!userIds.length) return 0;
+    const message = `${params.playerName} nu vine la ${params.noun} de ${formatWhen(params.startTime)}.${params.reason ? ` Motiv: ${truncateNote(params.reason)}` : ''}`;
+    await db.insert(notifications).values(userIds.map((userId) => ({
+        userId,
+        type: 'rsvp_declined',
+        title: 'Absență anunțată',
+        message,
+        eventId: params.eventId,
+        playerId: params.playerId,
+    })));
+    return userIds.length;
+}

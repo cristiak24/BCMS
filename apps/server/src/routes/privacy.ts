@@ -5,6 +5,7 @@ import { db } from '../db';
 import {
     accessRequests,
     attendance,
+    eventResponses,
     clubs,
     legalAcceptances,
     notifications,
@@ -86,7 +87,7 @@ router.get('/export', exportLimiter, async (req, res) => {
             : await resolveSelfPlayer({ id: caller.id, role: caller.role, email: caller.email }).then((row) => (row ? [row] : []));
         const playerIds = linkedPlayers.map((player) => player.id);
 
-        const [teamRows, attendanceRows, paymentRows, notificationRows, acceptanceRows, requestRows, accessRows] = await Promise.all([
+        const [teamRows, attendanceRows, paymentRows, notificationRows, acceptanceRows, requestRows, accessRows, responseRows] = await Promise.all([
             playerIds.length
                 ? db.select({ playerId: playersToTeams.playerId, team: teams.name }).from(playersToTeams)
                     .innerJoin(teams, eq(teams.id, playersToTeams.teamId)).where(inArray(playersToTeams.playerId, playerIds))
@@ -99,6 +100,8 @@ router.get('/export', exportLimiter, async (req, res) => {
             db.select().from(legalAcceptances).where(eq(legalAcceptances.userId, caller.id)),
             db.select().from(privacyRequests).where(eq(privacyRequests.userId, caller.id)),
             db.select().from(accessRequests).where(eq(accessRequests.userId, caller.id)),
+            // „Vin / Nu vin / Poate” answers (Val 3), with any reason given.
+            playerIds.length ? db.select().from(eventResponses).where(inArray(eventResponses.playerId, playerIds)) : [],
         ]);
 
         const stamp = new Date().toISOString();
@@ -113,6 +116,7 @@ router.get('/export', exportLimiter, async (req, res) => {
                 teams: teamRows.filter((row) => row.playerId === player.id).map((row) => row.team),
             })),
             attendance: attendanceRows,
+            eventResponses: responseRows,
             payments: paymentRows,
             notifications: notificationRows,
             legalAcceptances: acceptanceRows,

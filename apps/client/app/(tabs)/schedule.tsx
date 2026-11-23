@@ -10,6 +10,10 @@ import { useSession } from '../../context/AuthContext';
 import { getCoachScopedEvents } from '../../components/coach/coachUtils';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../components/HeaderContext';
 import { PlayerEventDetailModal } from '../../components/schedule/player/PlayerEventDetailModal';
+import { loadMyResponses } from '../../hooks/useMyResponses';
+import RsvpChip from '../../components/rsvp/RsvpChip';
+import { useRsvpState } from '../../components/rsvp/useRsvpState';
+import { responseLabel } from '../../utils/rsvp';
 import { Skeleton } from '../../components/ui/Skeleton';
 import PageContainer from '../../components/ui/PageContainer';
 import PageHero, { GlassStat, StatStrip } from '../../components/admin/PageHero';
@@ -180,6 +184,34 @@ function getNextMatchLabel(match: CalendarEvent | null) {
  * second card list („Evenimente viitoare”) beside the calendar repeated the
  * same sessions.
  */
+/** One event of „Evenimentele lunii”; the player's answer replaces the chevron (Val 3). */
+function MonthEventLine({ event, onPress }: { event: CalendarEvent; onPress: () => void }) {
+  const meta = getEventTypeMeta(event.type);
+  const rsvp = useRsvpState(event);
+  const answer = rsvp.status ? responseLabel(rsvp.status, rsvp.voice) : rsvp.open ? tr('așteaptă răspuns') : '';
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${meta.label}: ${event.title}, ${formatTimeRange(event.startTime, event.endTime)}${rsvp.show && answer ? `, ${answer}` : ''}`}
+      className="ui-press flex-row items-center gap-2.5 rounded-[10px] px-2 py-2 min-h-[44px] text-left hover:bg-[var(--c-surface-2)]"
+    >
+      <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: meta.solid }} />
+      <View className="flex-1 min-w-0">
+        <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{event.title}</Text>
+        <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
+          {[meta.label, formatTimeRange(event.startTime, event.endTime), event.location || tr('Teren club')].join(' · ')}
+        </Text>
+      </View>
+      {rsvp.show ? (
+        <RsvpChip status={rsvp.status} open={rsvp.open} voice={rsvp.voice} />
+      ) : (
+        <MaterialIcons name="chevron-right" size={18} color="var(--c-faint)" />
+      )}
+    </Pressable>
+  );
+}
+
 function MonthDayRow({
   dateKey,
   events,
@@ -203,27 +235,9 @@ function MonthDayRow({
         <Text className="t-label mt-1" style={{ color: isToday ? 'var(--c-brand-fg)' : 'var(--c-muted)' }}>{isToday ? tr('Azi') : weekday.charAt(0).toUpperCase() + weekday.slice(1)}</Text>
       </View>
       <View className="flex-1 min-w-0 gap-0.5">
-        {events.map((event) => {
-          const meta = getEventTypeMeta(event.type);
-          return (
-            <Pressable
-              key={event.id}
-              onPress={() => onSelectEvent(event)}
-              accessibilityRole="button"
-              accessibilityLabel={`${meta.label}: ${event.title}, ${formatTimeRange(event.startTime, event.endTime)}`}
-              className="ui-press flex-row items-center gap-2.5 rounded-[10px] px-2 py-2 min-h-[44px] text-left hover:bg-[var(--c-surface-2)]"
-            >
-              <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: meta.solid }} />
-              <View className="flex-1 min-w-0">
-                <Text className="text-[14px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>{event.title}</Text>
-                <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>
-                  {[meta.label, formatTimeRange(event.startTime, event.endTime), event.location || tr('Teren club')].join(' · ')}
-                </Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={18} color="var(--c-faint)" />
-            </Pressable>
-          );
-        })}
+        {events.map((event) => (
+          <MonthEventLine key={event.id} event={event} onPress={() => onSelectEvent(event)} />
+        ))}
       </View>
     </DenseRow>
   );
@@ -314,6 +328,10 @@ export default function ScheduleScreen() {
       // A refresh keeps the history already on screen; the first load starts
       // with this month and what is ahead.
       const start = loadedFromRef.current ?? initialHistoryStart();
+      // The player's own answers (Val 3) for the rows and the sheet; never blocks the page.
+      if (!isCoach) {
+        void loadMyResponses(start, new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)).catch(() => undefined);
+      }
       const [allEvents, teamRows] = await Promise.all([
         eventsApi.getEvents({ start: start.toISOString() }),
         isCoach ? teamsApi.getTeams() : Promise.resolve([]),

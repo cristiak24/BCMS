@@ -22,6 +22,8 @@ import { plural } from '../../../utils/plural';
 import { isNotFound } from '../../../services/apiClient';
 import { useLeaveGuard } from '../../../hooks/useLeaveGuard';
 import LeaveGuardDialog from '../../../components/ui/LeaveGuardDialog';
+import RsvpStaffSummary from '../../../components/rsvp/RsvpStaffSummary';
+import { eventTakesResponses } from '../../../utils/rsvp';
 
 /** Roles the server lets change an event (ensureTeamAccess); others only read it. */
 
@@ -301,6 +303,8 @@ export default function EventDetailScreen() {
   const now = Date.now();
   const isUpcoming = start.getTime() > now;
   const cancelled = String(event.status ?? '').toLowerCase() === 'cancelled';
+  // „Răspunsuri” (Val 3): after „Când” on phones, at the top of the right column on desktop.
+  const responsesCard = eventTakesResponses(event) ? <RsvpStaffSummary eventId={event.id} variant="card" /> : null;
   const scoreMatch = (event.description ?? '').match(SCORE_RE);
   const sides = event.type === 'match' ? event.title.split(/\s+vs\s+/i) : [];
   const description = cleanDescription(event.description);
@@ -404,6 +408,8 @@ export default function EventDetailScreen() {
                 </View>
               </Card>
 
+              {isMobile ? responsesCard : null}
+
               <Card
                 title="Unde"
                 trailing={event.location ? (
@@ -450,6 +456,7 @@ export default function EventDetailScreen() {
             </View>
 
             <View className="gap-4 min-w-0">
+              {isMobile ? null : responsesCard}
               {event.type === 'match' && event.teamId && !cancelled ? (
                 <L12MatchLink eventId={event.id} onOpen={(path) => router.push(path as any)} />
               ) : null}

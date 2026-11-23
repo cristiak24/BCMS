@@ -101,6 +101,9 @@ export default function AppHeader({
       router.push('/payments');
     } else if (notification.type === 'access_request') {
       router.push(session?.role === 'coach' ? '/coach/requests' : '/admin/manage-access');
+    } else if (notification.type === 'rsvp_declined' && notification.eventId != null) {
+      // „Nu vine” (Val 3): straight to that session's attendance list.
+      router.push(session?.role === 'coach' ? `/coach/attendance?event=${notification.eventId}` : `/admin/attendance/${notification.eventId}`);
     } else if (notification.type === 'privacy_request') {
       router.push(session?.role === 'superadmin' ? '/super-admin/privacy' : '/admin/privacy');
     } else if (notification.eventId != null) {

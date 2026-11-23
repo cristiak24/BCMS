@@ -29,6 +29,10 @@ import { plural } from '../../../utils/plural';
 import { DenseList, DenseRow } from '../../../components/ui/DenseList';
 import { isNotFound } from '../../../services/apiClient';
 import { useLeaveGuard } from '../../../hooks/useLeaveGuard';
+import RsvpIndicator from '../../../components/rsvp/RsvpIndicator';
+import { RemindButton, useEventResponses } from '../../../components/rsvp/RsvpStaffSummary';
+import type { StaffResponseRow } from '../../../services/eventResponsesApi';
+import { countsLine, eventTakesResponses } from '../../../utils/rsvp';
 import LeaveGuardDialog from '../../../components/ui/LeaveGuardDialog';
 import { isRetryableSaveError, readPendingMarks, useAttendanceOutbox } from '../../../hooks/useAttendanceOutbox';
 
@@ -88,6 +92,11 @@ export default function AttendanceScreen() {
   // Gone (404 or a bad id): the page offers „Înapoi”, retrying can't help.
   const [missing, setMissing] = useState(false);
   const [event, setEvent] = useState<CalendarEvent | null>(null);
+  const { summary: responses, reload: reloadResponses } = useEventResponses(event?.id ?? null, eventTakesResponses(event));
+  const responseByPlayer = useMemo(
+    () => new Map((responses?.enabled ? responses.players : []).map((row) => [row.playerId, row])),
+    [responses],
+  );
   const [team, setTeam] = useState<Team | null>(null);
   const [roster, setRoster] = useState<RosterEntry[]>([]);
   const [filter, setFilter] = useState<StatusFilter>('all');
@@ -535,11 +544,20 @@ export default function AttendanceScreen() {
               <>
               {/* A heading for the list the page is about (it exposed only its h1). */}
               <Text className="sr-only" accessibilityRole="header">Prezența jucătorilor</Text>
+              {responses?.enabled ? (
+                <View className="flex-row items-center justify-between gap-2.5 flex-wrap mb-2.5">
+                  <Text className="text-[12.5px] font-medium flex-1 min-w-[200px]" style={{ color: 'var(--c-muted)' }}>
+                    {`Răspunsuri: ${countsLine(responses.counts)}`}
+                  </Text>
+                  <RemindButton summary={responses} onSent={reloadResponses} size="sm" />
+                </View>
+              ) : null}
               <DenseList label="Prezența jucătorilor">
                 {visibleRows.map((row) => (
                   <AttendanceRow
                     key={row.id}
                     row={row}
+                    response={responseByPlayer.get(row.id)}
                     busy={bulkSaving || busyIds.has(row.id)}
                     locked={locked}
                     waiting={outbox.pending.has(row.id)}
@@ -587,6 +605,7 @@ export default function AttendanceScreen() {
  */
 function AttendanceRow({
   row,
+  response,
   busy,
   locked,
   waiting,
@@ -597,6 +616,8 @@ function AttendanceRow({
   onSaveNote,
 }: {
   row: RosterEntry;
+  /** The player's „Vine / Nu vine / Poate” (Val 3): shown, never applied. */
+  response?: StaffResponseRow | null;
   busy: boolean;
   locked: boolean;
   /** The mark is kept on the device, not on the server yet. */
@@ -627,6 +648,7 @@ function AttendanceRow({
             lastName={row.lastName}
             badge={getPlayerBadge(row)}
             meta={metaParts.length ? metaParts.join(' · ') : null}
+            metaExtra={response?.status ? <RsvpIndicator row={response} /> : null}
           />
         </View>
         {waiting ? <MaterialIcons name="schedule" size={15} color="var(--c-warning-fg)" /> : null}

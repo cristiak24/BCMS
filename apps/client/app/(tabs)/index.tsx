@@ -33,6 +33,9 @@ import { PLAYER_FEATURE_FLAGS } from '../../config/playerFeatureFlags';
 import SectionHeader from '../../components/ui/SectionHeader';
 import { EmptyState, ErrorState } from '../../components/ui/ScreenState';
 import { PlayerEventDetailModal } from '../../components/schedule/player/PlayerEventDetailModal';
+import RsvpChip from '../../components/rsvp/RsvpChip';
+import { loadMyResponses, useMyResponses } from '../../hooks/useMyResponses';
+import { eventTakesResponses, responseLabel, responsesOpen } from '../../utils/rsvp';
 import TeamStandingsCard from '../../components/standings/TeamStandingsCard';
 import { getEventTypeMeta } from '../../components/schedule/scheduleShared';
 import { internalMatchResult, type MatchOutcome } from '../../utils/matchResult';
@@ -589,8 +592,15 @@ function getRelativeLabel(value: string) {
  * time and place. A row of one list, not a card — the type used to be coded
  * three times (tinted tile, coloured label, chip).
  */
-function AgendaRow({ event, onDetails }: { event: HubEvent; onDetails: () => void }) {
+function AgendaRow({ event, onDetails, isParent }: { event: HubEvent; onDetails: () => void; isParent: boolean }) {
   const meta = getEventTypeMeta(event.type);
+  // „Vin / Nu vin / Poate” in place of the chevron while it can be given (Val 3).
+  const answers = useMyResponses();
+  const answer = answers.get(event.id);
+  const open = eventTakesResponses(event) && responsesOpen(event.startTime);
+  const showResponse = open || Boolean(answer && eventTakesResponses(event));
+  const voice = isParent ? 'third' as const : 'self' as const;
+  const responseText = answer ? responseLabel(answer.status, voice) : open ? tr('așteaptă răspuns') : '';
   const relative = isOngoing(event) ? tr('În desfășurare') : getRelativeLabel(event.startTime);
   const label = getEventCategory(event);
 
@@ -599,7 +609,7 @@ function AgendaRow({ event, onDetails }: { event: HubEvent; onDetails: () => voi
       <Pressable
         onPress={onDetails}
         accessibilityRole="button"
-        accessibilityLabel={`${label}${relative ? `, ${relative.toLowerCase()}` : ''}: ${event.title}${event.coachNote ? tr(', cu notă de la antrenor') : ''}`}
+        accessibilityLabel={`${label}${relative ? `, ${relative.toLowerCase()}` : ''}: ${event.title}${event.coachNote ? tr(', cu notă de la antrenor') : ''}${showResponse && responseText ? `, ${responseText}` : ''}`}
         className="ui-press flex-1 min-w-0 flex-row items-center gap-3 px-3 py-2.5 min-h-[60px] text-left hover:bg-[var(--c-surface-2)]"
       >
         <DateTile value={event.startTime} fg="var(--c-muted)" bg="var(--c-surface-2)" size={44} dayFirst />
@@ -621,7 +631,11 @@ function AgendaRow({ event, onDetails }: { event: HubEvent; onDetails: () => voi
             {[formatTimeRange(event.startTime, event.endTime), event.venueName || event.location || tr('Teren club')].join(' · ')}
           </Text>
         </View>
-        <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
+        {showResponse ? (
+          <RsvpChip status={answer?.status} open={open} voice={voice} />
+        ) : (
+          <MaterialIcons name="chevron-right" size={20} color="var(--c-faint)" />
+        )}
       </Pressable>
     </DenseRow>
   );
@@ -871,6 +885,8 @@ function PlayerHomeScreen() {
       // Last HISTORY_MONTHS months onward: enough for results, form, the
       // attendance strip and month-over-month volume. This used to fetch the
       // club's entire history on every visit to the home screen.
+      // The player's own answers for what comes next (Val 3); never blocks the page.
+      void loadMyResponses(new Date(Date.now() - 24 * 60 * 60 * 1000), new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)).catch(() => undefined);
       const historyStart = new Date();
       historyStart.setMonth(historyStart.getMonth() - HISTORY_MONTHS, 1);
       historyStart.setHours(0, 0, 0, 0);
@@ -1031,6 +1047,9 @@ function PlayerHomeScreen() {
     return rows;
   }, [allUpcomingActivities, allUpcomingGames]);
   const upcomingTotal = allUpcomingActivities.length + allUpcomingGames.length;
+  const myAnswers = useMyResponses();
+  const awaitingAnswer = [...allUpcomingActivities, ...allUpcomingGames]
+    .filter((event) => eventTakesResponses(event) && responsesOpen(event.startTime) && !myAnswers.has(event.id)).length;
   const weekSummary = [
     weekTrainingCount ? plural(weekTrainingCount, tr('antrenament'), tr('antrenamente')) : null,
     weekMatchCount ? plural(weekMatchCount, tr('meci'), tr('meciuri')) : null,
@@ -1114,7 +1133,10 @@ function PlayerHomeScreen() {
             <View>
               <SectionHeader
                 title={tr('Urmează')}
-                subtitle={weekSummary ? tr('{weekSummary} în următoarele 7 zile', { weekSummary }) : tr('Nimic programat în următoarele 7 zile')}
+                subtitle={[
+                  weekSummary ? tr('{weekSummary} în următoarele 7 zile', { weekSummary }) : tr('Nimic programat în următoarele 7 zile'),
+                  awaitingAnswer ? tr('{0} așteaptă răspuns', { '0': awaitingAnswer }) : null,
+                ].filter(Boolean).join(' · ')}
                 trailing={(
                   <Button
                     label={upcomingTotal > agendaRows.length ? tr('Tot programul ({upcomingTotal})', { upcomingTotal }) : tr('Tot programul')}
@@ -1128,7 +1150,7 @@ function PlayerHomeScreen() {
               {agendaRows.length ? (
                 <DenseList label={tr('Urmează')}>
                   {agendaRows.map((event) => (
-                    <AgendaRow key={event.id} event={event} onDetails={() => setSelectedEvent(event)} />
+                    <AgendaRow key={event.id} event={event} isParent={isParent} onDetails={() => setSelectedEvent(event)} />
                   ))}
                 </DenseList>
               ) : (

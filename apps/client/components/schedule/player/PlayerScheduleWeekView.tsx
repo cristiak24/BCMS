@@ -9,6 +9,7 @@ import {
 } from '../scheduleShared';
 
 import { tr } from '../../../i18n';
+import { EventRsvpDot } from '../../rsvp/RsvpChip';
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm', 'Dum'].map((day) => tr(day));
 const WEEK_MAX_VISIBLE = 6;
 
@@ -116,9 +117,12 @@ export function PlayerScheduleWeekView({
                           style={{ borderLeftWidth: 3, borderLeftColor: meta.border, backgroundColor: meta.soft, minHeight: 44 }}
                           className={`rounded-xl px-3 py-2 justify-center ${cancelled ? 'opacity-50' : ''}`}
                         >
-                          <Text numberOfLines={1} className={`text-[12px] font-black ${cancelled ? 'line-through' : ''}`} style={{ color: meta.onSoft }}>
-                            {event.title}
-                          </Text>
+                          <View className="flex-row items-center gap-1.5 min-w-0">
+                            <EventRsvpDot event={event} />
+                            <Text numberOfLines={1} className={`text-[12px] font-black flex-1 min-w-0 ${cancelled ? 'line-through' : ''}`} style={{ color: meta.onSoft }}>
+                              {event.title}
+                            </Text>
+                          </View>
                           <Text className="text-[10px] font-bold mt-0.5" style={{ color: 'var(--c-muted)' }}>{formatTimeRange(event.startTime, event.endTime)}</Text>
                         </TouchableOpacity>
                       );
@@ -164,9 +168,12 @@ export function PlayerScheduleWeekView({
                         style={{ borderLeftWidth: 3, borderLeftColor: meta.border, backgroundColor: meta.soft, minHeight: 40 }}
                         className={`rounded-xl px-2.5 py-2 justify-center ${cancelled ? 'opacity-50' : ''}`}
                       >
-                        <Text numberOfLines={1} className={`text-[10px] font-black ${cancelled ? 'line-through' : ''}`} style={{ color: meta.onSoft }}>
-                          {event.title}
-                        </Text>
+                        <View className="flex-row items-center gap-1.5 min-w-0">
+                          <EventRsvpDot event={event} />
+                          <Text numberOfLines={1} className={`text-[10px] font-black flex-1 min-w-0 ${cancelled ? 'line-through' : ''}`} style={{ color: meta.onSoft }}>
+                            {event.title}
+                          </Text>
+                        </View>
                         <Text className="text-[9px] font-bold mt-0.5" style={{ color: 'var(--c-muted)' }}>{formatTimeRange(event.startTime, event.endTime)}</Text>
                       </TouchableOpacity>
                     );

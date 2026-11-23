@@ -231,6 +231,7 @@ export function CoachPlayerRow({
   lastName,
   badge,
   meta,
+  metaExtra,
   trailing,
   bare = false,
   rate,
@@ -240,6 +241,8 @@ export function CoachPlayerRow({
   lastName?: string | null;
   badge?: string;
   meta?: string | null;
+  /** Beside the meta line, under the name (Prezență: the player's answer), so the name keeps its width. */
+  metaExtra?: ReactNode;
   trailing?: ReactNode;
   bare?: boolean;
   rate?: number | null;
@@ -267,7 +270,12 @@ export function CoachPlayerRow({
         <Text className="f-display text-[14px] font-bold" style={{ color: 'var(--c-ink)' }} numberOfLines={1}>
           {firstName} {lastName}
         </Text>
-        {meta ? (
+        {metaExtra ? (
+          <View className="flex-row flex-wrap items-center gap-x-1.5 gap-y-1 mt-0.5 min-w-0">
+            {meta ? <Text className="t-meta shrink min-w-0" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{meta}</Text> : null}
+            {metaExtra}
+          </View>
+        ) : meta ? (
           <Text className="t-meta mt-0.5" style={{ color: 'var(--c-muted)' }} numberOfLines={1}>{meta}</Text>
         ) : null}
         {rate !== undefined ? <View className="mt-1.5 max-w-[180px]"><RateBar rate={rate} /></View> : null}

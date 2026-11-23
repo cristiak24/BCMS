@@ -18,6 +18,11 @@ import {
 } from '../scheduleShared';
 
 import { tr } from '../../../i18n';
+import RsvpPicker from '../../rsvp/RsvpPicker';
+import RsvpStaffSummary from '../../rsvp/RsvpStaffSummary';
+import { useMyResponses } from '../../../hooks/useMyResponses';
+import { useActiveChild } from '../../family/useActiveChild';
+import { eventTakesResponses, responsesOpen } from '../../../utils/rsvp';
 /**
  * Read-only event sheet for the player/coach surfaces (Home + Schedule).
  * No management actions — those stay admin-only.
@@ -86,6 +91,8 @@ export function PlayerEventDetailModal({
   const router = useRouter();
   const role = normalizeRole(session?.role);
   const isPlayer = role === 'player' || role === 'parent';
+  const { active: activeChild } = useActiveChild(role === 'parent');
+  const myAnswers = useMyResponses();
 
   const [myStatus, setMyStatus] = useState<{ status: string | null; note: string | null } | null>(null);
   const [loadingMine, setLoadingMine] = useState(false);
@@ -122,6 +129,15 @@ export function PlayerEventDetailModal({
     router.push(matchSheetPath(role, event.id) as any);
   };
   const description = cleanDescription(event?.description);
+  // „Participi?” while answers are open, or the answer given once closed.
+  const takesResponses = eventTakesResponses(event);
+  const showPicker = Boolean(event && isPlayer && takesResponses && (responsesOpen(event.startTime) || myAnswers.has(event.id)));
+  const showStaffResponses = Boolean(event && role === 'coach' && takesResponses);
+  const openResponseList = () => {
+    if (!event) return;
+    onClose();
+    router.push(`/coach/attendance?event=${event.id}` as any);
+  };
   const status = myStatus?.status ? STATUS_META[myStatus.status.toLowerCase()] : null;
 
   const addToCalendar = () => {
@@ -193,7 +209,7 @@ export function PlayerEventDetailModal({
                 ) : null}
               </View>
 
-              <View className="px-5 py-4 gap-3.5">
+              <View className="px-5 py-4 gap-3.5 shrink min-h-0" style={{ overflowY: 'auto' } as any}>
                 <DetailRow icon="schedule">
                   <Text className="text-[14px] font-semibold capitalize" style={{ color: 'var(--c-ink)' }}>
                     {parseApiDate(event.startTime).toLocaleDateString(RO_LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -212,6 +228,16 @@ export function PlayerEventDetailModal({
                     <Text className="text-[14px] font-semibold" style={{ color: 'var(--c-ink)' }}>{event.teamName}</Text>
                   </DetailRow>
                 ) : null}
+
+                {showPicker ? (
+                  <RsvpPicker
+                    event={event}
+                    childFirstName={role === 'parent' ? activeChild?.firstName ?? null : null}
+                    selfName={session?.name ?? null}
+                  />
+                ) : null}
+
+                {showStaffResponses ? <RsvpStaffSummary eventId={event.id} variant="sheet" onOpenList={openResponseList} /> : null}
 
                 {description ? (
                   <DetailRow icon="info-outline">
