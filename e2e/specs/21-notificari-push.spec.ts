@@ -11,7 +11,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect, signIn, apiAs, seedIds, expectNoHorizontalScroll } from '../support/fixtures';
 
-const browserKeys = { p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM', auth: 'tBHItJI5svbpez7KI4CCXg' };
+const browserKeys = { p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM', auth: 'tBHItJI5svbpez7KI4CCXg' }; // ggignore — fake browser subscription for tests, not a credential
 const ENDPOINT = 'https://push.invalid/e2e/parent-phone';
 
 async function stubPush(page: Page, options: { endpoint?: string | null; permission?: NotificationPermission } = {}) {

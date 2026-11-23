@@ -39,7 +39,7 @@ let mihai = 0; let ana = 0; let training = 0;
 
 const keys = webpush.generateVAPIDKeys();
 // A valid-looking browser key pair; the fake sender never encrypts anything.
-const browserKeys = { p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM', auth: 'tBHItJI5svbpez7KI4CCXg' };
+const browserKeys = { p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM', auth: 'tBHItJI5svbpez7KI4CCXg' }; // ggignore — fake browser subscription for tests, not a credential
 const endpointFor = (name: string) => `https://push.example.test/send/${name}`;
 
 function enablePush() {
