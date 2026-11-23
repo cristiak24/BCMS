@@ -19,7 +19,8 @@ import {
   type AuthUser,
   type UserRole,
 } from '../utils/authSession';
-import { ApiError, apiFetch, setActiveChildId, setSessionTokenGetter, setUnauthorizedHandler } from '../services/apiClient';
+import { ApiError, apiFetch, setActiveChildId, setSessionTokenGetter, setUnauthorizedHandler } from '../services/apiClient'
+import { unsubscribeOnSignOut } from '../src/pwa/push';
 import { loadProfileWithRetry, ProfileMissingError } from '../utils/profileRetry';
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -328,6 +329,9 @@ function AuthBridge({ children }: PropsWithChildren) {
   }, [clerk, currentUser]);
 
   const signOut = useCallback(async () => {
+    // Push stops on this device first, while the token still works: the next
+    // person on a shared phone must not get this account's notifications.
+    await unsubscribeOnSignOut();
     await clerk.signOut();
     setProfileMissing(false);
     // A parent's child selection must not leak into the next account on this device.

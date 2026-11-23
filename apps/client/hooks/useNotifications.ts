@@ -32,6 +32,11 @@ function fetchUnreadCount() {
     return inflight;
 }
 
+/** Re-read the badge count now (a push opened the app and marked one read). */
+export function refreshUnreadNotifications() {
+    return fetchUnreadCount();
+}
+
 function onVisibilityChange() {
     if (document.visibilityState === 'visible') void fetchUnreadCount();
 }

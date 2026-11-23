@@ -9,6 +9,7 @@ import { appLocale, tr } from '../../i18n';
 import { parseApiDate } from '../../utils/dates';
 import { announce } from '../ui/LiveRegion';
 import Button from '../ui/Button';
+import PushNudge from '../pwa/PushNudge';
 
 function formatDeadline(startTime: string) {
   const date = parseApiDate(startTime);
@@ -47,6 +48,8 @@ export default function RsvpPicker({ event, childFirstName, selfName }: {
   const [error, setError] = useState<string | null>(null);
   const [reasonDraft, setReasonDraft] = useState(answer?.reason ?? '');
   const [savedFlash, setSavedFlash] = useState(false);
+  // After an answer here: the one invitation to turn on push (Val 3B).
+  const [answeredHere, setAnsweredHere] = useState(false);
   const groupRef = useRef<HTMLElement | null>(null);
 
   // A new event in the same sheet, or the stored reason changed elsewhere.
@@ -63,6 +66,7 @@ export default function RsvpPicker({ event, childFirstName, selfName }: {
     try {
       await saveMyResponse(event.id, status, status === 'not_going' ? (reason?.trim() || null) : null);
       setSavedFlash(true);
+      setAnsweredHere(true);
       announce(tr('Răspuns salvat: {0}', { '0': responseLabel(status, voice) }));
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : tr('Nu s-a trimis. Reîncearcă.'));
@@ -186,6 +190,10 @@ export default function RsvpPicker({ event, childFirstName, selfName }: {
           <MaterialIcons name="error-outline" size={14} color="var(--c-danger-fg)" />
           <Text className="text-[12.5px] font-semibold flex-1" style={{ color: 'var(--c-danger-fg)' }}>{error}</Text>
         </View>
+      ) : null}
+
+      {answeredHere ? (
+        <PushNudge kind="event_changed" message={tr('Afli imediat pe telefon când se mută sau se anulează un antrenament.')} />
       ) : null}
 
       {answeredByOther ? (

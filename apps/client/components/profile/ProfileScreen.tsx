@@ -19,6 +19,7 @@ import Button from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
 import { ErrorState } from '../ui/ScreenState';
 import { ProfileCard } from './ProfileParts';
+import PushCard from '../pwa/PushCard';
 import PrivacyCard from './PrivacyCard';
 import { InstallAppCard } from '../pwa/InstallApp';
 
@@ -453,7 +454,7 @@ export default function ProfileScreen({ showBackButton = true }: ProfileScreenPr
             column below lg. */}
         <View className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-8">
           <View className="lg:col-span-7 2xl:col-span-8 min-w-0">
-            <ProfileForm profile={profile} onSave={handleSaveProfile} showLanguage={roleCanChooseLanguage(role)} />
+            <ProfileForm profile={profile} onSave={handleSaveProfile} showLanguage={roleCanChooseLanguage(role)} afterNotifications={<PushCard />} />
           </View>
 
           <View className="lg:col-span-5 2xl:col-span-4 min-w-0 gap-4">

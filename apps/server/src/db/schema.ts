@@ -342,6 +342,48 @@ export const notifications = pgTable("notifications", {
 		}),
 ]);
 
+// Web push (Val 3B): one row per browser/device that asked for notifications.
+// The endpoint is the push service's address for that browser; p256dh/auth
+// encrypt the payload so only that browser can read it. A dead endpoint
+// (404/410) is deleted on the first send. Migration 0030.
+export const pushSubscriptions = pgTable("push_subscriptions", {
+	id: serial().primaryKey().notNull(),
+	userId: integer("user_id").notNull(),
+	endpoint: text().notNull(),
+	p256dh: varchar({ length: 255 }).notNull(),
+	auth: varchar({ length: 255 }).notNull(),
+	deviceLabel: varchar("device_label", { length: 60 }),
+	failureCount: integer("failure_count").default(0).notNull(),
+	lastSuccessAt: timestamp("last_success_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	uniqueIndex("push_subscriptions_endpoint_unique").on(table.endpoint),
+	index("push_subscriptions_user_idx").on(table.userId),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "push_subscriptions_user_id_users_id_fk"
+		}).onDelete('cascade'),
+]);
+
+// Which kinds of notification an account wants as push, on all its devices.
+// No row = everything on (nothing is sent without a subscribed device anyway).
+export const pushPreferences = pgTable("push_preferences", {
+	userId: integer("user_id").primaryKey().notNull(),
+	eventNew: boolean("event_new").default(true).notNull(),
+	eventChanged: boolean("event_changed").default(true).notNull(),
+	rsvpReminder: boolean("rsvp_reminder").default(true).notNull(),
+	rsvpDeclined: boolean("rsvp_declined").default(true).notNull(),
+	paymentOverdue: boolean("payment_overdue").default(true).notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "push_preferences_user_id_users_id_fk"
+		}).onDelete('cascade'),
+]);
+
 export const l12Documents = pgTable("l12_documents", {
 	id: serial().primaryKey().notNull(),
 	teamId: integer("team_id").notNull(),

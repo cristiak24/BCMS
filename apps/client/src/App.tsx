@@ -7,6 +7,7 @@ import { lazyRoute, preloadRoutes, prefetchRoutes } from './lazyRoute';
 import RouteProgress from '../components/ui/RouteProgress';
 import { LiveRegion } from '../components/ui/LiveRegion';
 import { InstallBanner } from '../components/pwa/InstallApp';
+import { PushLanding } from './pwa/pushLanding';
 import { useSession } from '../context/AuthContext';
 import { getHomeRouteForRole, normalizeRole, readAuthSessionSync } from '../utils/authSession';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
@@ -380,6 +381,7 @@ export default function App() {
             <LiveRegion />
             <RoutePrefetcher />
             <InstallBanner />
+            <PushLanding />
             <LegalAcceptanceGate />
             <Suspense fallback={<LoadingScreen message="Se încarcă..." />}>
               <Routes>

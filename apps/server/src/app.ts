@@ -23,6 +23,7 @@ import fileRoutes from './routes/files';
 import gameRoutes from './routes/games';
 import notificationRoutes from './routes/notificationRoutes';
 import privacyRoutes from './routes/privacy';
+import pushRoutes from './routes/push';
 import { loadServerEnv } from './lib/loadEnv';
 import { cspReportRoute } from './routes/cspReport';
 import { clientErrorRoute } from './routes/clientErrors';
@@ -106,6 +107,7 @@ export function createServerApp() {
     app.use('/api/games', gameRoutes);
     app.use('/api/notifications', notificationRoutes);
     app.use('/api/privacy', privacyRoutes);
+    app.use('/api/push', pushRoutes);
 
     app.get('/', (_req, res) => {
         res.send('BCMS API is running');

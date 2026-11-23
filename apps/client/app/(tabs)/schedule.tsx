@@ -7,6 +7,7 @@ import { AddEventModal } from '../../components/schedule/admin/AddEventModal';
 import { coachManagedTeamIds } from '../../utils/coachEventScope';
 import { AuthUser, normalizeRole } from '../../utils/authSession';
 import { useSession } from '../../context/AuthContext';
+import { useLocalSearchParams } from '@/src/web/expoRouter';
 import { getCoachScopedEvents } from '../../components/coach/coachUtils';
 import { useHeader, DEFAULT_SEARCH_PLACEHOLDER } from '../../components/HeaderContext';
 import { PlayerEventDetailModal } from '../../components/schedule/player/PlayerEventDetailModal';
@@ -369,6 +370,22 @@ export default function ScheduleScreen() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Opened from a notification (`?event=`, Val 3B): that event's sheet, once.
+  const { event: requestedEvent } = useLocalSearchParams<{ event?: string }>();
+  const openedRequestRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading || !requestedEvent || openedRequestRef.current === requestedEvent) return;
+    openedRequestRef.current = requestedEvent;
+    const target = events.find((event) => String(event.id) === requestedEvent);
+    if (!target) return;
+    const date = getEventDate(target.startTime);
+    if (date) {
+      setViewDate(startOfMonth(date));
+      setSelectedDayKey(toDateKey(date));
+    }
+    setSelectedEvent(target);
+  }, [events, loading, requestedEvent]);
 
   // Older weeks, when the screen needs them: a month before what is loaded,
   // and the whole year for the agenda (it lists past sessions) and the week

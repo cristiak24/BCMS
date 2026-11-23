@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, Switch, Text, View } from '@/src/web/reactNative';
 import { MaterialIcons } from '@/src/web/expoVectorIcons';
 import type { ProfileRecord, UpdateProfilePayload } from '../../services/profileApi';
@@ -14,6 +14,8 @@ type ProfileFormProps = {
    * screens are Romanian only, so the option is hidden there.
    */
   showLanguage?: boolean;
+  /** Right under „Notificări”: the device's push card (applies at once, not via „Salvează”). */
+  afterNotifications?: ReactNode;
 };
 
 const DEFAULT_NOTIFICATIONS: NotificationPreferences = { email: true, push: false, sms: false };
@@ -38,7 +40,7 @@ function sameNotifications(a: NotificationPreferences, b: NotificationPreference
   return Boolean(a.email) === Boolean(b.email) && Boolean(a.push) === Boolean(b.push) && Boolean(a.sms) === Boolean(b.sms);
 }
 
-export default function ProfileForm({ profile, onSave, showLanguage = true }: ProfileFormProps) {
+export default function ProfileForm({ profile, onSave, showLanguage = true, afterNotifications }: ProfileFormProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
@@ -226,6 +228,8 @@ export default function ProfileForm({ profile, onSave, showLanguage = true }: Pr
           })}
         </View>
       </ProfileCard>
+
+      {afterNotifications}
 
       {error ? <FormNotice tone="danger" message={error} /> : null}
       {success ? <FormNotice tone="success" message={success} /> : null}

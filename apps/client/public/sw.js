@@ -109,3 +109,51 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(networkFirst(request));
 });
+
+/*
+ * Web push (Val 3B). The payload carries only a short title, a fixed line and
+ * a link: { title, body, url, tag }. Details load after the app opens, behind
+ * the login. A newer push with the same tag replaces the older one.
+ */
+function safePath(value) {
+  // Only paths inside this app; never another site.
+  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : '/';
+}
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (error) {
+    data = {};
+  }
+  const title = typeof data.title === 'string' && data.title ? data.title.slice(0, 80) : 'BCMS';
+  const body = typeof data.body === 'string' ? data.body.slice(0, 160) : 'Deschide aplicația pentru detalii.';
+  const options = {
+    body,
+    icon: '/pwa-192.png',
+    data: { url: safePath(data.url) },
+  };
+  if (typeof data.tag === 'string' && data.tag) {
+    options.tag = data.tag;
+    options.renotify = true;
+  }
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const path = safePath(event.notification.data && event.notification.data.url);
+  const target = new URL(path, self.location.origin).href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const open = windows.find((client) => new URL(client.url).origin === self.location.origin);
+    if (open) {
+      // The open app routes in place (src/pwa/pushLanding.ts) — no reload.
+      await open.focus();
+      open.postMessage({ type: 'bcms:push-open', url: path });
+      return;
+    }
+    await self.clients.openWindow(target);
+  })());
+});

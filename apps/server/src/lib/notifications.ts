@@ -4,6 +4,7 @@ import { and, eq, gte, inArray, ne, sql } from 'drizzle-orm';
 import { sendNotificationEmails } from './mailer';
 import { roundMoney } from './money';
 import { toDate } from './dateUtils';
+import { queuePush, type PushItem } from './push';
 
 const NOTE_PREVIEW_MAX_LENGTH = 300;
 
@@ -76,6 +77,25 @@ type NewNotification = {
     playerId?: number | null;
 };
 
+type Row = typeof notifications.$inferInsert;
+
+/**
+ * Save in-app notifications and queue their push copies (Val 3B). `childOf`
+ * names the child each row is about, so a parent's tap selects that child.
+ */
+async function insertAndPush(rows: Row[], childOf: (row: Row, index: number) => number | null | undefined = (row) => row.playerId) {
+    const saved = await db.insert(notifications).values(rows).returning({ id: notifications.id });
+    const items: PushItem[] = rows.map((row, index) => ({
+        userId: row.userId,
+        notificationId: saved[index]?.id ?? null,
+        type: row.type,
+        title: row.title,
+        eventId: row.eventId ?? null,
+        childId: childOf(row, index) ?? null,
+    }));
+    queuePush(items);
+}
+
 /** The same message by email (respecting each account's email opt-out). */
 function emailRows(rows: Array<typeof notifications.$inferInsert>, path: string) {
     return sendNotificationEmails(rows.map((row) => ({
@@ -90,6 +110,7 @@ function emailRows(rows: Array<typeof notifications.$inferInsert>, path: string)
 async function notifyPlayers(playerIds: number[], build: (playerId: number) => NewNotification, emailPath?: string) {
     const recipients = await recipientsForPlayers(playerIds);
     const rows: Array<typeof notifications.$inferInsert> = [];
+    const children: number[] = [];
     const seen = new Set<string>();
     for (const [playerId, userIds] of recipients) {
         const content = build(playerId);
@@ -99,10 +120,11 @@ async function notifyPlayers(playerIds: number[], build: (playerId: number) => N
             if (seen.has(key)) continue;
             seen.add(key);
             rows.push({ userId, ...content });
+            children.push(playerId);
         }
     }
     if (rows.length) {
-        await db.insert(notifications).values(rows);
+        await insertAndPush(rows, (_row, index) => children[index]);
         if (emailPath) await emailRows(rows, emailPath);
     }
     return rows.length;
@@ -170,6 +192,30 @@ export async function notifyEventChange(params: {
         }, '/schedule');
 }
 
+/**
+ * „Eveniment nou” (Val 3B): an event created by hand in the app, for a team,
+ * still ahead. Matches imported from the FRB never come through here — the
+ * season sync would bring dozens at once. In the app (and as push), not by email.
+ */
+export async function notifyEventCreated(params: {
+    teamId: number | null;
+    eventId: number;
+    title: string;
+    startTime: string;
+    status?: string | null;
+    location?: string | null;
+}) {
+    if (params.teamId == null || params.status === 'cancelled' || (toDate(params.startTime)?.getTime() ?? 0) < Date.now()) return 0;
+    const playerIds = await teamPlayerIds(params.teamId);
+    const when = formatWhen(params.startTime);
+    return notifyPlayers(playerIds, () => ({
+        type: 'event_created',
+        title: 'Eveniment nou',
+        message: `„${params.title}” pe ${when}${params.location ? `, la ${params.location}` : ''}.`,
+        eventId: params.eventId,
+    }));
+}
+
 /** "150 RON", "152,50 RON" — Romanian decimals in a sentence. */
 function formatRon(amount: number) {
     return `${new Intl.NumberFormat('ro-RO', { maximumFractionDigits: 2 }).format(roundMoney(amount))} RON`;
@@ -235,7 +281,7 @@ export async function sendPaymentReminders(balances: Array<{ playerId: number; p
         }
     }
     if (rows.length) {
-        await db.insert(notifications).values(rows);
+        await insertAndPush(rows);
         await emailRows(rows, '/payments');
     }
     return { notified: rows.length, skipped };
@@ -286,7 +332,7 @@ export async function notifyResponseDeclined(params: {
     }
     if (!userIds.length) return 0;
     const message = `${params.playerName} nu vine la ${params.noun} de ${formatWhen(params.startTime)}.${params.reason ? ` Motiv: ${truncateNote(params.reason)}` : ''}`;
-    await db.insert(notifications).values(userIds.map((userId) => ({
+    await insertAndPush(userIds.map((userId) => ({
         userId,
         type: 'rsvp_declined',
         title: 'Absență anunțată',

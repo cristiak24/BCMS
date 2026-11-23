@@ -31,6 +31,12 @@ const env: Record<string, string | undefined> = {
     STRIPE_SECRET_KEY: '',
     CORS_ORIGINS: E2E.webUrl,
     APP_BASE_URL: E2E.webUrl,
+    // Web push on, with throwaway keys made for this run (nothing is sent:
+    // specs only use made-up subscriptions on a non-routable host).
+    ...(() => {
+        const keys = (Module.createRequire(path.join(serverDir, 'package.json'))('web-push') as { generateVAPIDKeys: () => { publicKey: string; privateKey: string } }).generateVAPIDKeys();
+        return { VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: 'https://bcms.ro' };
+    })(),
 };
 for (const [key, value] of Object.entries(env)) process.env[key] = value;
 // The seed would make these accounts the club's staff instead of *@local.test.

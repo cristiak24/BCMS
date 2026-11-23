@@ -6,7 +6,7 @@ import { attendance, events, gameStats, notifications, players, playersToTeams, 
 import { and, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { buildEventQueryPlan, type EventQueryParams } from '../lib/eventQuery';
-import { createFeedbackNotification, notifyEventChange } from '../lib/notifications';
+import { createFeedbackNotification, notifyEventChange, notifyEventCreated } from '../lib/notifications';
 import { parseAttendancePayload, parseEventInput } from '../lib/eventValidation';
 import { fetchFrbMatches, frbDateToUtc, mergeSeasonMonths, takeMovedFixture, type ParsedMatch } from '../lib/frbMatches';
 import { resolveSelfPlayerForRequest } from '../lib/selfPlayer';
@@ -461,6 +461,16 @@ export const eventsController = {
                 metadata: { title: event.title, type: event.type, startTime: toIso(event.startTime), teamName: access.team.name },
             });
             res.json(await enrichEvent(event as EventDoc));
+            // „Eveniment nou” for the team's families (best effort — the event
+            // is already saved).
+            notifyEventCreated({
+                teamId: event.teamId,
+                eventId: event.id,
+                title: event.title,
+                startTime: String(event.startTime),
+                status: event.status,
+                location: event.location,
+            }).catch((error) => console.error('Event created notification error:', error));
         } catch (error) {
             console.error('Create event error:', error);
             res.status(500).json({ error: 'Internal server error' });

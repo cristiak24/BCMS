@@ -19,6 +19,7 @@ import './theme/dark.css';
 import './theme/dark-extras.css';
 import { initI18n } from '../i18n';
 import { captureInstallPrompt } from './pwa/installApp';
+import { capturePushLanding } from './pwa/pushLandingCapture';
 import { wakeServer } from '../services/apiClient';
 import { installErrorReporter } from '../services/errorReporter';
 
@@ -27,6 +28,10 @@ installErrorReporter();
 
 // Before render: Chrome can fire beforeinstallprompt as soon as the page loads.
 captureInstallPrompt();
+
+// Opened from a push: pick the child it is about and drop the link's extras
+// before any screen reads the address.
+capturePushLanding();
 
 // Start waking the API (Render free plan sleeps when idle) while Clerk loads
 // and the user types their password.

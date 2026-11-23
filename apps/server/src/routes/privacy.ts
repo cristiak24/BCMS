@@ -6,6 +6,8 @@ import {
     accessRequests,
     attendance,
     eventResponses,
+    pushPreferences,
+    pushSubscriptions,
     clubs,
     legalAcceptances,
     notifications,
@@ -87,7 +89,7 @@ router.get('/export', exportLimiter, async (req, res) => {
             : await resolveSelfPlayer({ id: caller.id, role: caller.role, email: caller.email }).then((row) => (row ? [row] : []));
         const playerIds = linkedPlayers.map((player) => player.id);
 
-        const [teamRows, attendanceRows, paymentRows, notificationRows, acceptanceRows, requestRows, accessRows, responseRows] = await Promise.all([
+        const [teamRows, attendanceRows, paymentRows, notificationRows, acceptanceRows, requestRows, accessRows, responseRows, pushDeviceRows, pushPreferenceRows] = await Promise.all([
             playerIds.length
                 ? db.select({ playerId: playersToTeams.playerId, team: teams.name }).from(playersToTeams)
                     .innerJoin(teams, eq(teams.id, playersToTeams.teamId)).where(inArray(playersToTeams.playerId, playerIds))
@@ -102,6 +104,10 @@ router.get('/export', exportLimiter, async (req, res) => {
             db.select().from(accessRequests).where(eq(accessRequests.userId, caller.id)),
             // „Vin / Nu vin / Poate” answers (Val 3), with any reason given.
             playerIds.length ? db.select().from(eventResponses).where(inArray(eventResponses.playerId, playerIds)) : [],
+            // Devices with push notifications on (Val 3B): the name and dates, not the keys.
+            db.select({ label: pushSubscriptions.deviceLabel, createdAt: pushSubscriptions.createdAt, lastSuccessAt: pushSubscriptions.lastSuccessAt })
+                .from(pushSubscriptions).where(eq(pushSubscriptions.userId, caller.id)),
+            db.select().from(pushPreferences).where(eq(pushPreferences.userId, caller.id)),
         ]);
 
         const stamp = new Date().toISOString();
@@ -119,6 +125,8 @@ router.get('/export', exportLimiter, async (req, res) => {
             eventResponses: responseRows,
             payments: paymentRows,
             notifications: notificationRows,
+            pushDevices: pushDeviceRows,
+            pushPreferences: pushPreferenceRows[0] ?? null,
             legalAcceptances: acceptanceRows,
             privacyRequests: requestRows,
             accessRequests: accessRows,

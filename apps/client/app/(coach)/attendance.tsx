@@ -28,6 +28,7 @@ import { tr } from '../../i18n';
 import { useLocalSearchParams } from '@/src/web/expoRouter';
 import RsvpIndicator from '../../components/rsvp/RsvpIndicator';
 import { RemindButton, useEventResponses } from '../../components/rsvp/RsvpStaffSummary';
+import PushNudge from '../../components/pwa/PushNudge';
 import type { StaffResponseRow } from '../../services/eventResponsesApi';
 import { countsLine, eventTakesResponses } from '../../utils/rsvp';
 /**
@@ -541,6 +542,9 @@ export default function CoachAttendanceScreen() {
                     </Text>
                     <RemindButton summary={responses} onSent={reloadResponses} size="sm" />
                   </View>
+                ) : null}
+                {responses?.enabled && responses.counts.notGoing > 0 ? (
+                  <PushNudge kind="rsvp_declined" message={tr('Afli pe telefon când cineva anunță că nu vine, chiar cu aplicația închisă.')} />
                 ) : null}
                 <DenseList label={tr('Jucători')}>
                   {players.map((player) => (
